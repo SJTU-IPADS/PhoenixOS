@@ -27,6 +27,10 @@ build_cuda() {
             fi
         echo "[2] cleaning remoting framework (cricket)"
             cd $script_dir
+            cd remoting/cuda/submodules/libtirpc
+            make clean
+            
+            cd $script_dir
             cd remoting/cuda/cpu
             make clean
         echo "[3] cleaning unittest"
@@ -50,7 +54,9 @@ build_cuda() {
             ninja
         echo "[2] building remoting framework (cricket)"
             cd $script_dir
-            cd remoting/cuda/cpu
+            cd remoting/cuda
+            make libtirpc -j
+            cd cpu
             if [ $multithread_build = true ]; then
                 LOG=DEBUG make cricket-rpc-server cricket-client.so -j
             else

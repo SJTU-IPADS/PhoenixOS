@@ -35,9 +35,6 @@ enum pos_retval {
 
 #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 
-// TSC frequency
-#define POS_TSC_FREQ 2200000000 // Hz
-
 /*!
  *  \brief  type for resource typeid
  */
@@ -62,3 +59,8 @@ using POSMem_ptr = std::shared_ptr<uint8_t[]>;
  *  \brief  switch group
  */
 #include "pos/include/switches.h"
+
+/*!
+ *  \brief  common configuration
+ */
+#include "pos/include/config.h"

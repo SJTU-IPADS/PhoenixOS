@@ -323,7 +323,7 @@ typedef struct POSAPIContext_QE {
         POS_CHECK_POINTER(pos_client);
         api_cxt = std::make_shared<POSAPIContext_t>(api_id, param_desps, retval_data, retval_size);
         POS_CHECK_POINTER(api_cxt);
-        create_tick = POSTimestamp::get_tsc();
+        create_tick = POSUtilTimestamp::get_tsc();
         runtime_s_tick = runtime_e_tick = worker_s_tick = worker_e_tick = 0;
 
         // initialization of checkpoint op specific fields

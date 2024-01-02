@@ -294,7 +294,7 @@ class POSDag:
         plt.xticks(size=6)
     
         ax1 = sns.barplot(data=ckpt_dataframe, x='idx', y='durations')
-        ax1.set_ylabel("Duration / s")
+        ax1.set_ylabel("Duration / us")
 
         ax2 = ax1.twinx()
         sns.lineplot(data=ckpt_dataframe, x='idx', y='ckpt_sizes', marker='o', ax=ax2, color = 'r')
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     dag = POSDag(file_path="/testdir/dag-0.pos")
 
     print(">>> dumping figure file")
-    dag.analyse_dag(figure_dir_path="/testdir/figures")
+    dag.analyse_dag(figure_dir_path="/testdir")
 
     # dag.collapse_matrix()
     # dag.dump_matrix(file_path="/testdir/dag_matrix.png")

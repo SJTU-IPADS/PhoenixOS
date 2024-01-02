@@ -1,0 +1,50 @@
+# Docker Version
+# version: "3.8"
+
+services: 
+  redis-central:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    # volumes:
+    #   - "redisdata:/data"
+
+  pos_svr_1:
+    build:
+      context: ../../dockerfiles
+      dockerfile: pos_svr_base_cuda_11_3.Dockerfile
+      target: base
+    container_name: pos_svr_1
+    image: pos_svr_base:11.3
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+    tty: true
+    expose:
+      - "8080"
+    depends_on:
+      - redis-central
+
+  pos_svr_2:
+    build:
+      context: ../../dockerfiles
+      dockerfile: pos_svr_base_cuda_11_3.Dockerfile
+      target: base
+    container_name: pos_svr_2
+    image: pos_svr_base:11.3
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+    tty: true
+    expose:
+      - "8080"
+    depends_on:
+      - redis-central

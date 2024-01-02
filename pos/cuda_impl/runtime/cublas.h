@@ -144,12 +144,6 @@ namespace cublas_set_stream {
             kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In)
         );
 
-        POS_DEBUG(
-            "client_Addr: %p, handle_Addr: %p",
-            (void*)pos_api_param_value(wqe, 0, uint64_t),
-            &cublas_context_handle
-        );
-
         retval = hm_cublas_context->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
             /* handle */ &cublas_context_handle

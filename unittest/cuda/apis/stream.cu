@@ -5,6 +5,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/timestamp.h"
+
 #include "unittest/cuda/apis/base.h"
 #include "unittest/cuda/unittest.h"
 
@@ -68,9 +70,9 @@ pos_retval_t test_cuda_launch_kernel(test_cxt* cxt){
 
     cudaMemcpy(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice);
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     kernel_1<<<1,256>>>(d_buf_1, d_buf_2, d_buf_3, d_buf_4, kNbElement);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -110,9 +112,9 @@ pos_retval_t test_cuda_stream_synchronize(test_cxt* cxt){
     cudaError cuda_result;
     uint64_t s_tick, e_tick;
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaStreamSynchronize(0);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -132,9 +134,9 @@ pos_retval_t test_cuda_stream_is_capturing(test_cxt* cxt){
     cudaStreamCaptureStatus status;
     uint64_t s_tick, e_tick;
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaStreamIsCapturing(0, &status);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -164,9 +166,9 @@ pos_retval_t test_cuda_event_create_record_destory(test_cxt* cxt){
     }
     POS_DEBUG("event: %p", event);
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaEventRecord(event, 0);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 

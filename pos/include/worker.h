@@ -200,7 +200,7 @@ class POSWorker {
 
                 // keep popping next pending op until we finished all operation
                 while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe)){
-                    wqe->worker_s_tick = POSTimestamp::get_tsc();
+                    wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
                     api_id = wqe->api_cxt->api_id;
 
                     // this is a checkpoint op
@@ -209,7 +209,7 @@ class POSWorker {
                             POS_WARN_C("failed to do checkpointing");
                         }
                         __done(this->_ws, wqe);
-                        wqe->worker_e_tick = POSTimestamp::get_tsc();
+                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                         continue;
                     }
 
@@ -285,12 +285,12 @@ class POSWorker {
                             /* library_id */ api_meta.library_id
                         );
 
-                        wqe->worker_e_tick = POSTimestamp::get_tsc();
+                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
 
                         if(wqe->status == kPOS_API_Execute_Status_Init){
                             // we only return the QE back to frontend when it hasn't been returned before
                             wqe->status = kPOS_API_Execute_Status_Launch_Failed;
-                            wqe->return_tick = POSTimestamp::get_tsc();
+                            wqe->return_tick = POSUtilTimestamp::get_tsc();
                             _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
                         }
 
@@ -311,12 +311,12 @@ class POSWorker {
                         /* library_id */ api_meta.library_id
                     );
 
-                    wqe->worker_e_tick = POSTimestamp::get_tsc();
+                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                     
                     if(wqe->status == kPOS_API_Execute_Status_Init){
                         // we only return the QE back to frontend when it hasn't been returned before
                         wqe->status = kPOS_API_Execute_Status_Launch_Failed;
-                        wqe->return_tick = POSTimestamp::get_tsc();
+                        wqe->return_tick = POSUtilTimestamp::get_tsc();
                         _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
                     }
                 }

@@ -2,3 +2,4 @@
 
 #define POS_ENABLE_DEBUG_CHECK          @pos_enable_debug_check@
 #define POS_ENABLE_HIJACK_API_CHECK     @pos_enable_hijack_api_check@
+#define POS_ENABLE_CHECKPOINT           @pos_enable_checkpoint@

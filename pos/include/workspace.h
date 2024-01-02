@@ -529,6 +529,9 @@ class POSWorkspace {
     // api id to mark an checkpoint op (different by platforms)
     uint64_t checkpoint_api_id;
 
+    // idx of all stateful resources (handles)
+    std::vector<uint64_t> stateful_handle_type_idx;
+
  protected:
     // pos runtime
     POSRuntime<T_POSTransport, T_POSClient> *_runtime;

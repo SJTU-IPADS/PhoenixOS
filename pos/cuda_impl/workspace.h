@@ -10,6 +10,7 @@
 #include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/runtime.h"
 #include "pos/cuda_impl/worker.h"
+#include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/api_context.h"
 
 template<class T_POSTransport>
@@ -43,6 +44,11 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
         this->api_mgnr = new POSApiManager_CUDA();
         POS_CHECK_POINTER(this->api_mgnr);
         this->api_mgnr->init();
+
+        // mark all stateful resources
+        this->stateful_handle_type_idx.push_back({
+            kPOS_ResourceTypeId_CUDA_Memory
+        });
 
         return POS_SUCCESS;
     }

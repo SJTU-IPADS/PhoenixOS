@@ -7,6 +7,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/timestamp.h"
+
 #include "unittest/cuda/apis/base.h"
 #include "unittest/cuda/unittest.h"
 
@@ -16,9 +18,9 @@ pos_retval_t test_cublas_create(test_cxt* cxt){
     cublasHandle_t handle = nullptr;
     uint64_t s_tick, e_tick;
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cublas_result = cublasCreate_v2(&handle);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -45,9 +47,9 @@ pos_retval_t test_cublas_set_stream(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cublas_result = cublasSetStream(handle, 0);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -72,9 +74,9 @@ pos_retval_t test_cublas_set_mathmode(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cublas_result = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -203,7 +205,7 @@ pos_retval_t test_cublas_sgemm(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cublas_result = cublasSgemm(    
         handle,
         CUBLAS_OP_T,
@@ -220,7 +222,7 @@ pos_retval_t test_cublas_sgemm(test_cxt* cxt){
         d_C,
         M
     );
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
     

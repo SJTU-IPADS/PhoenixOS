@@ -158,7 +158,7 @@ class POSRuntime {
                 api_id = wqe->api_cxt->api_id;
                 api_meta = _ws->api_mgnr->api_metas[api_id];
 
-                wqe->runtime_s_tick = POSTimestamp::get_tsc();
+                wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
 
             #if POS_ENABLE_DEBUG_CHECK
                 if(unlikely(_parser_functions.count(api_id) == 0)){
@@ -185,7 +185,7 @@ class POSRuntime {
                         wqe->client_id, api_id
                     );
                     wqe->status = kPOS_API_Execute_Status_Parse_Failed;
-                    wqe->return_tick = POSTimestamp::get_tsc();                    
+                    wqe->return_tick = POSUtilTimestamp::get_tsc();                    
                     _ws->template push_cq<kPOS_Queue_Position_Runtime>(wqe);
 
                     goto checkpoint_entrance;
@@ -206,7 +206,7 @@ class POSRuntime {
                  *              we directly return the result back to the frontend side
                  */
                 if(wqe->status == kPOS_API_Execute_Status_Return_After_Parse){
-                    wqe->return_tick = POSTimestamp::get_tsc();
+                    wqe->return_tick = POSUtilTimestamp::get_tsc();
                     _ws->template push_cq<kPOS_Queue_Position_Runtime>(wqe);
                 }
 
@@ -215,7 +215,7 @@ class POSRuntime {
                  *  \brief  ================== phrase 2 - checkpoint insertion ==================
                  */
                 // TODO: this checkpoint tick should be modified as per-client
-                current_tick = POSTimestamp::get_tsc();
+                current_tick = POSUtilTimestamp::get_tsc();
                 if(unlikely(
                     current_tick - last_ckpt_tick >= this->checkpoint_interval_tick
                 )){
@@ -225,7 +225,7 @@ class POSRuntime {
                     }
                 }
 
-                wqe->runtime_e_tick = POSTimestamp::get_tsc();
+                wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
             }
 
             wqes.clear();

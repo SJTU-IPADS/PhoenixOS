@@ -279,6 +279,59 @@ class POSHandle_CUDA_Memory : public POSHandle {
     }
 
     /*!
+     *  \brief  checkpoint the state of the resource behind this handle
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0) override { 
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        POSCheckpointSlot_ptr ckpt_slot;
+
+        // uint64_t s_tick = 0, e_tick = 0;
+        
+        // apply new checkpoint slot
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag.apply_new_checkpoint(
+                /* version */ version_id,
+                /* ptr */ &ckpt_slot
+            )
+        )){
+            POS_WARN_C("failed to apply checkpoint slot");
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // checkpoint
+        // TODO: takes long time
+        // s_tick = POSUtilTimestamp::get_tsc();
+        cuda_rt_retval = cudaMemcpyAsync(
+            /* dst */ ckpt_slot->expose_pointer(), 
+            /* src */ this->server_addr,
+            /* size */ this->state_size,
+            /* kind */ cudaMemcpyDeviceToHost,
+            /* stream */ stream_id
+        );
+        // e_tick = POSUtilTimestamp::get_tsc();
+
+        // POS_LOG("copy duration: %lf us, size: %lu Bytes", POS_TSC_RANGE_TO_USEC(e_tick, s_tick), this->state_size);
+
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C(
+                "failed to checkpoint memory handle: server_addr(%p), retval(%d)",
+                this->server_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+    
+    exit:
+        return retval;
+    }
+
+    /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */

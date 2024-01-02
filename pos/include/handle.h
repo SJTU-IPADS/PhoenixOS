@@ -255,6 +255,17 @@ class POSHandle {
     }
 
     /*!
+     *  \brief  checkpoint the state of the resource behind this handle
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0){ 
+        return POS_FAILED_NOT_IMPLEMENTED; 
+    }
+
+    /*!
      *  \brief  restore the current handle when it becomes broken status
      *  \return POS_SUCCESS for successfully restore
      */

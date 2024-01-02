@@ -168,7 +168,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
     pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE_ptr wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandleManager<POSHandle>* hm;
         POSAPIContext_QE_ptr ckpt_wqe;
         uint64_t i;
 
@@ -183,20 +183,21 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         );
         POS_CHECK_POINTER(ckpt_wqe);
 
-        // TODO: maybe we can encapsulate the following code as an lambda, to checkpoint more stateful handles
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
-        POS_CHECK_POINTER(hm_memory);
-        std::vector<POSHandle_CUDA_Memory_ptr>& modified_handles = hm_memory->get_modified_handles(); 
-        for(i=0; i<modified_handles.size(); i++){
-            ckpt_wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory, 
-                POSHandleView_t(modified_handles[i], kPOS_Edge_Direction_Out, 0)
-            );
+        // we only checkpoint those resources that has been modified since last checkpoint
+        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
+            hm = client->handle_managers[stateful_handle_id];
+            POS_CHECK_POINTER(hm);
+            std::vector<POSHandle_ptr>& modified_handles = hm->get_modified_handles(); 
+            for(i=0; i<modified_handles.size(); i++){
+                ckpt_wqe->record_handle(
+                    stateful_handle_id, 
+                    POSHandleView_t(modified_handles[i], kPOS_Edge_Direction_Out, 0)
+                );
+            }
+            hm->clear_modified_handle();
+            retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
         }
-        hm_memory->clear_modified_handle();
-
-        retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
-
+        
     exit:
         return retval;
     }   

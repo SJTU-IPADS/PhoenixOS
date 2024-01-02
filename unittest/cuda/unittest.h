@@ -6,13 +6,11 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/timestamp.h"
 
 #include "pos/cuda_impl/api_index.h"
 
 #include "unittest/cuda/apis/base.h"
-#include "unittest/cuda/include/utils.h"
-
-
 
 using pos_unittest_func_t = pos_retval_t(*)(test_cxt*);
 

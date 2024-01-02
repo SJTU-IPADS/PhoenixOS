@@ -34,6 +34,12 @@ sources = []
 # target selection (options: cuda, todos: rocm/ascend)
 target = 'cuda'
 
+# config:   TSC register frequency
+tsc_reg_freq = 2200000000
+
+# switch:   enable checkpoint / restore functionality
+enable_checkpoint = 1
+
 # switch:   whether to check correctness of function parameters, return values, etc.,
 #           which might cause extra runtime burden, should be enabled while debuging
 enable_runtime_debug_check = 0

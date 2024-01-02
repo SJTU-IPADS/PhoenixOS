@@ -5,6 +5,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/timestamp.h"
+
 #include "unittest/cuda/apis/base.h"
 #include "unittest/cuda/unittest.h"
 
@@ -16,9 +18,9 @@ pos_retval_t test_cuda_set_device(test_cxt* cxt){
     std::vector<float> buf_1, buf_2;
     uint64_t s_tick, e_tick;
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaSetDevice(0);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -58,9 +60,9 @@ pos_retval_t test_cuda_get_device_count(test_cxt* cxt){
     int device_count = 0;
     uint64_t s_tick, e_tick;
 
-    s_tick = pos_utils_get_tsc();
+    s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaGetDeviceCount(&device_count);
-    e_tick = pos_utils_get_tsc();
+    e_tick = POSUtilTimestamp::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -96,9 +98,9 @@ pos_retval_t test_cuda_get_device_properties(test_cxt* cxt){
     cxt->duration_ticks = 0;
 
     for(i=0; i<device_count; i++){
-        s_tick = pos_utils_get_tsc();
+        s_tick = POSUtilTimestamp::get_tsc();
         cuda_result =  cudaGetDeviceProperties(&prop, i);
-        e_tick = pos_utils_get_tsc();
+        e_tick = POSUtilTimestamp::get_tsc();
     
         cxt->duration_ticks = ((double)(e_tick-s_tick) + (double)(cxt->duration_ticks)) / (double)(i+1);
 
@@ -134,9 +136,9 @@ pos_retval_t test_cuda_get_device(test_cxt* cxt){
             goto exit;
         }
 
-        s_tick = pos_utils_get_tsc();
+        s_tick = POSUtilTimestamp::get_tsc();
         cuda_result = cudaGetDevice(&used_device_id);
-        e_tick = pos_utils_get_tsc();
+        e_tick = POSUtilTimestamp::get_tsc();
         
         if(unlikely(cuda_result != cudaSuccess)){
             POS_WARN_DETAIL("failed");

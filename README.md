@@ -25,8 +25,8 @@ python3 -m pip install ninja
 ### 3. Build From Source
 
 ```bash
-bash build -t cuda -c
-bash build -t cuda -j -u true
+bash build.sh -t cuda -c
+bash build.sh -t cuda -j -u true
 ```
 
 ## II. Example
@@ -39,9 +39,14 @@ bash build -t cuda -j -u true
 
 ## IV. Roadmap
 
-[] (Jan.2) Fast checkpoint of all stateful resources
-[] (Jan.2) Develop central node (using golang)
-[] Develop communication channel across multiple POS servers
+[] (Jan.3) Fast checkpoint of all stateful resources
+    [*] develop performance code to measure checkpoint performance
+    - verify stream behaviour
+    - develop overlap version
+[] (Jan.2) Develop container environment
+[] (Jan.2) Develop central node & redis (using golang)
+[] (Jan.2) Develop communication channel across multiple POS servers
+
 [] Develop client-server switch of POS and cricket
 [] Develop dumping checkpoint state to memory / file
 [] Try migration development (i.e., restore mechanism)
