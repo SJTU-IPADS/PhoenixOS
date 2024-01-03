@@ -78,15 +78,15 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread
      */
     pos_retval_t daemon_init() override {
-        /*!
-         *  \note   make sure the worker thread is bound to a CUDA context
-         *          if we don't do this and use the driver API, it might be unintialized
-         */
-        if(cudaSetDevice(0) != cudaSuccess){
-            POS_WARN_C_DETAIL("runtime thread failed to invoke cudaSetDevice");
-            return POS_FAILED; 
-        }
-        cudaDeviceSynchronize();
+        // /*!
+        //  *  \note   make sure the worker thread is bound to a CUDA context
+        //  *          if we don't do this and use the driver API, it might be unintialized
+        //  */
+        // if(cudaSetDevice(0) != cudaSuccess){
+        //     POS_WARN_C_DETAIL("runtime thread failed to invoke cudaSetDevice");
+        //     return POS_FAILED; 
+        // }
+        // cudaDeviceSynchronize();
 
         return POS_SUCCESS; 
     }

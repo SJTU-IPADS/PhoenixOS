@@ -3,5 +3,5 @@
 ## Prepare
 
 ```bash
-python -m pip install -U matplotlib seaborn palettable
+python3 -m pip install -U matplotlib seaborn palettable panda numpy
 ```

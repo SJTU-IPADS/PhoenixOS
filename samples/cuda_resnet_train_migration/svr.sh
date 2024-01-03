@@ -36,14 +36,14 @@ start_server() {
 
     if [ $mount = false ] ; then
         sudo docker run --gpus all -dit --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name pos_svr_base:11.3
+                        --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         cd $script_dir && cd .. && cd ..
         sudo docker cp . $container_name:/root
         sudo docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..
         sudo docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name pos_svr_base:11.3
+                        --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         sudo docker exec -it $container_name bash
     fi
 }

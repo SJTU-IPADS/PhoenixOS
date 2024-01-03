@@ -20,7 +20,7 @@ class POSAgent {
     POSAgent(){
         char remote_addr[256] = { 0 };
 
-        // TODO: this address should be obtain from central service instead of environment variable
+        // TODO: this address should be obtained from central service instead of environment variable
         char remote_addr_env[] = "REMOTE_GPU_ADDRESS";
         if (!getenv(remote_addr_env)) {
             POS_ERROR_C_DETAIL("failed to start POSAgent, no remote server address provided through \"REMOTE_GPU_ADDRESS\"");

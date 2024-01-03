@@ -16,7 +16,7 @@ sudo docker network rm pos_net
 (1) build base image
 
 ```bash
-sudo docker build -t pos_svr_base:11.3 -f ./dockerfiles/pos_svr_base_cuda_11_3.Dockerfile .
+sudo docker build -t zobinhuang/pos_svr_base:11.3 -f ./dockerfiles/pos_svr_base_cuda_11_3.Dockerfile .
 ```
 
 (2) run servers

@@ -1,4 +1,9 @@
 .vscode
 .bash_hitory
-.nv
+**/.nv
+**/.cache
+**/.config
+**/.python_history
 **/build
+**/bin
+**/lib

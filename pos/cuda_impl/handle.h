@@ -3,9 +3,11 @@
 #include <iostream>
 #include <string>
 
+#include <sys/resource.h>
 #include <stdint.h>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <nvToolsExt.h>
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
@@ -290,7 +292,9 @@ class POSHandle_CUDA_Memory : public POSHandle {
         cudaError_t cuda_rt_retval;
         POSCheckpointSlot_ptr ckpt_slot;
 
-        // uint64_t s_tick = 0, e_tick = 0;
+        struct rusage s_r_usage, e_r_usage;
+        uint64_t s_tick = 0, e_tick = 0;
+        double duration_us = 0;
         
         // apply new checkpoint slot
         if(unlikely(
@@ -306,7 +310,10 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
         // checkpoint
         // TODO: takes long time
-        // s_tick = POSUtilTimestamp::get_tsc();
+        if(unlikely(getrusage(RUSAGE_SELF, &s_r_usage) != 0)){
+            POS_ERROR_DETAIL("failed to call getrusage");
+        }
+        s_tick = POSUtilTimestamp::get_tsc();
         cuda_rt_retval = cudaMemcpyAsync(
             /* dst */ ckpt_slot->expose_pointer(), 
             /* src */ this->server_addr,
@@ -314,9 +321,21 @@ class POSHandle_CUDA_Memory : public POSHandle {
             /* kind */ cudaMemcpyDeviceToHost,
             /* stream */ stream_id
         );
-        // e_tick = POSUtilTimestamp::get_tsc();
+        e_tick = POSUtilTimestamp::get_tsc();
+        if(unlikely(getrusage(RUSAGE_SELF, &e_r_usage) != 0)){
+            POS_ERROR_DETAIL("failed to call getrusage");
+        }
 
-        // POS_LOG("copy duration: %lf us, size: %lu Bytes", POS_TSC_RANGE_TO_USEC(e_tick, s_tick), this->state_size);
+        duration_us = POS_TSC_RANGE_TO_USEC(e_tick, s_tick);
+
+        POS_LOG(
+            "copy duration: %lf us, size: %lu Bytes, bandwidth: %lf Mbps, page fault: %ld (major), %ld (minor)",
+            duration_us,
+            this->state_size,
+            (double)(this->state_size) / duration_us,
+            e_r_usage.ru_majflt - s_r_usage.ru_majflt,
+            e_r_usage.ru_minflt - s_r_usage.ru_minflt
+        );
 
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(

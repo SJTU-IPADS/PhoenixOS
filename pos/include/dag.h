@@ -20,7 +20,7 @@ typedef struct pos_handle_meta {
         : handle(other_.handle), start_pc(other_.start_pc), end_pc(other_.end_pc) {}
 
 } pos_handle_meta_t;
-    
+
 typedef struct pos_op_meta {
     POSAPIContext_QE_ptr wqe;
 

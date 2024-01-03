@@ -192,7 +192,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             }
         }
 
-        // make sure the checkpoint is finished (around 10us)
+        // make sure the checkpoint is finished
         cuda_rt_retval = cudaStreamSynchronize(0);
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C("failed to synchronize after checkpointing");

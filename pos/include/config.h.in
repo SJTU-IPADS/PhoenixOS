@@ -1,6 +1,9 @@
 #pragma once
 
+/*!
+ *  \brief  hard-coded configurations of PhoenixOS
+ */
+
 // TSC frequency
 // #define POS_TSC_FREQ 2200000000 // Hz
-
-#define POS_TSC_FREQ    @pos_tsc_freq@ // Hz
+#define POS_TSC_FREQ                    @pos_tsc_freq@ // Hz
