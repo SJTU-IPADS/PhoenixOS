@@ -2,3 +2,7 @@
 	path = remoting/cuda
 	url = git@ipads.se.sjtu.edu.cn:scaleaisys/cricket.git
 	branch = zhuobin/ckpt_v2_reorg
+
+[submodule "third_party/websocketpp"]
+	path = third_party/websocketpp
+	url = git@github.com:zaphoyd/websocketpp.git

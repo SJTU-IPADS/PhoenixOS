@@ -5,7 +5,10 @@
 1. create network
 
 ```bash
-sudo docker network create --driver bridge --subnet 192.168.20.0/24 --gateway 192.168.20.1 pos_net
+sudo docker network create --driver bridge --subnet 10.66.0.0/16 --gateway 10.66.0.1 pos_net
+
+# to remove
+sudo docker network rm pos_net
 ```
 
 2. raise all necessary containers
@@ -19,8 +22,7 @@ sudo docker build -t pos_svr_base:11.3 -f ./dockerfiles/pos_svr_base_cuda_11_3.D
 (2) run servers
 
 ```bash
-# TODO: we need to expose necessary port!
-bash ./start_svr.sh 1   # change the parameter to be 2 to start the second sever
+bash ./svr.sh -s 1 -m false  # change the parameter to be 2 to start the second sever
 
 # inside container
 cd /root
@@ -28,23 +30,39 @@ bash build.sh -t cuda -c
 bash build.sh -t cuda -j -u true
 ```
 
+Other:
+
 ```bash
 # to stop server
-bash ./stop_svr.sh 1
+bash ./svr.sh -c 1
 
 # to enter the existing server
-bash ./enter_svr.sh 1
+bash ./svr.sh -e 1
 
 # to refresh the content inside the server
-bash ./refresh_svr.sh 1
+bash ./svr.sh -r 1
 ```
 
-(3) run redis container
+(3) run central service
 
+```bash
 
-(4) run central service
+```
 
+(4) run client
 
-(5) run client
+```bash
+bash ./clnt.sh -s 1 -i zobinhuang/pytorch:1.13.1-devel-for-pos -m false
+```
+
+Other:
+
+```bash
+# to stop client
+bash ./clnt.sh -c 1
+
+# to enter the existing client
+bash ./svr.sh -e 1
+```
 
 3. migration operation

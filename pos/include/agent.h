@@ -18,9 +18,24 @@ class POSAgent {
      *  \brief  constructor
      */
     POSAgent(){
+        char remote_addr[256] = { 0 };
+
+        // TODO: this address should be obtain from central service instead of environment variable
+        char remote_addr_env[] = "REMOTE_GPU_ADDRESS";
+        if (!getenv(remote_addr_env)) {
+            POS_ERROR_C_DETAIL("failed to start POSAgent, no remote server address provided through \"REMOTE_GPU_ADDRESS\"");
+        }
+        if (strncpy(remote_addr, getenv(remote_addr_env), 256) == NULL) {
+            POS_ERROR_C_DETAIL("failed to copy \"REMOTE_GPU_ADDRESS\" to buffer");
+        }
+
+        POS_LOG_C("try to connect to %s:%u", remote_addr, POS_OOB_SERVER_DEFAULT_PORT);
         _pos_oob_client = new POSOobClient<T_POSTransport>(
             /* agent */ this,
-            /* local_port */ POS_OOB_CLIENT_DEFAULT_PORT
+            /* local_port */ POS_OOB_CLIENT_DEFAULT_PORT,
+            /* local_ip */ "0.0.0.0",
+            /* server_port */ POS_OOB_SERVER_DEFAULT_PORT,
+            /* server_ip */ remote_addr
         );
         POS_CHECK_POINTER(_pos_oob_client);
 

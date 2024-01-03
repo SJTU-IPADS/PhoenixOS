@@ -47,6 +47,8 @@ class POSWorkspace {
         // create out-of-band server
         _oob_server = new POSOobServer<T_POSTransport, T_POSClient>( /* ws */ this );
         POS_CHECK_POINTER(_oob_server);
+
+        // TODO: create control-plane client here
     }
     
     /*!

@@ -1,3 +1,0 @@
-/testdir/unittest/cuda/build/CMakeFiles/per_api_test.dir
-/testdir/unittest/cuda/build/CMakeFiles/edit_cache.dir
-/testdir/unittest/cuda/build/CMakeFiles/rebuild_cache.dir

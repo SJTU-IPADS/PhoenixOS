@@ -10,8 +10,6 @@
 #include "pos/include/log.h"
 #include "pos/include/utils/timestamp.h"
 
-#define POS_ENABLE_TRANSPORT_SHM 1
-
 enum pos_transport_roleid_t {
     kPOS_Transport_RoleId_Server=0,
     kPOS_Transport_RoleId_Client
@@ -102,8 +100,6 @@ class POSTransport {
     pos_transport_roleid_t _role;
     uint64_t _timeout;
 };
-
-#if POS_ENABLE_TRANSPORT_SHM
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -969,5 +965,3 @@ class POSTransport_SHM : public POSTransport {
     // key: segment id; value: pointer to the segment
     std::map<uint64_t, boost::interprocess::managed_shared_memory*> _segments;
 };
-
-#endif // POS_ENABLE_TRANSPORT_SHM
