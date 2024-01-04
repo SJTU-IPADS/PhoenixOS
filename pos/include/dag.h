@@ -224,17 +224,23 @@ class POSDag {
 
     /*!
      *  \brief  obtain the earlist pending op from the DAG
-     *  \param  wqe     pointer to work QE of the earlist pending op
-     *                  (could be nullptr for no pending op exist)
+     *  \param  wqe             pointer to work QE of the earlist pending op
+     *                          (could be nullptr for no pending op exist)
+     *  \param  nb_pending_ops  pointer to variable that stores #pending_ops in
+     *                          the DAG currently
      *  \note   this function will be called by the worker thread
      *  \return POS_SUCCESS for successfully obtain;
      *          POS_FAILED_NOT_READY for no pending op exist
      */
-    pos_retval_t get_next_pending_op(POSAPIContext_QE_ptr* wqe){
+    pos_retval_t get_next_pending_op(POSAPIContext_QE_ptr* wqe, uint64_t* nb_pending_ops=nullptr){
         pos_retval_t retval = POS_SUCCESS;
         std::shared_ptr<pos_op_meta_t> op;
         POS_CHECK_POINTER(wqe);
         
+        if(likely(nb_pending_ops != nullptr)){
+            *nb_pending_ops = _end_pc - _pc;
+        }
+
         if(unlikely(_pc == _end_pc)){
             // no op is pending
             *wqe = nullptr;
@@ -262,6 +268,12 @@ class POSDag {
      *  \return identify result
      */
     inline bool has_pending_op(){ return _end_pc > _pc; }
+
+    /*!
+     *  \brief  obtain the number of pending operators in the DAG
+     *  \return the number of pending operators in the DAG result
+     */
+    inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
 
  private:
     // underlying bipartite graph

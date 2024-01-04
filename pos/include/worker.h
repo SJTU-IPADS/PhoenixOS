@@ -150,19 +150,39 @@ class POSWorker {
     // worker function map
     std::map<uint64_t, pos_worker_launch_function_t<T_POSTransport, T_POSClient>> _launch_functions;
     std::map<uint64_t, pos_worker_landing_function_t<T_POSTransport, T_POSClient>> _landing_functions;
-
+    
     /*!
      *  \brief  checkpoint procedure, should be implemented by each platform
+     *  \note   this function will be invoked by level-1 ckpt
      *  \param  wqe     the checkpoint op
      *  \return POS_SUCCESS for successfully checkpointing
      */
     virtual pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe){ return POS_FAILED_NOT_IMPLEMENTED; }
+
+    /*!
+     *  \brief  generate overlap ckpt scheme
+     *  \note   this function will be invoked by level-2 ckpt
+     *  \param  wqe             the checkpoint op
+     *  \param  nb_pending_op   number of pending ops following the ckpt op
+     *  \return POS_SUCCESS for successfully generation
+     */
+    virtual pos_retval_t generate_overlap_ckpt_scheme(POSAPIContext_QE_ptr wqe, uint64_t nb_pending_op){ return POS_FAILED_NOT_IMPLEMENTED; }
 
  private:
     /*!
      *  \brief  processing daemon of the worker
      */
     void daemon(){
+        #if POS_CKPT_OPT_LEVAL == 1
+            this->__daemon_o0_o1();
+        #elif POS_CKPT_OPT_LEVAL == 2
+            this->__daemon_o2();
+        #else // POS_CKPT_OPT_LEVAL == 0
+            this->__daemon_o0_o1();
+        #endif
+    }
+
+    void __daemon_o2(){
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval, landing_retval;
 
@@ -179,6 +199,10 @@ class POSWorker {
         uint16_t nb_layers, layer_id_keeper;
         uint64_t handle_id_keeper;
 
+        bool during_ckpt = false;
+        // TODO:        
+        uint64_t nb_pending_ops, query_s_tick, query_e_tick;
+
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
             return;
@@ -187,11 +211,6 @@ class POSWorker {
         while(!_stop_flag){
             _ws->poll_client_dag(&clients);
 
-            // it's too annoy to print here :-(
-            // if(clients.size() > 0){
-            //     POS_DEBUG_C("polling client dags, obtain %lu pending clients", clients.size());
-            // }
-
             for(i=0; i<clients.size(); i++){
                 // we declare the pointer here so every iteration ends the shared_ptr would be released
                 POSAPIContext_QE_ptr wqe;
@@ -199,15 +218,62 @@ class POSWorker {
                 POS_CHECK_POINTER(client = clients[i]);
 
                 // keep popping next pending op until we finished all operation
-                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe)){
+                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe, &nb_pending_ops)){
                     wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
                     api_id = wqe->api_cxt->api_id;
 
                     // this is a checkpoint op
                     if(api_id == this->_ws->checkpoint_api_id){
+                    
+                    /*!
+                     *  \brief  macro for control the overlapping checkpoint
+                     *  \param  POS_CKPT_PENDING_US     maximum time to wait for gathering the overlap batch size
+                     *  \param  POS_OVERLAP_BATCH_SIZE  overlap batch size
+                     *  \note   these configuration should be tuned, if the remoting/parsing performance are optimized in the future!
+                     */
+                    #if POS_CKPT_INTERVAL >= 1000           /* ms */
+                        #define POS_CKPT_PENDING_US 5000    /* us */
+                        #define POS_OVERLAP_BATCH_SIZE 20
+                    #elif POS_CKPT_INTERVAL >= 100
+                        #define POS_CKPT_PENDING_US 500
+                        #define POS_OVERLAP_BATCH_SIZE 10  
+                    #else
+                        #define POS_CKPT_PENDING_US 50
+                        #define POS_OVERLAP_BATCH_SIZE 5
+                    #endif
+
+                        // we will wait here for the next following several ops
+                        query_s_tick = POSUtilTimestamp::get_tsc();
+                        while(likely(nb_pending_ops <= POS_OVERLAP_BATCH_SIZE)){
+                            nb_pending_ops = client->dag.get_nb_pending_op();
+                            query_e_tick = POSUtilTimestamp::get_tsc();
+                            if(unlikely(POS_TSC_TO_USEC(query_e_tick - query_s_tick) >= POS_CKPT_PENDING_US)){
+                                break;
+                            }
+                        }
+                        if(likely(nb_pending_ops == 1)){
+                            // TODO:
+                            // goto ckpt_op_end;
+                            POS_LOG("skip ckpt");
+                        } else {
+                            POS_LOG(
+                                "ckpt pending %u us, get #following_pending_ops in the DAG: %lu",
+                                POS_CKPT_PENDING_US,
+                                nb_pending_ops
+                            );
+                        }
+                        
+                        // generate checkpoint scheme
+                        if(unlikely(POS_SUCCESS != this->generate_overlap_ckpt_scheme(wqe, nb_pending_ops))){
+                            POS_WARN_C("failed to generate overlap checkpoint scheme");
+                            goto ckpt_op_end;
+                        }
+
                         if(unlikely(POS_SUCCESS != this->checkpoint(wqe))){
                             POS_WARN_C("failed to do checkpointing");
                         }
+
+                    ckpt_op_end:
                         __done(this->_ws, wqe);
                         wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                         continue;
@@ -215,15 +281,12 @@ class POSWorker {
 
                     api_meta = _ws->api_mgnr->api_metas[api_id];
 
+                    /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
                     for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
 
                         handle_view_vec = iter_hvm->second;
                         
                         for(j=0; j<handle_view_vec->size(); j++){
-                            
-                            /* >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Verification 1 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
-                            /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
-                            
                             broken_handle_list.reset();
                             (*handle_view_vec)[j].handle->collect_broken_handles(&broken_handle_list);
 
@@ -268,9 +331,177 @@ class POSWorker {
                                         broken_handle->resource_type_id
                                     );
                                 }
-                            }
-                        }
+                            } // while (1)
+                        } // for(j=0; j<handle_view_vec->size(); j++)
+                    } // for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++)
+
+                #if POS_ENABLE_DEBUG_CHECK
+                    if(unlikely(_launch_functions.count(api_id) == 0)){
+                        POS_ERROR_C_DETAIL(
+                            "runtime has no worker launch function for api %lu, need to implement", api_id
+                        );
                     }
+                #endif
+
+                    launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
+                    if(launch_retval != POS_SUCCESS){
+                        wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
+                            /* pos_retval */ launch_retval, 
+                            /* library_id */ api_meta.library_id
+                        );
+
+                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+
+                        if(wqe->status == kPOS_API_Execute_Status_Init){
+                            // we only return the QE back to frontend when it hasn't been returned before
+                            wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                            wqe->return_tick = POSUtilTimestamp::get_tsc();
+                            _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                        }
+
+                        continue;
+                    }
+                
+                #if POS_ENABLE_DEBUG_CHECK
+                    if(unlikely(_landing_functions.count(api_id) == 0)){
+                        POS_ERROR_C_DETAIL(
+                            "runtime has no worker landing function for api %lu, need to implement", api_id
+                        );
+                    }
+                #endif
+                
+                    landing_retval = (*(_landing_functions[api_id]))(_ws, wqe);
+                    wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
+                        /* pos_retval */ landing_retval, 
+                        /* library_id */ api_meta.library_id
+                    );
+
+                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+                    
+                    if(wqe->status == kPOS_API_Execute_Status_Init){
+                        // we only return the QE back to frontend when it hasn't been returned before
+                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                        wqe->return_tick = POSUtilTimestamp::get_tsc();
+                        _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                    }
+                }
+            }
+            
+            clients.clear();
+        }
+    }
+
+    /*!
+     *  \brief  processing daemon of the worker (under checkpoint optimization level 0 and 1)
+     *  \note   under this worker, checkpoint ops are executed using the same stream (thread) with other
+     *          normal operators
+     */
+    void __daemon_o0_o1(){
+        uint64_t i, j, k, w, api_id;
+        pos_retval_t launch_retval, landing_retval;
+
+        POSAPIMeta_t api_meta;
+
+        std::vector<T_POSClient*> clients;
+        T_POSClient* client;
+
+        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
+        std::vector<POSHandleView_t>* handle_view_vec;
+
+        POSHandle::pos_broken_handle_list_t broken_handle_list;
+        POSHandle *broken_handle;
+        uint16_t nb_layers, layer_id_keeper;
+        uint64_t handle_id_keeper;
+        
+        if(unlikely(POS_SUCCESS != daemon_init())){
+            POS_WARN_C("failed to init daemon, worker daemon exit");
+            return;
+        }
+
+        while(!_stop_flag){
+            _ws->poll_client_dag(&clients);
+
+            // it's too annoy to print here :-(
+            // if(clients.size() > 0){
+            //     POS_DEBUG_C("polling client dags, obtain %lu pending clients", clients.size());
+            // }
+
+            for(i=0; i<clients.size(); i++){
+                // we declare the pointer here so every iteration ends the shared_ptr would be released
+                POSAPIContext_QE_ptr wqe;
+
+                POS_CHECK_POINTER(client = clients[i]);
+
+                // keep popping next pending op until we finished all operation
+                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe)){
+                    wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
+                    api_id = wqe->api_cxt->api_id;
+
+                    // this is a checkpoint op
+                    if(api_id == this->_ws->checkpoint_api_id){
+                        if(unlikely(POS_SUCCESS != this->checkpoint(wqe))){
+                            POS_WARN_C("failed to do checkpointing");
+                        }
+                        __done(this->_ws, wqe);
+                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+                        continue;
+                    }
+
+                    api_meta = _ws->api_mgnr->api_metas[api_id];
+
+                    /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
+                    for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
+
+                        handle_view_vec = iter_hvm->second;
+                        
+                        for(j=0; j<handle_view_vec->size(); j++){
+                            broken_handle_list.reset();
+                            (*handle_view_vec)[j].handle->collect_broken_handles(&broken_handle_list);
+
+                            /*!
+                             *  \todo   1. should restore based on DAG info;
+                             *          2. this is a recursive procedure: obtain an op list to reexecute to restore these handles
+                             *          3. we need a good checkpoint mechanism to shorten the duration here
+                             */
+
+                            nb_layers = broken_handle_list.get_nb_layers();
+                            if(likely(nb_layers == 0)){
+                                continue;
+                            }
+
+                            layer_id_keeper = nb_layers - 1;
+                            handle_id_keeper = 0;
+
+                            while(1){
+                                broken_handle = broken_handle_list.reverse_get_handle(layer_id_keeper, handle_id_keeper);
+                                if(unlikely(broken_handle == nullptr)){
+                                    break;
+                                }
+
+                                /*!
+                                 *  \note   we don't need to restore the bottom handle while haven't create them yet
+                                 */
+                                if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
+                                    if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
+                                        continue;
+                                    }
+                                }
+
+                                if(unlikely(POS_SUCCESS != broken_handle->restore())){
+                                    POS_ERROR_C(
+                                        "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
+                                        broken_handle->resource_type_id, broken_handle->client_addr, broken_handle->server_addr,
+                                        broken_handle->status
+                                    );
+                                } else {
+                                    POS_DEBUG_C(
+                                        "restore broken handle: resource_type_id(%lu)",
+                                        broken_handle->resource_type_id
+                                    );
+                                }
+                            } // while (1)
+                        } // for(j=0; j<handle_view_vec->size(); j++)
+                    } // for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++)
 
                 #if POS_ENABLE_DEBUG_CHECK
                     if(unlikely(_launch_functions.count(api_id) == 0)){

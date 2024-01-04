@@ -146,13 +146,13 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
     }
 
     /*!
-     *  \brief  level-1 optimization of checkpoint insertion procedure
+     *  \brief  level-1/2 optimization of checkpoint insertion procedure
      *  \note   this implementation give hints of those memory handles that
      *          been modified (INOUT/OUT) since last checkpoint
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_o1(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE_ptr wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandleManager<POSHandle>* hm;
@@ -196,8 +196,9 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE_ptr wqe) override {
         #if POS_CKPT_OPT_LEVAL == 1
-            // return __checkpoint_insertion_naive(wqe);
-            return __checkpoint_insertion_o1(wqe);
+            return __checkpoint_insertion_o1_o2(wqe);
+        #elif POS_CKPT_OPT_LEVAL == 2
+            return __checkpoint_insertion_o1_o2(wqe);
         #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;
         #endif

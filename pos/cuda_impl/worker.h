@@ -226,7 +226,9 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      */
     pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe) override {
         #if POS_CKPT_OPT_LEVAL == 1
-            // return __checkpoint_naive(wqe);
+            return __checkpoint_o1(wqe);
+        #elif POS_CKPT_OPT_LEVAL == 2
+            // TODO: 
             return __checkpoint_o1(wqe);
         #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;

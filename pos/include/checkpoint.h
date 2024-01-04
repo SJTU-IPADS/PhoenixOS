@@ -58,7 +58,9 @@ using POSCheckpointSlot_ptr = std::shared_ptr<POSCheckpointSlot>;
 
 
 #if POS_CKPT_OPT_LEVAL == 1
-    #include "pos/include/checkpoint_o1.h"
+    #include "pos/include/checkpoint_o1_o2.h"
+#elif POS_CKPT_OPT_LEVAL == 2
+    #include "pos/include/checkpoint_o1_o2.h"
 #else // POS_CKPT_OPT_LEVAL == 0
     #include "pos/include/checkpoint_o0.h"
 #endif
