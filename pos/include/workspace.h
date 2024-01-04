@@ -71,29 +71,37 @@ class POSWorkspace {
         typename std::map<pos_client_uuid_t, T_POSTransport*>::iterator trsp_iter;
         typename std::map<pos_client_uuid_t, T_POSClient*>::iterator client_iter;
 
-        // shutdown out-of-band server
-        delete _oob_server;
+        POS_LOG_C("clearing POS Workspace...")
 
-        // clear all transports
+        if(likely(_oob_server != nullptr)){
+            delete _oob_server;
+            POS_LOG_C("shutdowned out-of-band server");
+        }
+        
+        POS_LOG_C("cleaning all transports ...");
         for(trsp_iter = _transport_maps.begin(); trsp_iter != _transport_maps.end(); trsp_iter++){
             if(trsp_iter->second != nullptr){
                 trsp_iter->second->clear();
                 delete trsp_iter->second;
             }
         }
-
-        // clear all clients
+        
+        POS_LOG_C("cleaning all clients ...");
         for(client_iter = _client_map.begin(); client_iter != _client_map.end(); client_iter++){
             if(client_iter->second != nullptr){
                 delete client_iter->second;
             }
         }
 
-        // stop runtime
-        if(_runtime != nullptr){ delete _runtime; }
+        if(_runtime != nullptr){ 
+            delete _runtime;
+            POS_LOG_C("shutdowned runtime thread");
+        }
 
-        // stop worker
-        if(_worker != nullptr){ delete _worker; }
+        if(_worker != nullptr){
+            delete _worker;
+            POS_LOG_C("shutdowned worker thread");
+        }
     }
 
     /*!

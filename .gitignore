@@ -1,5 +1,6 @@
-.vscode
-.bash_hitory
+**/.vscode
+**/.bash_history
+**/.ssh
 **/.nv
 **/.cache
 **/.config
@@ -7,3 +8,4 @@
 **/build
 **/bin
 **/lib
+**/dag.pos

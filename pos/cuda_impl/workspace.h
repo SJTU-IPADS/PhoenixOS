@@ -28,10 +28,7 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
      */
     pos_retval_t init() override {
         // create runtime
-        this->_runtime = new POSRuntime_CUDA<T_POSTransport>( 
-            /* ws */ this,
-            /* checkpoint_internal_ */ 10000
-        );
+        this->_runtime = new POSRuntime_CUDA<T_POSTransport>(/* ws */ this);
         POS_CHECK_POINTER(this->_runtime);
         this->_runtime->init();
 

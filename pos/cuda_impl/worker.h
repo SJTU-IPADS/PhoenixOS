@@ -128,7 +128,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             for(i=0; i<nb_handles; i++){
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle.get());
-                wqe->ckpt_memory_consumption += handle->ckpt_bag.get_memory_consumption();
+                wqe->ckpt_memory_consumption += handle->ckpt_bag->get_memory_consumption();
             }
         }
 
@@ -184,9 +184,6 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
                     goto exit;
                 }
 
-                // delete all old checkpoints
-                handle->ckpt_bag.clear_all_old_checkpoints(/* except_version */ wqe->dag_vertex_id);
-
                 wqe->nb_ckpt_handles += 1;
                 wqe->ckpt_size += handle->state_size;
             }
@@ -209,15 +206,15 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             for(i=0; i<nb_handles; i++){
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle.get());
-                wqe->ckpt_memory_consumption += handle->ckpt_bag.get_memory_consumption();
+                wqe->ckpt_memory_consumption += handle->ckpt_bag->get_memory_consumption();
             }
         }
 
-        POS_LOG_C(
-            "checkpointed %lu handles, memory consumption: %lu",
-            wqe->nb_ckpt_handles,
-            wqe->ckpt_memory_consumption
-        );
+        // POS_LOG_C(
+        //     "checkpointed %lu handles, memory consumption: %lu",
+        //     wqe->nb_ckpt_handles,
+        //     wqe->ckpt_memory_consumption
+        // );
 
         return retval;
     }
@@ -228,10 +225,10 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      *  \return POS_SUCCESS for successfully checkpointing
      */
     pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe) override {
-        #ifdef POS_ENABLE_CHECKPOINT
+        #if POS_CKPT_OPT_LEVAL == 1
             // return __checkpoint_naive(wqe);
             return __checkpoint_o1(wqe);
-        #else
+        #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;
         #endif
     }

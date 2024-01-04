@@ -31,21 +31,27 @@ sources = []
 
 
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
-# target selection (options: cuda, todos: rocm/ascend)
+# config:   target selection (options: cuda, todos: rocm/ascend)
 target = 'cuda'
+
+# config:   checkpoint optimization level (p.s., 0 is no checkpoint)
+ckpt_opt_level = 1
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
-# switch:   enable checkpoint / restore functionality
-enable_checkpoint = 1
+# config:   checkpoint interval (unit in ms)
+ckpt_interval_ms = 10000
+
+# config:   log file output path
+log_file_path = '/root/dag.pos'
 
 # switch:   whether to check correctness of function parameters, return values, etc.,
-#           which might cause extra runtime burden, should be enabled while debuging
+#           which might cause extra runtime burden, should only be enabled while debuging
 enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
-#           which might cause extra runtime burden, should be enabled while debuging
+#           which might cause extra runtime burden, should only be enabled while debuging
 enable_hijack_api_check = 0
 
 # switch:   whether to print all fatal messages
@@ -69,13 +75,17 @@ subdir('pos/include')
 
 # print configurations
 message('>>> Build configurations:')
-message('>>>>>> target:                     ' + target)
-message('>>>>>> enable_runtime_debug_check: ' + enable_runtime_debug_check.to_string())
-message('>>>>>> enable_hijack_api_check:    ' + enable_hijack_api_check.to_string())
-message('>>>>>> enable_print_error:         ' + enable_print_error.to_string())
-message('>>>>>> enable_print_warn:          ' + enable_print_warn.to_string())
-message('>>>>>> enable_print_log:           ' + enable_print_log.to_string())
-message('>>>>>> enable_print_debug:         ' + enable_print_debug.to_string())
+message('>>>>>> [Config] target:                        ' + target)
+message('>>>>>> [Config] TSC register frequency:        ' + tsc_reg_freq.to_string())
+message('>>>>>> [Config] checkpoint optimization level: ' + ckpt_opt_level.to_string())
+message('>>>>>> [Config] checkpoint interval (ms):      ' + ckpt_interval_ms.to_string())
+message('>>>>>> [Config] log file output path:          ' + log_file_path)
+message('>>>>>> [Switch] enable_runtime_debug_check:    ' + enable_runtime_debug_check.to_string())
+message('>>>>>> [Switch] enable_hijack_api_check:       ' + enable_hijack_api_check.to_string())
+message('>>>>>> [Switch] enable_print_error:            ' + enable_print_error.to_string())
+message('>>>>>> [Switch] enable_print_warn:             ' + enable_print_warn.to_string())
+message('>>>>>> [Switch] enable_print_log:              ' + enable_print_log.to_string())
+message('>>>>>> [Switch] enable_print_debug:            ' + enable_print_debug.to_string())
 message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>

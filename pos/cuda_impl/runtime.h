@@ -56,20 +56,8 @@ namespace rt_functions {
 template<class T_POSTransport>
 class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
  public:
-    POSRuntime_CUDA(
-        POSWorkspace<T_POSTransport, POSClient_CUDA>* ws, uint64_t checkpoint_interval_ms_
-    ) 
-        : POSRuntime<T_POSTransport, POSClient_CUDA>(ws, checkpoint_interval_ms_)
-    {
-        /*!
-         *  \note   make sure the runtime thread is bound to a CUDA context
-         *          if we don't do this and use the driver API, it might be unintialized
-         */
-        if(cudaSetDevice(0) != cudaSuccess){
-            POS_ERROR_C_DETAIL("runtime thread failed to invoke cudaSetDevice");
-        }
-        cudaDeviceSynchronize();
-    }
+    POSRuntime_CUDA(POSWorkspace<T_POSTransport, POSClient_CUDA>* ws)
+        : POSRuntime<T_POSTransport, POSClient_CUDA>(ws){}
     ~POSRuntime_CUDA() = default;
 
  private:
@@ -87,7 +75,6 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         //     return POS_FAILED; 
         // }
         // cudaDeviceSynchronize();
-
         return POS_SUCCESS; 
     }
 
@@ -165,7 +152,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_insertion_o1(POSAPIContext_QE_ptr wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandleManager<POSHandle>* hm;
@@ -208,10 +195,10 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE_ptr wqe) override {
-        #ifdef POS_ENABLE_CHECKPOINT
+        #if POS_CKPT_OPT_LEVAL == 1
             // return __checkpoint_insertion_naive(wqe);
-            return __checkpoint_insertion_o1_o2(wqe);
-        #else
+            return __checkpoint_insertion_o1(wqe);
+        #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;
         #endif
     }

@@ -20,8 +20,9 @@ int main(){
     double duration_us;
     void *ptr;
     std::vector<void*> mems;
-    std::vector<float> host_data;
+    void *host_data;
     std::ofstream output_file;
+    cudaError_t cuda_rt_retval;
 
     struct rusage s_r_usage, e_r_usage;
 
@@ -34,9 +35,10 @@ int main(){
     max_buffer_size = buffer_sizes[nb_buffers-1];
 
     // set host buffer
-    host_data.reserve(max_buffer_size);
-    for(i=0; i<max_buffer_size; i++){
-        host_data.push_back(1.0f);
+    cuda_rt_retval = cudaMallocHost(&host_data, max_buffer_size);
+    if(cuda_rt_retval != cudaSuccess){
+        printf("failed cudaMallocHost: %d\n", cuda_rt_retval);
+        exit(1);
     }
 
     // malloc corresponding buffer
@@ -49,7 +51,7 @@ int main(){
     }
 
     // warmup
-    cudaMemcpyAsync(host_data.data(), mems[1], buffer_sizes[1], cudaMemcpyDeviceToHost, 0);
+    cudaMemcpyAsync(host_data, mems[1], buffer_sizes[1], cudaMemcpyDeviceToHost, 0);
     cudaStreamSynchronize(0);
 
     // measure
@@ -60,12 +62,11 @@ int main(){
         }
 
         s_tick = get_tsc();
-        if(cudaSuccess != cudaMemcpyAsync(
-            host_data.data(),
+        if(cudaSuccess != cudaMemcpy(
+            host_data,
             mems[i],
             buffer_sizes[i],
-            cudaMemcpyDeviceToHost,
-            0
+            cudaMemcpyDeviceToHost
         )){
             printf("failed cudaMemcpyAsync at %lu\n", i);
             exit(1);
@@ -90,6 +91,7 @@ int main(){
     for(i=0; i<nb_buffers; i++){
         cudaFree(mems[i]);
     }
+    cudaFreeHost(host_data);
 
     output_file.close();
 

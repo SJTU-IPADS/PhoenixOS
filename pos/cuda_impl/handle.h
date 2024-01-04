@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include <nvToolsExt.h>
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
@@ -269,6 +268,11 @@ class POSHandle_CUDA_Memory : public POSHandle {
         : POSHandle(size_, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
+
+        // initialize checkpoint bag
+        if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
+            POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
+        }
     }
 
     /*!
@@ -278,6 +282,34 @@ class POSHandle_CUDA_Memory : public POSHandle {
         : POSHandle(client_addr_, size_, state_size_)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
+    }
+
+    static void* __checkpoint_allocator(uint64_t state_size) {
+        cudaError_t cuda_rt_retval;
+        void *ptr;
+
+        if(unlikely(state_size == 0)){
+            POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
+            return nullptr;
+        }
+
+        cuda_rt_retval = cudaMallocHost(&ptr, state_size);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed cudaMallocHost, error: %d", cuda_rt_retval);
+            return nullptr;
+        }
+
+        return ptr;
+    }
+
+    static void __checkpoint_deallocator(void* data){
+        cudaError_t cuda_rt_retval;
+        if(likely(data != nullptr)){
+            cuda_rt_retval = cudaFreeHost(data);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_DETAIL("failed cudaFreeHost, error: %d", cuda_rt_retval);
+            }
+        }
     }
 
     /*!
@@ -298,10 +330,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
         
         // apply new checkpoint slot
         if(unlikely(
-            POS_SUCCESS != this->ckpt_bag.apply_new_checkpoint(
-                /* version */ version_id,
-                /* ptr */ &ckpt_slot
-            )
+            POS_SUCCESS != this->ckpt_bag->apply_new_checkpoint(/* version */ version_id, /* ptr */ &ckpt_slot)
         )){
             POS_WARN_C("failed to apply checkpoint slot");
             retval = POS_FAILED;
@@ -310,10 +339,10 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
         // checkpoint
         // TODO: takes long time
-        if(unlikely(getrusage(RUSAGE_SELF, &s_r_usage) != 0)){
-            POS_ERROR_DETAIL("failed to call getrusage");
-        }
-        s_tick = POSUtilTimestamp::get_tsc();
+        // if(unlikely(getrusage(RUSAGE_SELF, &s_r_usage) != 0)){
+        //     POS_ERROR_DETAIL("failed to call getrusage");
+        // }
+        // s_tick = POSUtilTimestamp::get_tsc();
         cuda_rt_retval = cudaMemcpyAsync(
             /* dst */ ckpt_slot->expose_pointer(), 
             /* src */ this->server_addr,
@@ -321,21 +350,21 @@ class POSHandle_CUDA_Memory : public POSHandle {
             /* kind */ cudaMemcpyDeviceToHost,
             /* stream */ stream_id
         );
-        e_tick = POSUtilTimestamp::get_tsc();
-        if(unlikely(getrusage(RUSAGE_SELF, &e_r_usage) != 0)){
-            POS_ERROR_DETAIL("failed to call getrusage");
-        }
+        // e_tick = POSUtilTimestamp::get_tsc();
+        // if(unlikely(getrusage(RUSAGE_SELF, &e_r_usage) != 0)){
+        //     POS_ERROR_DETAIL("failed to call getrusage");
+        // }
 
-        duration_us = POS_TSC_RANGE_TO_USEC(e_tick, s_tick);
+        // duration_us = POS_TSC_RANGE_TO_USEC(e_tick, s_tick);
 
-        POS_LOG(
-            "copy duration: %lf us, size: %lu Bytes, bandwidth: %lf Mbps, page fault: %ld (major), %ld (minor)",
-            duration_us,
-            this->state_size,
-            (double)(this->state_size) / duration_us,
-            e_r_usage.ru_majflt - s_r_usage.ru_majflt,
-            e_r_usage.ru_minflt - s_r_usage.ru_minflt
-        );
+        // POS_LOG(
+        //     "copy duration: %lf us, size: %lu Bytes, bandwidth: %lf Mbps, page fault: %ld (major), %ld (minor)",
+        //     duration_us,
+        //     this->state_size,
+        //     (double)(this->state_size) / duration_us,
+        //     e_r_usage.ru_majflt - s_r_usage.ru_majflt,
+        //     e_r_usage.ru_minflt - s_r_usage.ru_minflt
+        // );
 
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(
@@ -356,7 +385,22 @@ class POSHandle_CUDA_Memory : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Memory"); }
 
-    protected:
+ protected:
+    /*!
+     *  \brief  initialize checkpoint bag of this handle
+     *  \note   it must be implemented by different implementations of stateful 
+     *          handle, as they might require different allocators and deallocators
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    pos_retval_t init_ckpt_bag() override { 
+        this->ckpt_bag = new POSCheckpointBag(
+            this->state_size,
+            this->__checkpoint_allocator,
+            this->__checkpoint_deallocator
+        );
+        POS_CHECK_POINTER(this->ckpt_bag);
+        return POS_SUCCESS;
+    }
 };
 using POSHandle_CUDA_Memory_ptr = std::shared_ptr<POSHandle_CUDA_Memory>;
 

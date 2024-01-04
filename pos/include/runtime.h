@@ -52,14 +52,11 @@ namespace rt_functions {
 template<class T_POSTransport, class T_POSClient>
 class POSRuntime {
  public:
-    POSRuntime(
-        POSWorkspace<T_POSTransport, T_POSClient>* ws, uint64_t checkpoint_interval_ms_
-    ) : _ws(ws), _stop_flag(false), checkpoint_interval_ms(checkpoint_interval_ms_)
-    {   
+    POSRuntime(POSWorkspace<T_POSTransport, T_POSClient>* ws) : _ws(ws), _stop_flag(false) {   
         int rc;
         cpu_set_t cpuset;
 
-        this->checkpoint_interval_tick = ((double)this->checkpoint_interval_ms / 1000.f) * (double)(POS_TSC_FREQ);
+        this->checkpoint_interval_tick = ((double)POS_CKPT_INTERVAL / 1000.f) * (double)(POS_TSC_FREQ);
 
         CPU_ZERO(&cpuset);
         CPU_SET(1, &cpuset);    // stick to core 1
@@ -71,10 +68,11 @@ class POSRuntime {
         rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
         assert(rc == 0);
 
-        POS_DEBUG_C(
-            "runtime started: checkpoint_interval(%lu ms, %lu ticks)",
-            this->checkpoint_interval_ms,
-            this->checkpoint_interval_tick
+        POS_LOG_C(
+            "runtime started: ckpt_interval(%lu ms, %lu ticks), ckpt_opt_level(%d)",
+            POS_CKPT_INTERVAL,
+            this->checkpoint_interval_tick,
+            POS_CKPT_OPT_LEVAL
         );
     };
 
@@ -104,7 +102,7 @@ class POSRuntime {
             _daemon_thread->join();
             delete _daemon_thread;
             _daemon_thread = nullptr;
-            POS_DEBUG_C("Runtime daemon thread shutdown");
+            POS_LOG_C("Runtime daemon thread shutdown");
         }
     }
 
@@ -122,7 +120,6 @@ class POSRuntime {
     std::map<uint64_t, pos_runtime_parser_function_t<T_POSTransport, T_POSClient>> _parser_functions;
     
     // intervals between two checkpoint ops
-    uint64_t checkpoint_interval_ms;
     uint64_t checkpoint_interval_tick;
 
  private:

@@ -102,10 +102,8 @@ class POSDag:
         self.handles : dict[int, POSHandle] = {}
         self.dag_mat : list = []
 
-        print(f">>> parsing trace file {file_path}")
+        print(f">>> parsing trace file {file_path}...")
         self._parse_trace_file()
-
-        print(f">>> collapsing DAG to matrix")
 
     def __del__(self):
         self.trace_file.close()
@@ -188,6 +186,7 @@ class POSDag:
                     handle.add_op_id(op.id, direction)
 
     def collapse_matrix(self):
+        print(f">>> collapsing DAG to matrix...")
         for id, op in self.ops.items():
             handle_vector = list(4 for _ in range(self.nb_handles))
             for hid, direction in op.handle_map.items():
@@ -196,9 +195,10 @@ class POSDag:
 
     def analyse_dag(self, figure_dir_path:str):
         self._analyse_ckpt(figure_dir_path)
-        self._analyse_op_duration()
+        # self._analyse_ops()
 
-    def _analyse_op_duration(self):
+    def _analyse_ops(self):
+        print(">>> analysing ops...")
         api_call_times : dict[int, int] = {}
         runtime_duration_dict : dict[int,list[float]] = {}
         worker_duration_dict : dict[int,list[float]] = {}
@@ -239,8 +239,7 @@ class POSDag:
             _print_statistics(physical_duration_dict[api_id], "physical")
 
     def _analyse_ckpt(self, figure_dir_path:str):
-        print("\n>>> analysing checkpoint")
-
+        print(">>> analysing checkpoint...")
         normal_ops : list[POSOp] = []
         checkpoint_ops : list[POSOp] = []
         normal_ops_duration : int = 0
@@ -258,15 +257,12 @@ class POSDag:
                 normal_ops_duration += op.worker_duration
 
         print(
-            f"normal ops duration: {normal_ops_duration}s, ckpt ops duration: {checkpoint_ops_duration}s, times of ckpt: {len(checkpoint_ops)}"
+            f"normal ops duration: {normal_ops_duration} us, ckpt ops duration: {checkpoint_ops_duration} us, times of ckpt: {len(checkpoint_ops)}"
         )
 
-        print(
-            f"ckpt size: {checkpoint_size / 1024 / 1024 / 1024} GB"
-        )
+        print(f"ckpt size: {checkpoint_size / 1024 / 1024 / 1024} GB")
 
         # draw figure
-
         # >>>>>>>>>> Draw checkpoint op series figure <<<<<<<<<<
         ckpt_op_series : list[tuple] = []
         # print(">>>>>> ckpt statistics")
@@ -292,12 +288,14 @@ class POSDag:
         plt.title("Checkpoint Process")
         plt.xlabel("Checkpoint Op Id", fontsize=10)
         plt.xticks(size=6)
+        plt.grid(True, linestyle='dashed', alpha=0.5)
     
         ax1 = sns.barplot(data=ckpt_dataframe, x='idx', y='durations')
         ax1.set_ylabel("Duration / us")
 
         ax2 = ax1.twinx()
-        sns.lineplot(data=ckpt_dataframe, x='idx', y='ckpt_sizes', marker='o', ax=ax2, color = 'r')
+        # sns.lineplot(data=ckpt_dataframe, x='idx', y='ckpt_sizes', marker='o', ax=ax2, color = 'r')
+        sns.lineplot(data=ckpt_dataframe, x='idx', y='ckpt_sizes', ax=ax2, color = 'r')
         ax2.set_ylabel("# Checkpointed Size / MB")
 
         plt.savefig(f"{figure_dir_path}/ckpt_series.png")
@@ -308,12 +306,14 @@ class POSDag:
         plt.title("Memory Consumption")
         plt.xlabel("Checkpoint Op Id", fontsize=10)
         plt.xticks(size=6)
+        plt.grid(True, linestyle='dashed', alpha=0.5)
 
         ax3 = sns.lineplot(data=ckpt_dataframe, x='idx', y='ckpt_memory_consumption', color = 'r')
         ax3.set_ylabel("Memory Consumption / MB")
         plt.savefig(f"{figure_dir_path}/memory_consumption.png")
 
     def dump_matrix(self, file_path:str):
+        print(f">>> dumping matrix to figure...")
         plt.figure(figsize=(self.nb_ops * 0.3, self.nb_handles * 0.3),dpi=100)
 
         """colors for 4 types of opearation direction
@@ -361,10 +361,10 @@ class POSDag:
         hm.get_figure().savefig(file_path)
 
 if __name__ == "__main__":
-    dag = POSDag(file_path="/testdir/dag-0.pos")
+    dag = POSDag(file_path="/root/dag.pos")
 
-    print(">>> dumping figure file")
-    dag.analyse_dag(figure_dir_path="/testdir")
+    
+    dag.analyse_dag(figure_dir_path="/root")
 
     # dag.collapse_matrix()
-    # dag.dump_matrix(file_path="/testdir/dag_matrix.png")
+    # dag.dump_matrix(file_path="/root/dag_matrix.png")

@@ -247,7 +247,7 @@ class POSBipartiteGraph {
         }
 
         output_file.close();
-        POS_DEBUG("finish dump DAG to %s", file_path);
+        POS_LOG("finish dump DAG file to %s", file_path);
     }
 
  private:

@@ -298,8 +298,13 @@ typedef struct POSAPIContext_QE {
     std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*> handle_view_map;
 
     /* =========== checkpoint op specific fields =========== */
+    // number of handles this checkpoint op checkpointed
     uint64_t nb_ckpt_handles;
+
+    // size of state this checkpoint op checkpointed
     uint64_t ckpt_size;
+
+    // checkpoint memory consumption after this checkpoint op
     uint64_t ckpt_memory_consumption;
     /* ======= end of checkpoint op specific fields ======== */
 

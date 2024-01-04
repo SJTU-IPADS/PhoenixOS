@@ -64,21 +64,19 @@ for epoch in tqdm(range(1, n_epochs+1)):
         if nb_iteration == 5:
             break
 
-    exit(0)
-
-    model.eval()
-    for data, target in valid_loader:
-        data = data.to(device)
-        target = target.to(device)
-        output = model(data).to(device)
-        loss = criterion(output, target)
-        valid_loss += loss.item()*data.size(0)
-        _, pred = torch.max(output, 1)    
-        correct_tensor = pred.eq(target.data.view_as(pred))
-        total_sample += batch_size
-        for i in correct_tensor:
-            if i:
-                right_sample += 1
+    # model.eval()
+    # for data, target in valid_loader:
+    #     data = data.to(device)
+    #     target = target.to(device)
+    #     output = model(data).to(device)
+    #     loss = criterion(output, target)
+    #     valid_loss += loss.item()*data.size(0)
+    #     _, pred = torch.max(output, 1)    
+    #     correct_tensor = pred.eq(target.data.view_as(pred))
+    #     total_sample += batch_size
+    #     for i in correct_tensor:
+    #         if i:
+    #             right_sample += 1
 
     end_t = time.time()
 

@@ -5,12 +5,12 @@ bash run_test.sh
 ```
 
 ```bash
-mkdir build && cd build && cmake .. && make
+cd memcpy_performance && mkdir build && cd build && cmake .. && make
 ```
 
 ```bash
 python3 -m pip install -U matplotlib seaborn palettable panda numpy
-python3 ./analyse/analyse.py
+python3 ../analyse/analyse.py
 ```
 
 

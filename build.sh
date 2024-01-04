@@ -14,7 +14,7 @@ doclean=false
 multithread_build=false
 
 # run unittest after building
-run_unit_test=false
+run_unit_test=true
 
 # build cuda target
 build_cuda() {
@@ -58,9 +58,9 @@ build_cuda() {
             make libtirpc -j
             cd cpu
             if [ $multithread_build = true ]; then
-                LOG=DEBUG make cricket-rpc-server cricket-client.so -j
+                LOG=INFO make cricket-rpc-server cricket-client.so -j
             else
-                LOG=DEBUG make cricket-rpc-server cricket-client.so
+                LOG=INFO make cricket-rpc-server cricket-client.so
             fi
         echo "[3] building unittest"
             cd $script_dir

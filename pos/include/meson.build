@@ -4,7 +4,6 @@ config_conf = configuration_data()
 
 switches_conf.set('pos_enable_debug_check', enable_runtime_debug_check)
 switches_conf.set('pos_enable_hijack_api_check', enable_hijack_api_check)
-switches_conf.set('pos_enable_checkpoint', enable_checkpoint)
 configure_file(input : 'switches.h.in', output : 'switches.h', configuration : switches_conf)
 
 log_conf.set('pos_print_error', enable_print_error)
@@ -15,4 +14,7 @@ log_conf.set('pos_print_with_color', enable_print_with_color)
 configure_file(input : 'log.h.in', output : 'log.h', configuration : log_conf)
 
 config_conf.set('pos_tsc_freq', tsc_reg_freq)
+config_conf.set('pos_ckpt_opt_level', ckpt_opt_level)
+config_conf.set('pos_ckpt_interval_ms', ckpt_interval_ms)
+config_conf.set('pos_log_file_path', log_file_path)
 configure_file(input : 'config.h.in', output : 'config.h', configuration : config_conf)

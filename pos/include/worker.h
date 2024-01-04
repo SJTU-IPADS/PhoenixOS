@@ -72,7 +72,7 @@ class POSWorker {
         rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
         assert(rc == 0);
 
-        POS_DEBUG_C("worker started");
+        POS_LOG_C("worker started");
     }
 
     /*!
@@ -101,7 +101,7 @@ class POSWorker {
             _daemon_thread->join();
             delete _daemon_thread;
             _daemon_thread = nullptr;
-            POS_DEBUG_C("Worker daemon thread shutdown");
+            POS_LOG_C("Worker daemon thread shutdown");
         }
     }
 
@@ -215,12 +215,14 @@ class POSWorker {
 
                     api_meta = _ws->api_mgnr->api_metas[api_id];
 
-                    // verify whether all relyed resources are ready, if not, we need to restore their state first
                     for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
 
                         handle_view_vec = iter_hvm->second;
                         
                         for(j=0; j<handle_view_vec->size(); j++){
+                            
+                            /* >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Verification 1 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
+                            /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
                             
                             broken_handle_list.reset();
                             (*handle_view_vec)[j].handle->collect_broken_handles(&broken_handle_list);

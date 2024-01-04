@@ -88,7 +88,7 @@ class POSHandle {
         :   client_addr(client_addr_), server_addr(nullptr), size(size_),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(state_size_) {}
+            ckpt_bag(nullptr) {}
     
     /*!
      *  \param  size_   size of the resources represented by this handle
@@ -100,7 +100,7 @@ class POSHandle {
         :   client_addr(nullptr), server_addr(nullptr), size(size_),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(state_size_) {}
+            ckpt_bag(nullptr) {}
     
     virtual ~POSHandle() = default;
 
@@ -314,9 +314,12 @@ class POSHandle {
     size_t state_size;
 
     /*!
-     *  \brief  list of checkpoint (under different version)
+     *  \brief  bag of checkpoints, implemented by different ckpt optimization level
+     *  \note   it must be initialized by different implementations of stateful handle,
+     *          as they might require different allocators and deallocators, see function
+     *          init_ckpt_bag
      */
-    POSCheckpointBag ckpt_bag;
+    POSCheckpointBag *ckpt_bag;
 
     /*!
      *  \brief  map between (1) dag pc to (2) host-side new value of 
@@ -328,6 +331,15 @@ class POSHandle {
      *          so we use a map here
      */
     std::map<uint64_t, std::pair<POSMem_ptr, uint64_t>> host_value_map;
+
+ protected:
+    /*!
+     *  \brief  initialize checkpoint bag of this handle
+     *  \note   it must be implemented by different implementations of stateful 
+     *          handle, as they might require different allocators and deallocators
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    virtual pos_retval_t init_ckpt_bag(){ return POS_FAILED_NOT_IMPLEMENTED; }
 };
 using POSHandle_ptr = std::shared_ptr<POSHandle>;
 
@@ -381,6 +393,7 @@ class POSHandleManager {
         POS_CHECK_POINTER(handle.get());
         
         // prevent we have add this handle before
+        // TODO: this could be slow
         for(i=0; i<_modified_handles_buffer.size(); i++){
             if(unlikely(_modified_handles_buffer[i]->client_addr == handle->client_addr)){
                 is_duplicated = true;

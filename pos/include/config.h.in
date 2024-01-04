@@ -7,3 +7,12 @@
 // TSC frequency
 // #define POS_TSC_FREQ 2200000000 // Hz
 #define POS_TSC_FREQ                    @pos_tsc_freq@ // Hz
+
+// checkpoint optimization level
+#define POS_CKPT_OPT_LEVAL              @pos_ckpt_opt_level@
+
+// checkpoint interval (unit in ms)
+#define POS_CKPT_INTERVAL               @pos_ckpt_interval_ms@ // ms
+
+// path to output log file
+#define POS_LOG_FILE_PATH               "@pos_log_file_path@"

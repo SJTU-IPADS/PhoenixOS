@@ -122,10 +122,8 @@ class POSDag {
     
     ~POSDag(){
         if(_pc > 0){
-            char path[1024] = { 0 };
-            sprintf(path, "/testdir/dag-%lu.pos", _client_id);
             _graph.dump_graph_to_file(
-                /* file_path */ path,
+                /* file_path */ POS_LOG_FILE_PATH,
                 /* serilize_t1 */ POSDag::_serilize_op,
                 /* serilize_t2 */ POSDag::_serilize_handle
             );
