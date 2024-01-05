@@ -348,7 +348,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
             /* src */ this->server_addr,
             /* size */ this->state_size,
             /* kind */ cudaMemcpyDeviceToHost,
-            /* stream */ stream_id
+            /* stream */ (cudaStream_t)(stream_id)
         );
         // e_tick = POSUtilTimestamp::get_tsc();
         // if(unlikely(getrusage(RUSAGE_SELF, &e_r_usage) != 0)){

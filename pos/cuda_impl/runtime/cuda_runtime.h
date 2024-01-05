@@ -242,19 +242,13 @@ namespace cuda_launch_kernel {
             arg_value = *((void**)arg_addr);
 
             /*!
-             *  \warning    this could be buggy here: what if an non-pointer value exactly 
-             *              equals to an client-side memory address?
+             *  \note   find out all involved memory areas
              */
             tmp_retval = hm_memory->get_handle_by_client_addr(
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
             if(likely(tmp_retval == POS_SUCCESS)){
-                /*!
-                 *  \note   we found out the memory handle here, but we can't replace the client-side address
-                 *          to the server-side address right here, as the memory might hasn't been physically 
-                 *          allocated yet, we must leave this procedure in the worker launching function :-(
-                 */
                 wqe->record_handle(
                     /* id */ kPOS_ResourceTypeId_CUDA_Memory,
                     /* handle_view */ POSHandleView_t(

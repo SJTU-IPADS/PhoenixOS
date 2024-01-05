@@ -342,15 +342,8 @@ typedef struct POSAPIContext_QE {
      *  \note   this constructor is for checkpointing ops
      *  \param  api_id              specialized API index of the checkpointing op
      *  \param  pos_client          pointer to the POSClient instance
-     *  \param  dag_vertex_id       reuse the previous op's dag_vertex_id
      */
-    POSAPIContext_QE(
-        uint64_t api_id,
-        void* pos_client,
-        uint64_t dag_vertex_id_
-    )
-        : client(pos_client), dag_vertex_id(dag_vertex_id_)
-    {
+    POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client) {
         api_cxt = std::make_shared<POSAPIContext_t>(api_id);
         POS_CHECK_POINTER(api_cxt);
     }

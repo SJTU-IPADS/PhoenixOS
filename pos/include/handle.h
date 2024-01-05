@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <map>
 
 #include <stdint.h>
 #include <assert.h>
@@ -634,3 +635,86 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
 exit:
     return ret;
 }
+
+typedef struct pos_ckpt_overlap_scheme {
+    // ckpt step index -> handles to be ckpted
+    std::vector<std::vector<POSHandle_ptr>> *_final_scheme;
+
+    // deadline index -> handles to be ckpted
+    std::vector<std::vector<POSHandle_ptr>> *_initial_scheme;
+
+    uint64_t _overlap_batch_size;
+    
+    inline void refresh(uint64_t overlap_batch_size){        
+        if(likely(_final_scheme != nullptr)){ delete _final_scheme; _final_scheme = nullptr; }
+        _final_scheme = new std::vector<std::vector<POSHandle_ptr>>(
+            /* capacity */ overlap_batch_size,
+            /* initial_value */ std::vector<POSHandle_ptr>()
+        );
+        POS_CHECK_POINTER(_final_scheme);
+
+        if(likely(_initial_scheme != nullptr)){ delete _initial_scheme; _initial_scheme = nullptr; }
+        _initial_scheme = new std::vector<std::vector<POSHandle_ptr>>(
+            /* capacity */ overlap_batch_size,
+            /* initial_value */ std::vector<POSHandle_ptr>()
+        );
+        POS_CHECK_POINTER(_initial_scheme);
+
+        _overlap_batch_size = overlap_batch_size;
+    }
+
+    inline void add_new_handle_for_distribute(uint64_t relative_deadline_position, POSHandle_ptr handle){
+        assert(relative_deadline_position < _overlap_batch_size);
+        (*_initial_scheme)[relative_deadline_position].push_back(handle);
+    }
+
+    inline void schedule(){
+        uint64_t i, j;
+        std::vector<POSHandle_ptr> handles;
+        std::vector<uint64_t> op_ckpt_budget(
+            /* capacity */ _overlap_batch_size,
+            /* initial_value */ 0
+        );
+        typename std::vector<uint64_t>::iterator op_ckpt_budget_iter;
+        uint64_t min_burden_op_pos;
+
+        auto get_overall_state_size = [](std::vector<POSHandle_ptr> &handles) -> uint64_t {
+            uint64_t overall_state_size = 0;
+            for(auto& handle : handles){ overall_state_size += handle->state_size; }
+            return overall_state_size;
+        };
+
+        for(i=0; i<_overlap_batch_size; i++){
+            handles = (*_initial_scheme)[i];
+
+            /*!
+             *  \note   for handles must be immediately ckpted by current ckpt op, we don't 
+             *          need to do the distribution scheduling below, just directly assign
+             */
+            if(unlikely(i == 0)){
+                (*_final_scheme)[i] = (*_initial_scheme)[i];
+                op_ckpt_budget[i] += get_overall_state_size(handles);
+                continue;
+            }
+
+            for(auto& handle: handles){
+                op_ckpt_budget_iter = std::min_element(op_ckpt_budget.begin(), op_ckpt_budget.begin() + i);
+                min_burden_op_pos = std::distance(op_ckpt_budget.begin(), op_ckpt_budget_iter);
+                (*_final_scheme)[min_burden_op_pos].push_back(handle);
+                op_ckpt_budget[min_burden_op_pos] += handle->state_size;
+            }            
+        }
+    }
+
+    inline std::vector<POSHandle_ptr>* get_overlap_scheme_by_ckpt_step_id(uint64_t ckpt_step_id){
+        if(unlikely(ckpt_step_id >= _overlap_batch_size)){
+            POS_WARN_DETAIL("ckpt step exceed range: ckpt_step_id(%lu)", ckpt_step_id);
+            return nullptr;
+        } else {
+            return &((*_final_scheme)[ckpt_step_id]);
+        }
+    }
+
+    pos_ckpt_overlap_scheme() : _overlap_batch_size(0), _final_scheme(nullptr), _initial_scheme(nullptr) {}
+    ~pos_ckpt_overlap_scheme() = default;
+} pos_ckpt_overlap_scheme_t;

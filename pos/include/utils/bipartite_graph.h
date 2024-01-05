@@ -150,7 +150,7 @@ class POSBipartiteGraph {
     template<typename T>
     std::shared_ptr<T> get_vertex_by_id(pos_vertex_id_t id){
         static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
-            "try to add invalid type of vertex into the graph, this is a bug!"
+            "try to get id of invalid type of vertex from the graph, this is a bug!"
         );
         if constexpr (std::is_same_v<T, T1>) {
             if(likely(_t1s.count(id) != 0)){ return _t1s[id]->data; } 
@@ -160,6 +160,31 @@ class POSBipartiteGraph {
             else { return std::shared_ptr<T>(nullptr); }
         }
     }
+
+
+    template<typename T>
+    std::map<pos_vertex_id_t, pos_edge_direction_t>* get_vertex_neighbors_by_id(pos_vertex_id_t id){
+        static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
+            "try to get neighbor of invalid type of vertex from the graph, this is a bug!"
+        );
+
+        std::map<pos_vertex_id_t, pos_edge_direction_t>* retval = nullptr;
+
+        if constexpr (std::is_same_v<T, T1>) {
+            // TODO: we might need to store a transpose matrix of _topo to accelerate searching
+            POS_ERROR_C_DETAIL("not implemented yet");
+        } else { // T2
+            if(likely(_topo.count(id) != 0)){ 
+                POS_CHECK_POINTER(retval = _topo[id])
+            } else { 
+                POS_WARN_C_DETAIL("no topology record of T2 id %lu", id);
+            }
+        }
+        
+    exit:
+        return retval;
+    }
+
 
     /*!
      *  \brief  functions for serilze T1 and T2 node, for dumping the graph to file

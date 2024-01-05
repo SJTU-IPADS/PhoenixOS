@@ -165,12 +165,13 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         
         ckpt_wqe = std::make_shared<POSAPIContext_QE>(
             /* api_id*/ this->_ws->checkpoint_api_id,
-            /* client */ wqe->client,
-            /* dag_vertex_id_ */ wqe->dag_vertex_id
+            /* client */ wqe->client
         );
         POS_CHECK_POINTER(ckpt_wqe);
 
-        // we only checkpoint those resources that has been modified since last checkpoint
+        /*!
+         *  \note   we only checkpoint those resources that has been modified since last checkpoint
+         */
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
             hm = client->handle_managers[stateful_handle_id];
             POS_CHECK_POINTER(hm);
@@ -182,8 +183,9 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
                 );
             }
             hm->clear_modified_handle();
-            retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
         }
+
+        retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
         
     exit:
         return retval;
