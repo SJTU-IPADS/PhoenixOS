@@ -53,6 +53,7 @@ build_cuda() {
             ninja clean
             ninja
         echo "[2] building remoting framework (cricket)"
+            export POS_ENABLE=true
             cd $script_dir
             cd remoting/cuda
             make libtirpc -j

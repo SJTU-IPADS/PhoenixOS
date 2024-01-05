@@ -10,3 +10,5 @@
 **/lib
 **/dag.pos
 **/*.nsys-rep
+
+remoting/cuda_old

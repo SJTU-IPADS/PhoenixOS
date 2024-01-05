@@ -261,6 +261,9 @@ class POSWorker {
                         #define POS_OVERLAP_BATCH_SIZE 5
                     #endif
 
+                        // Resource DAG
+                        // Compare: reexecute
+
                         // we will wait here for the next following several ops
                         // TODO: we need to prevent the following op is a ckpt op??
                         query_s_tick = POSUtilTimestamp::get_tsc();
