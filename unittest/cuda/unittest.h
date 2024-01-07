@@ -47,7 +47,9 @@ class POSUnitTest {
             {   CUDA_LAUNCH_KERNEL, test_cuda_launch_kernel },
             {   CUDA_STREAM_SYNCHRONIZE, test_cuda_stream_synchronize },
             {   CUDA_STREAM_IS_CAPTURING, test_cuda_stream_is_capturing },
-            {   CUDA_EVENT_CREATE, test_cuda_event_create_record_destory },
+            {   CUDA_EVENT_CREATE_WITH_FLAGS, test_cuda_event_create_with_flags },
+            {   CUDA_EVENT_RECORD, test_cuda_event_record },
+            {   CUDA_EVENT_DESTROY, test_cuda_event_destory },
             
             /* cublas apis */
             {   rpc_cublasCreate, test_cublas_create },

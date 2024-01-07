@@ -91,7 +91,7 @@ build_cuda() {
                     cd unittest/cuda/build
                     LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=127.0.0.1 ../bin/per_api_test
                     client_retval=$?
-                    kill $server_pid
+                    kill -SIGINT $server_pid
 
                     if [ $client_retval -eq 0 ]; then
                         echo "Per-API unittest passed!"

@@ -152,7 +152,29 @@ exit:
     return retval;
 }
 
-pos_retval_t test_cuda_event_create_record_destory(test_cxt* cxt){
+pos_retval_t test_cuda_event_create_with_flags(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaEvent_t event;
+    cudaError cuda_result;
+    uint64_t s_tick, e_tick;
+    
+    s_tick = POSUtilTimestamp::get_tsc();
+    cuda_result = cudaEventCreateWithFlags(&event, cudaEventDefault);
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    cxt->duration_ticks = e_tick - s_tick;
+
+    if(unlikely(cuda_result != cudaSuccess)){
+        POS_WARN_DETAIL("failed: %d", cuda_result);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+exit:
+    return retval;
+}
+
+pos_retval_t test_cuda_event_record(test_cxt* cxt){
     pos_retval_t retval = POS_SUCCESS;
     cudaEvent_t event;
     cudaError cuda_result;
@@ -164,7 +186,6 @@ pos_retval_t test_cuda_event_create_record_destory(test_cxt* cxt){
         retval = POS_FAILED;
         goto exit;
     }
-    POS_DEBUG("event: %p", event);
 
     s_tick = POSUtilTimestamp::get_tsc();
     cuda_result = cudaEventRecord(event, 0);
@@ -178,12 +199,35 @@ pos_retval_t test_cuda_event_create_record_destory(test_cxt* cxt){
         goto exit;
     }
 
-    cuda_result = cudaEventDestroy(event);
+exit:
+    return retval;
+}
+
+
+pos_retval_t test_cuda_event_destory(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaEvent_t event;
+    cudaError cuda_result;
+    uint64_t s_tick, e_tick;
+
+    cuda_result = cudaEventCreateWithFlags(&event, cudaEventDefault);
     if(unlikely(cuda_result != cudaSuccess)){
         POS_WARN_DETAIL("failed: %d", cuda_result);
         retval = POS_FAILED;
         goto exit;
     }
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cuda_result = cudaEventDestroy(event);
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    if(unlikely(cuda_result != cudaSuccess)){
+        POS_WARN_DETAIL("failed: %d", cuda_result);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cxt->duration_ticks = e_tick - s_tick;
 
 exit:
     return retval;

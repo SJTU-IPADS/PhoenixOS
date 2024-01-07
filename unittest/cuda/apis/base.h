@@ -32,7 +32,9 @@ pos_retval_t test_cuda_get_error_string(test_cxt* cxt);
 pos_retval_t test_cuda_launch_kernel(test_cxt* cxt);
 pos_retval_t test_cuda_stream_synchronize(test_cxt* cxt);
 pos_retval_t test_cuda_stream_is_capturing(test_cxt* cxt);
-pos_retval_t test_cuda_event_create_record_destory(test_cxt* cxt);
+pos_retval_t test_cuda_event_create_with_flags(test_cxt* cxt);
+pos_retval_t test_cuda_event_record(test_cxt* cxt);
+pos_retval_t test_cuda_event_destory(test_cxt* cxt);
 
 pos_retval_t test_cublas_create(test_cxt* cxt);
 pos_retval_t test_cublas_set_stream(test_cxt* cxt);

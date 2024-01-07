@@ -195,7 +195,7 @@ class POSDag:
 
     def analyse_dag(self, figure_dir_path:str):
         self._analyse_ckpt(figure_dir_path)
-        # self._analyse_ops()
+        self._analyse_ops()
 
     def _analyse_ops(self):
         print(">>> analysing ops...")
