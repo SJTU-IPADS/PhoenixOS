@@ -759,6 +759,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
         POSHandle_CUDA_Device_ptr device_handle;
 
         // get number of physical devices on the machine
+        // TODO: we shouldn't call this function here?
         if(unlikely(cudaSuccess != cudaGetDeviceCount(&num_device))){
             POS_ERROR_C_DETAIL("failed to call cudaGetDeviceCount");
         }

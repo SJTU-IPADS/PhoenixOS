@@ -52,7 +52,8 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     rpc_elf_load,
     rpc_register_function,
     rpc_elf_unload,
-    rpc_deinit
+    rpc_deinit,
+    rpc_checkpoint
 });
 
 bool pos_is_hijacked(uint64_t api_id){

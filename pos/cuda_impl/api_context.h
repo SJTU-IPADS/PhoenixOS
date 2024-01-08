@@ -115,7 +115,7 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cudaLaunchKernel"
                 }
             },
-            { 
+            {
                 /* api_id */ CUDA_SET_DEVICE, 
                 { 
                     /* is_sync */       false, 
@@ -124,7 +124,7 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cudaSetDevice"
                 }
             },
-            { 
+            {
                 /* api_id */ CUDA_GET_LAST_ERROR, 
                 { 
                     /* is_sync */       false, 
