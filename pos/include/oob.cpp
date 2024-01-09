@@ -271,7 +271,7 @@ namespace mock_api_call {
         payload->api_id = api_call_meta->api_id;
         payload->nb_params = api_call_meta->param_desps.size();
         for(i=0; i<payload->nb_params; i++){
-            assert(api_call_meta->param_desps[i].size <= 64);
+            POS_ASSERT(api_call_meta->param_desps[i].size <= 64);
             memcpy(
                 payload->api_params[i].value,
                 api_call_meta->param_desps[i].value,

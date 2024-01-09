@@ -33,7 +33,7 @@ namespace cublas_create {
             cublas_context_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_cuBLAS_Context, 0);
             POS_CHECK_POINTER(cublas_context_handle);
             cublas_context_handle->set_server_addr((void*)actual_handle);
-            cublas_context_handle->status = kPOS_HandleStatus_Active;
+            cublas_context_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
     exit:

@@ -36,7 +36,7 @@ namespace cu_module_load_data {
             module_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Module, 0);
             POS_CHECK_POINTER(module_handle);
             module_handle->set_server_addr((void*)module);
-            module_handle->status= kPOS_HandleStatus_Active;
+            module_handle->mark_status(kPOS_HandleStatus_Active);
         }
     
     exit_POS_WK_FUNC_LAUNCH_cu_module_load_data:
@@ -98,7 +98,7 @@ namespace cu_module_get_function {
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             function_handle->set_server_addr((void*)function);
-            function_handle->status = kPOS_HandleStatus_Active;
+            function_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
     exit_POS_WK_FUNC_LAUNCH_cu_module_get_function:
@@ -164,7 +164,7 @@ namespace cu_module_get_global {
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             var_handle->set_server_addr((void*)dptr);
-            var_handle->status = kPOS_HandleStatus_Active;
+            var_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
         // we temp hide the error from this api

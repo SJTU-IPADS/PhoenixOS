@@ -495,7 +495,7 @@ class POSWorkspace {
                     // found the called sync api
                     if(cqe->api_inst_id == wqe->api_inst_id){
                         // we should NOT do this assumtion here!
-                        // assert(i == cqes.size() - 1);
+                        // POS_ASSERT(i == cqes.size() - 1);
 
                         // setup return code
                         retval = has_prev_error ? prev_error_code : cqe->api_cxt->return_code;

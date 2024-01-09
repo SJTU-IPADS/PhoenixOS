@@ -31,8 +31,11 @@ namespace cuda_malloc {
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
             memory_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
             POS_CHECK_POINTER(memory_handle);
-            memory_handle->set_passthrough_addr(ptr);
-            memory_handle->status = kPOS_HandleStatus_Active;
+            
+            retval = memory_handle->set_passthrough_addr(ptr, memory_handle);
+            if(unlikely(POS_SUCCESS != retval)){ goto exit; }
+
+            memory_handle->mark_status(kPOS_HandleStatus_Active);
             memcpy(wqe->api_cxt->ret_data, &(memory_handle->client_addr), sizeof(uint64_t));
         } else {
             memset(wqe->api_cxt->ret_data, 0, sizeof(uint64_t));
@@ -79,7 +82,7 @@ namespace cuda_free {
         );
 
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            memory_handle_view.handle->status = kPOS_HandleStatus_Deleted;
+            memory_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
     exit:
@@ -590,6 +593,7 @@ namespace cuda_get_device_count {
 
     // landing function
     POS_WK_FUNC_LANDING(){
+        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device_count
@@ -653,6 +657,7 @@ namespace cuda_get_device {
 
     // landing function
     POS_WK_FUNC_LANDING(){
+        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device
@@ -768,7 +773,7 @@ namespace cuda_event_create_with_flags {
             event_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Event, 0);
             POS_CHECK_POINTER(event_handle);
             event_handle->set_server_addr(ptr);
-            event_handle->status = kPOS_HandleStatus_Active;
+            event_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
     exit:
@@ -814,7 +819,7 @@ namespace cuda_event_destory {
         );
 
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            event_handle_view.handle->status = kPOS_HandleStatus_Deleted;
+            event_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
     exit:

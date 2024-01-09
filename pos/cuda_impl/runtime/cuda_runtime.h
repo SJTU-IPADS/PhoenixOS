@@ -136,7 +136,7 @@ namespace cuda_free {
             goto exit;
         }
 
-        memory_handle->status = kPOS_HandleStatus_Delete_Pending;
+        memory_handle->mark_status(kPOS_HandleStatus_Delete_Pending);
 
         wqe->record_handle(
             kPOS_ResourceTypeId_CUDA_Memory, POSHandleView_t(memory_handle, kPOS_Edge_Direction_Delete)
@@ -908,6 +908,9 @@ namespace cuda_get_device_count {
         memcpy(wqe->api_cxt->ret_data, &nb_handles_int, sizeof(int));
 
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        
+        // launch the op to the dag (just for profiling)
+        retval = client->dag.launch_op(wqe);
 
         return retval;
     }
@@ -1252,8 +1255,8 @@ namespace cuda_event_destory {
             );
             goto exit;
         }
-
-        event_handle->status = kPOS_HandleStatus_Delete_Pending;
+        
+        event_handle->mark_status(kPOS_HandleStatus_Delete_Pending);
     
         wqe->record_handle(
             kPOS_ResourceTypeId_CUDA_Event, POSHandleView_t(event_handle, kPOS_Edge_Direction_Delete)

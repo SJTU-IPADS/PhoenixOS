@@ -62,7 +62,7 @@ typedef struct POSCudaFunctionDesp {
      *  \param  name_   the name to be set
      */
     inline void set_name(const char* name_){
-        assert(name.get() == nullptr);  // we can only set the name once
+        POS_ASSERT(name.get() == nullptr);  // we can only set the name once
         name = std::make_unique<char[]>(strlen(name_)+1);
         POS_CHECK_POINTER(name.get());
         strcpy(name.get(), name_);
@@ -624,7 +624,7 @@ class POSUtil_CUDA_Fatbin {
         bool is_duplicated;
 
         POS_CHECK_POINTER(memory); POS_CHECK_POINTER(desps);
-        assert(memsize > 0);
+        POS_ASSERT(memsize > 0);
 
         // create elf descriptor for the memory region
         POS_CHECK_POINTER(elf = elf_memory((char*)memory, memsize));

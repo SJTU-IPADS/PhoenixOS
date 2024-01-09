@@ -66,7 +66,7 @@ class POSRuntime {
         POS_CHECK_POINTER(_daemon_thread);
 
         rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
-        assert(rc == 0);
+        POS_ASSERT(rc == 0);
 
         POS_LOG_C(
             "runtime started: ckpt_interval(%lu ms, %lu ticks), ckpt_opt_level(%d)",
@@ -152,10 +152,11 @@ class POSRuntime {
                 POSAPIContext_QE_ptr wqe;
 
                 POS_CHECK_POINTER(wqe = wqes[i]);
-                api_id = wqe->api_cxt->api_id;
-                api_meta = _ws->api_mgnr->api_metas[api_id];
 
                 wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
+
+                api_id = wqe->api_cxt->api_id;
+                api_meta = _ws->api_mgnr->api_metas[api_id];
 
             #if POS_ENABLE_DEBUG_CHECK
                 if(unlikely(_parser_functions.count(api_id) == 0)){

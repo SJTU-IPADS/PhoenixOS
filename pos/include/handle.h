@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <type_traits>
 
 #include <stdint.h>
 #include <assert.h>
@@ -73,6 +75,12 @@ enum pos_handle_status_t : uint8_t {
     kPOS_HandleStatus_Broken
 };
 
+
+// forward declaration
+template<class T_POSHandle>
+class POSHandleManager;
+
+
 /*!
  *  \brief  a mapping of client-side and server-side handle, along with its metadata
  */
@@ -80,28 +88,31 @@ class POSHandle {
  public:
     /*!
      *  \param  client_addr_    the mocked client-side address of the handle
-     *  \param  size_           size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      *  \note   this constructor is for software resource, whose client-side address
      *          and server-side address could be seperated
      */
-    POSHandle(void *client_addr_, size_t size_, size_t state_size_=0) 
-        :   client_addr(client_addr_), server_addr(nullptr), size(size_),
-            dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-            status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(nullptr) {}
+    POSHandle(
+        void *client_addr_, size_t size_, void* hm, size_t state_size_=0
+    ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
+        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+        status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
+        ckpt_bag(nullptr), _hm(hm) {}
     
     /*!
-     *  \param  size_   size of the resources represented by this handle
+     *  \param  size_           size of the resources represented by this handle
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      *  \note   this constructor is for hardware resource, whose client-side address
      *          and server-side address should be equal (e.g., memory)
      */
-    POSHandle(size_t size_, size_t state_size_=0)
+    POSHandle(size_t size_, void* hm, size_t state_size_=0)
         :   client_addr(nullptr), server_addr(nullptr), size(size_),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(nullptr) {}
+            ckpt_bag(nullptr), _hm(hm) {}
     
     virtual ~POSHandle() = default;
 
@@ -114,9 +125,12 @@ class POSHandle {
     /*!
      *  \brief  setting both the client-side and server-side address of the handle 
      *          after finishing allocation
-     *  \param  addr  the setting address of the handle
+     *  \param  addr        the setting address of the handle
+     *  \param  handle_ptr  shared pointer to current handle
+     *  \return POS_SUCCESS for successfully setting
+     *          POS_FAILED_ALREADY_EXIST for duplication failed;
      */
-    inline void set_passthrough_addr(void *addr){ client_addr = addr; server_addr = addr; }
+    pos_retval_t set_passthrough_addr(void *addr, std::shared_ptr<POSHandle> handle_ptr);
 
     /*!
     *  \brief  record a new parent handle of current handle
@@ -256,6 +270,13 @@ class POSHandle {
     }
 
     /*!
+     *  \brief  mark the status of this handle
+     *  \param  status the status to mark
+     *  \note   this function would call the inner function within the corresponding handle manager
+     */
+    void mark_status(pos_handle_status_t status);
+
+    /*!
      *  \brief  checkpoint the state of the resource behind this handle
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id  version of this checkpoint
@@ -271,7 +292,7 @@ class POSHandle {
      *  \return POS_SUCCESS for successfully restore
      */
     virtual pos_retval_t restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
-
+    
     /*!
     *  \brief  the typeid of the resource kind which this handle represents
     *  \note   the children class of this base class should replace this value
@@ -334,6 +355,8 @@ class POSHandle {
     std::map<uint64_t, std::pair<POSMem_ptr, uint64_t>> host_value_map;
 
  protected:
+    void *_hm;
+
     /*!
      *  \brief  initialize checkpoint bag of this handle
      *  \note   it must be implemented by different implementations of stateful 
@@ -458,6 +481,123 @@ class POSHandleManager {
         }
     }
 
+    inline pos_retval_t mark_handle_status(std::shared_ptr<T_POSHandle> handle, pos_handle_status_t status){
+        POS_CHECK_POINTER(handle.get());
+        return mark_handle_status(handle.get(), status);
+    }
+
+    inline pos_retval_t mark_handle_status(T_POSHandle *handle, pos_handle_status_t status){
+        typename std::map<uint64_t, std::shared_ptr<T_POSHandle>>::iterator handle_map_iter;
+        
+        POS_CHECK_POINTER(handle);
+        
+        switch (status)
+        {
+        case kPOS_HandleStatus_Active:
+            handle->status = kPOS_HandleStatus_Active;
+            POS_DEBUG_C(
+                "mark handle as \"Active\" status: client_addr(%p), server_addr(%p)",
+                handle->client_addr, handle->server_addr
+            );
+            break;
+
+        case kPOS_HandleStatus_Broken:
+            handle->status = kPOS_HandleStatus_Broken;
+            POS_DEBUG_C(
+                "mark handle as \"Broken\" status: client_addr(%p), server_addr(%p)",
+                handle->client_addr, handle->server_addr
+            );
+            break;
+
+        case kPOS_HandleStatus_Create_Pending:
+            handle->status = kPOS_HandleStatus_Create_Pending;
+            POS_DEBUG_C(
+                "mark handle as \"Create_Pending\" status: client_addr(%p), server_addr(%p)",
+                handle->client_addr, handle->server_addr
+            );
+            break;
+
+        case kPOS_HandleStatus_Delete_Pending:
+            handle->status = kPOS_HandleStatus_Delete_Pending;
+
+            // remove the handle from the address map
+            handle_map_iter = _handle_address_map.find((uint64_t)(handle->client_addr));
+            if (likely(handle_map_iter != _handle_address_map.end())) {
+                _deleted_handle_address_map.insert({
+                    /* client_addr */ (uint64_t)(handle->client_addr),
+                    /* handle_ptr */ handle_map_iter->second
+                });
+                _handle_address_map.erase((uint64_t)(handle->client_addr));   
+            }
+
+            POS_DEBUG_C(
+                "mark handle as \"Delete_Pending\" status: client_addr(%p), server_addr(%p)",
+                handle->client_addr, handle->server_addr
+            );
+            break;
+
+        case kPOS_HandleStatus_Deleted:
+            handle->status = kPOS_HandleStatus_Deleted;
+
+            // remove the handle from the address map (should be already deleted in the last case)
+            handle_map_iter = _handle_address_map.find((uint64_t)(handle->client_addr));
+            if (unlikely(handle_map_iter != _handle_address_map.end())) {
+                POS_WARN_C_DETAIL("remove handle from address map when mark it as deleted, is this a bug?");
+                _deleted_handle_address_map.insert({
+                    /* client_addr */ (uint64_t)(handle->client_addr),
+                    /* handle_ptr */ handle_map_iter->second
+                });
+                _handle_address_map.erase((uint64_t)(handle->client_addr));
+            }
+
+            POS_DEBUG_C(
+                "mark handle as \"Deleted\" status: client_addr(%p), server_addr(%p)",
+                handle->client_addr, handle->server_addr
+            );
+            break;
+        
+        default:
+            POS_ERROR_C_DETAIL("unknown status %u", status);
+        }
+    }
+
+    /*!
+     *  \brief  record handle address to the address map
+     *  \note   this function should be called right after a handle obtain its client-side address:
+     *          (1) for non-passthrough handle: called within __allocate_mocked_resource;
+     *          (2) for passthrough handle: called within handle->set_server_addr
+     *  \param  addr    client-side address of the handle
+     *  \param  handle  the handle to be recorded
+     *  \return POS_SUCCESS for successfully recorded;
+     *          POS_FAILED_ALREADY_EXIST for duplication failed
+     */
+    inline pos_retval_t record_handle_address(void* addr, std::shared_ptr<T_POSHandle> handle){
+        pos_retval_t retval = POS_SUCCESS;
+        std::shared_ptr<T_POSHandle> __tmp;
+        uint64_t addr_u64 = (uint64_t)(addr);
+
+        POS_CHECK_POINTER(handle.get());
+
+        if(likely(POS_FAILED_NOT_EXIST == __get_handle_by_client_addr(addr, &__tmp))){
+            _handle_address_map[addr_u64] = handle;
+        } else {
+            POS_CHECK_POINTER(__tmp.get());
+            POS_WARN_C(
+                "try to record duplicated handle to the manager: new_addr(%p), new_size(%lu), old_addr(%p), old_size(%lu)",
+                addr, handle->size, __tmp->client_addr, __tmp->size
+            );
+
+            /*!
+             *  \note   no need to be failed here, some handle will record duplicated resources on purpose, 
+             *          e.g., cudaFunction
+             */
+            // retval = POS_FAILED_ALREADY_EXIST;
+        }
+
+    exit:
+        return retval;
+    }
+
  protected:
     uint64_t _base_ptr;
     
@@ -501,6 +641,10 @@ class POSHandleManager {
      *          POS_SUCCESS for successfully founded
      */
     pos_retval_t __get_handle_by_client_addr(void* client_addr, std::shared_ptr<T_POSHandle>* handle, uint64_t* offset=nullptr);
+
+ private:
+    std::map<uint64_t, std::shared_ptr<T_POSHandle>> _handle_address_map;
+    std::unordered_map<uint64_t, std::shared_ptr<T_POSHandle>> _deleted_handle_address_map;
 };
 
 
@@ -531,7 +675,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
  *  \param  size            size of the newly allocated resource
  *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
  *  \note   this function should be internally invoked by allocate_mocked_resource, which leave to children class to implement
- *  \return POS_FAILED_DRAIN for run out of virtual address space; 
+ *  \return POS_FAILED_DRAIN for run out of virtual address space;
+ *          POS_FAILED_ALREADY_EXIST for duplication failed;
  *          POS_SUCCESS for successfully allocation
  */
 template<class T_POSHandle>
@@ -541,12 +686,13 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
     uint64_t expected_addr,
     uint64_t state_size
 ){
-    pos_retval_t ret = POS_SUCCESS;
+    pos_retval_t retval = POS_SUCCESS;
 
     POS_CHECK_POINTER(handle);
 
     if(this->_passthrough){
-        *handle = std::make_shared<T_POSHandle>(size, state_size);
+        *handle = std::make_shared<T_POSHandle>(size, this, state_size);
+        POS_CHECK_POINTER((*handle).get());
     } else {
         // if one want to create on an expected address, we directly move the pointer forward
         if(unlikely(expected_addr != 0)){
@@ -556,20 +702,25 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         // make sure the resource to be allocated won't exceed the range
         if(unlikely(kPOS_ResourceEndAddr - _base_ptr < size)){
             POS_WARN_C(
-            "failed to allocate new resource, exceed range: request %lu bytes, yet %lu bytes left",
-            size, kPOS_ResourceEndAddr - _base_ptr
+                "failed to allocate new resource, exceed range: request %lu bytes, yet %lu bytes left",
+                size, kPOS_ResourceEndAddr - _base_ptr
             );
-            ret = POS_FAILED_DRAIN;
+            retval = POS_FAILED_DRAIN;
             *handle = nullptr;
-            goto exit_POSHandleManager_allocate_resource;
+            goto exit;
         }
 
+        *handle = std::make_shared<T_POSHandle>((void*)_base_ptr, size, this, state_size);
+        POS_CHECK_POINTER((*handle).get());
 
-        *handle = std::make_shared<T_POSHandle>((void*)_base_ptr, size, state_size);
+        // record client-side address to the map
+        retval = record_handle_address((void*)(_base_ptr), *handle);
+        if(unlikely(POS_SUCCESS != retval)){
+            goto exit;
+        }
 
         _base_ptr += size;
     }
-    POS_CHECK_POINTER((*handle).get());
 
     POS_DEBUG_C(
         "allocate new resource: _base_ptr(%p), size(%lu), POSHandle.resource_type_id(%u)",
@@ -578,8 +729,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
 
     _handles.push_back(*handle);
 
-  exit_POSHandleManager_allocate_resource:
-    return ret;
+  exit:
+    return retval;
 }
 
 /*!
@@ -611,24 +762,75 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
     pos_retval_t ret = POS_SUCCESS;
     std::shared_ptr<T_POSHandle> handle_ptr;
     uint64_t i;
-    
+    uint64_t client_addr_u64 = (uint64_t)(client_addr);
+
+    // std::map<uint64_t, std::shared_ptr<T_POSHandle>> _handle_address_map;
+    typename std::map<uint64_t, std::shared_ptr<T_POSHandle>>::iterator handle_map_iter;
+
     POS_CHECK_POINTER(handle);
     
-    for(i=0; i<_handles.size(); i++){
-        POS_CHECK_POINTER(handle_ptr = _handles[i]);
-        if(unlikely(handle_ptr->is_client_addr_in_range(client_addr, offset))){
-            if(unlikely(
-                handle_ptr->status == kPOS_HandleStatus_Deleted || handle_ptr->status == kPOS_HandleStatus_Delete_Pending
-            )){
-                continue;
-            }
+    /*!
+     *  \note   direct case: the given address is exactly the base address
+     */
+    if(likely(this->_handle_address_map.count(client_addr_u64) > 0)){
+        *handle = this->_handle_address_map[client_addr_u64];
+
+        /*!
+         *  \note   those handle that has been deleted (i.e., kPOS_HandleStatus_Deleted) and 
+         *          are going to be deleted (i.e., kPOS_HandleStatus_Delete_Pending) must be
+         *          not in the map! 
+         */
+        POS_ASSERT(
+            (*handle)->status != kPOS_HandleStatus_Deleted 
+            && (*handle)->status != kPOS_HandleStatus_Delete_Pending
+        );
+
+        if(unlikely(offset != nullptr)){
+            *offset = 0;
+        }
+        goto exit;
+    }
+    
+    /*!
+     *  \brief  indirect case: the given address is beyond the base address
+     */
+
+    // get the first handle less than the given address
+    handle_map_iter = this->_handle_address_map.lower_bound(client_addr_u64);
+    if(handle_map_iter != this->_handle_address_map.begin()){
+        handle_map_iter--;
+        handle_ptr = handle_map_iter->second;
+
+        POS_ASSERT(
+            handle_ptr->status != kPOS_HandleStatus_Deleted 
+            && handle_ptr->status != kPOS_HandleStatus_Delete_Pending
+        );
+
+        if(
+            (uint64_t)(handle_ptr->client_addr) <= client_addr_u64 
+            && client_addr_u64 < (uint64_t)(handle_ptr->client_addr) + handle_ptr->size
+        ){
             *handle = handle_ptr;
             goto exit;
         }
     }
-    
-    POS_DEBUG_C("failed to get handle: client_addr(%p)", client_addr);
 
+    // for(i=0; i<_handles.size(); i++){
+    //     POS_CHECK_POINTER(handle_ptr = _handles[i]);
+    //     if(unlikely(handle_ptr->is_client_addr_in_range(client_addr, offset))){
+    //         if(unlikely(
+    //             handle_ptr->status == kPOS_HandleStatus_Deleted || handle_ptr->status == kPOS_HandleStatus_Delete_Pending
+    //         )){
+    //             continue;
+    //         }
+    //         *handle = handle_ptr;
+    //         goto exit;
+    //     }
+    // }
+    
+    // POS_DEBUG_C("failed to get handle: client_addr(%p)", client_addr);
+
+not_found:
     *handle = nullptr;
     ret = POS_FAILED_NOT_EXIST;
 
@@ -664,7 +866,7 @@ typedef struct pos_ckpt_overlap_scheme {
     }
 
     inline void add_new_handle_for_distribute(uint64_t relative_deadline_position, POSHandle_ptr handle){
-        assert(relative_deadline_position < _overlap_batch_size);
+        POS_ASSERT(relative_deadline_position < _overlap_batch_size);
         (*_initial_scheme)[relative_deadline_position].push_back(handle);
     }
 

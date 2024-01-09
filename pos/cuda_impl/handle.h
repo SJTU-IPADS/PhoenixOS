@@ -40,11 +40,12 @@ class POSHandle_CUDA_Context : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Context(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Context(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Context;
     }
@@ -52,7 +53,9 @@ class POSHandle_CUDA_Context : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Context(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Context(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -82,7 +85,7 @@ class POSHandle_CUDA_Context : public POSHandle {
 
         // TODO: should we append to DAG here?
 
-        this->status = kPOS_HandleStatus_Active;
+        this->mark_status(kPOS_HandleStatus_Active);
 
         return POS_SUCCESS;
     }
@@ -104,11 +107,12 @@ class POSHandle_CUDA_Module : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Module(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Module(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
     }
@@ -116,7 +120,9 @@ class POSHandle_CUDA_Module : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Module(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Module(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -140,11 +146,12 @@ class POSHandle_CUDA_Var : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Var(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
     }
@@ -152,7 +159,9 @@ class POSHandle_CUDA_Var : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Var(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Var(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -176,11 +185,12 @@ class POSHandle_CUDA_Function : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Function(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_) 
+    POSHandle_CUDA_Function(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_) 
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Function;
     }
@@ -188,7 +198,9 @@ class POSHandle_CUDA_Function : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Function(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Function(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -224,11 +236,12 @@ class POSHandle_CUDA_Device : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Device(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Device(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
     }
@@ -236,7 +249,9 @@ class POSHandle_CUDA_Device : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Device(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Device(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -261,11 +276,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
  public:
     /*!
      *  \brief  constructor
-     *  \param  size    size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Memory(size_t size_, size_t state_size_=0)
-        : POSHandle(size_, state_size_)
+    POSHandle_CUDA_Memory(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
 
@@ -278,8 +294,8 @@ class POSHandle_CUDA_Memory : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Memory(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
@@ -413,11 +429,12 @@ class POSHandle_CUDA_Stream : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Stream(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Stream(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Stream;
     }
@@ -425,7 +442,9 @@ class POSHandle_CUDA_Stream : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Stream(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Stream(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -448,11 +467,12 @@ class POSHandle_CUDA_Event : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Event(void *client_addr_, size_t size_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, state_size_)
+    POSHandle_CUDA_Event(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Event;
     }
@@ -460,7 +480,9 @@ class POSHandle_CUDA_Event : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Event(size_t size_, size_t state_size_=0) : POSHandle(size_, state_size_){
+    POSHandle_CUDA_Event(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -530,7 +552,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
             POS_ERROR_C_DETAIL("failed to allocate mocked CUDA stream in the manager");
         }
         stream_handle->set_server_addr((void*)(0));
-        stream_handle->status = kPOS_HandleStatus_Active;
+        stream_handle->mark_status(kPOS_HandleStatus_Active);
 
         // record in the manager
         this->_handles.push_back(stream_handle);
@@ -779,7 +801,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
                 POS_ERROR_C_DETAIL("failed to allocate mocked CUDA device in the manager");
             }
             device_handle->device_id = i;
-            device_handle->status = kPOS_HandleStatus_Active;
+            device_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
         this->latest_used_handle = this->_handles[0];
@@ -848,7 +870,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
         }
 
         device_handle = this->_handles[device_id];        
-        assert(device_id == device_handle->device_id);
+        POS_ASSERT(device_id == device_handle->device_id);
 
         *handle = device_handle;
     }

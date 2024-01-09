@@ -240,7 +240,7 @@ class POSDag {
         }
 
         // the vertex id of the op should be exactly the end pc
-        assert(wqe->dag_vertex_id == _end_pc);
+        POS_ASSERT(wqe->dag_vertex_id == _end_pc);
 
         POS_DEBUG_C(
             "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",

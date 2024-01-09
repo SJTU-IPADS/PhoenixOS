@@ -24,11 +24,12 @@ class POSHandle_cuBLAS_Context : public POSHandle {
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
-     *  \param  size            size of the resources represented by this handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
      *  \param  state_size      size of resource state behind this handle  
      */
-    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, uint64_t state_size=0)
-        : POSHandle(client_addr_, size_, state_size)
+    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, uint64_t state_size=0)
+        : POSHandle(client_addr_, size_, hm, state_size)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }

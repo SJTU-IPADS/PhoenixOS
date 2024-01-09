@@ -363,7 +363,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             if(unlikely(handle_modified_position.size() == 0)){
                 deadline_position = wqe->dag_vertex_id + (nb_pending_op-1);
             } else {
-                assert(handle_modified_position[0] > wqe->dag_vertex_id); // must be...
+                POS_ASSERT(handle_modified_position[0] > wqe->dag_vertex_id); // must be...
                 deadline_position = handle_modified_position[0] - 1;                
             }
             relative_deadline_position = deadline_position - wqe->dag_vertex_id;

@@ -70,7 +70,7 @@ class POSWorker {
         POS_CHECK_POINTER(_daemon_thread);
 
         rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
-        assert(rc == 0);
+        POS_ASSERT(rc == 0);
 
         POS_LOG_C("worker started");
     }

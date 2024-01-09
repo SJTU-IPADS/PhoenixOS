@@ -253,7 +253,7 @@ namespace cu_module_get_function {
         function_handle->name = function_desp->name;
 
         // set handle state as pending to create
-        function_handle->status = kPOS_HandleStatus_Create_Pending;
+        function_handle->mark_status(kPOS_HandleStatus_Create_Pending);
 
         // record the related handle to QE
         wqe->record_handle(

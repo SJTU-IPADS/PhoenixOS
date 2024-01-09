@@ -33,7 +33,9 @@ enum pos_retval {
 
 #define UINT_64_MAX (1<<64 -1)
 
+#define POS_ASSERT(x)           assert(x);
 #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
+
 
 /*!
  *  \brief  type for resource typeid

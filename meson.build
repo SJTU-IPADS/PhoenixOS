@@ -48,11 +48,11 @@ log_file_path = '/root/dag.pos'
 
 # switch:   whether to check correctness of function parameters, return values, etc.,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_runtime_debug_check = 1
+enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 1
+enable_hijack_api_check = 0
 
 # switch:   whether to print all fatal messages
 enable_print_error = 1
@@ -123,7 +123,7 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += []
+sources += ['pos/src/handle.cpp']
 if target == 'cuda'
     sources += ['pos/cuda_impl/api_context.cpp']
 else

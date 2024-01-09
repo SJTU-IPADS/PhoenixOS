@@ -191,7 +191,7 @@ class POSTransport_SHM : public POSTransport {
                 POS_WARN_C("failed to create the first segment")
                 goto POSTransport_SHM_init_th_clean_resource;
             }
-            assert(segment_id == 0);
+            POS_ASSERT(segment_id == 0);
         }
 
         /*!
@@ -780,7 +780,7 @@ class POSTransport_SHM : public POSTransport {
         POS_CHECK_POINTER(new_segment_id);
         *new_segment_id = _segments.size() > 0 
                                 ? _segments.rbegin()->first + 1 : 0;
-        assert(_segments.count(*new_segment_id) == 0);
+        POS_ASSERT(_segments.count(*new_segment_id) == 0);
 
         // step 1: create SHM segment
         memset(name, 0, sizeof(name));
