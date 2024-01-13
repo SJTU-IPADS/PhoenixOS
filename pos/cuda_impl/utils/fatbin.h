@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include <sstream>
 
 #include <libelf.h>
 #include <gelf.h>
@@ -54,6 +56,15 @@ typedef struct POSCudaFunctionDesp {
     // size of each parameter
     std::vector<uint32_t> param_sizes;
 
+    // index of those parameter which is a input pointer (const pointer)
+    std::vector<uint32_t> input_pointer_params;
+
+    // index of those parameter which is a output pointer (non-const pointer)
+    std::vector<uint32_t> output_pointer_params;
+
+    // index of those non-pointer parameters that may carry pointer inside their values
+    std::vector<uint32_t> suspicious_params;
+
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
 
@@ -70,9 +81,89 @@ typedef struct POSCudaFunctionDesp {
 
     POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0) {}
     ~POSCudaFunctionDesp(){}
-
 } POSCudaFunctionDesp_t;
 using POSCudaFunctionDesp_ptr = std::shared_ptr<POSCudaFunctionDesp_t>;
+
+
+/*！
+ *  \brief  parser of CUDA kernel
+ */
+class POSUtil_CUDA_Kernel_Parser {
+ public:
+    /*!
+     *  \brief  analyse the behaviour of an kernel based on its prototype, 
+     *          the behaviour is represent by its parameter (i.e., whether it's a pointer), and the direction of the
+     *          pointer (i.e., whether this pointer is an const pointer)
+     *  \param  kernel_str      low-level (mangles) identifiers of the kernel
+     *  \param  function_desp   shared_ptr of function descriptor
+     *  \example    mangles:    _Z8kernel_1PKfPfS1_S1_i
+     *              demangles:  kernel_1(const float *, float *, float *, float *, int)
+     *  \note   this function will use binary utilites "cu++filt" to obtain the kernel prototype, and
+     *          use clang to parse the semantics of the prototype
+     *  \todo   use __cu_demangle under CUDA 12.0
+     *  \return POS_SUCCESS for successfully parsing
+     *          POS_FAILED for failed parsing
+     */
+    static pos_retval_t parse_by_prototype(const char *kernel_str, POSCudaFunctionDesp_ptr function_desp){
+        pos_retval_t retval = POS_SUCCESS;
+        std::string kernel_demangles_name, kernel_prototype;
+
+        POS_CHECK_POINTER(kernel_str);
+        POS_CHECK_POINTER(function_desp.get());
+
+        retval = __preprocess_prototype(kernel_str, kernel_demangles_name);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed parsing kernel prototype: preprocess failed: kernel_str(%s)", kernel_str);
+            goto exit;
+        }
+
+        retval = __generate_prototype(kernel_demangles_name, kernel_prototype);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed parsing kernel prototype: generate prototype failed: kernel_str(%s)", kernel_str);
+            goto exit;
+        }
+
+        retval = __parse_prototype(kernel_prototype, function_desp);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "failed parsing kernel prototype: parsing failed: kernel_str(%s), kernel_prototype(%s)",
+                kernel_str, kernel_prototype
+            );
+            goto exit;
+        }
+
+    exit:
+        return retval;
+    }
+ 
+ private:
+    /*!
+     *  \brief  preprocess a raw demangles name
+     *  \param  kernel_str              the raw demangles name
+     *  \param  kernel_demangles_name   the processed demangles name
+     *  \return POS_SUCCESS for successfully processed
+     *          POS_INVALID_INPUT for invalid raw demangles name
+     */
+    static pos_retval_t __preprocess_prototype(const char *kernel_str, std::string& kernel_demangles_name);
+
+    /*!
+     *  \brief  generate the origin kernel prototype based on processed demangles name
+     *  \param  kernel_demangles_name   the processed demangles name
+     *  \param  kernel_prototype        the generated kernel prototype
+     *  \return POS_SUCCESS for successfully generation
+     *          POS_FAILED for failed generation
+     */
+    static pos_retval_t __generate_prototype(const std::string& kernel_demangles_name, std::string& kernel_prototype);
+
+    /*!
+     *  \brief  parsing the kernel prototype
+     *  \param  kernel_prototype        the generated kernel prototype
+     *  \param  function_desp           shared_ptr of function descriptor
+     *  \return POS_SUCCESS for successfully processed
+     *          POS_FAILED for failed processed
+     */
+    static pos_retval_t __parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp_ptr function_desp);
+};
 
 
 /*！
@@ -250,7 +341,7 @@ class POSUtil_CUDA_Fatbin {
 
         if(unlikely(fatbin_elf_hdr->magic != FATBIN_TEXT_MAGIC)){
             POS_WARN(
-                "invalid magic within the fatbin ELF header: given(%lx), expected(%lx)",
+                "invalid magic within the fatbin ELF header: given(%x), expected(%x)",
                 fatbin_elf_hdr->magic, FATBIN_TEXT_MAGIC
             );
             retval = POS_FAILED_INVALID_INPUT;
@@ -548,12 +639,10 @@ class POSUtil_CUDA_Fatbin {
         auto get_params_for_kernel = [&](
             Elf *elf, POSCudaFunctionDesp_ptr *function_desp, void* memory, size_t memsize
         ) -> pos_retval_t {
-            pos_retval_t retval = POS_SUCCESS;
             char *section_name = NULL;
             Elf_Scn *section = NULL;
             Elf_Data *data = NULL;
             size_t secpos=0;
-            int i=0;
 
             POS_CHECK_POINTER(elf); POS_CHECK_POINTER(function_desp); POS_CHECK_POINTER(memory);
 
@@ -588,6 +677,15 @@ class POSUtil_CUDA_Fatbin {
                     (*function_desp)->nb_params += 1;
                     (*function_desp)->param_offsets.push_back(kparam->offset);
                     (*function_desp)->param_sizes.push_back(kparam->size);
+
+                    /*!
+                     *  \note   for those parameters that larger that 64, we suspect it might contains device pointer,
+                     *          and we will conduct checking when user first launch this kernel
+                     */
+                    if(unlikely(kparam->size >= 64)){
+                        (*function_desp)->suspicious_params.push_back(kparam->ordinal);
+                    }
+
                     secpos += sizeof(struct nv_info_kernel_entry) + entry->values_size-4;
                 } else if (entry->format == EIFMT_HVAL && entry->attribute == EIATTR_CBANK_PARAM_SIZE) {
                     (*function_desp)->cbank_param_size = entry->values_size;
@@ -720,6 +818,13 @@ class POSUtil_CUDA_Fatbin {
             if(unlikely(retval != POS_SUCCESS)){
                 POS_WARN_DETAIL("failed to extract parameter out of the kernel in the ELF: kernel_name(%s)", kernel_str);
                 goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+            }
+
+            // parsing the parameters hints (e.g., whether it's a pointer, direction of the pointer)
+            retval = POSUtil_CUDA_Kernel_Parser::parse_by_prototype(kernel_str, function_desp);
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_DETAIL("failed to extract parameter hints (pointer, direction): kernel_name(%s), won't be recorded!", kernel_str);
+                continue;
             }
 
             desps->push_back(function_desp);

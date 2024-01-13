@@ -20,12 +20,19 @@ run_unit_test=true
 build_cuda() {
     if [ $doclean = true ]; then
         echo "clean target: cuda"
-        echo "[1] cleaning POS"
+        echo "[1] cleaning dependencies"
+        echo "    [1.1] cleaning libclang"
+            cd $script_dir
+            cd third_party/libclang-static-build
+            if [ -d "./build" ]; then
+                rm -rf build include lib share
+            fi
+        echo "[2] cleaning POS"
             cd $script_dir
             if [ -d "./build" ]; then
                 rm -rf ./build
             fi
-        echo "[2] cleaning remoting framework (cricket)"
+        echo "[3] cleaning remoting framework (cricket)"
             cd $script_dir
             cd remoting/cuda/submodules/libtirpc
             make clean
@@ -33,7 +40,7 @@ build_cuda() {
             cd $script_dir
             cd remoting/cuda/cpu
             make clean
-        echo "[3] cleaning unittest"
+        echo "[4] cleaning unittest"
             cd $script_dir
             cd unittest/cuda
             if [ -d "./build" ]; then
@@ -44,7 +51,19 @@ build_cuda() {
             fi
     else
         echo "build target: cuda"
-        echo "[1] building POS"
+        echo "[1] building dependencies"
+            cd $script_dir
+            echo "    [1.1] building libclang"
+            cd third_party/libclang-static-build
+            mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=..
+            make install -j
+            
+            # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
+            cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
+            cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
+            
+        echo "[2] building POS"
             cd $script_dir
             if [ ! -d "./build" ]; then
                 meson build
@@ -52,7 +71,7 @@ build_cuda() {
             cd build
             ninja clean
             ninja
-        echo "[2] building remoting framework (cricket)"
+        echo "[3] building remoting framework (cricket)"
             export POS_ENABLE=true
             cd $script_dir
             cd remoting/cuda
@@ -63,7 +82,7 @@ build_cuda() {
             else
                 LOG=INFO make cricket-rpc-server cricket-client.so
             fi
-        echo "[3] building unittest"
+        echo "[4] building unittest"
             cd $script_dir
             cd unittest/cuda
             if [ -d "./build" ]; then

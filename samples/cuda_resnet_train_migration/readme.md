@@ -55,6 +55,17 @@ bash ./svr.sh -r 1
 bash ./clnt.sh -s 1 -i zobinhuang/pytorch:1.13.1-devel-for-pos -m false
 ```
 
+we need to change the g++ --version inside client because it's a old ubuntu18.04 image
+
+```bash
+apt-get install software-properties-common
+add-apt-repository ppa:jonathonf/gcc
+apt-get update
+apt-get install g++-9
+update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
+update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 9
+```
+
 Other:
 
 ```bash

@@ -251,6 +251,9 @@ namespace cu_module_get_function {
         function_handle->param_sizes = function_desp->param_sizes;
         function_handle->cbank_param_size = function_desp->cbank_param_size;
         function_handle->name = function_desp->name;
+        function_handle->input_pointer_params = function_desp->input_pointer_params;
+        function_handle->output_pointer_params = function_desp->output_pointer_params;
+        function_handle->suspicious_params = function_desp->suspicious_params;
 
         // set handle state as pending to create
         function_handle->mark_status(kPOS_HandleStatus_Create_Pending);

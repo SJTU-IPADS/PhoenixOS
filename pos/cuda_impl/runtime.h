@@ -158,6 +158,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         POSHandleManager<POSHandle>* hm;
         POSAPIContext_QE_ptr ckpt_wqe;
         uint64_t i;
+        typename std::map<uint64_t, POSHandle_ptr>::iterator map_iter;
 
         POS_CHECK_POINTER(wqe);
 
@@ -175,11 +176,12 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
             hm = client->handle_managers[stateful_handle_id];
             POS_CHECK_POINTER(hm);
-            std::vector<POSHandle_ptr>& modified_handles = hm->get_modified_handles(); 
-            for(i=0; i<modified_handles.size(); i++){
+            std::map<uint64_t, POSHandle_ptr>& modified_handles = hm->get_modified_handles(); 
+            for(map_iter = modified_handles.begin(); map_iter != modified_handles.end(); map_iter++){
+                POS_CHECK_POINTER(map_iter->second.get());
                 ckpt_wqe->record_handle(
-                    stateful_handle_id, 
-                    POSHandleView_t(modified_handles[i], kPOS_Edge_Direction_Out, 0)
+                    stateful_handle_id,
+                    POSHandleView_t(map_iter->second, kPOS_Edge_Direction_Out, 0)
                 );
             }
             hm->clear_modified_handle();

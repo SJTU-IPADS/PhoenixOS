@@ -231,7 +231,7 @@ class POSDag {
 
         retval =_graph.add_vertex<pos_op_meta_t>(
             /* data */ op_meta,
-            /* neighbor */ neighbor_map,
+            /* neighbor */ neighbor_map, // TODO: wqe->neighbor_map
             /* id */ &(wqe->dag_vertex_id)
         );
         if(unlikely(retval != POS_SUCCESS)){

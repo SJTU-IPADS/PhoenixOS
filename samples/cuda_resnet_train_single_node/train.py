@@ -49,12 +49,15 @@ for epoch in tqdm(range(1, n_epochs+1)):
     for data, target in train_loader:
         data = data.to(device)
         target = target.to(device)
+        
+        # NOTE: comment out to mock inference
         optimizer.zero_grad()
+        
         output = model(data).to(device)
+
+        # NOTE: comment out to mock inference
         loss = criterion(output, target)
-
         loss.backward()
-
         optimizer.step()
         train_loss += loss.item()*data.size(0)
 

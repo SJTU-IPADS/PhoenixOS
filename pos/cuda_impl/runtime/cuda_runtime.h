@@ -163,11 +163,13 @@ namespace cuda_launch_kernel {
         POSHandle_CUDA_Function_ptr function_handle;
         POSHandle_CUDA_Stream_ptr stream_handle;
         POSHandle_CUDA_Memory_ptr memory_handle;
-        uint64_t i;
+        uint64_t i, param_index;
         void *args, *arg_addr, *arg_value;
         POSHandleManager<POSHandle_CUDA_Function>* hm_function;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        
+        uint64_t s_tick, e_tick;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -231,43 +233,67 @@ namespace cuda_launch_kernel {
         args += (sizeof(size_t) + sizeof(uint16_t) * function_handle->nb_params);
         
         /*!
-         *  \brief  find out all involved memory
-         *  \note   use a cache to optimize this part
+         *  \note   check suspicious parameters that might contains pointer
          */
-        for(i=0; i<function_handle->nb_params; i++){
-            arg_addr = args + function_handle->param_offsets[i];
+        if(unlikely(function_handle->has_verified_params == false)){
+            // TODO:
+            function_handle->has_verified_params = true;
+        }
+
+        /*!
+         *  \note   record all output memories
+         */
+        for(i=0; i<function_handle->output_pointer_params.size(); i++){
+            param_index = function_handle->output_pointer_params[i];
+
+            arg_addr = args + function_handle->param_offsets[param_index];
             POS_CHECK_POINTER(arg_addr);
-
-            // the argument stores here MIGHT be a client-side address, we would give it a shot below
             arg_value = *((void**)arg_addr);
-
+            
             /*!
-             *  \note   find out all involved memory areas
+             *  \note   sometimes one would launch kernel with some pointer params are nullptr (at least pytorch did),
+             *          this is probably normal, so we just ignore this situation
              */
+            if(unlikely(arg_value == nullptr)){
+                continue;
+            }
+
             tmp_retval = hm_memory->get_handle_by_client_addr(
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
-            if(likely(tmp_retval == POS_SUCCESS)){
-                wqe->record_handle(
-                    /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-                    /* handle_view */ POSHandleView_t(
-                        /* handle_ */ memory_handle,
-                        /* dir_ */ kPOS_Edge_Direction_InOut,
-                        /* host_value_s */ nullptr,
-                        /* host_value_size_ */ 0,
-                        /* param_index_ */ i
-                    )
+            if(unlikely(tmp_retval != POS_SUCCESS)){
+                POS_WARN(
+                    "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
+                    "yet it contains no memory address during launching: given client addr(%p)",
+                    param_index, function_handle->name.get(), arg_value
                 );
-                hm_memory->record_modified_handle(memory_handle);
+                continue;
             }
+
+            wqe->record_handle(
+                /* id */ kPOS_ResourceTypeId_CUDA_Memory,
+                /* handle_view */ POSHandleView_t(
+                    /* handle_ */ memory_handle,
+                    /* dir_ */ kPOS_Edge_Direction_Out,
+                    /* host_value_s */ nullptr,
+                    /* host_value_size_ */ 0,
+                    /* param_index_ */ param_index
+                )
+            );
+            hm_memory->record_modified_handle(memory_handle);
         }
+
+        // s_tick = POSUtilTimestamp::get_tsc();
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
 
-        goto exit;
+        // e_tick = POSUtilTimestamp::get_tsc();
 
+        // POS_LOG("launch op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+
+    #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(
             "parse(cuda_launch_kernel): function(%s), stream(%p), grid_dim(%u,%u,%u), block_dim(%u,%u,%u), SM_size(%lu), #buffer(%lu)",
@@ -281,6 +307,7 @@ namespace cuda_launch_kernel {
             pos_api_param_value(wqe, 4, size_t),
             wqe->handle_view_map[kPOS_ResourceTypeId_CUDA_Memory]->size()
         );
+    #endif
 
     exit:
         return retval;

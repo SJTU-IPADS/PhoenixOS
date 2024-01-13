@@ -193,6 +193,7 @@ class POSHandle_CUDA_Function : public POSHandle {
         : POSHandle(client_addr_, size_, hm, state_size_) 
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Function;
+        this->has_verified_params = false;
     }
     
     /*!
@@ -221,6 +222,16 @@ class POSHandle_CUDA_Function : public POSHandle {
 
     // size of each parameter
     std::vector<uint32_t> param_sizes;
+
+    // index of those parameter which is a input pointer (const pointer)
+    std::vector<uint32_t> input_pointer_params;
+
+    // index of those parameter which is a output pointer (non-const pointer)
+    std::vector<uint32_t> output_pointer_params;
+
+    // index of those non-pointer parameters that may carry pointer inside their values
+    std::vector<uint32_t> suspicious_params;
+    bool has_verified_params;
 
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
@@ -858,11 +869,12 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *          POS_SUCCESS for successfully founded
      */
     pos_retval_t get_handle_by_client_addr(void* client_addr, std::shared_ptr<POSHandle_CUDA_Device>* handle, uint64_t* offset=nullptr){
-        int device_id, i;
+        int device_id, device_id_u64, i;
         POSHandle_CUDA_Device_ptr device_handle;
 
         // we cast the client address into device id here
-        device_id = (int)client_addr;
+        device_id_u64 = (uint64_t)(client_addr);
+        device_id = (int)(device_id_u64);
 
         if(device_id >= this->_handles.size()){
             *handle = nullptr;

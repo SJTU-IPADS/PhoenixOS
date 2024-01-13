@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 as base
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as base
 # FROM zobinhuang/pytorch:1.13.1-devel as base
 
 

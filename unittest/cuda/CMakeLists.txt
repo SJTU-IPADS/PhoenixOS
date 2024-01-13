@@ -31,14 +31,17 @@ add_executable(per_api_test ./perapi.cu ${SRC_POS_UNITTEST_COMMON_SRC} ${SRC_POS
 # hidden API test
 # add_executable(hidden_api_test ./hidden.cpp ${SRC_POS_UNITTEST_COMMON_SRC})
 
+# hidden API test
+add_executable(kernel_parse ./kernel_parse/main.cpp ${SRC_POS_UNITTEST_COMMON_SRC})
+
 # set(TEST_TARGETS per_api_test hidden_api_test)
-set(TEST_TARGETS per_api_test)
+set(TEST_TARGETS per_api_test kernel_parse)
 
 foreach( test_target ${TEST_TARGETS} )
     set_target_properties(${test_target} PROPERTIES LINKER_LANGUAGE CUDA)
 
     # target_link_libraries(${test_target} nvToolsExt -lcublas -lcurand)
-    target_link_libraries(${test_target} -lcuda -lcublas -ldl -lpthread)
+    target_link_libraries(${test_target} -lcuda -lcublas -ldl -lpthread -lclang)
     # target_link_libraries(${test_target} Boost::serialization)
 
     target_include_directories(${test_target} PUBLIC ${CUDA_TOOLKIT_ROOT_DIR}/include)
@@ -50,6 +53,9 @@ foreach( test_target ${TEST_TARGETS} )
     # link POS
     find_library(pos_so NAMES pos HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../build)
     target_link_libraries(${test_target} ${pos_so})
+
+    # include third party header
+    target_include_directories(${test_target} PUBLIC ../../third_party/libclang-static-build/include)
 
     # important here to set cuda as dynamically linked
     set_target_properties(${test_target} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)

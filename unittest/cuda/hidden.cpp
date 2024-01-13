@@ -48,7 +48,7 @@ void test_cuModuleLoadData(){
     std::ifstream file("/testdir/cpu/pos/unittest/pos-test.fatbin", std::ios::binary | std::ios::ate);
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(size);
+    std::vector<char> buffer(size);
     CUresult res;
     fat_header_t *fat_hdr;
     fat_elf_header_t *elf_hdr;
@@ -62,7 +62,7 @@ void test_cuModuleLoadData(){
             elf_hdr->magic, buffer.size(), elf_hdr->header_size + elf_hdr->size
         );
 
-        res = pos_cuda_ws->pos_process( 
+        res = (CUresult)(pos_cuda_ws->pos_process( 
             /* api_id */ rpc_cuModuleLoad, 
             /* uuid */ client_uuid, 
             /* param_desps */ {
@@ -70,7 +70,7 @@ void test_cuModuleLoadData(){
                 { .value = elf_hdr, .size = elf_hdr->header_size + elf_hdr->size }
             },
             /* ret_data */ nullptr
-        );
+        ));
         POS_DEBUG("(test_cuModuleLoadData): pos_process return %d", res);
     } else {
         POS_ERROR("(test_cuModuleLoadData): failed to open the fatbin file");

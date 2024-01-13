@@ -5,7 +5,7 @@
 #include "pos/include/utils/readerwriterqueue/atomicops.h"
 #include "pos/include/utils/readerwriterqueue/readerwriterqueue.h"
 
-#define POS_LOCKLESS_Q_DEFAULT_LEN  64
+#define POS_LOCKLESS_QUEUE_LEN  8192
 
 /*!
  *  \brief  lock-free queue
@@ -15,7 +15,7 @@ template<typename T>
 class POSLockFreeQueue {
  public:
     POSLockFreeQueue(){
-        _q = new moodycamel::ReaderWriterQueue<std::shared_ptr<T>>();
+        _q = new moodycamel::ReaderWriterQueue<std::shared_ptr<T>, POS_LOCKLESS_QUEUE_LEN>();
         POS_CHECK_POINTER(_q);
     }
     ~POSLockFreeQueue() = default;
@@ -41,5 +41,5 @@ class POSLockFreeQueue {
     }
 
  private:
-    moodycamel::ReaderWriterQueue<std::shared_ptr<T>> *_q;
+    moodycamel::ReaderWriterQueue<std::shared_ptr<T>, POS_LOCKLESS_QUEUE_LEN> *_q;
 };

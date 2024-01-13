@@ -37,7 +37,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_cuBLAS_Context(size_t size_, uint64_t state_size=0) : POSHandle(size_, state_size){
+    POSHandle_cuBLAS_Context(size_t size_, void* hm, uint64_t state_size=0) : POSHandle(size_, hm, state_size){
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 

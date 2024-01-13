@@ -11,9 +11,16 @@
 class POSCheckpointSlot;
 using POSCheckpointSlot_ptr = std::shared_ptr<POSCheckpointSlot>;
 
+using pos_custom_ckpt_allocate_func_t = void*(*)(uint64_t state_size);
+using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
+
 class POSCheckpointBag {
  public:
-    POSCheckpointBag(uint64_t state_size) {}
+    POSCheckpointBag(
+        uint64_t state_size,
+        pos_custom_ckpt_allocate_func_t allocator,
+        pos_custom_ckpt_deallocate_func_t deallocator
+    ) {}
     ~POSCheckpointBag() = default;
     
     /*!

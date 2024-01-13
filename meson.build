@@ -26,8 +26,14 @@ deps = []
 # include directories
 inc_dirs = []
 
+# all libraries that want to be statically linked
+libraries = []
+
 # source files
 sources = []
+
+# current directory of this meson file
+meson_file_dir = meson.source_root()
 
 
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
@@ -35,7 +41,7 @@ sources = []
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 2
+ckpt_opt_level = 0
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
@@ -68,7 +74,7 @@ enable_print_debug = 0
 
 # switch:   whether to print fatal/warn/debug/log with colors
 #           should be disabled when try to dump all outputs to a file
-enable_print_with_color = 1
+enable_print_with_color = 0
 
 # we need to hardcoded some configurations as source code
 subdir('pos/include')
@@ -125,13 +131,26 @@ message('>>> Detecting CUDA toolkit done\n')
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
 sources += ['pos/src/handle.cpp']
 if target == 'cuda'
-    sources += ['pos/cuda_impl/api_context.cpp']
+    sources += [
+        'pos/cuda_impl/api_context.cpp',
+        'pos/cuda_impl/utils/fatbin.cpp'
+    ]
 else
     assert(false, 'target ' + target + ' is currently not supported')
 endif
 
 inc_dirs += ['./']
 inc_dirs += ['./third_party/websocketpp/websocketpp']
+
+
+# >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
+
+message('>>> Detecting libclang')
+ld_args += ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
+inc_dirs += ['./third_party/libclang-static-build/include']
+message('>>>>>> Link option: ' + '-L' + meson_file_dir + '/third_party/libclang-static-build/lib, -lclang')
+message('>>>>>> Include path: ./third_party/libclang-static-build/include')
+message('>>> Detecting libclang done')
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>

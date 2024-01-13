@@ -131,7 +131,7 @@ class POSWorker {
      */
     static inline void __done(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE_ptr wqe){
         T_POSClient *client;
-        POS_CHECK_POINTER(client = wqe->client);
+        POS_CHECK_POINTER(client = (T_POSClient*)(wqe->client));
 
         // forward the DAG pc
         client->dag.forward_pc();

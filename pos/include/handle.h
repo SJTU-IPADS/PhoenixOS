@@ -412,37 +412,23 @@ class POSHandleManager {
      *  \param  handle  the handle that will be modified
      */
     inline void record_modified_handle(std::shared_ptr<T_POSHandle> handle){
-        uint64_t i;
-        bool is_duplicated = false;
         POS_CHECK_POINTER(handle.get());
-        
-        // prevent we have add this handle before
-        // TODO: this could be slow
-        for(i=0; i<_modified_handles_buffer.size(); i++){
-            if(unlikely(_modified_handles_buffer[i]->client_addr == handle->client_addr)){
-                is_duplicated = true;
-                break;
-            }
-        }
-
-        if(!is_duplicated){
-            _modified_handles_buffer.push_back(handle);
-        }
+        _modified_handles_map[(uint64_t)(handle->client_addr)] = handle;
     }
 
     /*!
      *  \brief  clear all records of modified handles
      */
     inline void clear_modified_handle(){ 
-        _modified_handles_buffer.clear();
+        _modified_handles_map.clear();
     }
 
     /*!
      *  \brief  get all records of modified handles
      *  \return all records of modified handles
      */
-    inline std::vector<std::shared_ptr<T_POSHandle>>& get_modified_handles(){
-        return _modified_handles_buffer;
+    inline std::map<uint64_t, std::shared_ptr<T_POSHandle>>& get_modified_handles(){
+        return _modified_handles_map;
     }
 
     /*!
@@ -582,15 +568,15 @@ class POSHandleManager {
             _handle_address_map[addr_u64] = handle;
         } else {
             POS_CHECK_POINTER(__tmp.get());
-            POS_WARN_C(
-                "try to record duplicated handle to the manager: new_addr(%p), new_size(%lu), old_addr(%p), old_size(%lu)",
-                addr, handle->size, __tmp->client_addr, __tmp->size
-            );
 
             /*!
              *  \note   no need to be failed here, some handle will record duplicated resources on purpose, 
-             *          e.g., cudaFunction
+             *          e.g., CUFunction
              */
+            // POS_WARN_C(
+            //     "try to record duplicated handle to the manager: new_addr(%p), new_size(%lu), old_addr(%p), old_size(%lu)",
+            //     addr, handle->size, __tmp->client_addr, __tmp->size
+            // );
             // retval = POS_FAILED_ALREADY_EXIST;
         }
 
@@ -610,11 +596,11 @@ class POSHandleManager {
     std::vector<std::shared_ptr<T_POSHandle>> _handles;
 
     /*!
-     *  \brief  this buffer records all modified buffers since last checkpoint, 
+     *  \brief  this map records all modified buffers since last checkpoint, 
      *          will be updated during parsing, and cleared during launching
      *          checkpointing op
      */
-    std::vector<std::shared_ptr<T_POSHandle>> _modified_handles_buffer;
+    std::map<uint64_t, std::shared_ptr<T_POSHandle>> _modified_handles_map;
 
     /*!
      *  \brief  allocate new mocked resource within the manager

@@ -38,9 +38,13 @@ class POSOp:
         self.worker_s_tick = worker_s_tick
         self.worker_e_tick = worker_e_tick
         self.tsc_freq = tsc_freq
+
+        # durations
         self.runtime_duration:float = _cast_duration_us_from_ticks(self.runtime_e_tick-self.runtime_s_tick, tsc_freq)
         self.worker_duration:float = _cast_duration_us_from_ticks(self.worker_e_tick-self.worker_s_tick, tsc_freq)
         self.physical_duration:float = _cast_duration_us_from_ticks(self.r_tick-self.c_tick, tsc_freq)
+        self.runtime_queue_duration:float = _cast_duration_us_from_ticks(self.runtime_s_tick-self.c_tick, tsc_freq)
+        self.worker_queue_duration:float = _cast_duration_us_from_ticks(self.worker_s_tick-self.runtime_e_tick, tsc_freq)
 
         self.nb_ckpt_handles = nb_ckpt_handles
         self.ckpt_size = ckpt_size
@@ -194,8 +198,8 @@ class POSDag:
             self.dag_mat.append(handle_vector)
 
     def analyse_dag(self, figure_dir_path:str):
-        self._analyse_ckpt(figure_dir_path)
-        # self._analyse_ops()
+        # self._analyse_ckpt(figure_dir_path)
+        self._analyse_ops()
 
     def _analyse_ops(self):
         print(">>> analysing ops...")
@@ -203,6 +207,8 @@ class POSDag:
         runtime_duration_dict : dict[int,list[float]] = {}
         worker_duration_dict : dict[int,list[float]] = {}
         physical_duration_dict : dict[int,list[float]] = {}
+        runtime_queue_duration_dict : dict[int,list[float]] = {}
+        worker_queue_duration_dict : dict[int,list[float]] = {}
 
         for id, op in self.ops.items():
             if op.api_id not in api_call_times.keys():
@@ -222,6 +228,14 @@ class POSDag:
                 physical_duration_dict[op.api_id] = list()
             physical_duration_dict[op.api_id].append(op.physical_duration)
 
+            if op.api_id not in runtime_queue_duration_dict.keys():
+                runtime_queue_duration_dict[op.api_id] = list()
+            runtime_queue_duration_dict[op.api_id].append(op.runtime_queue_duration)
+
+            if op.api_id not in worker_queue_duration_dict.keys():
+                worker_queue_duration_dict[op.api_id] = list()
+            worker_queue_duration_dict[op.api_id].append(op.worker_queue_duration)
+
         for api_id, call_time in api_call_times.items():
             print(f"\napi: {api_id}, call_times: {call_time}")
 
@@ -237,6 +251,8 @@ class POSDag:
             _print_statistics(runtime_duration_dict[api_id], "runtime")
             _print_statistics(worker_duration_dict[api_id], "worker")
             _print_statistics(physical_duration_dict[api_id], "physical")
+            _print_statistics(runtime_queue_duration_dict[api_id], "runtime queue")
+            _print_statistics(worker_queue_duration_dict[api_id], "worker queue")
 
     def _analyse_ckpt(self, figure_dir_path:str):
         print(">>> analysing checkpoint...")

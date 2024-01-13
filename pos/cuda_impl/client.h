@@ -60,11 +60,11 @@ class POSClient_CUDA : public POSClient {
         POSHandleManager_CUDA_Stream *stream_mgr;
         POSHandleManager_CUDA_Device *device_mgr;
 
-        ctx_mgr = this->handle_managers[kPOS_ResourceTypeId_CUDA_Context];
+        ctx_mgr = (POSHandleManager_CUDA_Context*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Context]);
         POS_CHECK_POINTER(ctx_mgr);
-        stream_mgr = this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+        stream_mgr = (POSHandleManager_CUDA_Stream*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
         POS_CHECK_POINTER(stream_mgr);
-        device_mgr = this->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        device_mgr = (POSHandleManager_CUDA_Device*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
         POS_CHECK_POINTER(device_mgr);
 
         // insert the one and only initial CUDA context

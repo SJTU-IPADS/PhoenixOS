@@ -297,6 +297,9 @@ typedef struct POSAPIContext_QE {
     // all involved handle during the processing of this API instance
     std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*> handle_view_map;
 
+    // flatten recording of involved handles of this wqe (to accelerate launch_op)
+    std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
+
     /* =========== checkpoint op specific fields =========== */
     // number of handles this checkpoint op checkpointed
     uint64_t nb_ckpt_handles;
@@ -381,6 +384,9 @@ typedef struct POSAPIContext_QE {
         }
 
         dst_handle_vec->push_back(handle_view);
+
+        // TODO: recording in the flatten map
+        // neighbor_map[handle_view.handle->dag_vertex_id] = handle_view.dir;
     }
 
     /*!

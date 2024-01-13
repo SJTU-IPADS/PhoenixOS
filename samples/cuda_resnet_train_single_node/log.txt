@@ -1,0 +1,29 @@
+|-POS Log-| [POSRuntime<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12bd0]
+runtime started: ckpt_interval(10 ms, 22000000 ticks), ckpt_opt_level(0)
+|-POS Log-| [POSWorker<POSTransport_SHM, POSClient_CUDA> @ 0x55a5789dfe90]
+worker started
++00:00:00.158978 [34mINFO[0m:	waiting for RPC requests...
+Cache Optimization: Enabled!
+Async Optimization: Enabled!
+Handler Optimization: Enabled!
+xpu remote address: localhost
+create shm buffer
++00:00:05.214527 [34mINFO[0m:	have a nice day!
+
+timeout in receive_request in proxy/svc.cpp:179, proc_id: 0
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+clearing POS Workspace...
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+shutdowned out-of-band server
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+cleaning all transports ...
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+cleaning all clients ...
+|-POS Log-| [POSRuntime<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12bd0]
+Runtime daemon thread shutdown
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+shutdowned runtime thread
+|-POS Log-| [POSWorker<POSTransport_SHM, POSClient_CUDA> @ 0x55a5789dfe90]
+Worker daemon thread shutdown
+|-POS Log-| [POSWorkspace<POSTransport_SHM, POSClient_CUDA> @ 0x55a578a12760]
+shutdowned worker thread

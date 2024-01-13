@@ -3,10 +3,12 @@
 #include "pos/include/common.h"
 #include "pos/cuda_impl/worker.h"
 
+#include <cuda.h>
 #include <cuda_runtime_api.h>
 
-namespace wk_functions {
+char* __cu_demangle(const char *id, char *output_buffer, size_t *length, int *status);
 
+namespace wk_functions {
 
 /*!
  *  \related    cuModuleLoadData
