@@ -303,8 +303,6 @@ namespace cublas_sgemm {
             /* handle_view */ POSHandleView_t(
                 /* handle_ */ memory_handle_A,
                 /* dir_ */ kPOS_Edge_Direction_In,
-                /* host_value_s */ nullptr,
-                /* host_value_size_ */ 0,
                 /* param_index_ */ 7
             )
         );
@@ -325,8 +323,6 @@ namespace cublas_sgemm {
             /* handle_view */ POSHandleView_t(
                 /* handle_ */ memory_handle_B,
                 /* dir_ */ kPOS_Edge_Direction_In,
-                /* host_value_s */ nullptr,
-                /* host_value_size_ */ 0,
                 /* param_index_ */ 9
             )
         );
@@ -347,8 +343,6 @@ namespace cublas_sgemm {
             /* handle_view */ POSHandleView_t(
                 /* handle_ */ memory_handle_C,
                 /* dir_ */ kPOS_Edge_Direction_Out,
-                /* host_value_s */ nullptr,
-                /* host_value_size_ */ 0,
                 /* param_index_ */ 12
             )
         );

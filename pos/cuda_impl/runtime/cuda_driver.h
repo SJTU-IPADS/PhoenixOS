@@ -86,7 +86,7 @@ namespace cu_module_load_data {
         module_handle->record_host_value(
             /* data */ pos_api_param_addr(wqe, 1),
             /* size */ pos_api_param_size(wqe, 1),
-            /* version */ client->dag.get_current_pc()
+            /* version */ client->dag.get_current_pc_runtime()
         );
 
         // record the related handle to QE

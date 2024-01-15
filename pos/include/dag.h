@@ -301,10 +301,17 @@ class POSDag {
 
     /*!
      *  \brief  obtain the current version
-     *  \note   must be called runtime function, or the version will be the next round (i.e., in worker function)
+     *  \note   must be called runtime function
      *  \return the current version
      */
-    inline uint64_t get_current_pc(){ return _end_pc; }
+    inline uint64_t get_current_pc_runtime(){ return _end_pc; }
+
+    /*!
+     *  \brief  obtain the current version
+     *  \note   must be called worker function
+     *  \return the current version
+     */
+    inline uint64_t get_current_pc_worker(){ return _pc; }
 
  private:
     // underlying bipartite graph

@@ -821,21 +821,6 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
         }
     }
 
-    // for(i=0; i<_handles.size(); i++){
-    //     POS_CHECK_POINTER(handle_ptr = _handles[i]);
-    //     if(unlikely(handle_ptr->is_client_addr_in_range(client_addr, offset))){
-    //         if(unlikely(
-    //             handle_ptr->status == kPOS_HandleStatus_Deleted || handle_ptr->status == kPOS_HandleStatus_Delete_Pending
-    //         )){
-    //             continue;
-    //         }
-    //         *handle = handle_ptr;
-    //         goto exit;
-    //     }
-    // }
-    
-    // POS_DEBUG_C("failed to get handle: client_addr(%p)", client_addr);
-
 not_found:
     *handle = nullptr;
     ret = POS_FAILED_NOT_EXIST;

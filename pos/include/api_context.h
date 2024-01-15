@@ -211,15 +211,6 @@ typedef struct POSHandleView {
     pos_edge_direction_t dir;
 
     /*!
-     *  \brief  host-side new value of the resource behind this handle
-     *  \note   for those APIs which bring new value to handle from the host-side,
-     *          we need to cache the host-side value in case we would reply this
-     *          API call later
-     */
-    POSMem_ptr host_value;
-    uint64_t host_value_size;
-
-    /*!
      *  \brief      index of the corresponding parameter of this handle view
      *  \example    for API such as launchKernel, we need to know which parameter this handle 
      *              is corresponding to, in order to translating the address in the worker 
@@ -239,30 +230,12 @@ typedef struct POSHandleView {
      *  \brief  constructor
      *  \param  handle_             pointer to the handle which is view targeted on
      *  \param  dir_                direction of the view to use this handle
-     *  \param  host_value_         new value of the resource behind this handle (optional)
-     *  \param  host_value_size_    size of the host-side new value (optional)
      *  \param  param_index_        index of the corresponding parameter of this handle view
      *  \param  offset_             offset from the base address of the handle
      */
     POSHandleView(
-        POSHandle_ptr handle_, pos_edge_direction_t dir_, 
-        void* host_value_ = nullptr, uint64_t host_value_size_ = 0,
-        uint64_t param_index_ = 0, uint64_t offset_ = 0
-    ) : handle(handle_), dir(dir_), param_index(param_index_), offset(offset_)
-    {
-        if(unlikely(host_value_ != nullptr && host_value_size_ > 0)){
-            /*!
-             *  \note   seems it's ok to use std::make_unique to allocate a shared_ptr
-             *          that point to an array
-             *  \ref    https://stackoverflow.com/a/47202220
-             */
-            host_value = std::make_unique<uint8_t[]>(host_value_size_);
-            POS_CHECK_POINTER(host_value);
-            memcpy(host_value.get(), host_value_, host_value_size_);
-        }
-        host_value_size = host_value_size_;
-    }
-
+        POSHandle_ptr handle_, pos_edge_direction_t dir_, uint64_t param_index_ = 0, uint64_t offset_ = 0
+    ) : handle(handle_), dir(dir_), param_index(param_index_), offset(offset_){}
 } POSHandleView_t;
 
 /*!

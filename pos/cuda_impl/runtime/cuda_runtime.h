@@ -245,8 +245,44 @@ namespace cuda_launch_kernel {
         /*!
          *  \note   record all input memory areas
          */
-        // TODO:
+        for(i=0; i<function_handle->input_pointer_params.size(); i++){
+            param_index = function_handle->input_pointer_params[i];
 
+            arg_addr = args + function_handle->param_offsets[param_index];
+            POS_CHECK_POINTER(arg_addr);
+            arg_value = *((void**)arg_addr);
+            
+            /*!
+             *  \note   sometimes one would launch kernel with some pointer params are nullptr (at least pytorch did),
+             *          this is probably normal, so we just ignore this situation
+             */
+            if(unlikely(arg_value == nullptr)){
+                continue;
+            }
+
+            tmp_retval = hm_memory->get_handle_by_client_addr(
+                /* client_addr */ arg_value,
+                /* handle */ &memory_handle
+            );
+            if(unlikely(tmp_retval != POS_SUCCESS)){
+                POS_WARN(
+                    "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
+                    "yet it contains non-exist memory address during launching: given client addr(%p)",
+                    param_index, function_handle->name.get(), arg_value
+                );
+                continue;
+            }
+
+            wqe->record_handle(
+                /* id */ kPOS_ResourceTypeId_CUDA_Memory,
+                /* handle_view */ POSHandleView_t(
+                    /* handle_ */ memory_handle,
+                    /* dir_ */ kPOS_Edge_Direction_In,
+                    /* param_index_ */ param_index
+                )
+            );
+        }
+        
         /*!
          *  \note   record all output memory areas
          */
@@ -272,7 +308,7 @@ namespace cuda_launch_kernel {
             if(unlikely(tmp_retval != POS_SUCCESS)){
                 POS_WARN(
                     "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
-                    "yet it contains no memory address during launching: given client addr(%p)",
+                    "yet it contains non-exist memory address during launching: given client addr(%p)",
                     param_index, function_handle->name.get(), arg_value
                 );
                 continue;
@@ -283,8 +319,6 @@ namespace cuda_launch_kernel {
                 /* handle_view */ POSHandleView_t(
                     /* handle_ */ memory_handle,
                     /* dir_ */ kPOS_Edge_Direction_Out,
-                    /* host_value_s */ nullptr,
-                    /* host_value_size_ */ 0,
                     /* param_index_ */ param_index
                 )
             );
