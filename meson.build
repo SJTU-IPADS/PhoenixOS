@@ -145,12 +145,35 @@ inc_dirs += ['./third_party/websocketpp/websocketpp']
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
 
-message('>>> Detecting libclang')
-ld_args += ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
-inc_dirs += ['./third_party/libclang-static-build/include']
-message('>>>>>> Link option: ' + '-L' + meson_file_dir + '/third_party/libclang-static-build/lib, -lclang')
-message('>>>>>> Include path: ./third_party/libclang-static-build/include')
-message('>>> Detecting libclang done')
+message('>>> Setup libclang')
+libclang_ld_args = ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
+libclang_inc_dirs = ['./third_party/libclang-static-build/include']
+message('>>>>>> Link option:')
+message(libclang_ld_args)
+message('>>>>>> Include path:')
+message(libclang_inc_dirs)
+message('>>> Setup libclang done\n')
+
+message('>>> Setup hiredis')
+hiredis_ld_args = ['-lhiredis']
+hiredis_inc_dirs = ['./third_party/hiredis']
+message('>>>>>> Link option:')
+message(hiredis_ld_args)
+message('>>>>>> Include path:')
+message(hiredis_inc_dirs)
+message('>>> Setup hiredis done\n')
+
+message('>>> Setup libevent')
+libevent_ld_args = ['-levent']
+libevent_inc_dirs = ['./third_party/libevent/include']
+message('>>>>>> Link option:')
+message(libevent_ld_args)
+message('>>>>>> Include path:')
+message(libevent_inc_dirs)
+message('>>> Setup libevent done\n')
+
+ld_args += libclang_ld_args + hiredis_ld_args + libevent_ld_args
+inc_dirs += libclang_inc_dirs + hiredis_inc_dirs + libevent_inc_dirs
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>

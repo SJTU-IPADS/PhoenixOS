@@ -11,5 +11,6 @@
 **/dag.pos
 **/*.nsys-rep
 **/.viminfo
+**/.cmake
 
 remoting/cuda_old

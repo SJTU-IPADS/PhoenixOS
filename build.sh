@@ -25,11 +25,24 @@ build_cuda() {
         echo "clean target: cuda"
         echo "[1] cleaning dependencies"
         if [ $involve_third_party = true ]; then
+
             echo "    [1.1] cleaning libclang"
             cd $script_dir
             cd third_party/libclang-static-build
             if [ -d "./build" ] || [ -d "./include" ] || [ -d "./lib" ] || [ -d "./share" ]; then
                 rm -rf build include lib share
+            fi
+
+            echo "    [1.2] cleaning hiredis"
+            cd $script_dir
+            cd third_party/hiredis
+            make clean
+
+            echo "    [1.3] cleaning libevent"
+            cd $script_dir
+            cd third_party/libevent
+            if [ -d "./build" ]; then
+                rm -rf build
             fi
         else
             echo "    SKIPED"
@@ -72,6 +85,21 @@ build_cuda() {
                 # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
                 cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
                 cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
+
+                echo "    [1.2] building hiredis"
+                cd $script_dir
+                cd third_party/hiredis
+                make -j
+                # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
+                cp $script_dir/third_party/hiredis/*.so* /lib/x86_64-linux-gnu/
+                cp $script_dir/third_party/hiredis/*.a* /lib/x86_64-linux-gnu/
+
+                echo "    [1.3] building libevent"
+                cd $script_dir
+                cd third_party/libevent
+                mkdir build && cd build
+                cmake ..
+                make install -j
             else
                 echo "    SKIPED"
             fi

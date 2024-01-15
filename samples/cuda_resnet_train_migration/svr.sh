@@ -4,7 +4,7 @@
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 
-# >>>>>>>>>> build configurations <<<<<<<<<<
+# >>>>>>>>>> action configurations <<<<<<<<<<
 container_id=0
 mount=true
 do_start=false
