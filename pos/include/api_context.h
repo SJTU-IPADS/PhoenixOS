@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <memory>
 
 #include <string.h>
 #include <stdint.h>
@@ -298,7 +299,7 @@ typedef struct POSAPIContext_QE {
     std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*> handle_view_map;
 
     // flatten recording of involved handles of this wqe (to accelerate launch_op)
-    std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
+    POSNeighborMap_t flat_neighbor_map;
 
     /* =========== checkpoint op specific fields =========== */
     // number of handles this checkpoint op checkpointed
@@ -385,8 +386,10 @@ typedef struct POSAPIContext_QE {
 
         dst_handle_vec->push_back(handle_view);
 
-        // TODO: recording in the flatten map
-        // neighbor_map[handle_view.handle->dag_vertex_id] = handle_view.dir;
+        /*!
+         *  \note  we also record the handle in the flatten map to accelerate the launch_op process of DAG
+         */
+        flat_neighbor_map[handle_view.handle->dag_vertex_id] = handle_view.dir;
     }
 
     /*!

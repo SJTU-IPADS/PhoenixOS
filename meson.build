@@ -74,7 +74,7 @@ enable_print_debug = 0
 
 # switch:   whether to print fatal/warn/debug/log with colors
 #           should be disabled when try to dump all outputs to a file
-enable_print_with_color = 0
+enable_print_with_color = 1
 
 # we need to hardcoded some configurations as source code
 subdir('pos/include')

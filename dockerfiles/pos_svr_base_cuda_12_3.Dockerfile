@@ -12,7 +12,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt-get install -y libibverbs-dev libboost-all-dev net-tools            \
     git-lfs pkg-config python3-pip libelf-dev libssl-dev libgl1-mesa-dev    \
-    libvdpau-dev iputils-ping wget gdb vim llvm-dev clang libclang-dev
+    libvdpau-dev iputils-ping wget gdb vim intel-oneapi-mkl-devel
 
 RUN python3 -m pip install meson
 RUN python3 -m pip install ninja

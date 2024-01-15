@@ -276,6 +276,26 @@ class POSHandle {
      */
     void mark_status(pos_handle_status_t status);
 
+
+    /*!
+     *  \brief  record host value of the handle under specific version
+     *  \param  data    pointer to the remoting buffer, which contains the host-side value
+     *  \param  size    size of the host-side value
+     *  \param  version version (pc index) of the host-side value
+     */
+    inline void record_host_value(void* data, uint64_t size, uint64_t version){
+        POSMem_ptr host_value;
+
+        POS_CHECK_POINTER(data);
+        POS_ASSERT(size > 0);
+
+        host_value = std::make_unique<uint8_t[]>(size);
+        POS_CHECK_POINTER(host_value);
+        memcpy(host_value.get(), data, size);
+
+        host_value_map[version] = { host_value, size };
+    }
+
     /*!
      *  \brief  checkpoint the state of the resource behind this handle
      *  \note   only handle of stateful resource should implement this method

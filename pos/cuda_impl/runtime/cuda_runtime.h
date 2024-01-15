@@ -237,11 +237,18 @@ namespace cuda_launch_kernel {
          */
         if(unlikely(function_handle->has_verified_params == false)){
             // TODO:
+            // 1. how to check?
+            // 2. only check once?
             function_handle->has_verified_params = true;
         }
 
         /*!
-         *  \note   record all output memories
+         *  \note   record all input memory areas
+         */
+        // TODO:
+
+        /*!
+         *  \note   record all output memory areas
          */
         for(i=0; i<function_handle->output_pointer_params.size(); i++){
             param_index = function_handle->output_pointer_params[i];

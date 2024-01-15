@@ -82,14 +82,19 @@ namespace cu_module_load_data {
         // set current handle as the latest used handle
         hm_module->latest_used_handle = module_handle;
 
+        // cache the host-side value
+        module_handle->record_host_value(
+            /* data */ pos_api_param_addr(wqe, 1),
+            /* size */ pos_api_param_size(wqe, 1),
+            /* version */ client->dag.get_current_pc()
+        );
+
         // record the related handle to QE
         wqe->record_handle(
             /* id */ kPOS_ResourceTypeId_CUDA_Module, 
             /* handle_view */ POSHandleView_t(
                 /* handle */ module_handle,
-                /* dir */ kPOS_Edge_Direction_Create,
-                /* host_value */ pos_api_param_addr(wqe, 1),
-                /* host_value_size */ pos_api_param_size(wqe, 1)
+                /* dir */ kPOS_Edge_Direction_Create
             )
         );
 

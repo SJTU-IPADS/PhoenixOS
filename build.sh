@@ -16,17 +16,25 @@ multithread_build=false
 # run unittest after building
 run_unit_test=true
 
+# involve third-party library to the operation
+involve_third_party=false
+
 # build cuda target
 build_cuda() {
     if [ $doclean = true ]; then
         echo "clean target: cuda"
         echo "[1] cleaning dependencies"
-        echo "    [1.1] cleaning libclang"
+        if [ $involve_third_party = true ]; then
+            echo "    [1.1] cleaning libclang"
             cd $script_dir
             cd third_party/libclang-static-build
-            if [ -d "./build" ]; then
+            if [ -d "./build" ] || [ -d "./include" ] || [ -d "./lib" ] || [ -d "./share" ]; then
                 rm -rf build include lib share
             fi
+        else
+            echo "    SKIPED"
+        fi
+
         echo "[2] cleaning POS"
             cd $script_dir
             if [ -d "./build" ]; then
@@ -52,16 +60,21 @@ build_cuda() {
     else
         echo "build target: cuda"
         echo "[1] building dependencies"
-            cd $script_dir
-            echo "    [1.1] building libclang"
-            cd third_party/libclang-static-build
-            mkdir build && cd build
-            cmake .. -DCMAKE_INSTALL_PREFIX=..
-            make install -j
-            
-            # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
-            cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
-            cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
+            if [ $involve_third_party = true ]; then
+                echo "    [1.1] building libclang"
+                cd $script_dir
+                cd third_party/libclang-static-build
+                if [ ! -d "./build" ]; then
+                    mkdir build && cd build
+                    cmake .. -DCMAKE_INSTALL_PREFIX=..
+                    make install -j
+                fi
+                # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
+                cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
+                cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
+            else
+                echo "    SKIPED"
+            fi
             
         echo "[2] building POS"
             cd $script_dir
@@ -141,11 +154,12 @@ print_usage() {
     echo "  -j              multi-threading build"
     echo "  -c              clean previously built assets"
     echo "  -h              help message"
+    echo "  -3              involve third-party library"
 }
 
 
 # parse command line options
-while getopts ":t:hcju:" opt; do
+while getopts ":t:hcju:3" opt; do
   case $opt in
     t)
         target=$OPTARG
@@ -153,6 +167,9 @@ while getopts ":t:hcju:" opt; do
     h)
         print_usage
         exit 0
+        ;;
+    3)
+        involve_third_party=true
         ;;
     u)
         if [ "$OPTARG" = "true" ]; then

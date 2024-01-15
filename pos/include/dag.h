@@ -173,12 +173,12 @@ class POSDag {
         uint64_t handle_id, uint64_t start_op_id, uint64_t end_op_id, std::vector<uint64_t>* positions
     ){
         pos_retval_t retval = POS_SUCCESS;
-        std::map<pos_vertex_id_t, pos_edge_direction_t>* neigh_ops;
+        POSNeighborMap_ptr neigh_ops;
 
         POS_CHECK_POINTER(positions);
 
         neigh_ops = _graph.get_vertex_neighbors_by_id<pos_handle_meta_t>(handle_id);
-        if(unlikely(neigh_ops == nullptr)){
+        if(unlikely(neigh_ops.get() == nullptr)){
             POS_WARN_C_DETAIL("failed to obtain neighbor ops of handle: vertex_id(%lu)", handle_id);
             retval = POS_FAILED_NOT_EXIST;
         } else {
@@ -210,30 +210,19 @@ class POSDag {
         std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
         std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
 
-        // traverse all involved handles
-        for(map_iter = wqe->handle_view_map.begin(); map_iter != wqe->handle_view_map.end(); map_iter++){
-            handle_view_vec = map_iter->second;
-            for(i=0; i<handle_view_vec->size(); i++){
-                POSHandleView_t &h_view = (*handle_view_vec)[i];
+        uint64_t s_tick, e_tick;
 
-                // set up neighbors (i.e., handles)
-                neighbor_map[h_view.handle->dag_vertex_id] = h_view.dir;
-
-                // TODO: we record the OUT / INPUT handles here
-
-                // save the host-side new value (if has any)
-                if(unlikely(h_view.host_value_size > 0)){
-                    h_view.handle->host_value_map[_end_pc] 
-                        = std::pair<POSMem_ptr, uint64_t>(h_view.host_value, h_view.host_value_size);
-                }
-            }
-        }
+        // s_tick = POSUtilTimestamp::get_tsc();
 
         retval =_graph.add_vertex<pos_op_meta_t>(
             /* data */ op_meta,
-            /* neighbor */ neighbor_map, // TODO: wqe->neighbor_map
+            /* neighbor */ wqe->flat_neighbor_map,
             /* id */ &(wqe->dag_vertex_id)
         );
+
+        // e_tick = POSUtilTimestamp::get_tsc();
+        // POS_LOG("add vertex duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C_DETAIL("failed to add op to the DAG graph");
             goto exit_POSDag_add_op;
@@ -309,6 +298,13 @@ class POSDag {
      *  \return the number of pending operators in the DAG result
      */
     inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
+
+    /*!
+     *  \brief  obtain the current version
+     *  \note   must be called runtime function, or the version will be the next round (i.e., in worker function)
+     *  \return the current version
+     */
+    inline uint64_t get_current_pc(){ return _end_pc; }
 
  private:
     // underlying bipartite graph

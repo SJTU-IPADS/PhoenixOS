@@ -12,7 +12,14 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt-get install -y libibverbs-dev libboost-all-dev net-tools            \
     git-lfs pkg-config python3-pip libelf-dev libssl-dev libgl1-mesa-dev    \
-    libvdpau-dev iputils-ping wget gdb vim llvm-dev clang libclang-dev
+    libvdpau-dev iputils-ping wget gdb vim
+
+# # install oneMKL (4GB)
+# # ref: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html?operatingsystem=linux&distributions=aptpackagemanager
+# RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null  
+# RUN echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
+# RUN apt update
+# RUN apt install intel-oneapi-mkl-devel libtbb-dev
 
 RUN python3 -m pip install meson
 RUN python3 -m pip install ninja
@@ -24,7 +31,6 @@ COPY ./dockerfiles/assets/NsightSystems-linux-cli-public-2023.4.1.97-3355750.deb
 RUN cd /tmp && \
     dpkg -i NsightSystems-linux-cli-public-2023.4.1.97-3355750.deb && \
     rm -rf /tmp/NsightSystems-linux-cli-public-2023.4.1.97-3355750.deb
-
 
 # FROM base as final
 # WORKDIR /root
