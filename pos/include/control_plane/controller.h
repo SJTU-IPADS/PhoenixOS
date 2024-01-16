@@ -41,13 +41,13 @@ using pos_ctrlplane_sub_routine_t = pos_retval_t(*)(POSController* controller, r
 /*!
  *  \brief  function signature for publishing control-plane message
  *  \param  controller      controller instance that invoke this routine
- *  \param  priv_data       private data to invoke this routine
- *  \param  channel_name    the resulted redis channel name to publish
- *  \param  msg             the resulted message to publish to the channel
+ *  \param  attributes      attributes to be published
+ *  \param  key             the resulted key to publish
+ *  \param  value           the resulted value to publish
  *  \return POS_SUCCESS for succesfully execution
  */
 using pos_ctrlplane_pub_routine_t = pos_retval_t(*)(
-    POSController* controller, void* priv_data, std::string& channel_name, std::string& msg
+    POSController* controller, std::map<std::string,std::string>& attributes, std::string& key, std::string& value
 );
 
 
@@ -63,14 +63,13 @@ class POSController {
     )
         : pub_routine_map(pub_rm), sub_routine_map(sub_rm), 
           sub_dispatcher(sub_dispatcher_), entrance(entrance_)
-    {   
+    {
         POS_CHECK_POINTER(sub_dispatcher);
-
-        POS_CHECK_POINTER(redis_pub = new POSUtil_RedisPublisher());
-        POS_CHECK_POINTER(redis_sub = new POSUtil_RedisSubscriber(
-            /* cb */ POSController::__subscribe_callback,
-            /* priv_data */ this
-        ));
+        POS_CHECK_POINTER(redis_adaptor_async = new POSUtil_RedisAdaptor_Async({
+            /* cb_sub */ POSController::__subscribe_callback,
+            /* priv_data_sub */ this
+        }));
+        POS_CHECK_POINTER(redis_adaptor = new POSUtil_RedisAdaptor());
     }
 
     ~POSController() = default;
@@ -78,22 +77,27 @@ class POSController {
     /*!
      *  \brief  start running controller
      *  \return POS_SUCCESS for successfully running;
-     *          POS_FAILED for failed raising redis publisher/subscriber
+     *          POS_FAILED for failed raising redis adaptors
      */
-    inline pos_retval_t start(){
+    inline pos_retval_t start(std::string& redis_ip, uint16_t redis_port){
         pos_retval_t retval = POS_SUCCESS;
 
-        retval = redis_pub->connect_and_run();
+        retval = redis_adaptor_async->connect_and_run(redis_ip.c_str(), redis_port);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to connect and run redis publisher");
+            POS_WARN_C("failed to connect and run redis async adaptor");
             goto exit;
         }
 
-        retval = redis_sub->connect_and_run();
+        retval = redis_adaptor->connect(redis_ip.c_str(), redis_port);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to connect and run redis subscriber");
-            goto exit;
+            POS_WARN_C("failed to connect redis adaptor");
+            goto disconnect_async_adaptor;
         }
+
+        goto exit;
+
+    disconnect_async_adaptor:
+        redis_adaptor_async->disconnect_and_stop();
 
     exit:
         return retval;
@@ -103,12 +107,12 @@ class POSController {
     /*!
      *  \brief  call control-plane routine to publish control-plane message
      *  \param  rid         corresponding routine index
-     *  \param  priv_data   private data to call the publish routine (optional)
+     *  \param  attributes      attributes to be published
      *  \return POS_SUCCESS for successfully publishing, otherwise there's error occurs
      */
-    inline pos_retval_t call(pos_ctrlplane_routine_id_t rid, void* priv_data=nullptr){
+    inline pos_retval_t publish(pos_ctrlplane_routine_id_t rid, std::map<std::string,std::string>& attributes){
         pos_retval_t retval = POS_SUCCESS;
-        std::string channel_name, msg; 
+        std::string key, value; 
 
         if(unlikely(pub_routine_map.count(rid) == 0)){
             POS_WARN_C("failed to call non-exist publish routine: rid(%u)", rid);
@@ -116,21 +120,21 @@ class POSController {
             goto exit;
         }
 
-        channel_name.clear();
-        msg.clear();
+        key.clear();
+        value.clear();
 
-        retval = (*(pub_routine_map[rid]))(this, priv_data, channel_name, msg);
+        retval = (*(pub_routine_map[rid]))(this, attributes, key, value);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("publish routine execute failed: rid(%u), retval(%u)", rid, retval);
             goto exit;
         }
 
-        retval = redis_pub->publish(channel_name, msg);
+        retval = redis_adaptor->set(key, value);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C(
                 "failed to publish to redis db after successful routine execution: "
-                "rid(%u), retval(%u), channel_name(%s), msg(%s)", 
-                rid, retval, channel_name.c_str(), msg.c_str()
+                "rid(%u), retval(%u), key(%s), value(%s)", 
+                rid, retval, key.c_str(), value.c_str()
             );
             goto exit;
         }
@@ -152,10 +156,10 @@ class POSController {
     pos_ctrlplane_sub_dispatcher_t sub_dispatcher;
 
     /*!
-     *  \brief  redis subscriber/publisher group
+     *  \brief  redis adaptors
      */
-    POSUtil_RedisPublisher *redis_pub;
-    POSUtil_RedisSubscriber *redis_sub;
+    POSUtil_RedisAdaptor_Async *redis_adaptor_async;
+    POSUtil_RedisAdaptor *redis_adaptor;
 
     /*!
      *  \brief  entrance to control the system
@@ -204,3 +208,17 @@ class POSController {
         return retval;
     }
 };
+
+/*! 
+ *  \brief  check necessary attributes to publish to the redis db (internal used)
+ *  \param  attributes  given attributes
+ *  \param  strs        necessary attribute keys
+ *  \note   this function will fatal when miss necessary attribute
+ */
+static inline void __check_necessary_publish_attributes(std::vector<std::string,std::string>& attributes, std::vector<std::string> strs){
+    for(auto &str : strs){
+        if(unlikely(attributes.count(str) == 0)){
+            POS_ERROR_C_DETAIL("non-comprehensive attributes provided to publish, this is a bug: attribute(%s)", str.c_str());
+        }
+    }
+}
