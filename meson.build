@@ -41,7 +41,7 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 0
+ckpt_opt_level = 2
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
@@ -129,7 +129,7 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += ['pos/src/handle.cpp', 'pos/src/control_plane/client_control.cpp']
+sources += ['pos/src/handle.cpp']
 if target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',

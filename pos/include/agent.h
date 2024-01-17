@@ -7,9 +7,6 @@
 #include "pos/include/oob.h"
 #include "pos/include/api_context.h"
 
-#include "pos/include/control_plane/controller.h"
-#include "pos/include/control_plane/client_control.h"
-
 /*!
  *  \brief  client-side PhoenixOS agent, manages all POS resources
  *  \tparam transport implementation    
@@ -20,14 +17,7 @@ class POSAgent {
     /*!
      *  \brief  constructor
      */
-    POSAgent() 
-        : _controller(
-            /* pub_rm */ client_pub_routine_map,
-            /* sub_rm */ client_sub_routine_map,
-            /* sub_dispatcher_ */ pos_ctrl_client_sub_dispatcher,
-            /* entrance */ this
-        )
-    {
+    POSAgent(){
         char remote_addr[256] = { 0 };
 
         // TODO: this address should be obtained from central service instead of environment variable
@@ -123,8 +113,6 @@ class POSAgent {
 
     // uuid of the client
     pos_client_uuid_t _uuid;
-
-    POSController _controller;
 };
 
 extern POSAgent<POSTransport_SHM> *pos_agent;

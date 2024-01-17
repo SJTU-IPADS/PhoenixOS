@@ -65,14 +65,81 @@ class POSCheckpointBag {
         return _state_size * 2;
     }
 
- private:    
+    /*!
+     *  \brief  obtain checkpointed data by given checkpoint version
+     *  \param  data        pointer for obtaining data
+     *  \param  size        size of the checkpoin data
+     *  \param  version     the specified version
+     *  \param  get_latest  whether to get the latest version of checkpoint,
+     *                      if this field is true, the version field will be ignored
+     *  \return POS_SUCCESS for successfully obtained
+     */
+    inline pos_retval_t get_checkpoint_data_by_version(void** data, uint64_t& size, uint64_t version=0, bool get_latest=true){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t version_to_check;
+        bool _has_record;
+
+        // check whether this bag has record
+        _has_record = (_front_version != 0) || (_back_version != 0);
+        if(unlikely(_has_record == false)){
+            retval = POS_FAILED_NOT_READY;
+            goto exit;
+        }
+
+        *data = _use_front ? _ckpt_back->expose_pointer() : _ckpt_front->expose_pointer();
+        size = _state_size;
+
+        if(unlikely(get_latest == false)){
+            version_to_check = _use_front ? _back_version : _front_version;
+
+            // no match version
+            if(unlikely(version_to_check != version)){
+                retval = POS_FAILED_NOT_READY;
+            }
+        }
+
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  obtain the latest checkpoint data with its checkpoint version
+     *  \param  data        pointer for obtaining data
+     *  \param  version     the resulted version
+     *  \param  size        size of the checkpoin data
+     *  \return POS_SUCCESS for successfully obtained
+     */
+    inline pos_retval_t get_latest_checkpoint(void **data, uint64_t& version, uint64_t& size){
+        pos_retval_t retval = POS_SUCCESS;
+        bool _has_record;
+
+        // check whether this bag has record
+        _has_record = (_front_version != 0) || (_back_version != 0);
+        if(unlikely(_has_record == false)){
+            retval = POS_FAILED_NOT_READY;
+            goto exit;
+        }
+
+        *data = _use_front ? _ckpt_back->expose_pointer() : _ckpt_front->expose_pointer();
+        version = _use_front ? _back_version : _front_version;
+        size = _state_size;
+
+    exit:
+        return retval;
+    }
+
+ private:
+    // indicate which checkpoint slot to use (front / back)
     bool _use_front;
 
+    // front checkpoint slot
     uint64_t _front_version;
     POSCheckpointSlot_ptr _ckpt_front;
 
+    // back checkpoint slot
     uint64_t _back_version;
     POSCheckpointSlot_ptr _ckpt_back;
 
+    // state size of each checkpoint
     uint64_t _state_size;
 };

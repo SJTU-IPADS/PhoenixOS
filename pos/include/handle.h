@@ -313,18 +313,52 @@ class POSHandle {
      */
     virtual pos_retval_t restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
     
-    /*!
-    *  \brief  the typeid of the resource kind which this handle represents
-    *  \note   the children class of this base class should replace this value
-    *          with their own typeid
-    */
-    pos_resource_typeid_t resource_type_id;
 
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
     virtual std::string get_resource_name(){ return std::string("unknown"); }
+
+    /*!
+     *  \brief  serilize the state of current handle into the binary area
+     *  \param  serilized_area  pointer to the binary area
+     *  \return POS_SUCCESS for successfully serilization
+     */
+    pos_retval_t serilize(POSMem_ptr& serilized_area){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t offset = 0;
+        POSMem_ptr tmp_serilized_area;
+
+        serilized_area = std::make_unique<uint8_t[]>(
+            this->__get_basic_serilize_size() + this->__get_extra_serilize_size()
+        );
+        POS_CHECK_POINTER(serilized_area.get());
+
+        retval = this->__serilize_basic(serilized_area, offset);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to serilize basic fields of handle");
+            goto exit;
+        }
+
+        retval = this->__serilize_extra(serilized_area, offset);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to serilize extra fields of handle");
+            goto exit;
+        }
+
+        serilized_area = tmp_serilized_area;
+        
+    exit:
+        return retval;
+    }
+
+    /*!
+    *  \brief  the typeid of the resource kind which this handle represents
+    *  \note   the children class of this base class should replace this value
+    *          with their own typeid
+    */
+    pos_resource_typeid_t resource_type_id;
 
     // status of the resource behind this handle
     pos_handle_status_t status;
@@ -373,9 +407,125 @@ class POSHandle {
      *          so we use a map here
      */
     std::map<uint64_t, std::pair<POSMem_ptr, uint64_t>> host_value_map;
-
+    
  protected:
+    /*!
+     *  \note   the belonging handle manager
+     */
     void *_hm;
+
+    /*!
+     *  \brief  obtain the serilization size of basic fields of POSHandle
+     *  \return the serilization size of basic fields of POSHandle
+     */
+    inline uint64_t __get_basic_serilize_size(){
+        return (
+            /* resource_type_id */      sizeof(pos_resource_typeid_t)
+            /* client_addr */           + sizeof(uint64_t)
+            /* server_addr */           + sizeof(uint64_t)
+            /* nb_parent_handle */      + sizeof(uint64_t)
+            /* parent_handle_indices */ + parent_handles.size() * sizeof(pos_vertex_id_t)
+            /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
+            /* size */                  + sizeof(uint64_t)
+            /* state_size */            + sizeof(uint64_t)
+
+            // TODO: in the future we might serilize multiple versions of checkpoint
+            /* checkpoint version */    + sizeof(uint64_t)
+            /* checkpoint size */       + sizeof(uint64_t)
+            /* ckpt_state */            + state_size
+        );
+    }
+
+    /*!
+     *  \brief  obtain the serilization size of extra fields of specific POSHandle type
+     *  \return the serilization size of extra fields of POSHandle
+     */
+    virtual uint64_t __get_extra_serilize_size(){
+        return 0;
+    }
+
+    /*!
+     *  \brief  serilize spefic field of the handle to the serilization area
+     *  \param  dptr    the serilization memory to store the field
+     *  \param  sptr    address of the field to be serilized
+     *  \param  size    size of the field to be serilized
+     *  \param  offset  offset from the base of serilization area after serilization this field
+     */
+    static void __serilize_write_field(void* dptr, void* sptr, uint64_t size, uint64_t& offset){
+        if(likely(size > 0)){
+            memcpy(dptr, sptr, size);
+            dptr += size;
+            offset += size;
+        }
+    }
+
+    /*!
+     *  \brief  serilize the basic state of current handle into the binary area
+     *  \param  serilized_area  pointer to the binary area
+     *  \param  offset          offset within the serlized_area after serilize basic fields
+     *  \return POS_SUCCESS for successfully serilization
+     */
+    pos_retval_t __serilize_basic(POSMem_ptr& serilized_area, uint64_t& offset){
+        pos_retval_t retval = POS_SUCCESS;
+        void *ptr = serilized_area.get();
+        void *ckpt_data;
+        uint64_t ckpt_version, ckpt_size;
+        uint64_t _nb_parent_handles;
+        std::pair<POSMem_ptr, uint64_t> host_ckpt;
+
+        POS_CHECK_POINTER(ptr);
+        
+        _nb_parent_handles = parent_handles.size();
+
+        POSHandle::__serilize_write_field(ptr, &resource_type_id, sizeof(pos_resource_typeid_t), offset);
+        POSHandle::__serilize_write_field(ptr, &client_addr, sizeof(uint64_t), offset);
+        POSHandle::__serilize_write_field(ptr, &server_addr, sizeof(uint64_t), offset);
+        POSHandle::__serilize_write_field(ptr, &_nb_parent_handles, sizeof(uint64_t), offset);
+        for(auto& parent_handle : parent_handles){
+            POSHandle::__serilize_write_field(ptr, &(parent_handle->dag_vertex_id), sizeof(uint64_t), offset);
+        }
+        POSHandle::__serilize_write_field(ptr, &dag_vertex_id, sizeof(pos_vertex_id_t), offset);
+        POSHandle::__serilize_write_field(ptr, &size, sizeof(uint64_t), offset);
+        POSHandle::__serilize_write_field(ptr, &state_size, sizeof(uint64_t), offset);
+
+        // copy checkpoint
+        retval = ckpt_bag->get_latest_checkpoint(&ckpt_data, ckpt_version, ckpt_size);
+        if(unlikely(retval == POS_FAILED_NOT_READY)){
+            // no checkpoint found, we need to use the state passed from the host
+            if(likely(host_value_map.size() > 0)){
+                ckpt_version = (host_value_map.rbegin())->first;
+                host_ckpt = (host_value_map.rbegin())->second;
+                ckpt_data = host_ckpt.first.get();
+                ckpt_size = host_ckpt.second;
+            } else {
+                ckpt_version = 0;
+                ckpt_size = 0;
+            }
+        } else if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C_DETAIL("failed to obtain checkpoint while serilizing, is checkpointing turned on?");
+            ckpt_version = 0;
+            ckpt_size = 0;
+        }
+
+        POSHandle::__serilize_write_field(ptr, &ckpt_version, sizeof(uint64_t), offset);
+        POSHandle::__serilize_write_field(ptr, &ckpt_size, sizeof(uint64_t), offset);
+        if(likely(ckpt_size > 0)){
+            POSHandle::__serilize_write_field(ptr, ckpt_data, state_size, offset);
+        }
+        
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  serilize the extra state of current handle into the binary area
+     *  \param  serilized_area  pointer to the binary area
+     *  \param  offset          offset within the serlized_area after serilize basic fields
+     *  \return POS_SUCCESS for successfully serilization
+     */
+    virtual pos_retval_t __serilize_extra(POSMem_ptr& serilized_area, uint64_t& offset){
+        return POS_SUCCESS;
+    }
 
     /*!
      *  \brief  initialize checkpoint bag of this handle

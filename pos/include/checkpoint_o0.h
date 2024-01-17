@@ -41,5 +41,29 @@ class POSCheckpointBag {
         return 0;
     }
 
+    /*!
+     *  \brief  obtain checkpointed data by given checkpoint version
+     *  \param  data        pointer for obtaining data
+     *  \param  size        size of the checkpoin data
+     *  \param  version     the specified version
+     *  \param  get_latest  whether to get the latest version of checkpoint,
+     *                      if this field is true, the version field will be ignored
+     *  \return POS_SUCCESS for successfully obtained
+     */
+    inline pos_retval_t get_checkpoint_data_by_version(void** data, uint64_t& size, uint64_t version=0, bool get_latest=true){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  obtain the latest checkpoint data with its checkpoint version
+     *  \param  data        pointer for obtaining data
+     *  \param  version     the resulted version
+     *  \param  size        size of the checkpoin data
+     *  \return POS_SUCCESS for successfully obtained
+     */
+    inline pos_retval_t get_latest_checkpoint(void **data, uint64_t& version, uint64_t& size){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
  private:
 };
