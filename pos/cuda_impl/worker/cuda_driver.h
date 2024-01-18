@@ -40,17 +40,6 @@ namespace cu_module_load_data {
             module_handle->set_server_addr((void*)module);
             module_handle->mark_status(kPOS_HandleStatus_Active);
         }
-    
-    exit_POS_WK_FUNC_LAUNCH_cu_module_load_data:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
@@ -58,6 +47,7 @@ namespace cu_module_load_data {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cu_module_load_data
@@ -85,14 +75,7 @@ namespace cu_module_get_function {
         );
         POS_CHECK_POINTER(function_handle);
 
-        if(unlikely(function_handle->parent_handles.size() == 0)){
-            POS_WARN(
-                "launch(cu_module_get_function): no parent module of the function recorded: device_name(%s)",
-                function_handle->name.get()
-            );
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POS_WK_FUNC_LAUNCH_cu_module_get_function;
-        }
+        POS_ASSERT(function_handle->parent_handles.size() > 0);
         module_handle = function_handle->parent_handles[0];
 
         wqe->api_cxt->return_code = cuModuleGetFunction(&function, module_handle->server_addr, function_handle->name.get());
@@ -103,26 +86,15 @@ namespace cu_module_get_function {
             function_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
-    exit_POS_WK_FUNC_LAUNCH_cu_module_get_function:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         // TODO: skip checking
         // if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
         //     POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         // } else {
         //     POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         // }
-
         POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
 
+    exit:
         return retval;
     }
 } // namespace cu_module_get_function
@@ -151,14 +123,7 @@ namespace cu_module_get_global {
         );
         POS_CHECK_POINTER(var_handle);
 
-        if(unlikely(var_handle->parent_handles.size() == 0)){
-            POS_WARN(
-                "launch(cu_module_get_global): no parent module of the var recorded: device_name(%s)",
-                var_handle->name.get()
-            );
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
+        POS_ASSERT(var_handle->parent_handles.size() > 0);
         module_handle = var_handle->parent_handles[0];
 
         wqe->api_cxt->return_code = cuModuleGetGlobal(&dptr, &d_size, module_handle->server_addr, var_handle->name.get());
@@ -174,23 +139,13 @@ namespace cu_module_get_global {
             wqe->api_cxt->return_code = CUDA_SUCCESS;
         }
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cu_module_get_global
@@ -219,16 +174,6 @@ namespace cu_device_primary_ctx_get_state {
             (unsigned int*)(wqe->api_cxt->ret_data),
             (int*)(wqe->api_cxt->ret_data + sizeof(unsigned int))
         );
-
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);

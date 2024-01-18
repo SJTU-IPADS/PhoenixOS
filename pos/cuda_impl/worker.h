@@ -78,6 +78,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      *  \note   this procedure checkpoints all memory handles, stores all checkpointing
      *          history of all buffers, cause (1) long checkpoint latency and (2) large
      *          checkpointing memory consumption
+     * \note    this is the implementation of singularity
      * \param   wqe WQ element of the checkpoint op
      */
     pos_retval_t __checkpoint_naive(POSAPIContext_QE_ptr wqe) {
@@ -238,6 +239,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      */
     pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe) override {
         #if POS_CKPT_OPT_LEVAL == 1
+            // return __checkpoint_naive(wqe); // singularity
             return __checkpoint_o1(wqe);
         #elif POS_CKPT_OPT_LEVAL == 2
             POS_ERROR_C_DETAIL("shouldn't invoke this function");
@@ -448,41 +450,6 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             {   rpc_cublasSgemm,                wk_functions::cublas_sgemm::launch                      },
         });
         POS_DEBUG_C("insert %lu worker launch functions", this->_launch_functions.size());
-
-        this->_landing_functions.insert({
-            /* CUDA runtime functions */
-            {   CUDA_MALLOC,                    wk_functions::cuda_malloc::landing                      },
-            {   CUDA_FREE,                      wk_functions::cuda_free::landing                        },
-            {   CUDA_LAUNCH_KERNEL,             wk_functions::cuda_launch_kernel::landing               },
-            {   CUDA_MEMCPY_HTOD,               wk_functions::cuda_memcpy_h2d::landing                  },
-            {   CUDA_MEMCPY_DTOH,               wk_functions::cuda_memcpy_d2h::landing                  },
-            {   CUDA_MEMCPY_DTOD,               wk_functions::cuda_memcpy_d2d::landing                  },
-            {   CUDA_MEMCPY_HTOD_ASYNC,         wk_functions::cuda_memcpy_h2d_async::landing            },
-            {   CUDA_MEMCPY_DTOH_ASYNC,         wk_functions::cuda_memcpy_d2h_async::landing            },
-            {   CUDA_MEMCPY_DTOD_ASYNC,         wk_functions::cuda_memcpy_d2d_async::landing            },
-            {   CUDA_SET_DEVICE,                wk_functions::cuda_set_device::landing                  },
-            {   CUDA_GET_LAST_ERROR,            wk_functions::cuda_get_last_error::landing              },
-            {   CUDA_GET_ERROR_STRING,          wk_functions::cuda_get_error_string::landing            },
-            {   CUDA_GET_DEVICE_COUNT,          wk_functions::cuda_get_device_count::landing            },
-            {   CUDA_GET_DEVICE_PROPERTIES,     wk_functions::cuda_get_device_properties::landing       },
-            {   CUDA_GET_DEVICE,                wk_functions::cuda_get_device::landing                  },
-            {   CUDA_STREAM_SYNCHRONIZE,        wk_functions::cuda_stream_synchronize::landing          },
-            {   CUDA_STREAM_IS_CAPTURING,       wk_functions::cuda_stream_is_capturing::landing         },
-            {   CUDA_EVENT_CREATE_WITH_FLAGS,   wk_functions::cuda_event_create_with_flags::landing     },
-            {   CUDA_EVENT_DESTROY,             wk_functions::cuda_event_destory::landing               },
-            {   CUDA_EVENT_RECORD,              wk_functions::cuda_event_record::landing                },
-            /* CUDA driver functions */
-            {   rpc_cuModuleLoad,               wk_functions::cu_module_load_data::landing              },
-            {   rpc_cuModuleGetFunction,        wk_functions::cu_module_get_function::landing           },
-            {   rpc_register_var,               wk_functions::cu_module_get_global::landing             },
-            {   rpc_cuDevicePrimaryCtxGetState, wk_functions::cu_device_primary_ctx_get_state::landing  },
-            /* cuBLAS functions */
-            {   rpc_cublasCreate,               wk_functions::cublas_create::landing                    },
-            {   rpc_cublasSetStream,            wk_functions::cublas_set_stream::landing                },
-            {   rpc_cublasSetMathMode,          wk_functions::cublas_set_math_mode::landing             },
-            {   rpc_cublasSgemm,                wk_functions::cublas_sgemm::landing                     }
-        });
-        POS_DEBUG_C("insert %lu worker landing functions", this->_landing_functions.size());
 
         return POS_SUCCESS;
     }

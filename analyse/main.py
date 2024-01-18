@@ -198,8 +198,8 @@ class POSDag:
             self.dag_mat.append(handle_vector)
 
     def analyse_dag(self, figure_dir_path:str):
-        # self._analyse_ckpt(figure_dir_path)
-        self._analyse_ops()
+        self._analyse_ckpt(figure_dir_path)
+        # self._analyse_ops()
 
     def _analyse_ops(self):
         print(">>> analysing ops...")
@@ -248,11 +248,11 @@ class POSDag:
                 p10, p50, p99, mean, min, max = _analyse_duration(duration_list)
                 print(f"{name}: p10({p10:.2f} us), p50({p50:.2f} us), p99({p99:.2f} us), mean({mean:.2f} us), min({min:.2f} us), max({max:.2f} us)")
 
-            _print_statistics(runtime_duration_dict[api_id], "runtime")
-            _print_statistics(worker_duration_dict[api_id], "worker")
+            _print_statistics(runtime_duration_dict[api_id], "parse")
+            _print_statistics(worker_duration_dict[api_id], "execute")
             _print_statistics(physical_duration_dict[api_id], "physical")
-            _print_statistics(runtime_queue_duration_dict[api_id], "runtime queue")
-            _print_statistics(worker_queue_duration_dict[api_id], "worker queue")
+            _print_statistics(runtime_queue_duration_dict[api_id], "wait to parse")
+            _print_statistics(worker_queue_duration_dict[api_id], "wait to execute")
 
     def _analyse_ckpt(self, figure_dir_path:str):
         print(">>> analysing checkpoint...")

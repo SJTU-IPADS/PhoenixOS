@@ -958,8 +958,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
         handle_ptr = handle_map_iter->second;
 
         POS_ASSERT(
-            handle_ptr->status != kPOS_HandleStatus_Deleted 
-            && handle_ptr->status != kPOS_HandleStatus_Delete_Pending
+            handle_ptr->status != kPOS_HandleStatus_Deleted && handle_ptr->status != kPOS_HandleStatus_Delete_Pending
         );
 
         if(

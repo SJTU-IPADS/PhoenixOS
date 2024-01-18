@@ -153,7 +153,7 @@ class POSRuntime {
 
                 POS_CHECK_POINTER(wqe = wqes[i]);
 
-                wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
+                
 
                 api_id = wqe->api_cxt->api_id;
                 api_meta = _ws->api_mgnr->api_metas[api_id];
@@ -169,7 +169,9 @@ class POSRuntime {
                 /*!
                  *  \brief  ================== phrase 1 - parse API semantics ==================
                  */
+                wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
                 parser_retval = (*(_parser_functions[api_id]))(_ws, wqe);
+                wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
 
                 // set the return code
                 wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
@@ -188,6 +190,7 @@ class POSRuntime {
 
                     goto checkpoint_entrance;
                 }
+                
 
                 /*!
                  *  \note       for api in type of Delete_Resource, one can directly send
@@ -222,8 +225,6 @@ class POSRuntime {
                         POS_WARN_C("failed to insert checkpointing op");
                     }
                 }
-
-                wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
             }
 
             wqes.clear();

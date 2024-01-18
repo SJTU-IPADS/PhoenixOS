@@ -1158,6 +1158,8 @@ namespace cuda_stream_is_capturing {
         POSHandle_CUDA_Stream_ptr stream_handle;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
+        cudaStreamCaptureStatus capture_status;
+
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
 
@@ -1179,7 +1181,7 @@ namespace cuda_stream_is_capturing {
         hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
         POS_CHECK_POINTER(hm_stream);
 
-        // try obtain the source memory handle
+        // try obtain the stream handle
         retval = hm_stream->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
             /* handle */ &stream_handle
@@ -1189,14 +1191,25 @@ namespace cuda_stream_is_capturing {
                 "parse(cuda_stream_is_capturing): no stream was founded: client_addr(%p)",
                 (void*)pos_api_param_value(wqe, 0, uint64_t)
             );
-        } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Stream, 
-                POSHandleView_t(stream_handle, kPOS_Edge_Direction_In, 0)
-            );
+            goto exit;
         }
 
-        // launch the op to the dag
+        if(likely(stream_handle->is_capturing == false)){
+            capture_status = cudaStreamCaptureStatusNone;
+        } else {
+            capture_status = cudaStreamCaptureStatusActive;
+        }
+        memcpy(wqe->api_cxt->ret_data, &capture_status, sizeof(cudaStreamCaptureStatus));
+
+        wqe->record_handle(
+            kPOS_ResourceTypeId_CUDA_Stream, 
+            POSHandleView_t(stream_handle, kPOS_Edge_Direction_In, 0)
+        );
+        
+        // mark this sync call can be returned after parsing
+        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+
+        // launch the op to the dag (TODO: for debug)
         retval = client->dag.launch_op(wqe);
 
     exit:

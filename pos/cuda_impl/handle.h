@@ -445,7 +445,7 @@ class POSHandle_CUDA_Stream : public POSHandle {
      *  \param  state_size_     size of the resource state behind this handle
      */
     POSHandle_CUDA_Stream(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, hm, state_size_)
+        : POSHandle(client_addr_, size_, hm, state_size_), is_capturing(false)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Stream;
     }
@@ -454,7 +454,7 @@ class POSHandle_CUDA_Stream : public POSHandle {
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Stream(size_t size_, void* hm, size_t state_size_=0)
-        : POSHandle(size_, hm, state_size_)
+        : POSHandle(size_, hm, state_size_), is_capturing(false)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
@@ -465,7 +465,7 @@ class POSHandle_CUDA_Stream : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Stream"); }
 
-    protected:
+    bool is_capturing;
 };
 using POSHandle_CUDA_Stream_ptr = std::shared_ptr<POSHandle_CUDA_Stream>;
 

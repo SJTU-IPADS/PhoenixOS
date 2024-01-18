@@ -22,14 +22,6 @@ using pos_worker_launch_function_t = pos_retval_t(*)(
 );
 
 /*!
- *  \brief prototype for worker landing function for each API call
- */
-template<class T_POSTransport, class T_POSClient>
-using pos_worker_landing_function_t = pos_retval_t(*)(
-    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE_ptr
-);
-
-/*!
  *  \brief  macro for the definition of the worker launch functions
  */
 #define POS_WK_FUNC_LAUNCH()                                \
@@ -39,18 +31,8 @@ pos_retval_t launch(                                        \
     POSAPIContext_QE_ptr wqe                                \
 )
 
-/*!
- *  \brief  macro for the definition of the worker landing functions
- */
-#define POS_WK_FUNC_LANDING()                               \
-template<class T_POSTransport, class T_POSClient>           \
-pos_retval_t landing(                                       \
-    POSWorkspace<T_POSTransport, T_POSClient>* ws,          \
-    POSAPIContext_QE_ptr wqe                                \
-)
-
 namespace wk_functions {
-#define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); POS_WK_FUNC_LANDING(); }
+#define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); }
 };  // namespace rt_functions
 
 /*!
@@ -149,7 +131,6 @@ class POSWorker {
 
     // worker function map
     std::map<uint64_t, pos_worker_launch_function_t<T_POSTransport, T_POSClient>> _launch_functions;
-    std::map<uint64_t, pos_worker_landing_function_t<T_POSTransport, T_POSClient>> _landing_functions;
     
     /*!
      *  \brief  checkpoint procedure, should be implemented by each platform
@@ -200,20 +181,12 @@ class POSWorker {
 
     void __daemon_o2(){
         uint64_t i, j, k, w, api_id;
-        pos_retval_t launch_retval, landing_retval;
+        pos_retval_t launch_retval;
 
         POSAPIMeta_t api_meta;
 
         std::vector<T_POSClient*> clients;
         T_POSClient* client;
-
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
-        std::vector<POSHandleView_t>* handle_view_vec;
-
-        POSHandle::pos_broken_handle_list_t broken_handle_list;
-        POSHandle *broken_handle;
-        uint16_t nb_layers, layer_id_keeper;
-        uint64_t handle_id_keeper;
 
         bool during_ckpt = false, should_join_ckpt_stream = false;
         pos_ckpt_overlap_scheme_t ckpt_overlap_scheme;
@@ -260,9 +233,6 @@ class POSWorker {
                         #define POS_CKPT_PENDING_US 50
                         #define POS_OVERLAP_BATCH_SIZE 5
                     #endif
-
-                        // Resource DAG
-                        // Compare: reexecute
 
                         // we will wait here for the next following several ops
                         // TODO: we need to prevent the following op is a ckpt op??
@@ -320,59 +290,11 @@ class POSWorker {
 
                     api_meta = _ws->api_mgnr->api_metas[api_id];
 
-                    /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
-                    for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
-
-                        handle_view_vec = iter_hvm->second;
-                        
-                        for(j=0; j<handle_view_vec->size(); j++){
-                            broken_handle_list.reset();
-                            (*handle_view_vec)[j].handle->collect_broken_handles(&broken_handle_list);
-
-                            /*!
-                             *  \todo   1. should restore based on DAG info;
-                             *          2. this is a recursive procedure: obtain an op list to reexecute to restore these handles
-                             *          3. we need a good checkpoint mechanism to shorten the duration here
-                             */
-
-                            nb_layers = broken_handle_list.get_nb_layers();
-                            if(likely(nb_layers == 0)){
-                                continue;
-                            }
-
-                            layer_id_keeper = nb_layers - 1;
-                            handle_id_keeper = 0;
-
-                            while(1){
-                                broken_handle = broken_handle_list.reverse_get_handle(layer_id_keeper, handle_id_keeper);
-                                if(unlikely(broken_handle == nullptr)){
-                                    break;
-                                }
-
-                                /*!
-                                 *  \note   we don't need to restore the bottom handle while haven't create them yet
-                                 */
-                                if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
-                                    if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
-                                        continue;
-                                    }
-                                }
-
-                                if(unlikely(POS_SUCCESS != broken_handle->restore())){
-                                    POS_ERROR_C(
-                                        "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
-                                        broken_handle->resource_type_id, broken_handle->client_addr, broken_handle->server_addr,
-                                        broken_handle->status
-                                    );
-                                } else {
-                                    POS_DEBUG_C(
-                                        "restore broken handle: resource_type_id(%lu)",
-                                        broken_handle->resource_type_id
-                                    );
-                                }
-                            } // while (1)
-                        } // for(j=0; j<handle_view_vec->size(); j++)
-                    } // for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++)
+                    // check and restore broken handles
+                    if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
+                        POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
+                        continue;
+                    }
 
                 #if POS_ENABLE_DEBUG_CHECK
                     if(unlikely(_launch_functions.count(api_id) == 0)){
@@ -403,48 +325,28 @@ class POSWorker {
                     }
 
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
-                    if(launch_retval != POS_SUCCESS){
-                        wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
-                            /* pos_retval */ launch_retval, 
-                            /* library_id */ api_meta.library_id
-                        );
+                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
 
-                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-
-                        if(wqe->status == kPOS_API_Execute_Status_Init){
-                            // we only return the QE back to frontend when it hasn't been returned before
-                            wqe->status = kPOS_API_Execute_Status_Launch_Failed;
-                            wqe->return_tick = POSUtilTimestamp::get_tsc();
-                            _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
-                        }
-
-                        continue;
-                    }
-                
-                #if POS_ENABLE_DEBUG_CHECK
-                    if(unlikely(_landing_functions.count(api_id) == 0)){
-                        POS_ERROR_C_DETAIL(
-                            "runtime has no worker landing function for api %lu, need to implement", api_id
-                        );
-                    }
-                #endif
-                
-                    landing_retval = (*(_landing_functions[api_id]))(_ws, wqe);
+                    // cast return code
                     wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
-                        /* pos_retval */ landing_retval, 
+                        /* pos_retval */ launch_retval, 
                         /* library_id */ api_meta.library_id
                     );
 
+                    // check whether the execution is success
+                    if(unlikely(launch_retval != POS_SUCCESS)){
+                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                    }
+
+                    // check whether we need to join the checkpoint stream to finish
                     if(unlikely(should_join_ckpt_stream)){
                         this->checkpoint_join();
                         should_join_ckpt_stream = false;
                     }
-
-                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                     
+                    // check whether we need to return to frontend
                     if(wqe->status == kPOS_API_Execute_Status_Init){
                         // we only return the QE back to frontend when it hasn't been returned before
-                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
                         wqe->return_tick = POSUtilTimestamp::get_tsc();
                         _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
                     }
@@ -462,21 +364,11 @@ class POSWorker {
      */
     void __daemon_o0_o1(){
         uint64_t i, j, k, w, api_id;
-        pos_retval_t launch_retval, landing_retval;
-
+        pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;
-
         std::vector<T_POSClient*> clients;
         T_POSClient* client;
 
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
-        std::vector<POSHandleView_t>* handle_view_vec;
-
-        POSHandle::pos_broken_handle_list_t broken_handle_list;
-        POSHandle *broken_handle;
-        uint16_t nb_layers, layer_id_keeper;
-        uint64_t handle_id_keeper;
-        
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
             return;
@@ -502,70 +394,23 @@ class POSWorker {
                     api_id = wqe->api_cxt->api_id;
 
                     // this is a checkpoint op
-                    if(api_id == this->_ws->checkpoint_api_id){
+                    if(unlikely(api_id == this->_ws->checkpoint_api_id)){
                         if(unlikely(POS_SUCCESS != this->checkpoint(wqe))){
                             POS_WARN_C("failed to do checkpointing");
                         }
                         __done(this->_ws, wqe);
                         wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+                        wqe->return_tick = POSUtilTimestamp::get_tsc();
                         continue;
                     }
 
                     api_meta = _ws->api_mgnr->api_metas[api_id];
 
-                    /*! \note   verify whether all relyed resources are ready, if not, we need to restore their state first */
-                    for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
-
-                        handle_view_vec = iter_hvm->second;
-                        
-                        for(j=0; j<handle_view_vec->size(); j++){
-                            broken_handle_list.reset();
-                            (*handle_view_vec)[j].handle->collect_broken_handles(&broken_handle_list);
-
-                            /*!
-                             *  \todo   1. should restore based on DAG info;
-                             *          2. this is a recursive procedure: obtain an op list to reexecute to restore these handles
-                             *          3. we need a good checkpoint mechanism to shorten the duration here
-                             */
-
-                            nb_layers = broken_handle_list.get_nb_layers();
-                            if(likely(nb_layers == 0)){
-                                continue;
-                            }
-
-                            layer_id_keeper = nb_layers - 1;
-                            handle_id_keeper = 0;
-
-                            while(1){
-                                broken_handle = broken_handle_list.reverse_get_handle(layer_id_keeper, handle_id_keeper);
-                                if(unlikely(broken_handle == nullptr)){
-                                    break;
-                                }
-
-                                /*!
-                                 *  \note   we don't need to restore the bottom handle while haven't create them yet
-                                 */
-                                if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
-                                    if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
-                                        continue;
-                                    }
-                                }
-
-                                if(unlikely(POS_SUCCESS != broken_handle->restore())){
-                                    POS_ERROR_C(
-                                        "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
-                                        broken_handle->resource_type_id, broken_handle->client_addr, broken_handle->server_addr,
-                                        broken_handle->status
-                                    );
-                                } else {
-                                    POS_DEBUG_C(
-                                        "restore broken handle: resource_type_id(%lu)",
-                                        broken_handle->resource_type_id
-                                    );
-                                }
-                            } // while (1)
-                        } // for(j=0; j<handle_view_vec->size(); j++)
-                    } // for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++)
+                    // check and restore broken handles
+                    if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
+                        POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
+                        continue;
+                    }
 
                 #if POS_ENABLE_DEBUG_CHECK
                     if(unlikely(_launch_functions.count(api_id) == 0)){
@@ -576,51 +421,105 @@ class POSWorker {
                 #endif
 
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
-                    if(launch_retval != POS_SUCCESS){
-                        wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
-                            /* pos_retval */ launch_retval, 
-                            /* library_id */ api_meta.library_id
-                        );
+                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
 
-                        wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-
-                        if(wqe->status == kPOS_API_Execute_Status_Init){
-                            // we only return the QE back to frontend when it hasn't been returned before
-                            wqe->status = kPOS_API_Execute_Status_Launch_Failed;
-                            wqe->return_tick = POSUtilTimestamp::get_tsc();
-                            _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
-                        }
-
-                        continue;
-                    }
-                
-                #if POS_ENABLE_DEBUG_CHECK
-                    if(unlikely(_landing_functions.count(api_id) == 0)){
-                        POS_ERROR_C_DETAIL(
-                            "runtime has no worker landing function for api %lu, need to implement", api_id
-                        );
-                    }
-                #endif
-                
-                    landing_retval = (*(_landing_functions[api_id]))(_ws, wqe);
+                   // cast return code
                     wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
-                        /* pos_retval */ landing_retval, 
+                        /* pos_retval */ launch_retval, 
                         /* library_id */ api_meta.library_id
                     );
 
-                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-                    
+                    // check whether the execution is success
+                    if(unlikely(launch_retval != POS_SUCCESS)){
+                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                    }
+
+                    // check whether we need to return to frontend
                     if(wqe->status == kPOS_API_Execute_Status_Init){
                         // we only return the QE back to frontend when it hasn't been returned before
-                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
                         wqe->return_tick = POSUtilTimestamp::get_tsc();
                         _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
-                    }
+                    }               
                 }
             }
             
             clients.clear();
         }
+    }
+    
+    /*!
+     *  \brief  check and restore all broken handles, if there's any exists
+     *  \param  wqe         the op to be checked and restored
+     *  \param  api_meta    metadata of the called API
+     *  \return POS_SUCCESS for successfully checking and restoring
+     */
+    pos_retval_t __restore_broken_handles(POSAPIContext_QE_ptr wqe, POSAPIMeta_t& api_meta){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
+        std::vector<POSHandleView_t>* handle_view_vec;
+        POSHandle::pos_broken_handle_list_t broken_handle_list;
+        POSHandle *broken_handle;
+        uint16_t nb_layers, layer_id_keeper;
+        uint64_t handle_id_keeper;
+        
+        POS_CHECK_POINTER(wqe.get());
+
+        for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
+            handle_view_vec = iter_hvm->second;
+
+            for(i=0; i<handle_view_vec->size(); i++){
+                broken_handle_list.reset();
+                (*handle_view_vec)[i].handle->collect_broken_handles(&broken_handle_list);
+
+                nb_layers = broken_handle_list.get_nb_layers();
+                if(likely(nb_layers == 0)){
+                    continue;
+                }
+
+                layer_id_keeper = nb_layers - 1;
+                handle_id_keeper = 0;
+
+                while(1){
+                    broken_handle = broken_handle_list.reverse_get_handle(layer_id_keeper, handle_id_keeper);
+                    if(unlikely(broken_handle == nullptr)){
+                        break;
+                    }
+
+                    /*!
+                        *  \note   we don't need to restore the bottom handle while haven't create them yet
+                        */
+                    if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
+                        if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
+                            continue;
+                        }
+                    }
+
+                    /*!
+                     *  \todo   restore from remote
+                     *  \todo   replay based on DAG
+                     */
+
+                    if(unlikely(POS_SUCCESS != broken_handle->restore())){
+                        POS_ERROR_C(
+                            "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
+                            broken_handle->resource_type_id, broken_handle->client_addr, broken_handle->server_addr,
+                            broken_handle->status
+                        );
+                    } else {
+                        POS_DEBUG_C(
+                            "restore broken handle: resource_type_id(%lu)",
+                            broken_handle->resource_type_id
+                        );
+                    }
+                } // while (1)
+
+            } // foreach handle_view_vec
+
+        } // foreach handle_view_map
+
+    exit:
+        return retval;
     }
 
     /*!

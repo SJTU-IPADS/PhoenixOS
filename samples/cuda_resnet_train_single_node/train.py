@@ -51,18 +51,21 @@ for epoch in tqdm(range(1, n_epochs+1)):
         target = target.to(device)
         
         # NOTE: comment out to mock inference
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         
         output = model(data).to(device)
 
         # NOTE: comment out to mock inference
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()*data.size(0)
+        # loss = criterion(output, target)
+        # loss.backward()
+        # optimizer.step()
+        # train_loss += loss.item()*data.size(0)
 
         nb_iteration += 1
         
+        # NOTE: we make sure the data is copy back to host to force sync
+        host_output = output.to('cpu')
+
         # POS: we only train 5 iteration for test
         if nb_iteration == 5:
             break

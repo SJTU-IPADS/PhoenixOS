@@ -1,6 +1,6 @@
 #pragma once
 
 
-class POSUtil_ConfigParser {
-
+class POSUtil_Parser {
+    
 };

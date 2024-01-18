@@ -33,7 +33,10 @@ namespace cuda_malloc {
             POS_CHECK_POINTER(memory_handle);
             
             retval = memory_handle->set_passthrough_addr(ptr, memory_handle);
-            if(unlikely(POS_SUCCESS != retval)){ goto exit; }
+            if(unlikely(POS_SUCCESS != retval)){ 
+                POS_WARN_DETAIL("failed to set passthrough address for the memory handle: %p", ptr);
+                goto exit;
+            }
 
             memory_handle->mark_status(kPOS_HandleStatus_Active);
             memcpy(wqe->api_cxt->ret_data, &(memory_handle->client_addr), sizeof(uint64_t));
@@ -41,23 +44,13 @@ namespace cuda_malloc {
             memset(wqe->api_cxt->ret_data, 0, sizeof(uint64_t));
         }
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_malloc
@@ -85,23 +78,13 @@ namespace cuda_free {
             memory_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_free
@@ -112,6 +95,10 @@ namespace cuda_free {
  *  \brief      launch a user-define computation kernel
  */
 namespace cuda_launch_kernel {
+#define POS_CUDA_LAUNCH_KERNEL_MAX_NB_PARAMS    64
+
+    static void* cuda_args[POS_CUDA_LAUNCH_KERNEL_MAX_NB_PARAMS] = {0};
+
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
@@ -119,7 +106,7 @@ namespace cuda_launch_kernel {
         POSHandle_CUDA_Stream_ptr stream_handle;
         POSHandle_ptr memory_handle;
         uint64_t i, j, nb_involved_memory;
-        void **cuda_args = nullptr;
+        // void **cuda_args = nullptr;
         void *args, *args_values, *arg_addr;
         uint64_t *addr_list;
 
@@ -144,9 +131,10 @@ namespace cuda_launch_kernel {
          *          an array of pointers, so we allocate a new array here to store
          *          these pointers
          */
-        if(likely(function_handle->nb_params > 0)){
-            POS_CHECK_POINTER(cuda_args = malloc(function_handle->nb_params * sizeof(void*)));
-        }
+        // TODO: pre-allocated!
+        // if(likely(function_handle->nb_params > 0)){
+        //     POS_CHECK_POINTER(cuda_args = malloc(function_handle->nb_params * sizeof(void*)));
+        // }
 
         for(i=0; i<function_handle->nb_params; i++){
             cuda_args[i] = args + function_handle->param_offsets[i];
@@ -168,18 +156,7 @@ namespace cuda_launch_kernel {
             /* extra */ nullptr
         );
 
-        if(likely(cuda_args != nullptr)){ free(cuda_args); }
-
-    exit_POS_WK_FUNC_LAUNCH_cuda_launch_kernel:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
+        // if(likely(cuda_args != nullptr)){ free(cuda_args); }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
@@ -187,6 +164,7 @@ namespace cuda_launch_kernel {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_launch_kernel
@@ -215,23 +193,13 @@ namespace cuda_memcpy_h2d {
             /* kind */ cudaMemcpyHostToDevice
         );
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_h2d
@@ -259,23 +227,13 @@ namespace cuda_memcpy_d2h {
             /* kind */ cudaMemcpyDeviceToHost
         );
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_d2h
@@ -305,22 +263,13 @@ namespace cuda_memcpy_d2d {
             /* kind */ cudaMemcpyDeviceToDevice
         );
 
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_d2d
@@ -354,23 +303,13 @@ namespace cuda_memcpy_h2d_async {
             /* stream */ stream_handle->server_addr
         );
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_h2d_async
@@ -407,23 +346,13 @@ namespace cuda_memcpy_d2h_async {
         /*! \note   we must synchronize this api under remoting */
         wqe->api_cxt->return_code = cudaStreamSynchronize(stream_handle->server_addr);
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_d2h_async
@@ -458,23 +387,13 @@ namespace cuda_memcpy_d2d_async {
             /* stream */ stream_handle->server_addr
         );
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_memcpy_d2d_async
@@ -500,16 +419,6 @@ namespace cuda_set_device {
 
         wqe->api_cxt->return_code = cudaSetDevice(device_handle->device_id);
 
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
@@ -530,11 +439,7 @@ namespace cuda_set_device {
 namespace cuda_get_last_error {
     // parser function
     POS_WK_FUNC_LAUNCH(){
-        return POS_SUCCESS;
-    }
-
-    // dag function
-    POS_WK_FUNC_LANDING(){
+        POS_ERROR_DETAIL("shouldn't be called");
         return POS_SUCCESS;
     }
 } // namespace cuda_get_last_error
@@ -558,23 +463,9 @@ namespace cuda_get_error_string {
 
         wqe->api_cxt->return_code = cudaSuccess;
 
-        return POS_SUCCESS;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
+        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
-        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
-        } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
-        }
-
-        return retval;
+        return POS_SUCCESS;
     }
 } // namespace cuda_get_error_string
 
@@ -588,15 +479,12 @@ namespace cuda_get_error_string {
 namespace cuda_get_device_count {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        return POS_SUCCESS;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
+        // TODO: we launch this op for debug?
         POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device_count
+
 
 
 
@@ -622,22 +510,13 @@ namespace cuda_get_device_properties {
             device_handle->device_id
         );
 
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_get_device_properties
@@ -652,11 +531,7 @@ namespace cuda_get_device_properties {
 namespace cuda_get_device {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        return POS_SUCCESS;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
+        // TODO: we launch this op for debug?
         POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         return POS_SUCCESS;
     }
@@ -683,16 +558,6 @@ namespace cuda_stream_synchronize {
 
         wqe->api_cxt->return_code = cudaStreamSynchronize(stream_handle->server_addr);
 
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
@@ -713,39 +578,29 @@ namespace cuda_stream_synchronize {
 namespace cuda_stream_is_capturing {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        // pos_retval_t retval = POS_SUCCESS;
+        // POSHandle_CUDA_Stream_ptr stream_handle;
 
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
+        // POS_CHECK_POINTER(ws);
+        // POS_CHECK_POINTER(wqe);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        // POS_CHECK_POINTER(stream_handle.get());
 
-        wqe->api_cxt->return_code = cudaStreamIsCapturing(
-            /* stream */ stream_handle->server_addr,
-            /* pCaptureStatus */ (cudaStreamCaptureStatus*) wqe->api_cxt->ret_data
-        );
+        // wqe->api_cxt->return_code = cudaStreamIsCapturing(
+        //     /* stream */ stream_handle->server_addr,
+        //     /* pCaptureStatus */ (cudaStreamCaptureStatus*) wqe->api_cxt->ret_data
+        // );
 
-        return retval;
-    }
+        // return retval;
 
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
+        // we launch this op just for debug
+        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
 
-        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
-        } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
-        }
-
-        return retval;
+        return POS_SUCCESS;
     }
 } // namespace cuda_stream_is_capturing
+
 
 
 
@@ -776,23 +631,13 @@ namespace cuda_event_create_with_flags {
             event_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_event_create_with_flags
@@ -822,23 +667,13 @@ namespace cuda_event_destory {
             event_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_event_destory
@@ -868,23 +703,13 @@ namespace cuda_event_record {
             /* stream */ stream_handle_view.handle->server_addr
         );
 
-    exit:
-        return retval;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cuda_event_record
@@ -899,11 +724,6 @@ namespace cuda_event_record {
 namespace template_cuda {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    // landing function
-    POS_WK_FUNC_LANDING(){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 } // namespace template_cuda

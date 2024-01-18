@@ -16,7 +16,7 @@ namespace wk_functions {
  *  \brief      create a cuBlas context
  */
 namespace cublas_create {
-    // parser function
+    // execution function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle_ptr cublas_context_handle;
@@ -36,23 +36,13 @@ namespace cublas_create {
             cublas_context_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
-    exit:
-        return retval;
-    }
-
-    // dag function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cublas_create
@@ -85,23 +75,13 @@ namespace cublas_set_stream {
             stream_handle->server_addr
         );
 
-    exit:
-        return retval;
-    }
-
-    // dag function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cublas_set_stream
@@ -130,23 +110,13 @@ namespace cublas_set_math_mode {
             pos_api_param_value(wqe, 1, cublasMath_t)
         );
 
-    exit:
-        return retval;
-    }
-
-    // dag function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
 
+    exit:
         return retval;
     }
 } // namespace cublas_set_math_mode
@@ -195,23 +165,13 @@ namespace cublas_sgemm {
             /* ldc */ pos_api_param_value(wqe, 13, int)
         );
 
-    exit:
-        return retval;
-    }
-
-    // dag function
-    POS_WK_FUNC_LANDING(){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(wqe);
-
         if(unlikely(CUBLAS_STATUS_SUCCESS != wqe->api_cxt->return_code)){
             POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
         } else {
             POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
         }
-        
+
+    exit:
         return retval;
     }
 } // namespace cublas_sgemm

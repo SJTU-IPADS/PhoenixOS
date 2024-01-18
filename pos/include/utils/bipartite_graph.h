@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <mutex>
 
 #include <string.h>
 
@@ -99,7 +100,10 @@ class POSBipartiteGraph {
         pos_retval_t retval = POS_SUCCESS;
         POSBgVertex_t<T> *new_vertex;
         POSNeighborMap_ptr new_topo_map;
-    
+        
+        // make sure the adding process won't conflict with the merging process
+        std::lock_guard<std::mutex> lk(__merge_lock_mtx);
+
         POS_CHECK_POINTER(id);
 
         // make sure all provided neighbor idx are valid
@@ -229,7 +233,7 @@ class POSBipartiteGraph {
         POSBgVertex_t<T1>* t1v;
         POSBgVertex_t<T2>* t2v;
         std::string serilization_result;
-
+        
         // obtain comprehensive topology
         __join_topo();
 
@@ -321,6 +325,9 @@ class POSBipartiteGraph {
             __merge_topo_cache();
         }
     }
+
+    // mutex lock to protect merging process
+    std::mutex __merge_lock_mtx;
     
     /*!
      *  \brief  merge _topo_t1_cache into _topo
@@ -330,6 +337,9 @@ class POSBipartiteGraph {
         typename POSNeighborMap_t::iterator inner_iter;
         pos_vertex_id_t t1_vid;
         POSNeighborMap_ptr t1_nmap, t2_nmap;
+        
+        // make sure the merging process won't conflict with the adding process
+        std::lock_guard<std::mutex> lk(__merge_lock_mtx);
 
         for(outter_iter=_topo_t1_cache.begin(); outter_iter!=_topo_t1_cache.end(); outter_iter++){
             t1_vid = outter_iter->first;
