@@ -7,6 +7,7 @@
 **/.python_history
 **/build
 **/bin
+**/.conda
 # **/lib
 **/dag.pos
 **/*.nsys-rep
