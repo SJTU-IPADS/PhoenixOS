@@ -7,7 +7,7 @@
 **/.python_history
 **/build
 **/bin
-**/lib
+# **/lib
 **/dag.pos
 **/*.nsys-rep
 **/.viminfo
