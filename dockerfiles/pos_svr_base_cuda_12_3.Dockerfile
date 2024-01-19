@@ -12,12 +12,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt-get install -y libibverbs-dev libboost-all-dev net-tools            \
     git-lfs pkg-config python3-pip libelf-dev libssl-dev libgl1-mesa-dev    \
-    libvdpau-dev iputils-ping wget gdb vim intel-oneapi-mkl-devel
+    libvdpau-dev iputils-ping wget gdb vim
 
-RUN python3 -m pip install meson
-RUN python3 -m pip install ninja
-RUN python3 -m pip install cmake
-RUN python3 -m pip install -U matplotlib seaborn palettable panda numpy
+RUN python3 -m pip install meson -i https://pypi.douban.com/simple/
+RUN python3 -m pip install ninja -i https://pypi.douban.com/simple/
+RUN python3 -m pip install cmake -i https://pypi.douban.com/simple/
+RUN python3 -m pip install -U matplotlib seaborn palettable panda numpy -i https://pypi.douban.com/simple/
 
 # install nsys-cli for profiling
 COPY ./dockerfiles/assets/NsightSystems-linux-cli-public-2023.4.1.97-3355750.deb /tmp

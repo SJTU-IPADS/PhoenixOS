@@ -140,8 +140,6 @@ else
 endif
 
 inc_dirs += ['./']
-inc_dirs += ['./third_party/websocketpp/websocketpp']
-
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
 
