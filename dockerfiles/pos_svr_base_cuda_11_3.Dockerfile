@@ -12,7 +12,9 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt-get install -y libibverbs-dev libboost-all-dev net-tools            \
     git-lfs pkg-config python3-pip libelf-dev libssl-dev libgl1-mesa-dev    \
-    libvdpau-dev iputils-ping wget gdb vim
+    libvdpau-dev iputils-ping wget gdb vim nsight-compute-2023.1.1
+
+RUN ln -s /opt/nvidia/nsight-compute/2023.1.1/target/linux-desktop-glibc_2_11_3-x64/ncu /usr/local/bin/ncu
 
 # # install oneMKL (4GB)
 # # ref: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html?operatingsystem=linux&distributions=aptpackagemanager

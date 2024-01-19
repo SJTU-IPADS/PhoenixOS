@@ -12,5 +12,6 @@
 **/*.nsys-rep
 **/.viminfo
 **/.cmake
+**/env
 
 remoting/cuda_old
