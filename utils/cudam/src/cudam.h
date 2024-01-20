@@ -1,0 +1,15 @@
+#ifndef _CUDAM_H_
+#define _CUDAM_H_
+
+/* function return definition */
+enum {
+  RETVAL_SUCCESS = 1,
+  RETVAL_ERROR_ALREADY_EXIST,
+  RETVAL_ERROR_NOT_FOUND,
+  RETVAL_ERROR_INVALID,
+  RETVAL_ERROR_INTERNAL_ERROR
+};
+
+#define PROFILING_INTERVAL_MICROSECOND 5000000
+
+#endif
