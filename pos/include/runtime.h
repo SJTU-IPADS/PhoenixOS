@@ -153,8 +153,6 @@ class POSRuntime {
 
                 POS_CHECK_POINTER(wqe = wqes[i]);
 
-                
-
                 api_id = wqe->api_cxt->api_id;
                 api_meta = _ws->api_mgnr->api_metas[api_id];
 

@@ -8,10 +8,19 @@
 git clone https://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@github.com/microsoft/Megatron-DeepSpeed.git
 ```
 
-download datasets for BERT training
+then download pile datasets
+
+> the pile dataset has been took down due to copyright issue, we use the cache dataset to run training!
+
+make sure the dataset is located under `datasets`
 
 ```bash
-# TODO:
+$ cd datasets && ll .
+total 3151228
+drwxrwxr-x 2 hzb hzb       4096 Jan 20 02:53 ./
+drwxrwxr-x 4 hzb hzb       4096 Jan 20 02:52 ../
+-rw-rw-r-- 1 hzb hzb 3226484264 Jan 20 02:53 BookCorpusDataset_text_document.bin
+-rw-rw-r-- 1 hzb hzb     357402 Jan 20 02:53 BookCorpusDataset_text_document.idx
 ```
 
 2. downgrade megratron version, and fix a adaption bug
@@ -26,7 +35,12 @@ we also need to fix `from deepspeed import get_accelerator` to `from deepspeed.a
 3. run container
 
 ```bash
-sudo docker run --gpus all -dit --name hzb_bert_train -v[Megatron-DeepSpeed Path]:/root -v[Dataset Path]:/root zobinhuang/pytorch:1.13.1-megratron-deepspeed
+sudo docker run --gpus all -dit --name bert_train --privileged --ipc=host -v[Megatron-DeepSpeed Path]:/root -v[Dataset Path]:/root zobinhuang/pytorch:1.13.1-megratron-deepspeed
+
+# e.g.
+sudo docker run --gpus all -dit --name bert_train --privileged --ipc=host -v/disk1/hzb/projects/pos/reorg/phoenixos/samples/bert_training/Megatron-DeepSpeed:/root -v/disk1/hzb/projects/pos/reorg/phoenixos/samples/bert_training/datasets:/data zobinhuang/pytorch:1.13.1-megratron-deepspeed
+
+sudo docker exec -it bert_train bash
 ```
 
 ## Run training
@@ -38,9 +52,6 @@ sudo docker run --gpus all -dit --name hzb_bert_train -v[Megatron-DeepSpeed Path
 ```bash
 python3 ./examples_deepspeed/bert_with_pile/prepare_pile_data.py 
 ```
-
-
-
 
 ## Record of the building process of imgae `zobinhuang/pytorch:1.13.1-v3-megratron-deepspeed` (based on `zobinhuang/pytorch:1.13.1-v3`)
 

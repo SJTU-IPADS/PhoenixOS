@@ -4,8 +4,9 @@ from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
 from utils.readData import read_dataset
-from utils.ResNet import ResNet18
+from utils.ResNet import ResNet50
 import time
+import nvtx
 
 torch.backends.cudnn.enabled = False
 
@@ -15,12 +16,21 @@ batch_size = 128
 train_loader,valid_loader,test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 n_class = 10
 
-model = ResNet18()
-model.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False)
-model.fc = torch.nn.Linear(512, n_class)
+model = ResNet50()
+# model.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False)
+# model.fc = torch.nn.Linear(512, n_class)
 model = model.to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 
+nvtx_switch = False
+
+def __nvtx_push(message:str, color:str):
+    if nvtx_switch:
+        return nvtx.start_range(message=message, color=color)
+
+def __nvtx_pop(handle):
+    if nvtx_switch:
+        nvtx.end_range(handle)
 
 n_epochs = 1
 valid_loss_min = np.Inf # track change in validation loss
@@ -47,28 +57,39 @@ for epoch in tqdm(range(1, n_epochs+1)):
 
     model.train()
     for data, target in train_loader:
+        rng_iter = __nvtx_push(message=f"iteration {nb_iteration}", color="blue")
+        
+        rng_copy = __nvtx_push(message=f"data transfer", color="red")
         data = data.to(device)
         target = target.to(device)
-        
-        # NOTE: comment out to mock inference
-        # optimizer.zero_grad()
-        
+        __nvtx_pop(rng_copy)
+                
+        rng_fwd = __nvtx_push(message=f"forward", color="green")
         output = model(data).to(device)
+        __nvtx_pop(rng_fwd)
 
         # NOTE: comment out to mock inference
-        # loss = criterion(output, target)
-        # loss.backward()
-        # optimizer.step()
-        # train_loss += loss.item()*data.size(0)
+        rng_bwd = __nvtx_push(message=f"backward", color="green")
+        optimizer.zero_grad()
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        train_loss += loss.item()*data.size(0)
+        __nvtx_pop(rng_bwd)
 
         nb_iteration += 1
         
         # NOTE: we make sure the data is copy back to host to force sync
-        host_output = output.to('cpu')
+        # host_output = output.to('cpu')
+
+        __nvtx_pop(rng_iter)
 
         # POS: we only train 5 iteration for test
-        if nb_iteration == 5:
+        if nb_iteration == 2:
+            print("reach 2, break")
             break
+        
+        
 
     # model.eval()
     # for data, target in valid_loader:

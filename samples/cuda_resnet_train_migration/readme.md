@@ -52,7 +52,7 @@ bash ./svr.sh -r 1
 (4) run client
 
 ```bash
-bash ./clnt.sh -s 1 -i zobinhuang/pytorch:1.13.1-devel-for-pos -m false
+bash ./clnt.sh -s 1 -i zobinhuang/pytorch:1.13.1-v2 -m false
 ```
 
 we need to change the g++ --version inside client because it's a old ubuntu18.04 image

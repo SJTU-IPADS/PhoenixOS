@@ -920,7 +920,6 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
     uint64_t i;
     uint64_t client_addr_u64 = (uint64_t)(client_addr);
 
-    // std::map<uint64_t, std::shared_ptr<T_POSHandle>> _handle_address_map;
     typename std::map<uint64_t, std::shared_ptr<T_POSHandle>>::iterator handle_map_iter;
 
     POS_CHECK_POINTER(handle);
@@ -928,7 +927,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
     /*!
      *  \note   direct case: the given address is exactly the base address
      */
-    if(likely(this->_handle_address_map.count(client_addr_u64) > 0)){
+    if(unlikely(this->_handle_address_map.count(client_addr_u64) > 0)){
         *handle = this->_handle_address_map[client_addr_u64];
 
         /*!
@@ -949,11 +948,11 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
     
     /*!
      *  \brief  indirect case: the given address is beyond the base address
+     *  \note   most of query will fall back to this part
      */
-
-    // get the first handle less than the given address
     handle_map_iter = this->_handle_address_map.lower_bound(client_addr_u64);
     if(handle_map_iter != this->_handle_address_map.begin()){
+        // get the first handle less than the given address
         handle_map_iter--;
         handle_ptr = handle_map_iter->second;
 
@@ -961,11 +960,16 @@ pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* cl
             handle_ptr->status != kPOS_HandleStatus_Deleted && handle_ptr->status != kPOS_HandleStatus_Delete_Pending
         );
 
-        if(
+        if(likely(
             (uint64_t)(handle_ptr->client_addr) <= client_addr_u64 
             && client_addr_u64 < (uint64_t)(handle_ptr->client_addr) + handle_ptr->size
-        ){
+        )){
             *handle = handle_ptr;
+
+            if(offset != nullptr){
+                *offset = client_addr_u64 - (uint64_t)(handle_ptr->client_addr);
+            }
+
             goto exit;
         }
     }

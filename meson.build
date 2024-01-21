@@ -41,7 +41,7 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 1
+ckpt_opt_level = 0
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
@@ -64,7 +64,7 @@ enable_hijack_api_check = 0
 enable_print_error = 1
 
 # switch:   whether to print all warning messages
-enable_print_warn = 1
+enable_print_warn = 0
 
 # switch:   whether to print all log messages
 enable_print_log = 1
