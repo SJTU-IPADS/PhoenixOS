@@ -18,8 +18,8 @@ namespace cu_module_load_data {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSMem_ptr fatbin_binary;
+        POSHandle *module_handle;
+        uint8_t *fatbin_binary;
         CUresult res;
         CUmodule module = NULL;
 
@@ -31,7 +31,7 @@ namespace cu_module_load_data {
 
         fatbin_binary = module_handle->host_value_map[wqe->dag_vertex_id].first;
 
-        wqe->api_cxt->return_code = cuModuleLoadData(&module, fatbin_binary.get());
+        wqe->api_cxt->return_code = cuModuleLoadData(&module, fatbin_binary);
 
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
@@ -63,16 +63,14 @@ namespace cu_module_get_function {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSHandle_CUDA_Function_ptr function_handle;
+        POSHandle *module_handle;
+        POSHandle_CUDA_Function *function_handle;
         CUfunction function = NULL;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
     
-        function_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Function>(
-            pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Function, 0)
-        );
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Function, 0));
         POS_CHECK_POINTER(function_handle);
 
         POS_ASSERT(function_handle->parent_handles.size() > 0);
@@ -108,8 +106,8 @@ namespace cu_module_get_global {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSHandle_CUDA_Var_ptr var_handle;
+        POSHandle *module_handle;
+        POSHandle_CUDA_Var *var_handle;
         CUfunction function = NULL;
 
         CUdeviceptr dptr = 0;
@@ -118,9 +116,7 @@ namespace cu_module_get_global {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        var_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Var>(
-            pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Var, 0)
-        );
+        var_handle = (POSHandle_CUDA_Var*)(pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Var, 0));
         POS_CHECK_POINTER(var_handle);
 
         POS_ASSERT(var_handle->parent_handles.size() > 0);
@@ -161,13 +157,13 @@ namespace cu_device_primary_ctx_get_state {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
-        POS_CHECK_POINTER(device_handle.get());
+        POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cuDevicePrimaryCtxGetState(
             device_handle->device_id,

@@ -9,7 +9,6 @@
 #include "pos/include/log.h"
 
 class POSCheckpointSlot;
-using POSCheckpointSlot_ptr = std::shared_ptr<POSCheckpointSlot>;
 
 using pos_custom_ckpt_allocate_func_t = void*(*)(uint64_t state_size);
 using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
@@ -29,7 +28,7 @@ class POSCheckpointBag {
      *  \param  ptr         pointer to the new checkpoint slot
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t apply_new_checkpoint(uint64_t version, POSCheckpointSlot_ptr* ptr){
+    pos_retval_t apply_new_checkpoint(uint64_t version, POSCheckpointSlot** ptr){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 

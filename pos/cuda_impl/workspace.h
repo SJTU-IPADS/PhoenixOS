@@ -28,14 +28,14 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
      */
     pos_retval_t init() override {
         // create runtime
-        this->_runtime = new POSRuntime_CUDA<T_POSTransport>(/* ws */ this);
-        POS_CHECK_POINTER(this->_runtime);
-        this->_runtime->init();
+        this->runtime = new POSRuntime_CUDA<T_POSTransport>(/* ws */ this);
+        POS_CHECK_POINTER(this->runtime);
+        this->runtime->init();
 
         // create worker
-        this->_worker = new POSWorker_CUDA<T_POSTransport>( /* ws */ this );
-        POS_CHECK_POINTER(this->_worker);
-        this->_worker->init();
+        this->worker = new POSWorker_CUDA<T_POSTransport>( /* ws */ this );
+        POS_CHECK_POINTER(this->worker);
+        this->worker->init();
 
         // create the api manager
         this->api_mgnr = new POSApiManager_CUDA();

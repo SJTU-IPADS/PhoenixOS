@@ -51,12 +51,12 @@ for epoch in tqdm(range(1, n_epochs+1)):
     
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
     
-    start_t = time.time()
-
     nb_iteration = 0
 
     model.train()
     for data, target in train_loader:
+        start_t = time.time()
+
         rng_iter = __nvtx_push(message=f"iteration {nb_iteration}", color="blue")
         
         rng_copy = __nvtx_push(message=f"data transfer", color="red")
@@ -69,28 +69,31 @@ for epoch in tqdm(range(1, n_epochs+1)):
         __nvtx_pop(rng_fwd)
 
         # NOTE: comment out to mock inference
-        rng_bwd = __nvtx_push(message=f"backward", color="green")
-        optimizer.zero_grad()
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()*data.size(0)
-        __nvtx_pop(rng_bwd)
+        # rng_bwd = __nvtx_push(message=f"backward", color="green")
+        # optimizer.zero_grad()
+        # loss = criterion(output, target)
+        # loss.backward()
+        # optimizer.step()
+        # train_loss += loss.item()*data.size(0)
+        # __nvtx_pop(rng_bwd)
 
         nb_iteration += 1
         
-        # NOTE: we make sure the data is copy back to host to force sync
-        # host_output = output.to('cpu')
+        # NOTE: we force sync here to make sure the execution is done
+        # torch.cuda.default_stream(0).synchronize()
+        host_output = output.to("cpu")
 
         __nvtx_pop(rng_iter)
+        
+        end_t = time.time()
 
-        # POS: we only train 5 iteration for test
-        if nb_iteration == 2:
-            print("reach 2, break")
+        print(f"itetration {nb_iteration} duration: {int(round((end_t-start_t) * 1000))} ms")
+
+        # POS: we only train 15 iteration for test
+        if nb_iteration == 15:
+            print(f"reach {nb_iteration}, break")
             break
         
-        
-
     # model.eval()
     # for data, target in valid_loader:
     #     data = data.to(device)
@@ -104,10 +107,6 @@ for epoch in tqdm(range(1, n_epochs+1)):
     #     for i in correct_tensor:
     #         if i:
     #             right_sample += 1
-
-    end_t = time.time()
-
-    print(f"end-to-end duration: {int(round((end_t-start_t) * 1000))}ms")
 
     print("Accuracy:",100*right_sample/total_sample,"%")
     accuracy.append(right_sample/total_sample)

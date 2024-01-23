@@ -174,10 +174,12 @@ typedef struct POSAPIContext {
      *  \param  ret_data_       pointer to the memory area that store the returned value
      *  \param  retval_size_    size of the return value
      */
-    POSAPIContext(uint64_t id, std::vector<POSAPIParamDesp_t> param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0) 
+    POSAPIContext(uint64_t id, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0) 
         : api_id(id), ret_data(ret_data_), retval_size(retval_size_)
     {
         POSAPIParam_t *param;
+
+        params.reserve(16);
 
         // insert parameters
         for(auto param_desp : param_desps){
@@ -198,14 +200,13 @@ typedef struct POSAPIContext {
     }
 } POSAPIContext_t;
 
-using POSAPIContext_ptr = std::shared_ptr<POSAPIContext_t>;
 
 /*!
  *  \brief  view of the api instance to use the handle
  */
 typedef struct POSHandleView {
     // pointer to the used handle
-    POSHandle_ptr handle;
+    POSHandle *handle;
 
     // direction to use this handle
     pos_edge_direction_t dir;
@@ -234,7 +235,7 @@ typedef struct POSHandleView {
      *  \param  offset_             offset from the base address of the handle
      */
     POSHandleView(
-        POSHandle_ptr handle_, pos_edge_direction_t dir_, uint64_t param_index_ = 0, uint64_t offset_ = 0
+        POSHandle* handle_, pos_edge_direction_t dir_, uint64_t param_index_ = 0, uint64_t offset_ = 0
     ) : handle(handle_), dir(dir_), param_index(param_index_), offset(offset_){}
 } POSHandleView_t;
 
@@ -256,12 +257,8 @@ typedef struct POSAPIContext_QE {
     uint64_t api_inst_id;
 
     // context of the called API
-    POSAPIContext_ptr api_cxt;
-
-    // timestamp of the api call
-    uint64_t create_tick, return_tick;
-    uint64_t runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick;
-
+    POSAPIContext *api_cxt;
+    
     // execution status of the API call
     pos_api_execute_status_t status;
 
@@ -274,6 +271,12 @@ typedef struct POSAPIContext_QE {
     // flatten recording of involved handles of this wqe (to accelerate launch_op)
     POSNeighborMap_t flat_neighbor_map;
 
+    /* =========== profiling fields =========== */
+    uint64_t create_tick, return_tick;
+    uint64_t runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick;
+    uint64_t queue_len_before_parse;
+    /* ======= end of profiling fields ======== */
+
     /* =========== checkpoint op specific fields =========== */
     // number of handles this checkpoint op checkpointed
     uint64_t nb_ckpt_handles;
@@ -283,6 +286,9 @@ typedef struct POSAPIContext_QE {
 
     // checkpoint memory consumption after this checkpoint op
     uint64_t ckpt_memory_consumption;
+
+    // handles that will be checkpointed by this checkpoint op
+    std::map<pos_resource_typeid_t, std::set<POSHandle*>> checkpoint_handles;
     /* ======= end of checkpoint op specific fields ======== */
 
     /*!
@@ -297,13 +303,13 @@ typedef struct POSAPIContext_QE {
      *  \param  pos_transport   pointer to the POSTransport instance
      */
     POSAPIContext_QE(
-        uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t> param_desps,
+        uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
         uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client, void* pos_transport
     ) : client_id(uuid), client(pos_client), transport(pos_transport),
         status(kPOS_API_Execute_Status_Init), dag_vertex_id(0), api_inst_id(inst_id)
     {
         POS_CHECK_POINTER(pos_client);
-        api_cxt = std::make_shared<POSAPIContext_t>(api_id, param_desps, retval_data, retval_size);
+        api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
         POS_CHECK_POINTER(api_cxt);
         create_tick = POSUtilTimestamp::get_tsc();
         runtime_s_tick = runtime_e_tick = worker_s_tick = worker_e_tick = 0;
@@ -321,7 +327,7 @@ typedef struct POSAPIContext_QE {
      *  \param  pos_client          pointer to the POSClient instance
      */
     POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client) {
-        api_cxt = std::make_shared<POSAPIContext_t>(api_id);
+        api_cxt = new POSAPIContext_t(api_id);
         POS_CHECK_POINTER(api_cxt);
     }
 
@@ -348,10 +354,13 @@ typedef struct POSAPIContext_QE {
      */
     inline void record_handle(pos_resource_typeid_t id, POSHandleView_t handle_view){
         std::vector<POSHandleView_t>* dst_handle_vec;
+        uint64_t s_tick, e_tick;
+        // s_tick = POSUtilTimestamp::get_tsc();
 
-        if(handle_view_map.count(id) == 0){
+        if(unlikely(handle_view_map.count(id) == 0)){
             dst_handle_vec = new std::vector<POSHandleView_t>();
             POS_CHECK_POINTER(dst_handle_vec);
+            dst_handle_vec->reserve(5);
             handle_view_map[id] = dst_handle_vec;
         } else {
             dst_handle_vec = handle_view_map[id];
@@ -363,6 +372,18 @@ typedef struct POSAPIContext_QE {
          *  \note  we also record the handle in the flatten map to accelerate the launch_op process of DAG
          */
         flat_neighbor_map[handle_view.handle->dag_vertex_id] = handle_view.dir;
+       
+        // e_tick = POSUtilTimestamp::get_tsc();
+        // POS_LOG("inner duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+    }
+
+    /*!
+     *  \brief  record all handles that need to be checkpointed within this checkpoint op
+     *  \param  id          resource type index
+     *  \param  handle_set  sets of handles
+     */
+    inline void record_checkpoint_handles(pos_resource_typeid_t id, std::set<POSHandle*>& handle_set){
+        checkpoint_handles[id] = handle_set;
     }
 
     /*!
@@ -370,7 +391,7 @@ typedef struct POSAPIContext_QE {
      *  \param  dir     expected direction
      *  \param  handles pointer to a list that stores the results
      */
-    inline void get_handles_by_dir(pos_edge_direction_t dir, std::vector<POSHandle_ptr> *handles){
+    inline void get_handles_by_dir(pos_edge_direction_t dir, std::vector<POSHandle*> *handles){
         uint64_t i;
         std::vector<POSHandleView_t>* vecs;
         typename std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter;
@@ -393,9 +414,7 @@ typedef struct POSAPIContext_QE {
     (((*(qe_ptr->handle_view_map[typeid]))[index]).handle)
 
 #define pos_api_typed_handle(qe_ptr, typeid, cast_type, index)                  \
-    std::dynamic_pointer_cast<cast_type>(pos_api_handle(qe_ptr, typeid, index))
+    (cast_type*)(pos_api_handle(qe_ptr, typeid, index))
 
 #define pos_api_handle_view(qe_ptr, typeid, index)                              \
     ((*(qe_ptr->handle_view_map[typeid]))[index])
-
-using POSAPIContext_QE_ptr = std::shared_ptr<POSAPIContext_QE_t>;

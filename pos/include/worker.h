@@ -18,7 +18,7 @@
  */
 template<class T_POSTransport, class T_POSClient>
 using pos_worker_launch_function_t = pos_retval_t(*)(
-    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE_ptr
+    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE*
 );
 
 /*!
@@ -28,12 +28,25 @@ using pos_worker_launch_function_t = pos_retval_t(*)(
 template<class T_POSTransport, class T_POSClient>           \
 pos_retval_t launch(                                        \
     POSWorkspace<T_POSTransport, T_POSClient>* ws,          \
-    POSAPIContext_QE_ptr wqe                                \
+    POSAPIContext_QE* wqe                                   \
 )
 
 namespace wk_functions {
 #define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); }
 };  // namespace rt_functions
+
+
+typedef struct checkpoint_async_cxt {
+    // flag: checkpoint thread to notify the worker thread that the previous checkpoint has done
+    bool is_active;
+    
+    // checkpoint op context
+    POSAPIContext_QE *wqe;
+
+    checkpoint_async_cxt() : is_active(false) {}
+
+} checkpoint_async_cxt_t;
+
 
 /*!
  *  \brief  POS Worker
@@ -41,18 +54,14 @@ namespace wk_functions {
 template<class T_POSTransport, class T_POSClient>
 class POSWorker {
  public:
-    POSWorker(POSWorkspace<T_POSTransport, T_POSClient>* ws) : _ws(ws), _stop_flag(false){
+    POSWorker(POSWorkspace<T_POSTransport, T_POSClient>* ws) 
+        : _ws(ws), _stop_flag(false), worker_stream(nullptr)
+    {
         int rc;
-        cpu_set_t cpuset;
-        CPU_ZERO(&cpuset);
-        CPU_SET(2, &cpuset);    // stick to core 2
 
         // start daemon thread
         _daemon_thread = new std::thread(&daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
-
-        rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
-        POS_ASSERT(rc == 0);
 
         POS_LOG_C("worker started");
     }
@@ -93,7 +102,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __restore(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE_ptr wqe){
+    static inline void __restore(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE* wqe){
         POS_ERROR_DETAIL(
             "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
             wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->dag_vertex_id
@@ -111,13 +120,18 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __done(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE_ptr wqe){
+    static inline void __done(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE* wqe){
         T_POSClient *client;
         POS_CHECK_POINTER(client = (T_POSClient*)(wqe->client));
 
         // forward the DAG pc
         client->dag.forward_pc();
     }
+
+    /*!
+     *  TODO: we only prepare one worker stream here, is this sufficient?
+     */
+    void *worker_stream;
 
  protected:
     // stop flag to indicate the daemon thread to stop
@@ -138,32 +152,18 @@ class POSWorker {
      *  \param  wqe     the checkpoint op
      *  \return POS_SUCCESS for successfully checkpointing
      */
-    virtual pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe){ return POS_FAILED_NOT_IMPLEMENTED; }
-
+    virtual pos_retval_t checkpoint_sync(POSAPIContext_QE* wqe){ return POS_FAILED_NOT_IMPLEMENTED; }
+    
     /*!
-     *  \brief  checkpoint procedure, should be implemented by each platform
-     *  \note   this function will be invoked by level-2 ckpt
-     *  \param  wqe     the checkpoint op
-     *  \param  handles pointer to vector that stores handles to be checkpointed
-     *  \return POS_SUCCESS for successfully checkpointing
+     *  \brief  overlapped checkpoint procedure, should be implemented by each platform
+     *  \note   this thread will be raised by level-2 ckpt
+     *  \param  cxt     the context of this checkpointing
      */
-    virtual pos_retval_t checkpoint_async(POSAPIContext_QE_ptr wqe, std::vector<POSHandle_ptr>* handles){ 
-        return POS_FAILED_NOT_IMPLEMENTED; 
+    virtual void checkpoint_async_thread(checkpoint_async_cxt_t* cxt){
+        POS_CHECK_POINTER(cxt);
+        POS_LOG("#checkpoint handles: %lu", cxt->wqe->checkpoint_handles[8].size());
+        cxt->is_active = false;
     }
-
-    virtual pos_retval_t checkpoint_join();
-
-    /*!
-     *  \brief  generate overlap ckpt scheme
-     *  \note   this function will be invoked by level-2 ckpt
-     *  \param  wqe             the checkpoint op
-     *  \param  nb_pending_op   number of pending ops following the ckpt op
-     *  \param  ckpt_scheme     pointer to the generated checkpoint overlap scheme
-     *  \return POS_SUCCESS for successfully generation
-     */
-    virtual pos_retval_t generate_overlap_ckpt_scheme(
-        POSAPIContext_QE_ptr wqe, uint64_t nb_pending_op, pos_ckpt_overlap_scheme_t* ckpt_scheme
-    ){ return POS_FAILED_NOT_IMPLEMENTED; }
 
  private:
     /*!
@@ -182,18 +182,13 @@ class POSWorker {
     void __daemon_o2(){
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval;
-
         POSAPIMeta_t api_meta;
-
         std::vector<T_POSClient*> clients;
         T_POSClient* client;
+        POSAPIContext_QE *wqe;
 
-        bool during_ckpt = false, should_join_ckpt_stream = false;
-        pos_ckpt_overlap_scheme_t ckpt_overlap_scheme;
-        uint64_t nb_ckpt_steps, ckpt_step_id;
-        uint64_t nb_pending_ops;
-        std::vector<POSHandle_ptr>* overlap_scheme;
-        uint64_t query_s_tick, query_e_tick;
+        std::thread *ckpt_thread = nullptr;
+        checkpoint_async_cxt_t ckpt_cxt;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -204,87 +199,45 @@ class POSWorker {
             _ws->poll_client_dag(&clients);
 
             for(i=0; i<clients.size(); i++){
-                // we declare the pointer here so every iteration ends the shared_ptr would be released
-                POSAPIContext_QE_ptr wqe;
-
                 POS_CHECK_POINTER(client = clients[i]);
 
                 // keep popping next pending op until we finished all operation
-                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe, &nb_pending_ops)){
+                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe)){
                     wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
                     api_id = wqe->api_cxt->api_id;
 
                     // this is a checkpoint op
-                    if(api_id == this->_ws->checkpoint_api_id){
-                    
-                    /*!
-                     *  \brief  macro for control the overlapping checkpoint
-                     *  \param  POS_CKPT_PENDING_US     maximum time to wait for gathering following ops
-                     *  \param  POS_OVERLAP_BATCH_SIZE  overlap batch size
-                     *  \note   these configuration should be tuned, if the remoting/parsing performance are optimized in the future!
-                     */
-                    #if POS_CKPT_INTERVAL >= 1000           /* ms */
-                        #define POS_CKPT_PENDING_US 5000    /* us */
-                        #define POS_OVERLAP_BATCH_SIZE 20
-                    #elif POS_CKPT_INTERVAL >= 100
-                        #define POS_CKPT_PENDING_US 500
-                        #define POS_OVERLAP_BATCH_SIZE 10  
-                    #else
-                        #define POS_CKPT_PENDING_US 50
-                        #define POS_OVERLAP_BATCH_SIZE 5
-                    #endif
-
-                        // we will wait here for the next following several ops
-                        // TODO: we need to prevent the following op is a ckpt op??
-                        query_s_tick = POSUtilTimestamp::get_tsc();
-                        while(likely(nb_pending_ops <= POS_OVERLAP_BATCH_SIZE)){
-                            nb_pending_ops = client->dag.get_nb_pending_op();
-                            query_e_tick = POSUtilTimestamp::get_tsc();
-                            if(unlikely(POS_TSC_TO_USEC(query_e_tick - query_s_tick) >= POS_CKPT_PENDING_US)){
-                                break;
-                            }
+                    if(unlikely(api_id == this->_ws->checkpoint_api_id)){
+                        // if nothing to be checkpointed, we just omit
+                        if(unlikely(wqe->checkpoint_handles.size() == 0)){
+                            goto ckpt_finished;
                         }
-                        if(likely(nb_pending_ops == 1)){
-                            // POS_LOG("skip ckpt");
-                            goto ckpt_op_end;
-                        } else {
-                            // POS_LOG(
-                            //     "ckpt pending %u us, get #following_pending_ops in the DAG: %lu",
-                            //     POS_CKPT_PENDING_US,
-                            //     nb_pending_ops
-                            // );
+
+                        // check whether the previous checkpoint has finished, 
+                        // abandon this checkpoint if it's
+                        if(unlikely(ckpt_cxt.is_active == true)){
+                            // we need to cache those handles that need to be checkpointed
+                            goto ckpt_finished;
                         }
                         
-                        // generate checkpoint scheme
-                        if(unlikely(
-                            POS_SUCCESS != this->generate_overlap_ckpt_scheme(wqe, nb_pending_ops, &ckpt_overlap_scheme)
-                        )){
-                            POS_WARN_C("failed to generate overlap checkpoint scheme");
-                            goto ckpt_op_end;
+                        // start new checkpoint thread
+                        ckpt_cxt.wqe = wqe;
+
+                        // delete the handle of previous checkpoint
+                        if(likely(ckpt_thread != nullptr)){
+                            ckpt_thread->join();
+                            delete ckpt_thread;
                         }
 
-                        // raise flag
-                        // TODO: also, these flag should be per client!!
-                        during_ckpt = true;
-                        nb_ckpt_steps = nb_pending_ops;
-                        ckpt_step_id = 0;
-                        
-                        // if there's buffers that has no budget to overlap, we need to ckpt here
-                        overlap_scheme = ckpt_overlap_scheme.get_overlap_scheme_by_ckpt_step_id(ckpt_step_id);
-                        POS_CHECK_POINTER(overlap_scheme);
-                        // POS_LOG("ckpt op need to ckpt %lu orphan handles", overlap_scheme->size());
-                        for(j=0; j<overlap_scheme->size(); j++){
-                            if(unlikely(POS_SUCCESS != (*overlap_scheme)[i]->checkpoint(wqe->dag_vertex_id))){
-                                POS_WARN_C_DETAIL("failed to checkpoint handle");
-                            }   
-                        }
-                        cudaStreamSynchronize(0);
+                        // raise new checkpoint thread
+                        ckpt_thread = new std::thread(&(this->checkpoint_async_thread), this, &ckpt_cxt);
+                        POS_CHECK_POINTER(ckpt_thread);
+                        ckpt_cxt.is_active = true;
 
-                        ckpt_step_id += 1;
-
-                    ckpt_op_end:
+                    ckpt_finished:
                         __done(this->_ws, wqe);
                         wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+                        wqe->return_tick = POSUtilTimestamp::get_tsc();
                         continue;
                     }
 
@@ -304,30 +257,10 @@ class POSWorker {
                     }
                 #endif
 
-                    if(unlikely(during_ckpt == true)){
-                        overlap_scheme = ckpt_overlap_scheme.get_overlap_scheme_by_ckpt_step_id(ckpt_step_id);
-                        POS_CHECK_POINTER(overlap_scheme);
-
-                        if(unlikely(POS_SUCCESS != this->checkpoint_async(wqe, overlap_scheme))){
-                            POS_WARN("op %lu failed to checkpointed %lu handles", wqe->dag_vertex_id, overlap_scheme->size());
-                        } else {
-                            // POS_LOG("op %lu checkpointed %lu handles", wqe->dag_vertex_id, overlap_scheme->size());
-                        }
-                        
-                        ckpt_step_id += 1;
-
-                        // judge whether checkpoint is done
-                        if(unlikely(ckpt_step_id == nb_ckpt_steps)){ 
-                            during_ckpt = false;
-                        }
-
-                        should_join_ckpt_stream = true;
-                    }
-
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
                     wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
 
-                    // cast return code
+                   // cast return code
                     wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
                         /* pos_retval */ launch_retval, 
                         /* library_id */ api_meta.library_id
@@ -338,18 +271,12 @@ class POSWorker {
                         wqe->status = kPOS_API_Execute_Status_Launch_Failed;
                     }
 
-                    // check whether we need to join the checkpoint stream to finish
-                    if(unlikely(should_join_ckpt_stream)){
-                        this->checkpoint_join();
-                        should_join_ckpt_stream = false;
-                    }
-                    
                     // check whether we need to return to frontend
                     if(wqe->status == kPOS_API_Execute_Status_Init){
                         // we only return the QE back to frontend when it hasn't been returned before
                         wqe->return_tick = POSUtilTimestamp::get_tsc();
                         _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
-                    }
+                    }               
                 }
             }
             
@@ -368,6 +295,7 @@ class POSWorker {
         POSAPIMeta_t api_meta;
         std::vector<T_POSClient*> clients;
         T_POSClient* client;
+        POSAPIContext_QE *wqe;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -377,15 +305,7 @@ class POSWorker {
         while(!_stop_flag){
             _ws->poll_client_dag(&clients);
 
-            // it's too annoy to print here :-(
-            // if(clients.size() > 0){
-            //     POS_DEBUG_C("polling client dags, obtain %lu pending clients", clients.size());
-            // }
-
             for(i=0; i<clients.size(); i++){
-                // we declare the pointer here so every iteration ends the shared_ptr would be released
-                POSAPIContext_QE_ptr wqe;
-
                 POS_CHECK_POINTER(client = clients[i]);
 
                 // keep popping next pending op until we finished all operation
@@ -395,7 +315,7 @@ class POSWorker {
 
                     // this is a checkpoint op
                     if(unlikely(api_id == this->_ws->checkpoint_api_id)){
-                        if(unlikely(POS_SUCCESS != this->checkpoint(wqe))){
+                        if(unlikely(POS_SUCCESS != this->checkpoint_sync(wqe))){
                             POS_WARN_C("failed to do checkpointing");
                         }
                         __done(this->_ws, wqe);
@@ -453,7 +373,7 @@ class POSWorker {
      *  \param  api_meta    metadata of the called API
      *  \return POS_SUCCESS for successfully checking and restoring
      */
-    pos_retval_t __restore_broken_handles(POSAPIContext_QE_ptr wqe, POSAPIMeta_t& api_meta){
+    pos_retval_t __restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t& api_meta){
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i;
         std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
@@ -463,7 +383,7 @@ class POSWorker {
         uint16_t nb_layers, layer_id_keeper;
         uint64_t handle_id_keeper;
         
-        POS_CHECK_POINTER(wqe.get());
+        POS_CHECK_POINTER(wqe);
 
         for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
             handle_view_vec = iter_hvm->second;

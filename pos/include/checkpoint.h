@@ -54,7 +54,6 @@ class POSCheckpointSlot {
     void *_data;
     pos_custom_ckpt_deallocate_func_t _custom_deallocator;
 };
-using POSCheckpointSlot_ptr = std::shared_ptr<POSCheckpointSlot>;
 
 
 #if POS_CKPT_OPT_LEVAL == 1

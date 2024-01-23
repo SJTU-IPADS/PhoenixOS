@@ -16,11 +16,11 @@
  *  \brief  setting both the client-side and server-side address of the handle 
  *          after finishing allocation
  *  \param  addr        the setting address of the handle
- *  \param  handle_ptr  shared pointer to current handle
+ *  \param  handle_ptr  pointer to current handle
  *  \return POS_SUCCESS for successfully setting
  *          POS_FAILED_ALREADY_EXIST for duplication failed;
  */
-pos_retval_t POSHandle::set_passthrough_addr(void *addr, std::shared_ptr<POSHandle> handle_ptr){ 
+pos_retval_t POSHandle::set_passthrough_addr(void *addr, POSHandle* handle_ptr){ 
     using handle_type = typename std::decay<decltype(*this)>::type;
 
     pos_retval_t retval = POS_SUCCESS;
@@ -29,7 +29,7 @@ pos_retval_t POSHandle::set_passthrough_addr(void *addr, std::shared_ptr<POSHand
     POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)_hm;
 
     POS_CHECK_POINTER(hm_cast);
-    POS_ASSERT(handle_ptr.get() == this);
+    POS_ASSERT(handle_ptr == this);
 
     // record client-side address to the map
     retval = hm_cast->record_handle_address(addr, handle_ptr);

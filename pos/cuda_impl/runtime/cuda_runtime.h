@@ -23,18 +23,15 @@ namespace cuda_malloc {
     // parser function
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
-        T_POSTransport *transport;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
+        POSHandle_CUDA_Memory *memory_handle;
         POSHandleManager<POSHandle_CUDA_Device>* hm_device;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
 
-        transport = (T_POSTransport*)(wqe->transport);
         client = (POSClient_CUDA*)(wqe->client);
-        POS_CHECK_POINTER(transport);
         POS_CHECK_POINTER(client);
 
     #if POS_ENABLE_DEBUG_CHECK
@@ -57,9 +54,9 @@ namespace cuda_malloc {
         // operate on handler manager
         retval = hm_memory->allocate_mocked_resource(
             /* handle */ &memory_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Device, 
-                /* handles */ std::vector<POSHandle_ptr>({hm_device->latest_used_handle}) 
+                /* handles */ std::vector<POSHandle*>({hm_device->latest_used_handle}) 
             }}),
             /* size */ pos_api_param_value(wqe, 0, size_t),
             /* expected_addr */ 0,
@@ -75,6 +72,7 @@ namespace cuda_malloc {
         wqe->record_handle(kPOS_ResourceTypeId_CUDA_Memory, POSHandleView_t(memory_handle, kPOS_Edge_Direction_Create));
 
         // allocate the memory handle in the dag
+
         retval = client->dag.allocate_handle(memory_handle);
         if(unlikely(retval != POS_SUCCESS)){
             goto exit;
@@ -99,7 +97,7 @@ namespace cuda_free {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
+        POSHandle_CUDA_Memory *memory_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
         POS_CHECK_POINTER(wqe);
@@ -160,16 +158,16 @@ namespace cuda_launch_kernel {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Function_ptr function_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_CUDA_Memory_ptr memory_handle;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_CUDA_Memory *memory_handle;
         uint64_t i, param_index;
         void *args, *arg_addr, *arg_value;
         POSHandleManager<POSHandle_CUDA_Function>* hm_function;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
         
-        uint64_t s_tick, e_tick;
+        uint64_t all_tick, s_tick, e_tick;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -198,6 +196,7 @@ namespace cuda_launch_kernel {
         POS_CHECK_POINTER(hm_memory);
 
         // find out the involved function
+        // TODO: will this be slow under huge module?
         retval = hm_function->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
             /* handle */ &function_handle
@@ -242,12 +241,14 @@ namespace cuda_launch_kernel {
             function_handle->has_verified_params = true;
         }
 
+        all_tick = 0;
+        
         /*!
          *  \note   record all input memory areas
          */
         for(i=0; i<function_handle->input_pointer_params.size(); i++){
             param_index = function_handle->input_pointer_params[i];
-
+ 
             arg_addr = args + function_handle->param_offsets[param_index];
             POS_CHECK_POINTER(arg_addr);
             arg_value = *((void**)arg_addr);
@@ -264,6 +265,7 @@ namespace cuda_launch_kernel {
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
+
             if(unlikely(tmp_retval != POS_SUCCESS)){
                 POS_WARN(
                     "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
@@ -273,6 +275,7 @@ namespace cuda_launch_kernel {
                 continue;
             }
 
+            // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle(
                 /* id */ kPOS_ResourceTypeId_CUDA_Memory,
                 /* handle_view */ POSHandleView_t(
@@ -281,6 +284,8 @@ namespace cuda_launch_kernel {
                     /* param_index_ */ param_index
                 )
             );
+            // e_tick = POSUtilTimestamp::get_tsc();
+            // all_tick += (e_tick - s_tick);
         }
         
         /*!
@@ -305,6 +310,7 @@ namespace cuda_launch_kernel {
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
+
             if(unlikely(tmp_retval != POS_SUCCESS)){
                 POS_WARN(
                     "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
@@ -314,6 +320,7 @@ namespace cuda_launch_kernel {
                 continue;
             }
 
+            // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle(
                 /* id */ kPOS_ResourceTypeId_CUDA_Memory,
                 /* handle_view */ POSHandleView_t(
@@ -322,17 +329,20 @@ namespace cuda_launch_kernel {
                     /* param_index_ */ param_index
                 )
             );
+            // e_tick = POSUtilTimestamp::get_tsc();
+            // all_tick += (e_tick - s_tick);
+
             hm_memory->record_modified_handle(memory_handle);
         }
 
-        // s_tick = POSUtilTimestamp::get_tsc();
+        // POS_LOG("record handle duration: %lf us", POS_TSC_TO_USEC(all_tick));
 
         // launch the op to the dag
+        // s_tick = POSUtilTimestamp::get_tsc();
         retval = client->dag.launch_op(wqe);
-
         // e_tick = POSUtilTimestamp::get_tsc();
 
-        // POS_LOG("launch op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+        // POS_LOG("launch_op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
@@ -369,7 +379,7 @@ namespace cuda_memcpy_h2d {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
+        POSHandle_CUDA_Memory *memory_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
         POS_CHECK_POINTER(wqe);
@@ -433,7 +443,7 @@ namespace cuda_memcpy_d2h {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
+        POSHandle_CUDA_Memory *memory_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
         POS_CHECK_POINTER(wqe);
@@ -496,7 +506,7 @@ namespace cuda_memcpy_d2d {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr dst_memory_handle, src_memory_handle;
+        POSHandle_CUDA_Memory *dst_memory_handle, *src_memory_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
         POS_CHECK_POINTER(wqe);
@@ -579,8 +589,8 @@ namespace cuda_memcpy_h2d_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
@@ -663,8 +673,8 @@ namespace cuda_memcpy_d2h_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
@@ -744,8 +754,8 @@ namespace cuda_memcpy_d2d_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr dst_memory_handle, src_memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Memory *dst_memory_handle, *src_memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
@@ -846,7 +856,7 @@ namespace cuda_set_device {
         POSClient_CUDA *client;
 
         POSHandleManager_CUDA_Device* hm_device;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -997,8 +1007,8 @@ namespace cuda_get_device_properties {
         pos_retval_t retval = POS_SUCCESS;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Device_ptr device_handle;
-        POSHandleManager<POSHandle_CUDA_Device>* hm_device;
+        POSHandle_CUDA_Device *device_handle;
+        POSHandleManager<POSHandle_CUDA_Device> *hm_device;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1093,7 +1103,7 @@ namespace cuda_stream_synchronize {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
         POS_CHECK_POINTER(wqe);
@@ -1155,7 +1165,7 @@ namespace cuda_stream_is_capturing {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 
         cudaStreamCaptureStatus capture_status;
@@ -1230,7 +1240,7 @@ namespace cuda_event_create_with_flags {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
+        POSHandle_CUDA_Event *event_handle;
         POSHandleManager<POSHandle_CUDA_Event>* hm_event;
 
         POS_CHECK_POINTER(wqe);
@@ -1257,7 +1267,7 @@ namespace cuda_event_create_with_flags {
         // operate on handler manager
         retval = hm_event->allocate_mocked_resource(
             /* handle */ &event_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>()
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>()
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_event_create_with_flags): failed to allocate mocked resource within the CUDA event handler manager");
@@ -1300,7 +1310,7 @@ namespace cuda_event_destory {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
+        POSHandle_CUDA_Event *event_handle;
         POSHandleManager<POSHandle_CUDA_Event>* hm_event;
 
         POS_CHECK_POINTER(wqe);
@@ -1364,8 +1374,8 @@ namespace cuda_event_record {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Event *event_handle;
+        POSHandle_CUDA_Stream *stream_handle;
         POSHandleManager<POSHandle_CUDA_Event>* hm_event;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
 

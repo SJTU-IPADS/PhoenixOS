@@ -27,8 +27,8 @@ namespace cu_module_load_data {
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Module_ptr module_handle;
-        POSHandle_CUDA_Function_ptr function_handle;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Function *function_handle;
         POSHandleManager<POSHandle_CUDA_Context>* hm_context;
         POSHandleManager<POSHandle_CUDA_Module>* hm_module;
         POSHandleManager<POSHandle_CUDA_Function>* hm_function;
@@ -61,9 +61,9 @@ namespace cu_module_load_data {
         // operate on handler manager
         retval = hm_module->allocate_mocked_resource(
             /* handle */ &module_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Context, 
-                /* handles */ std::vector<POSHandle_ptr>({hm_context->latest_used_handle}) 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
             /* expected_addr */ pos_api_param_value(wqe, 0, uint64_t)
@@ -109,8 +109,8 @@ namespace cu_module_load_data {
 
         #if POS_PRINT_DEBUG
             for(auto desp : module_handle->function_desps){
-                char *offsets_info = malloc(1024); POS_CHECK_POINTER(offsets_info);
-                char *sizes_info = malloc(1024); POS_CHECK_POINTER(sizes_info);
+                char *offsets_info = (char*)malloc(1024); POS_CHECK_POINTER(offsets_info);
+                char *sizes_info = (char*)malloc(1024); POS_CHECK_POINTER(sizes_info);
                 memset(offsets_info, 0, 1024);
                 memset(sizes_info, 0, 1024);
 
@@ -158,9 +158,9 @@ namespace cu_module_get_function {
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Module_ptr module_handle;
-        POSHandle_CUDA_Function_ptr function_handle;
-        POSCudaFunctionDesp_ptr function_desp;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Function *function_handle;
+        POSCudaFunctionDesp *function_desp;
         bool found_function_desp;
         POSHandleManager<POSHandle_CUDA_Module>* hm_module;
         POSHandleManager<POSHandle_CUDA_Function>* hm_function;
@@ -232,9 +232,9 @@ namespace cu_module_get_function {
         // operate on handler manager
         retval = hm_function->allocate_mocked_resource(
             /* handle */ &function_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Module, 
-                /* handles */ std::vector<POSHandle_ptr>({module_handle}) 
+                /* handles */ std::vector<POSHandle*>({module_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
             /* expected_addr */ pos_api_param_value(wqe, 1, uint64_t)
@@ -301,8 +301,8 @@ namespace cu_module_get_global {
     // parser function
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Module_ptr module_handle;
-        POSHandle_CUDA_Var_ptr var_handle;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Var *var_handle;
         POSHandleManager<POSHandle_CUDA_Module>* hm_module;
         POSHandleManager<POSHandle_CUDA_Var>* hm_var;
         POSClient_CUDA *client;
@@ -354,9 +354,9 @@ namespace cu_module_get_global {
         // allocate a new var within the manager
         retval = hm_var->allocate_mocked_resource(
             /* handle */ &var_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Module, 
-                /* handles */ std::vector<POSHandle_ptr>({module_handle}) 
+                /* handles */ std::vector<POSHandle*>({module_handle}) 
             }}),
             /* size */ sizeof(CUdeviceptr),
             /* expected_addr */ pos_api_param_value(wqe, 1, uint64_t)
@@ -416,7 +416,7 @@ namespace cu_device_primary_ctx_get_state {
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
         POSHandleManager<POSHandle_CUDA_Device>* hm_device;
 
         POS_CHECK_POINTER(wqe);

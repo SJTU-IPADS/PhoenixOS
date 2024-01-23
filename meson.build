@@ -41,13 +41,13 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 0
+ckpt_opt_level = 2
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
 # config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 400
+ckpt_interval_ms = 10
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -64,7 +64,7 @@ enable_hijack_api_check = 0
 enable_print_error = 1
 
 # switch:   whether to print all warning messages
-enable_print_warn = 0
+enable_print_warn = 1
 
 # switch:   whether to print all log messages
 enable_print_log = 1

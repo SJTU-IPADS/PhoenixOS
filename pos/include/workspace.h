@@ -93,13 +93,13 @@ class POSWorkspace {
             }
         }
 
-        if(_runtime != nullptr){ 
-            delete _runtime;
+        if(runtime != nullptr){ 
+            delete runtime;
             POS_LOG_C("shutdowned runtime thread");
         }
 
-        if(_worker != nullptr){
-            delete _worker;
+        if(worker != nullptr){
+            delete worker;
             POS_LOG_C("shutdowned worker thread");
         }
     }
@@ -198,11 +198,11 @@ class POSWorkspace {
         return POS_SUCCESS;
     }
 
-    inline pos_retval_t poll_runtime_wq(std::vector<POSAPIContext_QE_ptr>* wqes){
+    inline pos_retval_t poll_runtime_wq(std::vector<POSAPIContext_QE*>* wqes){
         std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t>*>::iterator wq_iter;
         pos_client_uuid_t uuid;
         POSLockFreeQueue<POSAPIContext_QE_t> *wq;
-        POSAPIContext_QE_ptr wqe;
+        POSAPIContext_QE *wqe;
 
         POS_CHECK_POINTER(wqes);
         
@@ -227,9 +227,9 @@ class POSWorkspace {
 
     template<pos_queue_position_t qt>
     inline pos_retval_t poll_cq(
-        std::vector<POSAPIContext_QE_ptr>* cqes, pos_client_uuid_t uuid
+        std::vector<POSAPIContext_QE*>* cqes, pos_client_uuid_t uuid
     ){
-        POSAPIContext_QE_ptr cqe;
+        POSAPIContext_QE *cqe;
         POSLockFreeQueue<POSAPIContext_QE_t> *cq;
 
         POS_CHECK_POINTER(cqes);
@@ -263,7 +263,7 @@ class POSWorkspace {
     }
 
     template<pos_queue_position_t qposition>
-    inline pos_retval_t push_cq(POSAPIContext_QE_ptr cqe){
+    inline pos_retval_t push_cq(POSAPIContext_QE *cqe){
         pos_client_uuid_t uuid;
         POSLockFreeQueue<POSAPIContext_QE_t> *cq;
 
@@ -401,8 +401,9 @@ class POSWorkspace {
         T_POSTransport *transport;
         POSAPIMeta_t api_meta;
         bool has_prev_error = false;
-        POSAPIContext_QE_ptr wqe;
-        std::vector<POSAPIContext_QE_ptr> cqes;
+        POSAPIContext_QE* wqe;
+        std::vector<POSAPIContext_QE*> cqes;
+        POSAPIContext_QE* cqe;
         POSLockFreeQueue<POSAPIContext_QE_t>* wq;
         
         // TODO: we assume always be client 0 here, for debugging under cricket
@@ -452,7 +453,7 @@ class POSWorkspace {
         api_meta = api_mgnr->api_metas[api_id];
 
         // generate new work queue element
-        wqe = std::make_shared<POSAPIContext_QE>(
+        wqe = new POSAPIContext_QE(
             /* api_id*/ api_id,
             /* uuid */ uuid,
             /* param_desps */ param_desps,
@@ -464,7 +465,11 @@ class POSWorkspace {
         );
         POS_CHECK_POINTER(wqe);
 
+        // for profiling
+        wqe->queue_len_before_parse = wq->len();
+
         // push to the work queue
+        // this will introduce 25us overhead
         wq->push(wqe);
         
         /*!
@@ -472,9 +477,6 @@ class POSWorkspace {
          */
         if(unlikely(api_meta.is_sync)){
             while(1){
-                // we declare the pointer here so every iteration ends the shared_ptr would be released
-                POSAPIContext_QE_ptr cqe;
-
                 if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Runtime>(&cqes, uuid))){
                     POS_ERROR_C_DETAIL("failed to poll runtime cq");
                 }
@@ -542,13 +544,13 @@ class POSWorkspace {
     // idx of all stateful resources (handles)
     std::vector<uint64_t> stateful_handle_type_idx;
 
- protected:
     // pos runtime
-    POSRuntime<T_POSTransport, T_POSClient> *_runtime;
+    POSRuntime<T_POSTransport, T_POSClient> *runtime;
 
     // pos worker
-    POSWorker<T_POSTransport, T_POSClient> *_worker;
+    POSWorker<T_POSTransport, T_POSClient> *worker;
 
+ protected:
     // the out-of-band server
     POSOobServer<T_POSTransport, T_POSClient> *_oob_server;
 

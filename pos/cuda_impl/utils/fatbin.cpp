@@ -77,11 +77,11 @@ exit:
 /*!
  *  \brief  parsing the kernel prototype
  *  \param  kernel_prototype        the generated kernel prototype
- *  \param  function_desp           shared_ptr of function descriptor
+ *  \param  function_desp           pointer to the function descriptor
  *  \return POS_SUCCESS for successfully processed
  *          POS_FAILED for failed processed
  */
-pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp_ptr function_desp){
+pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp *function_desp){
     pos_retval_t retval = POS_SUCCESS;
     CXIndex index;
     CXErrorCode cx_retval;
@@ -92,7 +92,7 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& ke
     std::string cast_kernel_prototype;
 
     typedef struct __visit_meta {
-        POSCudaFunctionDesp_ptr function_desp;
+        POSCudaFunctionDesp *function_desp;
         uint32_t param_index;
     };
     

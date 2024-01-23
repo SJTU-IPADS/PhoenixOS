@@ -16,7 +16,7 @@ namespace cuda_malloc {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr memory_handle;
+        POSHandle *memory_handle;
         size_t allocate_size;
         void *ptr;
 
@@ -102,22 +102,28 @@ namespace cuda_launch_kernel {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Function_ptr function_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_ptr memory_handle;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle *memory_handle;
         uint64_t i, j, nb_involved_memory;
         // void **cuda_args = nullptr;
         void *args, *args_values, *arg_addr;
         uint64_t *addr_list;
+        cudaStream_t worker_stream;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         function_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Function, POSHandle_CUDA_Function, 0);
-        POS_CHECK_POINTER(function_handle.get());
+        POS_CHECK_POINTER(function_handle);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        // POS_CHECK_POINTER(stream_handle);
+
+        if(unlikely(ws->worker->worker_stream == nullptr)){
+            POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
+            ws->worker->worker_stream = worker_stream;
+        }
 
         // the 3rd parameter of the API call contains parameter to launch the kernel
         args = pos_api_param_addr(wqe, 3);
@@ -151,7 +157,8 @@ namespace cuda_launch_kernel {
             /* blockDimY */ ((__dim3_t*)pos_api_param_addr(wqe, 2))->y,
             /* blockDimZ */ ((__dim3_t*)pos_api_param_addr(wqe, 2))->z,
             /* sharedMemBytes */ pos_api_param_value(wqe, 4, size_t),
-            /* hStream */ stream_handle->server_addr,
+            // /* hStream */ stream_handle->server_addr,
+            /* hStream */ ws->worker->worker_stream,
             /* kernelParams */ cuda_args,
             /* extra */ nullptr
         );
@@ -285,7 +292,7 @@ namespace cuda_memcpy_h2d_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -293,7 +300,7 @@ namespace cuda_memcpy_h2d_async {
         POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
 
         stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ memory_handle_view.handle->server_addr,
@@ -325,7 +332,7 @@ namespace cuda_memcpy_d2h_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -333,7 +340,7 @@ namespace cuda_memcpy_d2h_async {
         POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
 
         stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ wqe->api_cxt->ret_data,
@@ -368,7 +375,7 @@ namespace cuda_memcpy_d2d_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -377,7 +384,7 @@ namespace cuda_memcpy_d2d_async {
         POSHandleView_t &src_memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 1);
 
         stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ dst_memory_handle_view.handle->server_addr,
@@ -409,13 +416,13 @@ namespace cuda_set_device {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
-        POS_CHECK_POINTER(device_handle.get());
+        POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cudaSetDevice(device_handle->device_id);
 
@@ -497,13 +504,13 @@ namespace cuda_get_device_properties {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
-        POS_CHECK_POINTER(device_handle.get());
+        POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cudaGetDeviceProperties(
             (struct cudaDeviceProp*)wqe->api_cxt->ret_data, 
@@ -548,13 +555,13 @@ namespace cuda_stream_synchronize {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
+        POSHandle_CUDA_Stream *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaStreamSynchronize(stream_handle->server_addr);
 
@@ -579,13 +586,13 @@ namespace cuda_stream_is_capturing {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         // pos_retval_t retval = POS_SUCCESS;
-        // POSHandle_CUDA_Stream_ptr stream_handle;
+        // POSHandle_CUDA_Stream *stream_handle;
 
         // POS_CHECK_POINTER(ws);
         // POS_CHECK_POINTER(wqe);
 
         // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        // POS_CHECK_POINTER(stream_handle.get());
+        // POS_CHECK_POINTER(stream_handle);
 
         // wqe->api_cxt->return_code = cudaStreamIsCapturing(
         //     /* stream */ stream_handle->server_addr,
@@ -612,7 +619,7 @@ namespace cuda_event_create_with_flags {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr event_handle;
+        POSHandle *event_handle;
         int flags;
         cudaEvent_t ptr;
 
@@ -694,9 +701,9 @@ namespace cuda_event_record {
         POS_CHECK_POINTER(wqe);
 
         POSHandleView_t &event_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Event, 0);
-        POS_CHECK_POINTER(event_handle_view.handle.get());
+        POS_CHECK_POINTER(event_handle_view.handle);
         POSHandleView_t &stream_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle_view.handle.get());
+        POS_CHECK_POINTER(stream_handle_view.handle);
 
         wqe->api_cxt->return_code = cudaEventRecord(
             /* event */ event_handle_view.handle->server_addr,

@@ -128,12 +128,12 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE_ptr wqe) { 
+    pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE* wqe) { 
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr handle;
-        POSAPIContext_QE_ptr ckpt_wqe;
+        POSHandle *handle;
+        POSAPIContext_QE *ckpt_wqe;
 
-        ckpt_wqe = std::make_shared<POSAPIContext_QE>(
+        ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
             /* client */ wqe->client,
             /* dag_vertex_id_ */ wqe->dag_vertex_id
@@ -152,19 +152,18 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE* wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandleManager<POSHandle>* hm;
-        POSAPIContext_QE_ptr ckpt_wqe;
+        POSAPIContext_QE *ckpt_wqe;
         uint64_t i;
-        typename std::map<uint64_t, POSHandle_ptr>::iterator map_iter;
 
         POS_CHECK_POINTER(wqe);
 
         client = (POSClient_CUDA*)(wqe->client);
         
-        ckpt_wqe = std::make_shared<POSAPIContext_QE>(
+        ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
             /* client */ wqe->client
         );
@@ -176,13 +175,9 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
             hm = client->handle_managers[stateful_handle_id];
             POS_CHECK_POINTER(hm);
-            std::map<uint64_t, POSHandle_ptr>& modified_handles = hm->get_modified_handles(); 
-            for(map_iter = modified_handles.begin(); map_iter != modified_handles.end(); map_iter++){
-                POS_CHECK_POINTER(map_iter->second.get());
-                ckpt_wqe->record_handle(
-                    stateful_handle_id,
-                    POSHandleView_t(map_iter->second, kPOS_Edge_Direction_Out, 0)
-                );
+            std::set<POSHandle*>& modified_handles = hm->get_modified_handles();
+            if(likely(modified_handles.size() > 0)){
+                ckpt_wqe->record_checkpoint_handles(stateful_handle_id, modified_handles);
             }
             hm->clear_modified_handle();
         }
@@ -198,7 +193,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t checkpoint_insertion(POSAPIContext_QE_ptr wqe) override {
+    pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {
         #if POS_CKPT_OPT_LEVAL == 1
             return __checkpoint_insertion_o1_o2(wqe);
         #elif POS_CKPT_OPT_LEVAL == 2

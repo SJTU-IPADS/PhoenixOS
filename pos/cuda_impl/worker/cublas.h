@@ -19,7 +19,7 @@ namespace cublas_create {
     // execution function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr cublas_context_handle;
+        POSHandle *cublas_context_handle;
         cublasHandle_t actual_handle;
 
         POS_CHECK_POINTER(ws);
@@ -58,20 +58,28 @@ namespace cublas_set_stream {
     // parser function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        cudaStream_t worker_stream;
+
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle.get());
+        POS_CHECK_POINTER(stream_handle);
 
         cublas_context_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_cuBLAS_Context, POSHandle_cuBLAS_Context, 0);
-        POS_CHECK_POINTER(cublas_context_handle.get());
+        POS_CHECK_POINTER(cublas_context_handle);
+
+        if(unlikely(ws->worker->worker_stream == nullptr)){
+            POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
+            ws->worker->worker_stream = worker_stream;
+        }
 
         wqe->api_cxt->return_code = cublasSetStream(
-            cublas_context_handle->server_addr,
+            // cublas_context_handle->server_addr,
+            ws->worker->worker_stream,
             stream_handle->server_addr
         );
 
@@ -97,13 +105,13 @@ namespace cublas_set_math_mode {
     // parser function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         cublas_context_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_cuBLAS_Context, POSHandle_cuBLAS_Context, 0);
-        POS_CHECK_POINTER(cublas_context_handle.get());
+        POS_CHECK_POINTER(cublas_context_handle);
 
         wqe->api_cxt->return_code = cublasSetMathMode(
             cublas_context_handle->server_addr,
@@ -132,21 +140,21 @@ namespace cublas_sgemm {
     // parser function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandle_CUDA_Memory_ptr memory_handle_A, memory_handle_B, memory_handle_C;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
         cublas_context_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_cuBLAS_Context, POSHandle_cuBLAS_Context, 0);
-        POS_CHECK_POINTER(cublas_context_handle.get());
+        POS_CHECK_POINTER(cublas_context_handle);
 
         POSHandleView_t &memory_A_hv = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
-        POS_CHECK_POINTER(memory_A_hv.handle.get());
+        POS_CHECK_POINTER(memory_A_hv.handle);
         POSHandleView_t &memory_B_hv = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 1);
-        POS_CHECK_POINTER(memory_B_hv.handle.get());
+        POS_CHECK_POINTER(memory_B_hv.handle);
         POSHandleView_t &memory_C_hv = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 2);
-        POS_CHECK_POINTER(memory_C_hv.handle.get());
+        POS_CHECK_POINTER(memory_C_hv.handle);
 
         wqe->api_cxt->return_code = cublasSgemm(
             /* handle */ (cublasHandle_t)(cublas_context_handle->server_addr),

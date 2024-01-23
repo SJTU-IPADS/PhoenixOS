@@ -9,11 +9,11 @@
 #include "pos/include/utils/bipartite_graph.h"
 
 typedef struct pos_handle_meta {
-    POSHandle_ptr handle;
+    POSHandle *handle;
     uint64_t start_pc;
     uint64_t end_pc;
 
-    pos_handle_meta(POSHandle_ptr handle_, uint64_t start_pc_) 
+    pos_handle_meta(POSHandle* handle_, uint64_t start_pc_) 
         : handle(handle_), start_pc(start_pc_) {}
 
     pos_handle_meta(pos_handle_meta const& other_) 
@@ -22,9 +22,9 @@ typedef struct pos_handle_meta {
 } pos_handle_meta_t;
 
 typedef struct pos_op_meta {
-    POSAPIContext_QE_ptr wqe;
+    POSAPIContext_QE *wqe;
 
-    pos_op_meta(POSAPIContext_QE_ptr wqe_) : wqe(wqe_) {}
+    pos_op_meta(POSAPIContext_QE* wqe_) : wqe(wqe_) {}
 
     pos_op_meta(pos_op_meta const& other_) : wqe(other_.wqe) {}
 } pos_op_meta_t;
@@ -42,24 +42,25 @@ class POSDag {
         std::vector<std::function<void()>> dump_flow;
 
         POS_CHECK_POINTER(meta);
-        POS_CHECK_POINTER(wqe = meta->wqe.get());
+        POS_CHECK_POINTER(wqe = meta->wqe);
         
         dump_flow.insert(dump_flow.end(), {
-            /* vid */               [&](){ result += std::to_string(wqe->dag_vertex_id); },
-            /* api_id */            [&](){ result += std::to_string(wqe->api_cxt->api_id); },
-            /* return_code */       [&](){ result += std::to_string(wqe->api_cxt->return_code); },
-            /* create_tick */       [&](){ result += std::to_string(wqe->create_tick); },
-            /* return_tick */       [&](){ result += std::to_string(wqe->return_tick); },
-            /* runtime_s_tick */    [&](){ result += std::to_string(wqe->runtime_s_tick); },
-            /* runtime_e_tick */    [&](){ result += std::to_string(wqe->runtime_e_tick); },
-            /* worker_s_tick */     [&](){ result += std::to_string(wqe->worker_s_tick); },
-            /* worker_e_tick */     [&](){ result += std::to_string(wqe->worker_e_tick); },
+            /* vid */                       [&](){ result += std::to_string(wqe->dag_vertex_id); },
+            /* api_id */                    [&](){ result += std::to_string(wqe->api_cxt->api_id); },
+            /* return_code */               [&](){ result += std::to_string(wqe->api_cxt->return_code); },
+            /* create_tick */               [&](){ result += std::to_string(wqe->create_tick); },
+            /* return_tick */               [&](){ result += std::to_string(wqe->return_tick); },
+            /* runtime_s_tick */            [&](){ result += std::to_string(wqe->runtime_s_tick); },
+            /* runtime_e_tick */            [&](){ result += std::to_string(wqe->runtime_e_tick); },
+            /* worker_s_tick */             [&](){ result += std::to_string(wqe->worker_s_tick); },
+            /* worker_e_tick */             [&](){ result += std::to_string(wqe->worker_e_tick); },
+            /* queue_len_before_parse */    [&](){ result += std::to_string(wqe->queue_len_before_parse); },
 
             /* =========== checkpoint op specific fields =========== */
-            /* nb_ckpt_handles */   [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
-            /* ckpt_size */         [&](){ result += std::to_string(wqe->ckpt_size); },
+            /* nb_ckpt_handles */           [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
+            /* ckpt_size */                 [&](){ result += std::to_string(wqe->ckpt_size); },
             /* ckpt_memory_consumption */   
-                                    [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
+                                            [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
         });
         
         result.clear();
@@ -83,7 +84,7 @@ class POSDag {
         std::vector<std::function<void()>> dump_flow;
 
         POS_CHECK_POINTER(meta);
-        POS_CHECK_POINTER(handle = meta->handle.get());
+        POS_CHECK_POINTER(handle = meta->handle);
         
         dump_flow.insert(dump_flow.end(), {
             /* vid */               [&](){ result += std::to_string(handle->dag_vertex_id); },
@@ -136,14 +137,16 @@ class POSDag {
      *  \note   this function will be called by the runtime thread
      *  \return POS_SUCCESS for successfully adding handle
      */
-    inline pos_retval_t allocate_handle(POSHandle_ptr handle){
+    inline pos_retval_t allocate_handle(POSHandle* handle){
         pos_retval_t retval = POS_SUCCESS;
         pos_vertex_id_t vertex_id;
-        pos_handle_meta_t handle_meta(handle, _end_pc);
+
+        pos_handle_meta_t *h_meta = new pos_handle_meta_t(handle, _end_pc);
+        POS_CHECK_POINTER(h_meta);
 
         if(unlikely(POS_SUCCESS != (retval =
             _graph.add_vertex<pos_handle_meta_t>(
-                /* data */ handle_meta,
+                /* data */ h_meta,
                 /* neighbor */ std::map<pos_vertex_id_t, pos_edge_direction_t>(),
                 /* id */ &(handle->dag_vertex_id)
             )
@@ -173,12 +176,12 @@ class POSDag {
         uint64_t handle_id, uint64_t start_op_id, uint64_t end_op_id, std::vector<uint64_t>* positions
     ){
         pos_retval_t retval = POS_SUCCESS;
-        POSNeighborMap_ptr neigh_ops;
+        POSNeighborMap_t *neigh_ops;
 
         POS_CHECK_POINTER(positions);
 
         neigh_ops = _graph.get_vertex_neighbors_by_id<pos_handle_meta_t>(handle_id);
-        if(unlikely(neigh_ops.get() == nullptr)){
+        if(unlikely(neigh_ops == nullptr)){
             POS_WARN_C_DETAIL("failed to obtain neighbor ops of handle: vertex_id(%lu)", handle_id);
             retval = POS_FAILED_NOT_EXIST;
         } else {
@@ -202,20 +205,22 @@ class POSDag {
      *  \note   this function will be called by the runtime thread
      *  \return POS_SUCCESS for successfully adding operator
      */
-    inline pos_retval_t launch_op(POSAPIContext_QE_ptr wqe){
+    inline pos_retval_t launch_op(POSAPIContext_QE* wqe){
         uint64_t i;
         pos_retval_t retval = POS_SUCCESS;
-        pos_op_meta_t op_meta(wqe);
         std::vector<POSHandleView_t>* handle_view_vec;
         std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
         std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
+
+        pos_op_meta_t *o_meta = new pos_op_meta_t(wqe);
+        POS_CHECK_POINTER(o_meta);
 
         uint64_t s_tick, e_tick;
 
         // s_tick = POSUtilTimestamp::get_tsc();
 
         retval =_graph.add_vertex<pos_op_meta_t>(
-            /* data */ op_meta,
+            /* data */ o_meta,
             /* neighbor */ wqe->flat_neighbor_map,
             /* id */ &(wqe->dag_vertex_id)
         );
@@ -256,9 +261,9 @@ class POSDag {
      *  \return POS_SUCCESS for successfully obtain;
      *          POS_FAILED_NOT_READY for no pending op exist
      */
-    pos_retval_t get_next_pending_op(POSAPIContext_QE_ptr* wqe, uint64_t* nb_pending_ops=nullptr){
+    pos_retval_t get_next_pending_op(POSAPIContext_QE** wqe, uint64_t* nb_pending_ops=nullptr){
         pos_retval_t retval = POS_SUCCESS;
-        std::shared_ptr<pos_op_meta_t> op;
+        pos_op_meta_t *op_meta;
         POS_CHECK_POINTER(wqe);
         
         if(likely(nb_pending_ops != nullptr)){
@@ -271,12 +276,13 @@ class POSDag {
             return POS_FAILED_NOT_READY;
         }
 
-        op = _graph.get_vertex_by_id<pos_op_meta_t>(_pc);
-        if(unlikely(op == nullptr)){
+        op_meta = _graph.get_vertex_by_id<pos_op_meta_t>(_pc);
+        if(unlikely(op_meta == nullptr)){
             POS_WARN_C_DETAIL("failed to obtain op: vertex_id(%lu)", _pc);
             retval = POS_FAILED_NOT_EXIST;
         } else {
-            *wqe = op->wqe;
+            *wqe = op_meta->wqe;
+            POS_ASSERT((*wqe)->dag_vertex_id == _pc);
         }
         
         return retval;

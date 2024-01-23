@@ -10,7 +10,6 @@
 #include "pos/include/log.h"
 
 class POSCheckpointSlot;
-using POSCheckpointSlot_ptr = std::shared_ptr<POSCheckpointSlot>;
 
 using pos_custom_ckpt_allocate_func_t = void*(*)(uint64_t state_size);
 using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
@@ -25,10 +24,10 @@ class POSCheckpointBag {
         : _state_size(state_size), _use_front(true), _front_version(0), _back_version(0)
     {
         // apply font and back checkpoint slot
-        _ckpt_front = std::make_shared<POSCheckpointSlot>(_state_size, allocator, deallocator);
-        POS_CHECK_POINTER((_ckpt_front).get());
-        _ckpt_back = std::make_shared<POSCheckpointSlot>(_state_size, allocator, deallocator);
-        POS_CHECK_POINTER((_ckpt_back).get());
+        _ckpt_front = new POSCheckpointSlot(_state_size, allocator, deallocator);
+        POS_CHECK_POINTER(_ckpt_front);
+        _ckpt_back = new POSCheckpointSlot(_state_size, allocator, deallocator);
+        POS_CHECK_POINTER(_ckpt_back);
     }
     ~POSCheckpointBag() = default;
     
@@ -38,7 +37,7 @@ class POSCheckpointBag {
      *  \param  ptr         pointer to the checkpoint slot
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t apply_new_checkpoint(uint64_t version, POSCheckpointSlot_ptr* ptr){
+    pos_retval_t apply_new_checkpoint(uint64_t version, POSCheckpointSlot** ptr){
         pos_retval_t retval = POS_SUCCESS;
 
         POS_CHECK_POINTER(ptr);
@@ -134,11 +133,11 @@ class POSCheckpointBag {
 
     // front checkpoint slot
     uint64_t _front_version;
-    POSCheckpointSlot_ptr _ckpt_front;
+    POSCheckpointSlot* _ckpt_front;
 
     // back checkpoint slot
     uint64_t _back_version;
-    POSCheckpointSlot_ptr _ckpt_back;
+    POSCheckpointSlot* _ckpt_back;
 
     // state size of each checkpoint
     uint64_t _state_size;

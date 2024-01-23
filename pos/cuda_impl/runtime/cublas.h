@@ -28,7 +28,7 @@ namespace cublas_create {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandleManager<POSHandle_CUDA_Context>* hm_context;
         POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
 
@@ -46,9 +46,9 @@ namespace cublas_create {
         // operate on handler manager
         retval = hm_cublas_context->allocate_mocked_resource(
             /* handle */ &cublas_context_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Context, 
-                /* handles */ std::vector<POSHandle_ptr>({hm_context->latest_used_handle}) 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ sizeof(cublasHandle_t)
         );
@@ -100,8 +100,8 @@ namespace cublas_set_stream {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
         POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
 
@@ -180,7 +180,7 @@ namespace cublas_set_math_mode {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
 
         POS_CHECK_POINTER(wqe);
@@ -241,8 +241,8 @@ namespace cublas_sgemm {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandle_CUDA_Memory_ptr memory_handle_A, memory_handle_B, memory_handle_C;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
         POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
         POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
 
@@ -286,7 +286,7 @@ namespace cublas_sgemm {
             POSHandleView_t(cublas_context_handle, kPOS_Edge_Direction_In)
         );
 
-        // operate on handler manager
+        // operate on memory manager
         retval = hm_memory->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 7, uint64_t),
             /* handle */ &memory_handle_A

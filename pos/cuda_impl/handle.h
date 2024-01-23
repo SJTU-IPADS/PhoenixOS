@@ -96,7 +96,6 @@ class POSHandle_CUDA_Context : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Context"); }
 };
-using POSHandle_CUDA_Context_ptr = std::shared_ptr<POSHandle_CUDA_Context>;
 
 
 /*!
@@ -133,9 +132,8 @@ class POSHandle_CUDA_Module : public POSHandle {
     std::string get_resource_name(){ return std::string("CUDA Module"); }
 
     // function descriptors under this module
-    std::vector<POSCudaFunctionDesp_ptr> function_desps;
+    std::vector<POSCudaFunctionDesp*> function_desps;
 };
-using POSHandle_CUDA_Module_ptr = std::shared_ptr<POSHandle_CUDA_Module>;
 
 
 /*!
@@ -174,7 +172,6 @@ class POSHandle_CUDA_Var : public POSHandle {
     // name of the kernel
     std::shared_ptr<char[]> name;
 };
-using POSHandle_CUDA_Var_ptr = std::shared_ptr<POSHandle_CUDA_Var>;
 
 
 /*!
@@ -236,7 +233,6 @@ class POSHandle_CUDA_Function : public POSHandle {
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
 };
-using POSHandle_CUDA_Function_ptr = std::shared_ptr<POSHandle_CUDA_Function>;
 
 
 /*!
@@ -277,7 +273,6 @@ class POSHandle_CUDA_Device : public POSHandle {
 
     protected:
 };
-using POSHandle_CUDA_Device_ptr = std::shared_ptr<POSHandle_CUDA_Device>;
 
 
 /*!
@@ -346,10 +341,10 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0) override { 
+    pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0) const override { 
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
-        POSCheckpointSlot_ptr ckpt_slot;
+        POSCheckpointSlot* ckpt_slot;
 
         struct rusage s_r_usage, e_r_usage;
         uint64_t s_tick = 0, e_tick = 0;
@@ -429,7 +424,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
         return POS_SUCCESS;
     }
 };
-using POSHandle_CUDA_Memory_ptr = std::shared_ptr<POSHandle_CUDA_Memory>;
 
 
 /*!
@@ -467,7 +461,6 @@ class POSHandle_CUDA_Stream : public POSHandle {
 
     bool is_capturing;
 };
-using POSHandle_CUDA_Stream_ptr = std::shared_ptr<POSHandle_CUDA_Stream>;
 
 
 /*!
@@ -503,7 +496,6 @@ class POSHandle_CUDA_Event : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Event"); }
 };
-using POSHandle_CUDA_Event_ptr = std::shared_ptr<POSHandle_CUDA_Event>;
 
 
 /* ================================ End of Handle Definition ================================= */
@@ -522,12 +514,12 @@ class POSHandleManager_CUDA_Context : public POSHandleManager<POSHandle_CUDA_Con
      *  \brief  constructor
      */
     POSHandleManager_CUDA_Context() : POSHandleManager() {
-        POSHandle_CUDA_Context_ptr ctx_handle;
+        POSHandle_CUDA_Context *ctx_handle;
 
         // allocate mocked context, and setup the actual context address
         if(unlikely(POS_SUCCESS != this->allocate_mocked_resource(
             /* handle */ &ctx_handle,
-            /* related_handle */ std::map<uint64_t, std::vector<POSHandle_ptr>>(),
+            /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>(),
             /* size */ sizeof(CUcontext)
         ))){
             POS_ERROR_C_DETAIL("failed to allocate mocked CUDA context in the manager");
@@ -548,13 +540,13 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
     /*!
      *  \brief  constructor
      */
-    POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context_ptr ctx_handle) : POSHandleManager() {
-        POSHandle_CUDA_Stream_ptr stream_handle;
+    POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context* ctx_handle) : POSHandleManager() {
+        POSHandle_CUDA_Stream *stream_handle;
 
         // allocate mocked stream
         if(unlikely(POS_SUCCESS != this->allocate_mocked_resource(
             /* handle */ &stream_handle,
-            /* related_handle */ std::map<uint64_t, std::vector<POSHandle_ptr>>({
+            /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
                 { kPOS_ResourceTypeId_CUDA_Context, {ctx_handle} }
             }),
             /* size */ sizeof(CUstream),
@@ -582,33 +574,38 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Stream>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Stream** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Context_ptr ctx_handle;
+        POSHandle *ctx_handle;
+
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
+    #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA stream");
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSHandleManager_POSHandle_CUDA_Stream_allocate_mocked_resource;
+            goto exit;
         }
-        ctx_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Context>
-                        (related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
+    #endif
+
+        ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
+        POS_CHECK_POINTER(ctx_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
-            goto exit_POSHandleManager_POSHandle_CUDA_Stream_allocate_mocked_resource;
+            goto exit;
         }
+
         (*handle)->record_parent_handle(ctx_handle);
 
-    exit_POSHandleManager_POSHandle_CUDA_Stream_allocate_mocked_resource:
+    exit:
         return retval;
     }
 
@@ -620,7 +617,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
      *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
      *          POS_SUCCESS for successfully founded
      */
-    pos_retval_t get_handle_by_client_addr(void* client_addr, std::shared_ptr<POSHandle_CUDA_Stream>* handle, uint64_t* offset=nullptr){
+    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Stream** handle, uint64_t* offset=nullptr){
         // the client-side address of the default stream would be nullptr in CUDA, we do some hacking here
         if(likely(client_addr == 0)){
             *handle = this->_handles[0];
@@ -648,33 +645,38 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Module>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Module** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Context_ptr context_handle;
+        POSHandle *context_handle;
+
         POS_CHECK_POINTER(handle);
 
+    #if POS_ENABLE_DEBUG_CHECK
         // obtain the context to allocate buffer
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA module");
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSHandleManager_POSHandle_CUDA_Module_allocate_mocked_resource;
+            goto exit;
         }
-        context_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Context>
-                        (related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
+    #endif
+
+        context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
+        POS_CHECK_POINTER(context_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA module in the manager");
-            goto exit_POSHandleManager_POSHandle_CUDA_Module_allocate_mocked_resource;
+            goto exit;
         }
+
         (*handle)->record_parent_handle(context_handle);
 
-    exit_POSHandleManager_POSHandle_CUDA_Module_allocate_mocked_resource:
+    exit:
         return retval;
     }
 };
@@ -696,30 +698,34 @@ class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Var>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Var** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Module_ptr module_handle;
+        POSHandle *module_handle;
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
+    #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Module) == 0)){
             POS_WARN_C("no binded module provided to create the CUDA var");
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         }
-        module_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Module>
-                        (related_handles[kPOS_ResourceTypeId_CUDA_Module][0]);
+    #endif
+
+        module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
+        POS_CHECK_POINTER(module_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
             goto exit;
         }
+
         (*handle)->record_parent_handle(module_handle);
 
     exit:
@@ -745,33 +751,38 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Function>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Function** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Module_ptr module_handle;
+        POSHandle *module_handle;
+
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
+    #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Module) == 0)){
             POS_WARN_C("no binded module provided to created the CUDA function");
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSHandleManager_POSHandle_CUDA_Function_allocate_mocked_resource;
+            goto exit;
         }
-        module_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Module>
-                        (related_handles[kPOS_ResourceTypeId_CUDA_Module][0]);
+    #endif
+
+        module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
+        POS_CHECK_POINTER(module_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
-            goto exit_POSHandleManager_POSHandle_CUDA_Function_allocate_mocked_resource;
+            goto exit;
         }
+
         (*handle)->record_parent_handle(module_handle);
 
-    exit_POSHandleManager_POSHandle_CUDA_Function_allocate_mocked_resource:
+    exit:
         return retval;
     }
 };
@@ -787,9 +798,9 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \note   insert actual #device to the device manager
      *          TBD: mock random number of devices
      */
-    POSHandleManager_CUDA_Device(POSHandle_CUDA_Context_ptr ctx_handle) : POSHandleManager() {
+    POSHandleManager_CUDA_Device(POSHandle_CUDA_Context* ctx_handle) : POSHandleManager() {
         int num_device, i;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         // get number of physical devices on the machine
         // TODO: we shouldn't call this function here?
@@ -804,7 +815,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
             if(unlikely(
                 POS_SUCCESS != this->allocate_mocked_resource(
                     &device_handle,
-                    std::map<uint64_t, std::vector<POSHandle_ptr>>({
+                    std::map<uint64_t, std::vector<POSHandle*>>({
                         { kPOS_ResourceTypeId_CUDA_Context, {ctx_handle} }
                     })
                 )
@@ -830,30 +841,34 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Device>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Device** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Context_ptr ctx_handle;
+        POSHandle *ctx_handle;
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate device
+    #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA stream");
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         }
-        ctx_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Context>
-                        (related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
+    #endif
+
+        ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
+        POS_CHECK_POINTER(ctx_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA device in the manager");
             goto exit;
         }
+
         (*handle)->record_parent_handle(ctx_handle);
 
     exit:
@@ -868,15 +883,16 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
      *          POS_SUCCESS for successfully founded
      */
-    pos_retval_t get_handle_by_client_addr(void* client_addr, std::shared_ptr<POSHandle_CUDA_Device>* handle, uint64_t* offset=nullptr){
-        int device_id, device_id_u64, i;
-        POSHandle_CUDA_Device_ptr device_handle;
+    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset=nullptr){
+        int device_id, i;
+        uint64_t device_id_u64;
+        POSHandle_CUDA_Device *device_handle;
 
         // we cast the client address into device id here
         device_id_u64 = (uint64_t)(client_addr);
         device_id = (int)(device_id_u64);
 
-        if(device_id >= this->_handles.size()){
+        if(unlikely(device_id >= this->_handles.size())){
             *handle = nullptr;
             return POS_FAILED_NOT_EXIST;
         }
@@ -885,6 +901,8 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
         POS_ASSERT(device_id == device_handle->device_id);
 
         *handle = device_handle;
+
+        return POS_SUCCESS;
     }
 };
 
@@ -913,29 +931,34 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<POSHandle_CUDA_Memory>* handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+        POSHandle_CUDA_Memory** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device_ptr device;
+        POSHandle_CUDA_Device *device;
+
         POS_CHECK_POINTER(handle);
 
         // obtain the device to allocate buffer
+    #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Device) == 0)){
             POS_WARN_C("no binded device provided to create the CUDA memory");
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         }
-        device = std::dynamic_pointer_cast<POSHandle_CUDA_Device>(related_handles[kPOS_ResourceTypeId_CUDA_Device][0]);
+    #endif
+    
+        device = related_handles[kPOS_ResourceTypeId_CUDA_Device][0];
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA memory in the manager");
             goto exit;
         }
+
         (*handle)->record_parent_handle(device);
 
     exit:

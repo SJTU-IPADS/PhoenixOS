@@ -27,7 +27,7 @@
  */
 template<class T_POSTransport, class T_POSClient>
 using pos_runtime_parser_function_t = pos_retval_t(*)(
-    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE_ptr
+    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE*
 );
 
 /*!
@@ -37,7 +37,7 @@ using pos_runtime_parser_function_t = pos_retval_t(*)(
 template<class T_POSTransport, class T_POSClient>           \
 pos_retval_t parse(                                         \
     POSWorkspace<T_POSTransport, T_POSClient>* ws,          \
-    POSAPIContext_QE_ptr wqe                 \
+    POSAPIContext_QE* wqe                                   \
 )
 
 namespace rt_functions {
@@ -54,19 +54,12 @@ class POSRuntime {
  public:
     POSRuntime(POSWorkspace<T_POSTransport, T_POSClient>* ws) : _ws(ws), _stop_flag(false) {   
         int rc;
-        cpu_set_t cpuset;
 
         this->checkpoint_interval_tick = ((double)POS_CKPT_INTERVAL / 1000.f) * (double)(POS_TSC_FREQ);
-
-        CPU_ZERO(&cpuset);
-        CPU_SET(1, &cpuset);    // stick to core 1
 
         // start daemon thread
         _daemon_thread = new std::thread(&daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
-
-        rc = pthread_setaffinity_np(_daemon_thread->native_handle(), sizeof(cpu_set_t), &cpuset);
-        POS_ASSERT(rc == 0);
 
         POS_LOG_C(
             "runtime started: ckpt_interval(%lu ms, %lu ticks), ckpt_opt_level(%d)",
@@ -130,7 +123,8 @@ class POSRuntime {
         uint64_t i, api_id;
         pos_retval_t parser_retval, dag_retval;
         POSAPIMeta_t api_meta;
-        std::vector<POSAPIContext_QE_ptr> wqes;
+        std::vector<POSAPIContext_QE*> wqes;
+        POSAPIContext_QE* wqe;
         uint64_t last_ckpt_tick = 0, current_tick;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
@@ -148,9 +142,6 @@ class POSRuntime {
         #endif
 
             for(i=0; i<wqes.size(); i++){
-                // we declare the pointer here so every iteration ends the shared_ptr would be released
-                POSAPIContext_QE_ptr wqe;
-
                 POS_CHECK_POINTER(wqe = wqes[i]);
 
                 api_id = wqe->api_cxt->api_id;
@@ -195,7 +186,7 @@ class POSRuntime {
                  *              response to the client right after operating on mocked resources
                  *  \warning    we can't apply this rule for Create_Resource, consider the memory situation, which is passthrough addressed
                  */
-                if(api_meta.api_type == kPOS_API_Type_Delete_Resource){
+                if(unlikely(api_meta.api_type == kPOS_API_Type_Delete_Resource)){
                     POS_DEBUG_C("api(%lu) is type of Delete_Resource, set as \"Return_After_Parse\"", api_id);
                     wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
                 }
@@ -246,5 +237,5 @@ class POSRuntime {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    virtual pos_retval_t checkpoint_insertion(POSAPIContext_QE_ptr wqe){ return POS_FAILED_NOT_IMPLEMENTED; }
+    virtual pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe){ return POS_FAILED_NOT_IMPLEMENTED; }
 };

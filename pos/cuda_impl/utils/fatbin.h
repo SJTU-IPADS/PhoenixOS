@@ -82,7 +82,6 @@ typedef struct POSCudaFunctionDesp {
     POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0) {}
     ~POSCudaFunctionDesp(){}
 } POSCudaFunctionDesp_t;
-using POSCudaFunctionDesp_ptr = std::shared_ptr<POSCudaFunctionDesp_t>;
 
 
 /*！
@@ -95,7 +94,7 @@ class POSUtil_CUDA_Kernel_Parser {
      *          the behaviour is represent by its parameter (i.e., whether it's a pointer), and the direction of the
      *          pointer (i.e., whether this pointer is an const pointer)
      *  \param  kernel_str      low-level (mangles) identifiers of the kernel
-     *  \param  function_desp   shared_ptr of function descriptor
+     *  \param  function_desp   pointer of function descriptor
      *  \example    mangles:    _Z8kernel_1PKfPfS1_S1_i
      *              demangles:  kernel_1(const float *, float *, float *, float *, int)
      *  \note   this function will use binary utilites "cu++filt" to obtain the kernel prototype, and
@@ -104,12 +103,12 @@ class POSUtil_CUDA_Kernel_Parser {
      *  \return POS_SUCCESS for successfully parsing
      *          POS_FAILED for failed parsing
      */
-    static pos_retval_t parse_by_prototype(const char *kernel_str, POSCudaFunctionDesp_ptr function_desp){
+    static pos_retval_t parse_by_prototype(const char *kernel_str, POSCudaFunctionDesp* function_desp){
         pos_retval_t retval = POS_SUCCESS;
         std::string kernel_demangles_name, kernel_prototype;
 
         POS_CHECK_POINTER(kernel_str);
-        POS_CHECK_POINTER(function_desp.get());
+        POS_CHECK_POINTER(function_desp);
 
         retval = __preprocess_prototype(kernel_str, kernel_demangles_name);
         if(unlikely(retval != POS_SUCCESS)){
@@ -158,11 +157,11 @@ class POSUtil_CUDA_Kernel_Parser {
     /*!
      *  \brief  parsing the kernel prototype
      *  \param  kernel_prototype        the generated kernel prototype
-     *  \param  function_desp           shared_ptr of function descriptor
+     *  \param  function_desp           pointer of function descriptor
      *  \return POS_SUCCESS for successfully processed
      *          POS_FAILED for failed processed
      */
-    static pos_retval_t __parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp_ptr function_desp);
+    static pos_retval_t __parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp* function_desp);
 };
 
 
@@ -179,10 +178,10 @@ class POSUtil_CUDA_Fatbin {
      *  \return POS_SUCCESS for successfully extraction
      */
     static pos_retval_t obtain_functions_from_fatbin(
-        uint8_t* fatbin, std::vector<POSCudaFunctionDesp_ptr>* desps
+        uint8_t* fatbin, std::vector<POSCudaFunctionDesp*>* desps
     ){
         pos_retval_t retval = POS_SUCCESS;
-        POSCudaFunctionDesp_ptr new_desp;
+        POSCudaFunctionDesp* new_desp;
         const uint8_t *input_pos = NULL;
         uint8_t *text_data = NULL;
         size_t text_data_size = 0;
@@ -499,7 +498,7 @@ class POSUtil_CUDA_Fatbin {
      *  \param  desps   vector to store the extracted function metadata
      */
     static pos_retval_t __extract_kernel_infos(
-        void* memory, size_t memsize, std::vector<POSCudaFunctionDesp_ptr>* desps
+        void* memory, size_t memsize, std::vector<POSCudaFunctionDesp*>* desps
     ){
         /* =================== ELF utility functions =================== */
 
@@ -629,7 +628,7 @@ class POSUtil_CUDA_Fatbin {
         /*!
          *  \brief  extract parameter info of the kernel within the ELF
          *  \param  elf             descriptor of target ELF file
-         *  \param  function_desp   pointer to the shared_ptr of function descriptor
+         *  \param  function_desp   pointer to the pointer of function descriptor
          *  \param  memory          data area of target ELF file
          *  \param  memsize         size of the data area of target ELF file
          *  \return POS_SUCCESS for successfully extraction
@@ -637,7 +636,7 @@ class POSUtil_CUDA_Fatbin {
          *          POS_FAILED_NOT_EXIST for no section was founded
          */
         auto get_params_for_kernel = [&](
-            Elf *elf, POSCudaFunctionDesp_ptr *function_desp, void* memory, size_t memsize
+            Elf *elf, POSCudaFunctionDesp** function_desp, void* memory, size_t memsize
         ) -> pos_retval_t {
             char *section_name = NULL;
             Elf_Scn *section = NULL;
@@ -718,7 +717,7 @@ class POSUtil_CUDA_Fatbin {
         int i = 0, j;
         GElf_Sym sym;
         const char *kernel_str;
-        POSCudaFunctionDesp_ptr function_desp;
+        POSCudaFunctionDesp *function_desp;
         bool is_duplicated;
 
         POS_CHECK_POINTER(memory); POS_CHECK_POINTER(desps);
@@ -808,7 +807,7 @@ class POSUtil_CUDA_Fatbin {
             }
             if(unlikely(is_duplicated)){ continue; }
 
-            function_desp = std::make_shared<POSCudaFunctionDesp_t>();
+            function_desp = new POSCudaFunctionDesp_t();
             POS_CHECK_POINTER(function_desp);
 
             function_desp->set_name(kernel_str);

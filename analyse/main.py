@@ -24,7 +24,7 @@ class POSOp:
 
     def __init__(
             self, id:int, api_id:int, return_code:int, 
-            c_tick:int, r_tick:int, runtime_s_tick:int, runtime_e_tick:int, worker_s_tick:int, worker_e_tick:int, tsc_freq:int,
+            c_tick:int, r_tick:int, runtime_s_tick:int, runtime_e_tick:int, worker_s_tick:int, worker_e_tick:int, queue_len_before_parse:int, tsc_freq:int,
             nb_ckpt_handles:int = 0, ckpt_size:int = 0, ckpt_memory_consumption:int = 0
     ) -> None:
         self.id = id
@@ -37,6 +37,7 @@ class POSOp:
         self.runtime_e_tick = runtime_e_tick
         self.worker_s_tick = worker_s_tick
         self.worker_e_tick = worker_e_tick
+        self.queue_len_before_parse = queue_len_before_parse
         self.tsc_freq = tsc_freq
 
         # durations
@@ -122,13 +123,13 @@ class POSDag:
             
             # next self.nb_ops lines: info of ops
             if(id <= self.nb_ops):
-                vid, api_id, return_code,                                                       \
-                c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick,   \
-                nb_ckpt_handles, ckpt_size, ckpt_memory_consumption                             \
+                vid, api_id, return_code,                                                                               \
+                c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse,   \
+                nb_ckpt_handles, ckpt_size, ckpt_memory_consumption                                                     \
                     = [int(x.strip()) for x in line.split(',')]
                 op = POSOp(
                     vid, api_id, return_code,
-                    c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, self.tsc_freq, 
+                    c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse, self.tsc_freq, 
                     nb_ckpt_handles, ckpt_size, ckpt_memory_consumption
                 )
                 self.ops[vid] = op
@@ -198,8 +199,8 @@ class POSDag:
             self.dag_mat.append(handle_vector)
 
     def analyse_dag(self, figure_dir_path:str):
-        self._analyse_ckpt(figure_dir_path)
-        # self._analyse_ops()
+        # self._analyse_ckpt(figure_dir_path)
+        self._analyse_ops()
 
     def _analyse_ops(self):
         print(">>> analysing ops...")
@@ -209,6 +210,7 @@ class POSDag:
         physical_duration_dict : dict[int,list[float]] = {}
         runtime_queue_duration_dict : dict[int,list[float]] = {}
         worker_queue_duration_dict : dict[int,list[float]] = {}
+        queue_len_before_parse_dict : dict[int,list[int]] = {}
 
         for id, op in self.ops.items():
             if op.api_id not in api_call_times.keys():
@@ -236,6 +238,10 @@ class POSDag:
                 worker_queue_duration_dict[op.api_id] = list()
             worker_queue_duration_dict[op.api_id].append(op.worker_queue_duration)
 
+            if op.api_id not in queue_len_before_parse_dict.keys():
+                queue_len_before_parse_dict[op.api_id] = list()
+            queue_len_before_parse_dict[op.api_id].append(op.queue_len_before_parse)
+
         for api_id, call_time in api_call_times.items():
             print(f"\napi: {api_id}, call_times: {call_time}")
 
@@ -251,6 +257,7 @@ class POSDag:
             _print_statistics(runtime_duration_dict[api_id], "parse")
             _print_statistics(worker_duration_dict[api_id], "execute")
             _print_statistics(physical_duration_dict[api_id], "physical")
+            _print_statistics(queue_len_before_parse_dict[api_id], "queue length before parse")
             _print_statistics(runtime_queue_duration_dict[api_id], "wait to parse")
             _print_statistics(worker_queue_duration_dict[api_id], "wait to execute")
 
