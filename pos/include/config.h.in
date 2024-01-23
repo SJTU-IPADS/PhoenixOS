@@ -1,5 +1,11 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+
+#include "pos/include/common.h"
+#include "pos/include/log.h"
+
 /*!
  *  \brief  hard-coded configurations of PhoenixOS
  */
@@ -16,3 +22,10 @@
 
 // path to output log file
 #define POS_LOG_FILE_PATH               "@pos_log_file_path@"
+
+typedef struct pos_global_config_server {
+    std::string job_name;
+    std::string kernel_meta_path;
+} pos_global_config_server_t;
+
+extern pos_global_config_server_t pos_gconfig_server;

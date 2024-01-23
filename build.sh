@@ -112,6 +112,7 @@ build_cuda() {
             cd build
             ninja clean
             ninja
+            cp $script_dir/build/*.so /lib/x86_64-linux-gnu/
         echo "[3] building remoting framework (cricket)"
             export POS_ENABLE=true
             cd $script_dir
@@ -142,7 +143,7 @@ build_cuda() {
                     # raise POS server
                     cd $script_dir
                     cd remoting/cuda/cpu
-                    nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../build ./cricket-rpc-server' &
+                    nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../build ./cricket-rpc-server -n test' &
                     server_pid=$!
 
                     # raise per-api unittest client

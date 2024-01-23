@@ -16,7 +16,7 @@
 template<class T_POSTransport>
 class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
  public:
-    POSWorkspace_CUDA(){
+    POSWorkspace_CUDA(int argc, char *argv[]) : POSWorkspace<T_POSTransport, POSClient_CUDA>(argc, argv){
         this->checkpoint_api_id = 6666;
     }
 

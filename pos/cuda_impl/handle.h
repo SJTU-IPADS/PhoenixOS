@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <cstdlib>
 
 #include <sys/resource.h>
 #include <stdint.h>
@@ -633,6 +634,113 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
  *  \brief   manager for handles of POSHandle_CUDA_Stream
  */
 class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Module> {
+ public:
+    std::map<std::string, POSCudaFunctionDesp_t*> cached_function_desps;
+
+    pos_retval_t load_cached_function_metas(std::string &file_path){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        std::string line, stream;
+        POSCudaFunctionDesp_t *new_desp;
+
+        auto generate_desp_from_meta = [](std::vector<std::string>& metas) -> POSCudaFunctionDesp_t* {
+            uint64_t i;
+            std::vector<uint32_t> param_offsets;
+            std::vector<uint32_t> param_sizes;
+            std::vector<uint32_t> input_pointer_params;
+            std::vector<uint32_t> output_pointer_params;
+            std::vector<uint32_t> suspicious_params;
+            uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_suspicious_params;
+            uint64_t ptr;
+
+            POSCudaFunctionDesp_t *new_desp = new POSCudaFunctionDesp_t();
+            POS_CHECK_POINTER(new_desp);
+
+            ptr = 0;
+
+            // mangled name of the kernel
+            new_desp->set_name(metas[ptr].c_str());
+            ptr++;
+
+            // number of paramters
+            new_desp->nb_params = std::stoul(metas[ptr]);
+            ptr++;
+
+            // offset of each parameter
+            for(i=0; i<new_desp->nb_params; i++){
+                param_offsets.push_back(std::stoul(metas[ptr+i]));
+                ptr++;
+            }
+            new_desp->param_offsets = param_offsets;
+
+            // size of each parameter
+            for(i=0; i<new_desp->nb_params; i++){
+                param_sizes.push_back(std::stoul(metas[ptr+i]));
+                ptr++;
+            }
+            new_desp->param_sizes = param_sizes;
+
+            // index of those parameter which is a input pointer (const pointer)
+            nb_input_pointer_params = std::stoul(metas[ptr]);
+            ptr++;
+            for(i=0; i<nb_input_pointer_params; i++){
+                input_pointer_params.push_back(std::stoul(metas[ptr+i]));
+                ptr++;
+            }
+            new_desp->input_pointer_params = input_pointer_params;
+
+            // size of each parameter
+            nb_output_pointer_params = std::stoul(metas[ptr]);
+            ptr++;
+            for(i=0; i<nb_output_pointer_params; i++){
+                output_pointer_params.push_back(std::stoul(metas[ptr+i]));
+                ptr++;
+            }
+            new_desp->output_pointer_params = output_pointer_params;
+
+            // size of each parameter
+            nb_suspicious_params = std::stoul(metas[ptr]);
+            ptr++;
+            for(i=0; i<nb_suspicious_params; i++){
+                suspicious_params.push_back(std::stoul(metas[ptr+i]));
+                ptr++;
+            }
+            new_desp->suspicious_params = suspicious_params;
+
+            // cbank parameter size (p.s., what is this?)
+            new_desp->cbank_param_size = std::stoul(metas[ptr].c_str());
+
+            return new_desp;
+        };
+
+        std::ifstream file(file_path.c_str(), std::ios::in);
+        if(likely(file.is_open())){
+            i = 0;
+            while (std::getline(file, line)) {
+                POS_LOG("line: %s", line.c_str());
+                // split by ","
+                std::stringstream ss(line);
+                std::string segment;
+                std::vector<std::string> metas;
+                while (std::getline(ss, segment, ',')) { metas.push_back(segment); }
+
+                // parse
+                new_desp = generate_desp_from_meta(metas);
+                cached_function_desps[std::string(new_desp->name.get())] = new_desp;
+
+                i++;
+            }
+            POS_LOG("parse %lu of cached kernel metas from file %s", i, file_path.c_str());
+            file.close();
+        } else {
+            retval = POS_FAILED_NOT_EXIST;
+            POS_WARN("failed to load kernel meta file %s, fall back to slow path", file_path.c_str());
+        }
+
+    exit:
+        return retval;
+    }
+    
     /*!
      *  \brief  allocate new mocked CUDA module within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource

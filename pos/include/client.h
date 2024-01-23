@@ -21,7 +21,9 @@ class POSClient {
      *  \param  id  client identifier
      */
     POSClient(uint64_t id) : id(id), _api_inst_pc(0), dag(id) {}
+
     POSClient() : id(0), dag(0) {}
+    
     ~POSClient(){}
     
     /*!
@@ -35,11 +37,26 @@ class POSClient {
     }
 
     /*!
+     *  \brief  deinit the client
+     *  \note   this part can't be in the deconstructor as we will invoke functions
+     *          that implemented by derived class
+     */
+    void deinit(){
+        this->deinit_handle_managers();
+    }
+
+    /*!
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
      */
     virtual void init_handle_managers(){}
+
+    /*!
+     *  \brief      deinit handle manager for all used resources
+     *  \example    CUDA function manager should export the metadata of functions
+     */
+    virtual void deinit_handle_managers(){}
 
     /*!
      *  \brief  initialization of the DAG

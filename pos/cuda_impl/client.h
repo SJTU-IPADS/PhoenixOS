@@ -20,7 +20,9 @@ class POSClient_CUDA : public POSClient {
      *          own needed handle managers
      */
     void init_handle_managers() override {
-        POSHandleManager_CUDA_Context* ctx_mgr;
+        POSHandleManager_CUDA_Context *ctx_mgr;
+        POSHandleManager_CUDA_Module *module_mgr;
+
         POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context());
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
@@ -33,6 +35,13 @@ class POSClient_CUDA : public POSClient {
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = new POSHandleManager_CUDA_Module();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Module]);
 
+        module_mgr = new POSHandleManager_CUDA_Module();
+        POS_CHECK_POINTER(module_mgr);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
+        if(likely(pos_gconfig_server.kernel_meta_path.size() > 0)){
+            module_mgr->load_cached_function_metas(pos_gconfig_server.kernel_meta_path);
+        }
+        
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = new POSHandleManager_CUDA_Function();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
 
@@ -87,6 +96,89 @@ class POSClient_CUDA : public POSClient {
                 POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
             }
         }
+    }
+
+    /*!
+     *  \brief      deinit handle manager for all used resources
+     *  \example    CUDA function manager should export the metadata of functions
+     */
+    void deinit_handle_managers() override {
+        uint64_t nb_functions, i;
+        POSHandleManager_CUDA_Function *hm_function;
+        POSHandle_CUDA_Function *function_handle;
+        std::ofstream output_file;
+        std::string file_path, dump_content;
+
+        auto dump_function_metas = [](POSHandle_CUDA_Function* function_handle) -> std::string {
+            std::string output_str("");
+            uint64_t i;
+
+            POS_CHECK_POINTER(function_handle);
+
+            // mangled name of the kernel
+            output_str += std::string(function_handle->name.get()) + std::string(",");
+
+            // number of paramters
+            output_str += std::to_string(function_handle->nb_params);
+            output_str += std::string(",");
+
+            // parameter offsets
+            for(i=0; i<function_handle->nb_params; i++){
+                output_str += std::to_string(function_handle->param_offsets[i]);
+                output_str += std::string(",");
+            }
+
+            // parameter sizes
+            for(i=0; i<function_handle->nb_params; i++){
+                output_str += std::to_string(function_handle->param_sizes[i]);
+                output_str += std::string(",");
+            }
+
+            // input paramters
+            output_str += std::to_string(function_handle->input_pointer_params.size());
+            output_str += std::string(",");
+            for(i=0; i<function_handle->input_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->input_pointer_params[i]);
+                output_str += std::string(",");
+            }
+
+            // output paramters
+            output_str += std::to_string(function_handle->output_pointer_params.size());
+            output_str += std::string(",");
+            for(i=0; i<function_handle->output_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->output_pointer_params[i]);
+                output_str += std::string(",");
+            }
+
+            // suspicious paramters
+            output_str += std::to_string(function_handle->suspicious_params.size());
+            output_str += std::string(",");
+            for(i=0; i<function_handle->suspicious_params.size(); i++){
+                output_str += std::to_string(function_handle->suspicious_params[i]);
+                output_str += std::string(",");
+            }
+
+            // cbank parameters
+            output_str += std::to_string(function_handle->cbank_param_size);
+
+            return output_str;
+        };
+
+        hm_function 
+            = (POSHandleManager_CUDA_Function*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
+        POS_CHECK_POINTER(hm_function);
+
+        file_path = std::string("./") + pos_gconfig_server.job_name + std::string(".txt");
+        output_file.open(file_path.c_str(), std::fstream::in | std::fstream::out | std::fstream::trunc);
+
+        nb_functions = hm_function->get_nb_handles();
+        for(i=0; i<nb_functions; i++){
+            POS_CHECK_POINTER(function_handle = hm_function->get_handle_by_id(i));
+            output_file << dump_function_metas(function_handle) << std::endl;
+        }
+
+        output_file.close();
+        POS_LOG("finish dump kernel metadats to %s", file_path.c_str());
     }
 
  private:

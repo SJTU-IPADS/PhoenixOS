@@ -129,7 +129,7 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += ['pos/src/handle.cpp']
+sources += ['pos/src/handle.cpp', 'pos/src/config.cpp']
 if target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',

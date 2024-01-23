@@ -3,8 +3,12 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <string>
 
 #include <stdint.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 template<class T_POSTransport, class T_POSClient>
 class POSWorkspace;
@@ -43,12 +47,12 @@ class POSWorkspace {
     /*!
      *  \brief  constructor
      */
-    POSWorkspace() : _current_max_uuid(0) { 
+    POSWorkspace(int argc, char *argv[]) : _current_max_uuid(0) {
+        this->parse_command_line_options(argc, argv);
+
         // create out-of-band server
         _oob_server = new POSOobServer<T_POSTransport, T_POSClient>( /* ws */ this );
         POS_CHECK_POINTER(_oob_server);
-
-        // TODO: create control-plane client here
     }
     
     /*!
@@ -89,6 +93,7 @@ class POSWorkspace {
         POS_LOG_C("cleaning all clients ...");
         for(client_iter = _client_map.begin(); client_iter != _client_map.end(); client_iter++){
             if(client_iter->second != nullptr){
+                client_iter->second->deinit();
                 delete client_iter->second;
             }
         }
@@ -569,4 +574,29 @@ class POSWorkspace {
 
     // the max uuid that has been recorded
     pos_client_uuid_t _current_max_uuid;
+
+    void parse_command_line_options(int argc, char *argv[]){
+        int opt;
+        const char *op_string = "n:k:";
+
+        while((opt = getopt(argc, argv, op_string)) != -1){
+            switch (opt)
+            {
+            case 'n':
+                pos_gconfig_server.job_name = std::string(optarg);
+                break;
+
+            case 'k':
+                pos_gconfig_server.kernel_meta_path = std::string(optarg);
+                break;
+            
+            default:
+                POS_ERROR("unknown command line parameter: %c", op_string);
+            }
+        }
+
+        if(unlikely(pos_gconfig_server.job_name.size() == 0)){
+            POS_ERROR_C("must assign a job name with -n option: -n resnet");
+        }
+    }
 };

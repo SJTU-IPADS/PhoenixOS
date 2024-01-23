@@ -184,7 +184,7 @@ class POSWorker {
         pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;
         std::vector<T_POSClient*> clients;
-        T_POSClient* client;
+        T_POSClient *client;
         POSAPIContext_QE *wqe;
 
         std::thread *ckpt_thread = nullptr;
