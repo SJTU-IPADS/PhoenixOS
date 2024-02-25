@@ -15,16 +15,9 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
-template<class T_POSTransport, class T_POSClient>
 class POSWorkspace;
-
-template<class T_POSTransport>
 class POSAgent;
-
-template<class T_POSTransport, class T_POSClient>
 class POSOobServer;
-
-template<class T_POSTransport>
 class POSOobClient;
 
 /*!
@@ -79,39 +72,12 @@ typedef struct POSOobMsg {
 /*!
  *  \brief  prototype of the server-side function
  */
-template<class T_POSTransport, class T_POSClient>
-using oob_server_function_t = pos_retval_t(*)(
-    int, struct sockaddr_in*, POSOobMsg_t*, POSWorkspace<T_POSTransport, T_POSClient>*, POSOobServer<T_POSTransport, T_POSClient>*
-);
+using oob_server_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMsg_t*, POSWorkspace*, POSOobServer*);
 
 /*!
  *  \brief  prototype of the client-side function
  */
-template<class T_POSTransport> 
-using oob_client_function_t = pos_retval_t(*)(
-    int, struct sockaddr_in*, POSOobMsg_t*, POSAgent<T_POSTransport>*, POSOobClient<T_POSTransport>*, void*
-);
-
-/*!
- *  \brief  macro of the definition of the server-side OOB RPC callback function
- */
-#define POS_OOB_FUNC_S()                                                                                    \
-template<class T_POSTransport, class T_POSClient>                                                           \
-pos_retval_t sv(                                                                                            \
-    int fd, struct sockaddr_in* remote, POSOobMsg_t* msg,                                                   \
-    POSWorkspace<T_POSTransport, T_POSClient>* ws, POSOobServer<T_POSTransport, T_POSClient>* oob_server    \
-)
-
-/*!
- *  \brief  macro for the definition of the client-side OOB RPC request function
- */
-#define POS_OOB_FUNC_C()                                                        \
-template<class T_POSTransport>                                                  \
-pos_retval_t clnt(                                                              \
-    int fd, struct sockaddr_in* remote, POSOobMsg_t* msg,                       \
-    POSAgent<T_POSTransport>* agent, POSOobClient<T_POSTransport>* oob_clnt,    \
-    void *call_data                                                             \
-)
+using oob_client_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMsg_t*, POSAgent*, POSOobClient*, void*);
 
 /*!
  *  \brief  macro for sending OOB message between client & server
@@ -140,7 +106,11 @@ pos_retval_t clnt(                                                              
  *  \brief  function prototypes for all out-of-band message types
  */
 namespace oob_functions {
-#define POS_OOB_DECLARE_FUNCTIONS(oob_type) namespace oob_type { POS_OOB_FUNC_S(); POS_OOB_FUNC_C(); }
+#define POS_OOB_DECLARE_FUNCTIONS(oob_type) namespace oob_type {                                                                        \
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server);                  \
+    pos_retval_t clnt(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void *call_data);  \
+}
+
     POS_OOB_DECLARE_FUNCTIONS(register_client);
     POS_OOB_DECLARE_FUNCTIONS(unregister_client);
     POS_OOB_DECLARE_FUNCTIONS(connect_transport);
@@ -150,7 +120,6 @@ namespace oob_functions {
 /*!
  *  \brief  UDP-based out-of-band RPC server
  */
-template<class T_POSTransport, class T_POSClient>
 class POSOobServer {
  public:
     /*!
@@ -160,7 +129,7 @@ class POSOobServer {
      *  \param  port    udp port to bind
      */
     POSOobServer(
-        POSWorkspace<T_POSTransport, T_POSClient>* ws,
+        POSWorkspace* ws,
         const char *ip_str=POS_OOB_SERVER_DEFAULT_IP, uint16_t port=POS_OOB_SERVER_DEFAULT_PORT
     ) : _ws(ws), _stop_flag(false) {
         POS_CHECK_POINTER(ws);
@@ -194,7 +163,7 @@ class POSOobServer {
         POS_DEBUG_C("out-of-band UDP server is binded to %s:%u", ip_str, port);
 
         // step 3: start daemon thread
-        _daemon_thread = new std::thread(&daemon, this);
+        _daemon_thread = new std::thread(&POSOobServer::daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
     }
 
@@ -270,16 +239,15 @@ class POSOobServer {
     std::thread *_daemon_thread;
 
     // map of callback functions
-    std::map<pos_oob_msg_typeid_t, oob_server_function_t<T_POSTransport,T_POSClient>> _callback_map;
+    std::map<pos_oob_msg_typeid_t, oob_server_function_t> _callback_map;
 
     // pointer to the server-side workspace
-    POSWorkspace<T_POSTransport, T_POSClient> *_ws;
+    POSWorkspace *_ws;
 };
 
 /*!
  *  \brief  UDP-based out-of-band RPC client
  */
-template<class T_POSTransport>
 class POSOobClient {
  public:
     /*!
@@ -291,7 +259,7 @@ class POSOobClient {
      *  \param  server_ip   destination server ipv4
      */
     POSOobClient(
-        POSAgent<T_POSTransport> *agent,
+        POSAgent *agent,
         uint16_t local_port, const char* local_ip="0.0.0.0",
         uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
     ) : _agent(agent) {
@@ -383,10 +351,8 @@ class POSOobClient {
     POSOobMsg_t _msg;
 
     // pointer to the client-side POS agent
-    POSAgent<T_POSTransport> *_agent;
+    POSAgent *_agent;
 
     // map of request functions
-    std::map<pos_oob_msg_typeid_t, oob_client_function_t<T_POSTransport>> _request_map;
+    std::map<pos_oob_msg_typeid_t, oob_client_function_t> _request_map;
 };
-
-#include "pos/include/oob.cpp"

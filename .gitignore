@@ -11,6 +11,7 @@
 # **/lib
 **/dag.pos
 **/*.nsys-rep
+**/*.qdstrm
 **/.viminfo
 **/.cmake
 **/env

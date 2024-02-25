@@ -11,7 +11,6 @@
  *  \brief  client-side PhoenixOS agent, manages all POS resources
  *  \tparam transport implementation    
  */
-template<class T_POSTransport>
 class POSAgent {
  public:
     /*!
@@ -30,7 +29,8 @@ class POSAgent {
         }
 
         POS_LOG_C("try to connect to %s:%u", remote_addr, POS_OOB_SERVER_DEFAULT_PORT);
-        _pos_oob_client = new POSOobClient<T_POSTransport>(
+
+        _pos_oob_client = new POSOobClient(
             /* agent */ this,
             /* local_port */ POS_OOB_CLIENT_DEFAULT_PORT,
             /* local_ip */ "0.0.0.0",
@@ -46,13 +46,14 @@ class POSAgent {
         POS_DEBUG_C("successfully register client: uuid(%lu)", _uuid);
 
         // step 2: open transport (top-half)
-        transport = new T_POSTransport(
+        // TODO: we need to select transport type here
+        transport = new POSTransport_SHM(
             /* id*/ _uuid,
             /* non_blocking */ true,
             /* role */ kPOS_Transport_RoleId_Client,
             /* timeout */ 5000
         );
-        POS_CHECK_POINTER(_pos_oob_client);
+        POS_CHECK_POINTER(transport);
         POS_DEBUG_C("successfully open transport (top-half)");
 
         // step 3: connect transport
@@ -105,14 +106,14 @@ class POSAgent {
     inline void set_uuid(pos_client_uuid_t id){ _uuid = id; }
 
     // pointer to the transportation layer
-    T_POSTransport *transport;
+    POSTransport *transport;
 
  private:
     // pointer to the out-of-band client
-    POSOobClient<T_POSTransport> *_pos_oob_client;
+    POSOobClient *_pos_oob_client;
 
     // uuid of the client
     pos_client_uuid_t _uuid;
 };
 
-extern POSAgent<POSTransport_SHM> *pos_agent;
+extern POSAgent *pos_agent;

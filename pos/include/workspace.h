@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-template<class T_POSTransport, class T_POSClient>
 class POSWorkspace;
 
 #include "pos/include/common.h"
@@ -32,16 +31,13 @@ enum pos_queue_type_t : uint8_t {
     kPOS_Queue_Type_CQ
 };
 
-template<class T_POSTransport, class T_POSClient>
 class POSWorker;
 
-template<class T_POSTransport, class T_POSClient>
 class POSRuntime;
 
 /*!
  * \brief   base workspace of PhoenixOS
  */
-template<class T_POSTransport, class T_POSClient>
 class POSWorkspace {
  public:
     /*!
@@ -51,7 +47,7 @@ class POSWorkspace {
         this->parse_command_line_options(argc, argv);
 
         // create out-of-band server
-        _oob_server = new POSOobServer<T_POSTransport, T_POSClient>( /* ws */ this );
+        _oob_server = new POSOobServer( /* ws */ this );
         POS_CHECK_POINTER(_oob_server);
     }
     
@@ -72,8 +68,8 @@ class POSWorkspace {
      *  \brief  shutdown the POS server
      */
     inline void clear(){
-        typename std::map<pos_client_uuid_t, T_POSTransport*>::iterator trsp_iter;
-        typename std::map<pos_client_uuid_t, T_POSClient*>::iterator client_iter;
+        typename std::map<pos_client_uuid_t, POSTransport*>::iterator trsp_iter;
+        typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
 
         POS_LOG_C("clearing POS Workspace...")
 
@@ -91,10 +87,10 @@ class POSWorkspace {
         }
         
         POS_LOG_C("cleaning all clients ...");
-        for(client_iter = _client_map.begin(); client_iter != _client_map.end(); client_iter++){
-            if(client_iter->second != nullptr){
-                client_iter->second->deinit();
-                delete client_iter->second;
+        for(clnt_iter = _client_map.begin(); clnt_iter != _client_map.end(); clnt_iter++){
+            if(clnt_iter->second != nullptr){
+                clnt_iter->second->deinit();
+                delete clnt_iter->second;
             }
         }
 
@@ -115,7 +111,7 @@ class POSWorkspace {
      *  \return nullptr for no client with specified uuid is founded;
      *          non-nullptr for pointer to founded client
      */
-    inline T_POSClient* get_client_by_uuid(pos_client_uuid_t id){
+    inline POSClient* get_client_by_uuid(pos_client_uuid_t id){
         if(unlikely(_client_map.count(id) == 0)){
             return nullptr;
         } else {
@@ -129,7 +125,7 @@ class POSWorkspace {
      *  \return nullptr for no transport with specified uuid is founded;
      *          non-nullptr for pointer to founded transport
      */
-    inline T_POSTransport* get_transport_by_uuid(pos_client_uuid_t id){
+    inline POSTransport* get_transport_by_uuid(pos_client_uuid_t id){
         if(unlikely(_transport_maps.count(id) == 0)){
             return nullptr;
         } else {
@@ -138,16 +134,21 @@ class POSWorkspace {
     }
 
     /*!
-     *  \brief  add a new client to the workspace
+     *  \brief  create and add a new client to the workspace
      *  \param  clnt    pointer to the POSClient to be added
      *  \param  uuid    the result uuid of the added client
      *  \return POS_SUCCESS for successfully added
      */
-    inline pos_retval_t create_client(T_POSClient* clnt, pos_client_uuid_t* uuid){
+    template<class T_POSClient>
+    inline pos_retval_t create_client(T_POSClient** clnt, pos_client_uuid_t* uuid){
+        POS_CHECK_POINTER(*clnt = new T_POSClient(/* id */ _current_max_uuid, /* ws */ this));
+        (*clnt)->init();
+
         *uuid = _current_max_uuid;
         _current_max_uuid += 1;
-        _client_map[*uuid] = clnt;
-        POS_DEBUG_C("add client: addr(%p), uuid(%lu)", clnt, *uuid);
+        _client_map[*uuid] = (*clnt);
+
+        POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), *uuid);
         return POS_SUCCESS;
     }
 
@@ -159,7 +160,7 @@ class POSWorkspace {
      */
     inline pos_retval_t remove_client(pos_client_uuid_t uuid){
         pos_retval_t retval = POS_SUCCESS;
-        T_POSClient* clnt;
+        void* clnt;
 
         /*!
          * \todo    we need to prevent other functions (e.g., poll_client_dag) would access
@@ -288,8 +289,8 @@ class POSWorkspace {
         return POS_SUCCESS;
     }
 
-    inline pos_retval_t poll_client_dag(std::vector<T_POSClient*> *clients){
-        typename std::map<pos_client_uuid_t, T_POSClient*>::iterator iter;
+    inline pos_retval_t poll_client_dag(std::vector<POSClient*>* clients){
+        typename std::map<pos_client_uuid_t, POSClient*>::iterator iter;
 
         POS_CHECK_POINTER(clients);
 
@@ -352,14 +353,21 @@ class POSWorkspace {
 
     /*!
      *  \brief  add a new transport to the workspace
-     *  \param  clnt    pointer to the POSTransport to be added
+     *  \param  trans   pointer to the POSTransport to be added
      *  \param  uuid    uuid of the transport to be added
      *  \return POS_SUCCESS for successfully added
      */
-    inline pos_retval_t create_transport(T_POSTransport* trpt, pos_client_uuid_t uuid){
-        POS_CHECK_POINTER(trpt);
-        _transport_maps[uuid] = trpt;
-        POS_DEBUG_C("add transport: addr(%p), uuid(%lu)", trpt, uuid);
+    template<class T_POSTransport>
+    inline pos_retval_t create_transport(T_POSTransport** trans, pos_client_uuid_t uuid){
+        *trans = new T_POSTransport( 
+            /* id*/ uuid,
+            /* non_blocking */ true,
+            /* role */ kPOS_Transport_RoleId_Server,
+            /* timeout */ 5000
+        );
+        POS_CHECK_POINTER(*trans);
+        _transport_maps[uuid] = (*trans);
+        POS_DEBUG_C("add transport: addr(%p), uuid(%lu)", (*trans), uuid);
         return POS_SUCCESS;
     }
 
@@ -371,7 +379,7 @@ class POSWorkspace {
      */
     inline pos_retval_t remove_transport(pos_client_uuid_t uuid){
         pos_retval_t retval = POS_SUCCESS;
-        T_POSTransport* trpt;
+        void* trpt;
 
         if(unlikely(_transport_maps.count(uuid) == 0)){
             retval = POS_FAILED_NOT_EXIST;
@@ -402,8 +410,8 @@ class POSWorkspace {
     ){
         uint64_t i;
         int retval, prev_error_code = 0;
-        T_POSClient *client;
-        T_POSTransport *transport;
+        POSClient *client;
+        POSTransport *transport;
         POSAPIMeta_t api_meta;
         bool has_prev_error = false;
         POSAPIContext_QE* wqe;
@@ -550,14 +558,14 @@ class POSWorkspace {
     std::vector<uint64_t> stateful_handle_type_idx;
 
     // pos runtime
-    POSRuntime<T_POSTransport, T_POSClient> *runtime;
+    POSRuntime *runtime;
 
     // pos worker
-    POSWorker<T_POSTransport, T_POSClient> *worker;
+    POSWorker *worker;
 
  protected:
     // the out-of-band server
-    POSOobServer<T_POSTransport, T_POSClient> *_oob_server;
+    POSOobServer *_oob_server;
 
     // queue pairs between frontend and runtime (per client)
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t>*> _runtime_wqs;
@@ -567,10 +575,10 @@ class POSWorkspace {
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t>*> _worker_cqs;
 
     // map of clients
-    std::map<pos_client_uuid_t, T_POSClient*> _client_map;
+    std::map<pos_client_uuid_t, POSClient*> _client_map;
 
     // map of transports
-    std::map<pos_client_uuid_t, T_POSTransport*> _transport_maps;
+    std::map<pos_client_uuid_t, POSTransport*> _transport_maps;
 
     // the max uuid that has been recorded
     pos_client_uuid_t _current_max_uuid;

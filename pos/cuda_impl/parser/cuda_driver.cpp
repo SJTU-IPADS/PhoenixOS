@@ -1,5 +1,3 @@
-#pragma once
-
 #include <iostream>
 
 #include "pos/include/common.h"
@@ -29,9 +27,9 @@ namespace cu_module_load_data {
         POSClient_CUDA *client;
         POSHandle_CUDA_Module *module_handle;
         POSHandle_CUDA_Function *function_handle;
-        POSHandleManager<POSHandle_CUDA_Context>* hm_context;
-        POSHandleManager<POSHandle_CUDA_Module>* hm_module;
-        POSHandleManager<POSHandle_CUDA_Function>* hm_function;
+        POSHandleManager_CUDA_Context *hm_context;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Function *hm_function;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -51,11 +49,20 @@ namespace cu_module_load_data {
         }
     #endif
 
-        hm_context = client->handle_managers[kPOS_ResourceTypeId_CUDA_Context];
-        hm_module = client->handle_managers[kPOS_ResourceTypeId_CUDA_Module];
-        hm_function = client->handle_managers[kPOS_ResourceTypeId_CUDA_Function];
-        POS_CHECK_POINTER(hm_context); POS_CHECK_POINTER(hm_context->latest_used_handle);
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
+        POS_CHECK_POINTER(hm_context);
+        POS_CHECK_POINTER(hm_context->latest_used_handle);
+
+        hm_module = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module
+        );
         POS_CHECK_POINTER(hm_module);
+
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
         POS_CHECK_POINTER(hm_function);
 
         // operate on handler manager
@@ -90,17 +97,16 @@ namespace cu_module_load_data {
         );
 
         // record the related handle to QE
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Module, 
-            /* handle_view */ POSHandleView_t(
-                /* handle */ module_handle,
-                /* dir */ kPOS_Edge_Direction_Create
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ module_handle
+        });
+        
 
         // analyse the fatbin and stores the function attributes in the handle
         retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
-            (uint8_t*)(pos_api_param_addr(wqe, 1)), &(module_handle->function_desps)
+            /* fatbin */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+            /* deps */ &(module_handle->function_desps),
+            /* cached_desp_map */ hm_module->cached_function_desps
         );
         POS_DEBUG(
             "parse(cu_module_load_data): found %lu functions in the fatbin",
@@ -162,8 +168,8 @@ namespace cu_module_get_function {
         POSHandle_CUDA_Function *function_handle;
         POSCudaFunctionDesp *function_desp;
         bool found_function_desp;
-        POSHandleManager<POSHandle_CUDA_Module>* hm_module;
-        POSHandleManager<POSHandle_CUDA_Function>* hm_function;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Function *hm_function;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -183,9 +189,14 @@ namespace cu_module_get_function {
         }
     #endif
 
-        hm_module = client->handle_managers[kPOS_ResourceTypeId_CUDA_Module];
-        hm_function = client->handle_managers[kPOS_ResourceTypeId_CUDA_Function];
+        hm_module = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module
+        );
         POS_CHECK_POINTER(hm_module);
+
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
         POS_CHECK_POINTER(hm_function);
 
         // obtain target handle
@@ -213,7 +224,10 @@ namespace cu_module_get_function {
         found_function_desp = false;
         for(i=0; i<module_handle->function_desps.size(); i++){
             if(unlikely(
-                !strcmp(module_handle->function_desps[i]->name.get(), pos_api_param_addr(wqe, 3))
+                !strcmp(
+                    module_handle->function_desps[i]->name.get(),
+                    (const char*)(pos_api_param_addr(wqe, 3))
+                )
             )){
                 function_desp = module_handle->function_desps[i];
                 found_function_desp = true;
@@ -259,18 +273,17 @@ namespace cu_module_get_function {
         function_handle->input_pointer_params = function_desp->input_pointer_params;
         function_handle->output_pointer_params = function_desp->output_pointer_params;
         function_handle->suspicious_params = function_desp->suspicious_params;
+        function_handle->has_verified_params = function_desp->has_verified_params;
+        function_handle->confirmed_suspicious_params = function_desp->confirmed_suspicious_params;
+        function_handle->signature = function_desp->signature;
 
         // set handle state as pending to create
         function_handle->mark_status(kPOS_HandleStatus_Create_Pending);
 
         // record the related handle to QE
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Function, 
-            /* handle_view */ POSHandleView_t(
-                /* handle */ function_handle,
-                /* dir */ kPOS_Edge_Direction_Create
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ function_handle
+        });
 
         // allocate the function handle in the dag
         retval = client->dag.allocate_handle(function_handle);
@@ -303,8 +316,8 @@ namespace cu_module_get_global {
         pos_retval_t retval = POS_SUCCESS;
         POSHandle_CUDA_Module *module_handle;
         POSHandle_CUDA_Var *var_handle;
-        POSHandleManager<POSHandle_CUDA_Module>* hm_module;
-        POSHandleManager<POSHandle_CUDA_Var>* hm_var;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Var *hm_var;
         POSClient_CUDA *client;
         
         POS_CHECK_POINTER(wqe);
@@ -325,9 +338,14 @@ namespace cu_module_get_global {
         }
     #endif
 
-        hm_module = client->handle_managers[kPOS_ResourceTypeId_CUDA_Module];
-        hm_var = client->handle_managers[kPOS_ResourceTypeId_CUDA_Var];
+        hm_module = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module
+        );
         POS_CHECK_POINTER(hm_module);
+
+        hm_var = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Var, POSHandleManager_CUDA_Var
+        );
         POS_CHECK_POINTER(hm_var);
 
         // obtain target handle
@@ -374,16 +392,15 @@ namespace cu_module_get_global {
         // record the name of the var in the handle
         var_handle->name = std::make_unique<char[]>(pos_api_param_size(wqe, 3));
         POS_CHECK_POINTER(var_handle->name.get());
-        strcpy(var_handle->name.get(), pos_api_param_addr(wqe, 3));
+        strcpy(
+            var_handle->name.get(),
+            (const char*)(pos_api_param_addr(wqe, 3))
+        );
 
         // record the related handle to QE
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Var, 
-            /* handle_view */ POSHandleView_t(
-                /* handle */ var_handle,
-                /* dir */ kPOS_Edge_Direction_Create
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ var_handle
+        });
 
         // allocate the var handle in the dag
         retval = client->dag.allocate_handle(var_handle);
@@ -417,7 +434,7 @@ namespace cu_device_primary_ctx_get_state {
         uint64_t i;
         POSClient_CUDA *client;
         POSHandle_CUDA_Device *device_handle;
-        POSHandleManager<POSHandle_CUDA_Device>* hm_device;
+        POSHandleManager_CUDA_Device *hm_device;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -437,7 +454,9 @@ namespace cu_device_primary_ctx_get_state {
         }
     #endif
 
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
         POS_CHECK_POINTER(hm_device);
         
         // find out the involved device
@@ -452,7 +471,9 @@ namespace cu_device_primary_ctx_get_state {
             );
             goto exit;
         }
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Device, POSHandleView_t(device_handle, kPOS_Edge_Direction_In));
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ device_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);

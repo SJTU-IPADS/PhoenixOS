@@ -23,29 +23,23 @@ checkRtError(cudaError_t res, const char *tok, const char *file, unsigned line)
 
 #define MB(x)   ((size_t) (x) << 20)
 
-// mock kernel execution duration
-template<unsigned us>
-__device__ void __sleep_us() {    
-    __nanosleep(us*1000);
-}
+typedef struct mock_dev_ptr_struct {
+    int nothing_1;
+    int nothing_2;
+    bool nothing_3;
+    void *dev_ptr_1;
+    void *dev_ptr_2;
+    bool nothing_4;
+    int nothing_5;
+} mock_dev_ptr_struct_t;
 
-__global__ void kernel_1(const float* in_a, float* out_a, float* out_b, float* out_c, int len){ 
-    __sleep_us<5>();
-}
-__global__ void kernel_2(const float* in_a, const float* in_b, const float* in_c, float* out_a, int len){
-   __sleep_us<10>();
-}
-__global__ void kernel_3(const float* in_a, float* out_a, int len){ 
-    __sleep_us<15>();
-}
-__global__ void kernel_4(const float* in_a, const float* in_b, float* out_a, int len){ 
-    __sleep_us<15>();
+__global__ void kernel_with_struct_input(const float* in_a, float* out_a, mock_dev_ptr_struct_t mock_struct_input, int len){ 
+    ((float*)(mock_struct_input.dev_ptr_1))[0] = in_a[0];
 }
 
 int main(){
-    uint64_t i, j;
     float *mem_1, *mem_2, *mem_3, *mem_4, *mem_5, *mem_6;
-
+    mock_dev_ptr_struct_t struct_input;
     uint64_t s_tick, e_tick;
 
     // cudaDeviceProp prop;
@@ -61,21 +55,18 @@ int main(){
     CHECK_RT(cudaMalloc(&mem_5, MB(8)));
     CHECK_RT(cudaMalloc(&mem_6, MB(2)));
 
+    struct_input.dev_ptr_1 = mem_1;
+    struct_input.dev_ptr_2 = mem_2;
+    
+    POS_LOG("mem_1: %p, mem_2: %p", mem_1, mem_2);
+
+    POS_LOG("sizeof mock_dev_ptr_struct_t: %lu bytes", sizeof(mock_dev_ptr_struct));
+
     s_tick = POSUtilTimestamp::get_tsc();
 
-    for(i=0; i<8; i++){
-        for(j=0; j<512; j++){
-            kernel_1<<<1,128>>>(mem_1, mem_2, mem_3, mem_4, 0);
-            kernel_2<<<1,128>>>(mem_2, mem_4, mem_1, mem_3, 0);
-            kernel_3<<<1,128>>>(mem_4, mem_3, 0);
-            kernel_4<<<1,128>>>(mem_3, mem_5, mem_6, 0);
-            kernel_3<<<1,128>>>(mem_6, mem_4, 0);
-            kernel_1<<<1,128>>>(mem_2, mem_4, mem_6, mem_1, 0);
-        }
-        CHECK_RT(cudaStreamSynchronize(0));
-        usleep(1000);
-    }
-
+    kernel_with_struct_input<<<1,128>>>(mem_1, mem_2, struct_input, 0);
+    kernel_with_struct_input<<<1,128>>>(mem_1, mem_2, struct_input, 0);
+    
     e_tick = POSUtilTimestamp::get_tsc();
 
     POS_LOG("E2E Latency: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));

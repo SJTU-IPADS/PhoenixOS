@@ -11,6 +11,12 @@
 
 class POSClient_CUDA : public POSClient {
  public:
+    /*!
+     *  \param  id  client identifier
+     *  \param  ws  pointer to the workspace related to this client
+     */
+    POSClient_CUDA(uint64_t id, void* ws) : POSClient(id, ws){}
+
     POSClient_CUDA(){}
     ~POSClient_CUDA(){};
 
@@ -20,6 +26,7 @@ class POSClient_CUDA : public POSClient {
      *          own needed handle managers
      */
     void init_handle_managers() override {
+        pos_retval_t retval;
         POSHandleManager_CUDA_Context *ctx_mgr;
         POSHandleManager_CUDA_Module *module_mgr;
 
@@ -39,7 +46,10 @@ class POSClient_CUDA : public POSClient {
         POS_CHECK_POINTER(module_mgr);
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
         if(likely(pos_gconfig_server.kernel_meta_path.size() > 0)){
-            module_mgr->load_cached_function_metas(pos_gconfig_server.kernel_meta_path);
+            retval = module_mgr->load_cached_function_metas(pos_gconfig_server.kernel_meta_path);
+            if(likely(retval == POS_SUCCESS)){
+                pos_gconfig_server.is_load_kernel_from_cache = true;
+            }
         }
         
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = new POSHandleManager_CUDA_Function();
@@ -158,18 +168,40 @@ class POSClient_CUDA : public POSClient {
                 output_str += std::string(",");
             }
 
+            // has verified suspicious paramters
+            if(function_handle->has_verified_params){
+                output_str += std::string("1,");
+
+                // inout paramters
+                output_str += std::to_string(function_handle->confirmed_suspicious_params.size());
+                output_str += std::string(",");
+                for(i=0; i<function_handle->confirmed_suspicious_params.size(); i++){
+                    output_str += std::to_string(function_handle->confirmed_suspicious_params[i].first);    // param_index
+                    output_str += std::string(",");
+                    output_str += std::to_string(function_handle->confirmed_suspicious_params[i].second);   // offset
+                    output_str += std::string(",");
+                }
+            } else {
+                output_str += std::string("0,");
+            }
+
             // cbank parameters
             output_str += std::to_string(function_handle->cbank_param_size);
 
             return output_str;
         };
 
+        // if we have already save the kernels, we can skip
+        if(likely(pos_gconfig_server.is_load_kernel_from_cache == true)){
+            goto exit;
+        }
+        
         hm_function 
             = (POSHandleManager_CUDA_Function*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
         POS_CHECK_POINTER(hm_function);
 
         file_path = std::string("./") + pos_gconfig_server.job_name + std::string(".txt");
-        output_file.open(file_path.c_str(), std::fstream::in | std::fstream::out | std::fstream::trunc);
+        output_file.open(file_path.c_str(), std::fstream::in | std::fstream::out | std::fstream::app);
 
         nb_functions = hm_function->get_nb_handles();
         for(i=0; i<nb_functions; i++){
@@ -179,6 +211,9 @@ class POSClient_CUDA : public POSClient {
 
         output_file.close();
         POS_LOG("finish dump kernel metadats to %s", file_path.c_str());
+
+    exit:
+        ;
     }
 
  private:

@@ -19,8 +19,9 @@ class POSClient {
  public:
     /*!
      *  \param  id  client identifier
+     *  \param  ws  pointer to the workspace related to this client
      */
-    POSClient(uint64_t id) : id(id), _api_inst_pc(0), dag(id) {}
+    POSClient(uint64_t id, void* ws) : id(id), _api_inst_pc(0), dag(id), _ws(ws) {}
 
     POSClient() : id(0), dag(0) {}
     
@@ -62,7 +63,7 @@ class POSClient {
      *  \brief  initialization of the DAG
      *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
      */
-    virtual void init_dag();
+    virtual void init_dag(){};
 
     // client identifier
     uint64_t id;
@@ -86,4 +87,10 @@ class POSClient {
  protected:
     // api instance pc
     uint64_t _api_inst_pc;
+
+    // workspace that this client belongs to
+    void *_ws;
 };
+
+#define pos_get_client_typed_hm(client, resource_id, hm_type)  \
+    (hm_type*)(client->handle_managers[resource_id])

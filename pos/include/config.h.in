@@ -25,7 +25,11 @@
 
 typedef struct pos_global_config_server {
     std::string job_name;
+
     std::string kernel_meta_path;
+    bool is_load_kernel_from_cache;
+
+    pos_global_config_server() : is_load_kernel_from_cache(false) {}
 } pos_global_config_server_t;
 
 extern pos_global_config_server_t pos_gconfig_server;

@@ -16,20 +16,13 @@
 /*!
  *  \brief prototype for worker launch function for each API call
  */
-template<class T_POSTransport, class T_POSClient>
-using pos_worker_launch_function_t = pos_retval_t(*)(
-    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE*
-);
+using pos_worker_launch_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
 
 /*!
  *  \brief  macro for the definition of the worker launch functions
  */
-#define POS_WK_FUNC_LAUNCH()                                \
-template<class T_POSTransport, class T_POSClient>           \
-pos_retval_t launch(                                        \
-    POSWorkspace<T_POSTransport, T_POSClient>* ws,          \
-    POSAPIContext_QE* wqe                                   \
-)
+#define POS_WK_FUNC_LAUNCH()                                        \
+    pos_retval_t launch(POSWorkspace* ws, POSAPIContext_QE* wqe)
 
 namespace wk_functions {
 #define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); }
@@ -43,24 +36,24 @@ typedef struct checkpoint_async_cxt {
     // checkpoint op context
     POSAPIContext_QE *wqe;
 
-    checkpoint_async_cxt() : is_active(false) {}
+    std::vector<POSHandle*> invalidated_handles;
 
+    checkpoint_async_cxt() : is_active(false), invalidated_handles(32) {}
 } checkpoint_async_cxt_t;
 
 
 /*!
  *  \brief  POS Worker
  */
-template<class T_POSTransport, class T_POSClient>
 class POSWorker {
  public:
-    POSWorker(POSWorkspace<T_POSTransport, T_POSClient>* ws) 
+    POSWorker(POSWorkspace* ws)
         : _ws(ws), _stop_flag(false), worker_stream(nullptr)
     {
         int rc;
 
         // start daemon thread
-        _daemon_thread = new std::thread(&daemon, this);
+        _daemon_thread = new std::thread(&POSWorker::daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
 
         POS_LOG_C("worker started");
@@ -102,7 +95,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __restore(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE* wqe){
+    static inline void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
         POS_ERROR_DETAIL(
             "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
             wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->dag_vertex_id
@@ -120,9 +113,9 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __done(POSWorkspace<T_POSTransport, T_POSClient>* ws, POSAPIContext_QE* wqe){
-        T_POSClient *client;
-        POS_CHECK_POINTER(client = (T_POSClient*)(wqe->client));
+    static inline void __done(POSWorkspace* ws, POSAPIContext_QE* wqe){
+        POSClient *client;
+        POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
 
         // forward the DAG pc
         client->dag.forward_pc();
@@ -141,10 +134,10 @@ class POSWorker {
     std::thread *_daemon_thread;
 
     // global workspace
-    POSWorkspace<T_POSTransport, T_POSClient>* _ws;
+    POSWorkspace *_ws;
 
     // worker function map
-    std::map<uint64_t, pos_worker_launch_function_t<T_POSTransport, T_POSClient>> _launch_functions;
+    std::map<uint64_t, pos_worker_launch_function_t> _launch_functions;
     
     /*!
      *  \brief  checkpoint procedure, should be implemented by each platform
@@ -183,8 +176,8 @@ class POSWorker {
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;
-        std::vector<T_POSClient*> clients;
-        T_POSClient *client;
+        std::vector<POSClient*> clients;
+        POSClient *client;
         POSAPIContext_QE *wqe;
 
         std::thread *ckpt_thread = nullptr;
@@ -230,7 +223,8 @@ class POSWorker {
                         }
 
                         // raise new checkpoint thread
-                        ckpt_thread = new std::thread(&(this->checkpoint_async_thread), this, &ckpt_cxt);
+                        ckpt_cxt.invalidated_handles.clear();
+                        ckpt_thread = new std::thread(&POSWorker::checkpoint_async_thread, this, &ckpt_cxt);
                         POS_CHECK_POINTER(ckpt_thread);
                         ckpt_cxt.is_active = true;
 
@@ -256,6 +250,11 @@ class POSWorker {
                         );
                     }
                 #endif
+
+                    // invalidate handles
+                    for(auto &output_handle_view : wqe->output_handle_views){
+                        ckpt_cxt.invalidated_handles.push_back(output_handle_view.handle);
+                    }
 
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
                     wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
@@ -293,8 +292,8 @@ class POSWorker {
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;
-        std::vector<T_POSClient*> clients;
-        T_POSClient* client;
+        std::vector<POSClient*> clients;
+        POSClient* client;
         POSAPIContext_QE *wqe;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
@@ -375,22 +374,19 @@ class POSWorker {
      */
     pos_retval_t __restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t& api_meta){
         pos_retval_t retval = POS_SUCCESS;
-        uint64_t i;
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter_hvm;
-        std::vector<POSHandleView_t>* handle_view_vec;
-        POSHandle::pos_broken_handle_list_t broken_handle_list;
-        POSHandle *broken_handle;
-        uint16_t nb_layers, layer_id_keeper;
-        uint64_t handle_id_keeper;
         
         POS_CHECK_POINTER(wqe);
 
-        for(iter_hvm = wqe->handle_view_map.begin(); iter_hvm != wqe->handle_view_map.end(); iter_hvm ++){
-            handle_view_vec = iter_hvm->second;
+        auto __restore_broken_hendles_per_direction = [&](std::vector<POSHandleView_t>& handle_view_vec){
+            uint64_t i;
+            POSHandle::pos_broken_handle_list_t broken_handle_list;
+            POSHandle *broken_handle;
+            uint16_t nb_layers, layer_id_keeper;
+            uint64_t handle_id_keeper;
 
-            for(i=0; i<handle_view_vec->size(); i++){
+            for(i=0; i<handle_view_vec.size(); i++){
                 broken_handle_list.reset();
-                (*handle_view_vec)[i].handle->collect_broken_handles(&broken_handle_list);
+                handle_view_vec[i].handle->collect_broken_handles(&broken_handle_list);
 
                 nb_layers = broken_handle_list.get_nb_layers();
                 if(likely(nb_layers == 0)){
@@ -419,7 +415,8 @@ class POSWorker {
                      *  \todo   restore from remote
                      *  \todo   replay based on DAG
                      */
-
+                    
+                    // restore locally
                     if(unlikely(POS_SUCCESS != broken_handle->restore())){
                         POS_ERROR_C(
                             "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
@@ -435,8 +432,13 @@ class POSWorker {
                 } // while (1)
 
             } // foreach handle_view_vec
+        };
 
-        } // foreach handle_view_map
+        __restore_broken_hendles_per_direction(wqe->input_handle_views);
+        __restore_broken_hendles_per_direction(wqe->output_handle_views);
+        __restore_broken_hendles_per_direction(wqe->inout_handle_views);
+        __restore_broken_hendles_per_direction(wqe->create_handle_views);
+        __restore_broken_hendles_per_direction(wqe->delete_handle_views);
 
     exit:
         return retval;

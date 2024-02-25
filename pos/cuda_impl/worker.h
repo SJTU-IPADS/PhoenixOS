@@ -1,5 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <map>
+
 #include <cuda_runtime_api.h>
 
 #include "pos/include/common.h"
@@ -51,11 +56,9 @@ namespace wk_functions {
 /*!
  *  \brief  POS Worker (CUDA Implementation)
  */
-template<class T_POSTransport>
-class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
+class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace<T_POSTransport, POSClient_CUDA>* ws) 
-        : POSWorker<T_POSTransport, POSClient_CUDA>(ws), _ckpt_stream(nullptr) {}
+    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws), _ckpt_stream(nullptr) {}
     ~POSWorker_CUDA(){};
 
  protected:
@@ -87,7 +90,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         wqe->ckpt_memory_consumption = 0;
         
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
             nb_handles = hm->get_nb_handles();
             for(i=0; i<nb_handles; i++){
@@ -121,7 +124,7 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
     exit:
         // collect statistics
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
             nb_handles = hm->get_nb_handles();
             for(i=0; i<nb_handles; i++){
@@ -246,8 +249,15 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
                     goto exit;
                 }
 
-                wqe->nb_ckpt_handles += 1;
-                wqe->ckpt_size += handle->state_size;
+                if(unlikely(
+                    std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
+                )){
+                    wqe->nb_abandon_handles += 1;
+                    wqe->abandon_ckpt_size += handle->state_size;
+                } else {
+                    wqe->nb_ckpt_handles += 1;
+                    wqe->ckpt_size += handle->state_size;
+                }
             }
         }
         
@@ -260,7 +270,10 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         }
 
     exit:
-        POS_LOG("checkpoint finished: #handles(%lu), size(%lu Bytes)", wqe->nb_ckpt_handles, wqe->ckpt_size);
+        POS_LOG(
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+        );
         cxt->is_active = false;
     }
 
@@ -328,5 +341,3 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         return POS_SUCCESS;
     }
 };
-
-#include "pos/cuda_impl/worker/base.h"

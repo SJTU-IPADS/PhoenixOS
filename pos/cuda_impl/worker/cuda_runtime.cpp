@@ -3,6 +3,7 @@
 #include "pos/include/common.h"
 #include "pos/cuda_impl/worker.h"
 
+#include <cuda.h>
 #include <cuda_runtime_api.h>
 
 namespace wk_functions {
@@ -29,7 +30,7 @@ namespace cuda_malloc {
 
         // record server address
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            memory_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+            memory_handle = pos_api_create_handle(wqe, 0);
             POS_CHECK_POINTER(memory_handle);
             
             retval = memory_handle->set_passthrough_addr(ptr, memory_handle);
@@ -45,9 +46,9 @@ namespace cuda_malloc {
         }
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -64,24 +65,26 @@ namespace cuda_free {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *memory_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+        memory_handle = pos_api_delete_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
 
         wqe->api_cxt->return_code = cudaFree(
-            /* devPtr */ memory_handle_view.handle->server_addr
+            /* devPtr */ memory_handle->server_addr
         );
 
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            memory_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
+            memory_handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -114,7 +117,7 @@ namespace cuda_launch_kernel {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        function_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Function, POSHandle_CUDA_Function, 0);
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_input_handle(wqe, 0));
         POS_CHECK_POINTER(function_handle);
 
         // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
@@ -149,7 +152,7 @@ namespace cuda_launch_kernel {
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
 
         wqe->api_cxt->return_code = cuLaunchKernel(
-            /* f */ function_handle->server_addr,
+            /* f */ (CUfunction)(function_handle->server_addr),
             /* gridDimX */ ((__dim3_t*)pos_api_param_addr(wqe, 1))->x,
             /* gridDimY */ ((__dim3_t*)pos_api_param_addr(wqe, 1))->y,
             /* gridDimZ */ ((__dim3_t*)pos_api_param_addr(wqe, 1))->z,
@@ -158,7 +161,7 @@ namespace cuda_launch_kernel {
             /* blockDimZ */ ((__dim3_t*)pos_api_param_addr(wqe, 2))->z,
             /* sharedMemBytes */ pos_api_param_value(wqe, 4, size_t),
             // /* hStream */ stream_handle->server_addr,
-            /* hStream */ ws->worker->worker_stream,
+            /* hStream */ (CUstream)(ws->worker->worker_stream),
             /* kernelParams */ cuda_args,
             /* extra */ nullptr
         );
@@ -166,9 +169,9 @@ namespace cuda_launch_kernel {
         // if(likely(cuda_args != nullptr)){ free(cuda_args); }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -187,23 +190,25 @@ namespace cuda_memcpy_h2d {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *memory_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+        memory_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
-            /* dst */ memory_handle_view.handle->server_addr,
+            /* dst */ memory_handle->server_addr,
             /* src */ pos_api_param_addr(wqe, 1),
             /* count */ pos_api_param_size(wqe, 1),
             /* kind */ cudaMemcpyHostToDevice
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -221,23 +226,25 @@ namespace cuda_memcpy_d2h {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *memory_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+        memory_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
             /* dst */ wqe->api_cxt->ret_data,
-            /* src */ (uint64_t)(memory_handle_view.handle->server_addr),
+            /* src */ (const void*)(memory_handle->server_addr),
             /* count */ pos_api_param_value(wqe, 1, uint64_t),
             /* kind */ cudaMemcpyDeviceToHost
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -256,24 +263,28 @@ namespace cuda_memcpy_d2d {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *dst_memory_handle, *src_memory_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &dst_memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
-        POSHandleView_t &src_memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 1);
+        dst_memory_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(dst_memory_handle);
+
+        src_memory_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(src_memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
-            /* dst */ dst_memory_handle_view.handle->server_addr,
-            /* src */ src_memory_handle_view.handle->server_addr,
+            /* dst */ dst_memory_handle->server_addr,
+            /* src */ src_memory_handle->server_addr,
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* kind */ cudaMemcpyDeviceToDevice
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -292,28 +303,29 @@ namespace cuda_memcpy_h2d_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle *memory_handle, *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+        memory_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        stream_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
-            /* dst */ memory_handle_view.handle->server_addr,
+            /* dst */ memory_handle->server_addr,
             /* src */ pos_api_param_addr(wqe, 1),
             /* count */ pos_api_param_size(wqe, 1),
             /* kind */ cudaMemcpyHostToDevice,
-            /* stream */ stream_handle->server_addr
+            /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -332,31 +344,34 @@ namespace cuda_memcpy_d2h_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle *memory_handle, *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
+        memory_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        stream_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ wqe->api_cxt->ret_data,
-            /* src */ memory_handle_view.handle->server_addr,
+            /* src */ memory_handle->server_addr,
             /* count */ pos_api_param_value(wqe, 1, uint64_t),
             /* kind */ cudaMemcpyDeviceToHost,
-            /* stream */ stream_handle->server_addr
+            /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
         /*! \note   we must synchronize this api under remoting */
-        wqe->api_cxt->return_code = cudaStreamSynchronize(stream_handle->server_addr);
+        wqe->api_cxt->return_code = cudaStreamSynchronize(
+            (cudaStream_t)(stream_handle->server_addr)
+        );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -375,29 +390,32 @@ namespace cuda_memcpy_d2d_async {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle *dst_memory_handle, *src_memory_handle, *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &dst_memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 0);
-        POSHandleView_t &src_memory_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Memory, 1);
+        dst_memory_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(dst_memory_handle);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        src_memory_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(src_memory_handle);
+
+        stream_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
-            /* dst */ dst_memory_handle_view.handle->server_addr,
-            /* src */ src_memory_handle_view.handle->server_addr,
+            /* dst */ dst_memory_handle->server_addr,
+            /* src */ src_memory_handle->server_addr,
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* kind */ cudaMemcpyDeviceToDevice,
-            /* stream */ stream_handle->server_addr
+            /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -421,15 +439,15 @@ namespace cuda_set_device {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
+        device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
         POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cudaSetDevice(device_handle->device_id);
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
         return retval;
@@ -470,7 +488,7 @@ namespace cuda_get_error_string {
 
         wqe->api_cxt->return_code = cudaSuccess;
 
-        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        POSWorker::__done(ws, wqe);
         
         return POS_SUCCESS;
     }
@@ -487,7 +505,7 @@ namespace cuda_get_device_count {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         // TODO: we launch this op for debug?
-        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        POSWorker::__done(ws, wqe);
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device_count
@@ -509,7 +527,7 @@ namespace cuda_get_device_properties {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
+        device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
         POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cudaGetDeviceProperties(
@@ -518,9 +536,9 @@ namespace cuda_get_device_properties {
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -539,7 +557,7 @@ namespace cuda_get_device {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         // TODO: we launch this op for debug?
-        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        POSWorker::__done(ws, wqe);
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device
@@ -555,20 +573,22 @@ namespace cuda_stream_synchronize {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
+        stream_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(stream_handle);
 
-        wqe->api_cxt->return_code = cudaStreamSynchronize(stream_handle->server_addr);
+        wqe->api_cxt->return_code = cudaStreamSynchronize(
+            (cudaStream_t)(stream_handle->server_addr)
+        );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
         return retval;
@@ -602,7 +622,7 @@ namespace cuda_stream_is_capturing {
         // return retval;
 
         // we launch this op just for debug
-        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        POSWorker::__done(ws, wqe);
 
         return POS_SUCCESS;
     }
@@ -632,16 +652,16 @@ namespace cuda_event_create_with_flags {
 
         // record server address
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            event_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Event, 0);
+            event_handle = pos_api_create_handle(wqe, 0);
             POS_CHECK_POINTER(event_handle);
             event_handle->set_server_addr(ptr);
             event_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -660,24 +680,26 @@ namespace cuda_event_destory {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *event_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &event_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Event, 0);
+        event_handle = pos_api_delete_handle(wqe, 0);
+        POS_CHECK_POINTER(event_handle);
 
         wqe->api_cxt->return_code = cudaEventDestroy(
-            /* event */ event_handle_view.handle->server_addr
+            /* event */ (cudaEvent_t)(event_handle->server_addr)
         );
 
         if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            event_handle_view.handle->mark_status(kPOS_HandleStatus_Deleted);
+            event_handle->mark_status(kPOS_HandleStatus_Deleted);
         }
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -696,24 +718,25 @@ namespace cuda_event_record {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
+        POSHandle *event_handle, *stream_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        POSHandleView_t &event_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Event, 0);
-        POS_CHECK_POINTER(event_handle_view.handle);
-        POSHandleView_t &stream_handle_view = pos_api_handle_view(wqe, kPOS_ResourceTypeId_CUDA_Stream, 0);
-        POS_CHECK_POINTER(stream_handle_view.handle);
+        event_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(event_handle);
+        stream_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaEventRecord(
-            /* event */ event_handle_view.handle->server_addr,
-            /* stream */ stream_handle_view.handle->server_addr
+            /* event */ (cudaEvent_t)(event_handle->server_addr),
+            /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:

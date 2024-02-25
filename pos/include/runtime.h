@@ -16,29 +16,17 @@
 #include "pos/include/api_context.h"
 #include "pos/include/workspace.h"
 
-// /*!
-//  *  \brief  pre-declaration
-//  */
-// template<class T_POSTransport, class T_POSClient>
-// class POSWorkspace;
 
 /*!
  *  \brief prototype for parser function for each API call
  */
-template<class T_POSTransport, class T_POSClient>
-using pos_runtime_parser_function_t = pos_retval_t(*)(
-    POSWorkspace<T_POSTransport, T_POSClient>*, POSAPIContext_QE*
-);
+using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
 
 /*!
  *  \brief  macro for the definition of the runtime parser functions
  */
-#define POS_RT_FUNC_PARSER()                                \
-template<class T_POSTransport, class T_POSClient>           \
-pos_retval_t parse(                                         \
-    POSWorkspace<T_POSTransport, T_POSClient>* ws,          \
-    POSAPIContext_QE* wqe                                   \
-)
+#define POS_RT_FUNC_PARSER()                                    \
+    pos_retval_t parse(POSWorkspace* ws, POSAPIContext_QE* wqe)
 
 namespace rt_functions {
 #define POS_RT_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
@@ -49,16 +37,15 @@ namespace rt_functions {
  *  \note   1. Parser:      parsing each API call, translate virtual handles to physicall handles;
  *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
  */
-template<class T_POSTransport, class T_POSClient>
 class POSRuntime {
  public:
-    POSRuntime(POSWorkspace<T_POSTransport, T_POSClient>* ws) : _ws(ws), _stop_flag(false) {   
+    POSRuntime(POSWorkspace* ws) : _ws(ws), _stop_flag(false) {   
         int rc;
 
         this->checkpoint_interval_tick = ((double)POS_CKPT_INTERVAL / 1000.f) * (double)(POS_TSC_FREQ);
 
         // start daemon thread
-        _daemon_thread = new std::thread(&daemon, this);
+        _daemon_thread = new std::thread(&POSRuntime::daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
 
         POS_LOG_C(
@@ -107,10 +94,10 @@ class POSRuntime {
     std::thread *_daemon_thread;
 
     // global workspace
-    POSWorkspace<T_POSTransport, T_POSClient>* _ws;
+    POSWorkspace *_ws;
 
     // parser function map
-    std::map<uint64_t, pos_runtime_parser_function_t<T_POSTransport, T_POSClient>> _parser_functions;
+    std::map<uint64_t, pos_runtime_parser_function_t> _parser_functions;
     
     // intervals between two checkpoint ops
     uint64_t checkpoint_interval_tick;

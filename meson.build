@@ -41,7 +41,7 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 2
+ckpt_opt_level = 0
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
@@ -129,11 +129,17 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += ['pos/src/handle.cpp', 'pos/src/config.cpp']
+sources += ['pos/src/handle.cpp', 'pos/src/config.cpp', 'pos/src/oob.cpp']
 if target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',
-        'pos/cuda_impl/utils/fatbin.cpp'
+        'pos/cuda_impl/utils/fatbin.cpp',
+        'pos/cuda_impl/parser/cublas.cpp',
+        'pos/cuda_impl/parser/cuda_driver.cpp',
+        'pos/cuda_impl/parser/cuda_runtime.cpp',
+        'pos/cuda_impl/worker/cublas.cpp',
+        'pos/cuda_impl/worker/cuda_driver.cpp',
+        'pos/cuda_impl/worker/cuda_runtime.cpp'
     ]
 else
     assert(false, 'target ' + target + ' is currently not supported')
@@ -150,16 +156,20 @@ message('>>>>>> Link option:')
 message(libclang_ld_args)
 message('>>>>>> Include path:')
 message(libclang_inc_dirs)
+ld_args += libclang_ld_args
+inc_dirs += libclang_inc_dirs
 message('>>> Setup libclang done\n')
 
-message('>>> Setup hiredis')
-hiredis_ld_args = ['-lhiredis']
-hiredis_inc_dirs = ['./third_party/hiredis']
-message('>>>>>> Link option:')
-message(hiredis_ld_args)
-message('>>>>>> Include path:')
-message(hiredis_inc_dirs)
-message('>>> Setup hiredis done\n')
+# message('>>> Setup hiredis')
+# hiredis_ld_args = ['-lhiredis']
+# hiredis_inc_dirs = ['./third_party/hiredis']
+# message('>>>>>> Link option:')
+# message(hiredis_ld_args)
+# message('>>>>>> Include path:')
+# message(hiredis_inc_dirs)
+# ld_args += hiredis_ld_args
+# inc_dirs += hiredis_inc_dirs
+# message('>>> Setup hiredis done\n')
 
 message('>>> Setup libevent')
 libevent_ld_args = ['-levent']
@@ -168,10 +178,28 @@ message('>>>>>> Link option:')
 message(libevent_ld_args)
 message('>>>>>> Include path:')
 message(libevent_inc_dirs)
+ld_args += libevent_ld_args
+inc_dirs += libevent_inc_dirs
 message('>>> Setup libevent done\n')
 
-ld_args += libclang_ld_args + hiredis_ld_args + libevent_ld_args
-inc_dirs += libclang_inc_dirs + hiredis_inc_dirs + libevent_inc_dirs
+message('>>> Setup librt') # for support shm_x
+ld_args += ['-lrt']
+message('>>> Setup librt done\n')
+
+message('>>> Setup pthread') # for support pthread_x
+ld_args += ['-pthread']
+message('>>> Setup pthread done\n')
+
+message('>>> Setup libelf') # for support elf_x
+ld_args += ['-lelf']
+message('>>> Setup libelf done\n')
+
+# message('>>> Setup boost')
+# boost_dep = dependency('boost')
+# deps += boost_dep
+# message('>>> Setup boost done\n')
+
+
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>

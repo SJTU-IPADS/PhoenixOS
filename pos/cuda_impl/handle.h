@@ -212,6 +212,8 @@ class POSHandle_CUDA_Function : public POSHandle {
     // name of the kernel
     std::shared_ptr<char[]> name;
 
+    std::string signature;
+
     // number of parameters within this function
     uint32_t nb_params;
 
@@ -230,6 +232,13 @@ class POSHandle_CUDA_Function : public POSHandle {
     // index of those non-pointer parameters that may carry pointer inside their values
     std::vector<uint32_t> suspicious_params;
     bool has_verified_params;
+
+    /*!
+     *  \brief  confirmed suspicious parameters: index of the parameter -> offset from the base address
+     *  \note   the structure might contains multiple pointers, so we use vector of pairs instead of 
+     *          map to store these relationships
+     */
+    std::vector<std::pair<uint32_t,uint64_t>> confirmed_suspicious_params;
 
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
@@ -650,7 +659,9 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
             std::vector<uint32_t> input_pointer_params;
             std::vector<uint32_t> output_pointer_params;
             std::vector<uint32_t> suspicious_params;
-            uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_suspicious_params;
+            std::vector<std::pair<uint32_t,uint64_t>> confirmed_suspicious_params;
+            bool confirmed;
+            uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_suspicious_params, nb_inout_params, has_verified_params;
             uint64_t ptr;
 
             POSCudaFunctionDesp_t *new_desp = new POSCudaFunctionDesp_t();
@@ -668,16 +679,16 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
             // offset of each parameter
             for(i=0; i<new_desp->nb_params; i++){
-                param_offsets.push_back(std::stoul(metas[ptr+i]));
-                ptr++;
+                param_offsets.push_back(std::stoul(metas[ptr+i]));   
             }
+            ptr += new_desp->nb_params;
             new_desp->param_offsets = param_offsets;
 
             // size of each parameter
             for(i=0; i<new_desp->nb_params; i++){
                 param_sizes.push_back(std::stoul(metas[ptr+i]));
-                ptr++;
             }
+            ptr += new_desp->nb_params;
             new_desp->param_sizes = param_sizes;
 
             // index of those parameter which is a input pointer (const pointer)
@@ -685,27 +696,45 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
             ptr++;
             for(i=0; i<nb_input_pointer_params; i++){
                 input_pointer_params.push_back(std::stoul(metas[ptr+i]));
-                ptr++;
             }
+            ptr += nb_input_pointer_params;
             new_desp->input_pointer_params = input_pointer_params;
 
-            // size of each parameter
+            // index of those parameter which is a output pointer (non-const pointer)
             nb_output_pointer_params = std::stoul(metas[ptr]);
             ptr++;
             for(i=0; i<nb_output_pointer_params; i++){
                 output_pointer_params.push_back(std::stoul(metas[ptr+i]));
-                ptr++;
             }
+            ptr += nb_output_pointer_params;
             new_desp->output_pointer_params = output_pointer_params;
 
-            // size of each parameter
+            // index of those parameter which is a output pointer (non-const pointer)
             nb_suspicious_params = std::stoul(metas[ptr]);
             ptr++;
             for(i=0; i<nb_suspicious_params; i++){
                 suspicious_params.push_back(std::stoul(metas[ptr+i]));
-                ptr++;
             }
+            ptr += nb_suspicious_params;
             new_desp->suspicious_params = suspicious_params;
+
+            // has verified suspicious paramters
+            has_verified_params = std::stoul(metas[ptr]);
+            ptr++;
+            new_desp->has_verified_params = has_verified_params;
+
+            if(has_verified_params == 1){
+                // index of those parameter which is a structure (contains pointers)
+                nb_inout_params = std::stoul(metas[ptr]);
+                ptr++;
+                for(i=0; i<nb_inout_params; i++){
+                    confirmed_suspicious_params.push_back({
+                        /* param_index */ std::stoul(metas[ptr+2*i]), /* offset */ std::stoul(metas[ptr+2*i+1])
+                    });
+                }
+                ptr += nb_inout_params;
+                new_desp->confirmed_suspicious_params = confirmed_suspicious_params;
+            }
 
             // cbank parameter size (p.s., what is this?)
             new_desp->cbank_param_size = std::stoul(metas[ptr].c_str());
@@ -715,9 +744,9 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
         std::ifstream file(file_path.c_str(), std::ios::in);
         if(likely(file.is_open())){
+            POS_LOG("parsing cached kernel metas from file %s...", i, file_path.c_str());
             i = 0;
             while (std::getline(file, line)) {
-                POS_LOG("line: %s", line.c_str());
                 // split by ","
                 std::stringstream ss(line);
                 std::string segment;
@@ -730,7 +759,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
                 i++;
             }
-            POS_LOG("parse %lu of cached kernel metas from file %s", i, file_path.c_str());
+            POS_LOG("parsed %lu of cached kernel metas from file %s", i, file_path.c_str());
             file.close();
         } else {
             retval = POS_FAILED_NOT_EXIST;
@@ -794,6 +823,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
  *  \brief   manager for handles of POSHandle_CUDA_Var
  */
 class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
+ public:
     /*!
      *  \brief  allocate new mocked CUDA var within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
@@ -1046,7 +1076,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device *device;
+        POSHandle *device_handle;
 
         POS_CHECK_POINTER(handle);
 
@@ -1059,7 +1089,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         }
     #endif
     
-        device = related_handles[kPOS_ResourceTypeId_CUDA_Device][0];
+        device_handle = related_handles[kPOS_ResourceTypeId_CUDA_Device][0];
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
@@ -1067,7 +1097,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
             goto exit;
         }
 
-        (*handle)->record_parent_handle(device);
+        (*handle)->record_parent_handle(device_handle);
 
     exit:
         return retval;

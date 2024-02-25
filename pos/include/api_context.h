@@ -208,9 +208,6 @@ typedef struct POSHandleView {
     // pointer to the used handle
     POSHandle *handle;
 
-    // direction to use this handle
-    pos_edge_direction_t dir;
-
     /*!
      *  \brief      index of the corresponding parameter of this handle view
      *  \example    for API such as launchKernel, we need to know which parameter this handle 
@@ -235,8 +232,8 @@ typedef struct POSHandleView {
      *  \param  offset_             offset from the base address of the handle
      */
     POSHandleView(
-        POSHandle* handle_, pos_edge_direction_t dir_, uint64_t param_index_ = 0, uint64_t offset_ = 0
-    ) : handle(handle_), dir(dir_), param_index(param_index_), offset(offset_){}
+        POSHandle* handle_, uint64_t param_index_ = 0, uint64_t offset_ = 0
+    ) : handle(handle_), param_index(param_index_), offset(offset_){}
 } POSHandleView_t;
 
 /*!
@@ -266,7 +263,11 @@ typedef struct POSAPIContext_QE {
     pos_vertex_id_t dag_vertex_id;
 
     // all involved handle during the processing of this API instance
-    std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*> handle_view_map;
+    std::vector<POSHandleView_t> input_handle_views;
+    std::vector<POSHandleView_t> output_handle_views;
+    std::vector<POSHandleView_t> create_handle_views;
+    std::vector<POSHandleView_t> delete_handle_views;
+    std::vector<POSHandleView_t> inout_handle_views;
 
     // flatten recording of involved handles of this wqe (to accelerate launch_op)
     POSNeighborMap_t flat_neighbor_map;
@@ -280,9 +281,11 @@ typedef struct POSAPIContext_QE {
     /* =========== checkpoint op specific fields =========== */
     // number of handles this checkpoint op checkpointed
     uint64_t nb_ckpt_handles;
+    uint64_t nb_abandon_handles;
 
     // size of state this checkpoint op checkpointed
     uint64_t ckpt_size;
+    uint64_t abandon_ckpt_size;
 
     // checkpoint memory consumption after this checkpoint op
     uint64_t ckpt_memory_consumption;
@@ -316,8 +319,17 @@ typedef struct POSAPIContext_QE {
 
         // initialization of checkpoint op specific fields
         nb_ckpt_handles = 0;
+        nb_abandon_handles = 0;
         ckpt_size = 0;
+        abandon_ckpt_size = 0;
         ckpt_memory_consumption = 0;
+
+        // reserve space
+        input_handle_views.reserve(5);
+        output_handle_views.reserve(5);
+        create_handle_views.reserve(1);
+        delete_handle_views.reserve(1);
+        inout_handle_views.reserve(2);
     }
     
     /*!
@@ -335,16 +347,7 @@ typedef struct POSAPIContext_QE {
      *  \brief  deconstructor
      */
     ~POSAPIContext_QE(){
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter;
-        for(iter = handle_view_map.begin(); iter != handle_view_map.end(); iter++){
-            if(likely(iter->second != nullptr)){ delete iter->second; }
-        }
-
-        // we debug here to make sure the POSAPIContext_QE is released on time, avoiding memory leak
-        // POS_DEBUG_C(
-        //     "released: client_id(%lu), api_inst_id(%lu), api_id(%lu)",
-        //     client_id, api_inst_id, api_cxt->api_id
-        // );
+        // TODO: release handle views
     }
 
     /*!
@@ -352,29 +355,19 @@ typedef struct POSAPIContext_QE {
      *  \param  id              type id of the involved handle
      *  \param  handle_view     view of the API instance to use this handle
      */
-    inline void record_handle(pos_resource_typeid_t id, POSHandleView_t handle_view){
-        std::vector<POSHandleView_t>* dst_handle_vec;
-        uint64_t s_tick, e_tick;
-        // s_tick = POSUtilTimestamp::get_tsc();
-
-        if(unlikely(handle_view_map.count(id) == 0)){
-            dst_handle_vec = new std::vector<POSHandleView_t>();
-            POS_CHECK_POINTER(dst_handle_vec);
-            dst_handle_vec->reserve(5);
-            handle_view_map[id] = dst_handle_vec;
-        } else {
-            dst_handle_vec = handle_view_map[id];
+    template<pos_edge_direction_t dir>
+    inline void record_handle(POSHandleView_t&& handle_view){
+        if constexpr (dir == kPOS_Edge_Direction_In){
+            input_handle_views.emplace_back(handle_view);
+        } else if (dir == kPOS_Edge_Direction_Out){
+            output_handle_views.emplace_back(handle_view);
+        } else if (dir == kPOS_Edge_Direction_Create){
+            create_handle_views.emplace_back(handle_view);
+        } else if (dir == kPOS_Edge_Direction_Delete){
+            delete_handle_views.emplace_back(handle_view);
+        } else { // inout
+            inout_handle_views.emplace_back(handle_view);
         }
-
-        dst_handle_vec->push_back(handle_view);
-
-        /*!
-         *  \note  we also record the handle in the flatten map to accelerate the launch_op process of DAG
-         */
-        flat_neighbor_map[handle_view.handle->dag_vertex_id] = handle_view.dir;
-       
-        // e_tick = POSUtilTimestamp::get_tsc();
-        // POS_LOG("inner duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
     }
 
     /*!
@@ -392,29 +385,22 @@ typedef struct POSAPIContext_QE {
      *  \param  handles pointer to a list that stores the results
      */
     inline void get_handles_by_dir(pos_edge_direction_t dir, std::vector<POSHandle*> *handles){
-        uint64_t i;
-        std::vector<POSHandleView_t>* vecs;
-        typename std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator iter;
-
-        POS_CHECK_POINTER(handles);
-
-        for(iter=handle_view_map.begin(); iter!=handle_view_map.end(); iter++){
-            POS_CHECK_POINTER(vecs = iter->second);
-            for(i=0; i<vecs->size(); i++){
-                if((*vecs)[i].dir == dir){
-                    handles->push_back(((*vecs)[i]).handle);
-                }
-            }
-        }
+        POS_ERROR_C_DETAIL("not implemented");
     }
 
 } POSAPIContext_QE_t;
 
-#define pos_api_handle(qe_ptr, typeid, index)                                   \
-    (((*(qe_ptr->handle_view_map[typeid]))[index]).handle)
+#define pos_api_output_handle(qe_ptr, index)            \
+    (qe_ptr->output_handle_views[index].handle)
 
-#define pos_api_typed_handle(qe_ptr, typeid, cast_type, index)                  \
-    (cast_type*)(pos_api_handle(qe_ptr, typeid, index))
+#define pos_api_input_handle(qe_ptr, index)             \
+    (qe_ptr->input_handle_views[index].handle)
 
-#define pos_api_handle_view(qe_ptr, typeid, index)                              \
-    ((*(qe_ptr->handle_view_map[typeid]))[index])
+#define pos_api_create_handle(qe_ptr, index)            \
+    (qe_ptr->create_handle_views[index].handle)
+
+#define pos_api_delete_handle(qe_ptr, index)            \
+    (qe_ptr->delete_handle_views[index].handle)
+
+#define pos_api_inout_handle(qe_ptr, index)            \
+    (qe_ptr->inout_handle_views[index].handle)

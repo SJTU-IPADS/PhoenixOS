@@ -53,11 +53,9 @@ namespace rt_functions {
  *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
  *          3. Scheduler:   launch unfinished / previously-failed call to worker
  */
-template<class T_POSTransport>
-class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
+class POSRuntime_CUDA : public POSRuntime {
  public:
-    POSRuntime_CUDA(POSWorkspace<T_POSTransport, POSClient_CUDA>* ws)
-        : POSRuntime<T_POSTransport, POSClient_CUDA>(ws){}
+    POSRuntime_CUDA(POSWorkspace* ws) : POSRuntime(ws){}
     ~POSRuntime_CUDA() = default;
 
  private:
@@ -135,8 +133,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
 
         ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
-            /* client */ wqe->client,
-            /* dag_vertex_id_ */ wqe->dag_vertex_id
+            /* client */ wqe->client
         );
         POS_CHECK_POINTER(ckpt_wqe);
         retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
@@ -173,7 +170,7 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
          *  \note   we only checkpoint those resources that has been modified since last checkpoint
          */
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
             std::set<POSHandle*>& modified_handles = hm->get_modified_handles();
             if(likely(modified_handles.size() > 0)){
@@ -203,5 +200,3 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
         #endif
     }
 };
-
-#include "pos/cuda_impl/runtime/base.h"

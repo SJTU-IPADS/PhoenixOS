@@ -86,7 +86,7 @@ class POSBipartiteGraph {
             POS_CHECK_POINTER(reserved_vertex_t2);
             _t2s.push_back(reserved_vertex_t2);
         }
-        POS_LOG("pos bipartite graph prefill done");
+        POS_DEBUG("pos bipartite graph prefill done");
     }
 
     ~POSBipartiteGraph(){
@@ -164,26 +164,24 @@ class POSBipartiteGraph {
         } else { // T2
             *id = max_t2_id; max_t2_id += 1;
         }
-
         
-
         // s_tick = POSUtilTimestamp::get_tsc();
 
         // add neighbor topology to corresponding list
         if(unlikely(*id >= kPOSBG_PREFILL_SIZE)){
-            POS_CHECK_POINTER(new_topo_map = new POSNeighborMap_t());
+            // POS_CHECK_POINTER(new_topo_map = new POSNeighborMap_t());
             POS_CHECK_POINTER(new_vertex = new POSBgVertex_t<T>());
         } else {
             if constexpr (std::is_same_v<T, T1>){ 
-                POS_CHECK_POINTER(new_topo_map = _topo_t1_cache[*id]);    
+                // POS_CHECK_POINTER(new_topo_map = _topo_t1_cache[*id]);    
                 POS_CHECK_POINTER(new_vertex = _t1s[*id]);
             } else { 
-                POS_CHECK_POINTER(new_topo_map = _topo[*id]); 
+                // POS_CHECK_POINTER(new_topo_map = _topo[*id]); 
                 POS_CHECK_POINTER(new_vertex = _t2s[*id]);
             }
         }
-        new_topo_map->insert(neighbor.begin(), neighbor.end());
-        new_vertex->data = data;
+        // new_topo_map->insert(neighbor.begin(), neighbor.end());
+        new_vertex->data = (T*)data;
         new_vertex->id = *id;
         
         // e_tick = POSUtilTimestamp::get_tsc();
@@ -195,10 +193,10 @@ class POSBipartiteGraph {
         if(unlikely(*id >= kPOSBG_PREFILL_SIZE)){
             if constexpr (std::is_same_v<T, T1>){
                 _t1s.push_back(new_vertex);
-                _topo_t1_cache[*id] = new_topo_map;
+                // _topo_t1_cache[*id] = new_topo_map;
             } else { // T2
                 _t2s.push_back(new_vertex);
-                _topo[*id] = new_topo_map;
+                // _topo[*id] = new_topo_map;
             }
         }
 

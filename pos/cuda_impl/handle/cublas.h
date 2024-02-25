@@ -56,6 +56,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
  *  \brief   manager for handles of POSHandle_cuBLAS_Context
  */
 class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS_Context> {
+ public:
     /*!
      *  \brief  allocate new mocked cuBLAS context within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
@@ -75,7 +76,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Context *context_handle;
+        POSHandle *context_handle;
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer

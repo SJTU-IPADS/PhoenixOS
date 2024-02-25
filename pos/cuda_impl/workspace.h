@@ -13,10 +13,9 @@
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/api_context.h"
 
-template<class T_POSTransport>
-class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
+class POSWorkspace_CUDA : public POSWorkspace{
  public:
-    POSWorkspace_CUDA(int argc, char *argv[]) : POSWorkspace<T_POSTransport, POSClient_CUDA>(argc, argv){
+    POSWorkspace_CUDA(int argc, char *argv[]) : POSWorkspace(argc, argv){
         this->checkpoint_api_id = 6666;
     }
 
@@ -28,12 +27,12 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
      */
     pos_retval_t init() override {
         // create runtime
-        this->runtime = new POSRuntime_CUDA<T_POSTransport>(/* ws */ this);
+        this->runtime = new POSRuntime_CUDA(/* ws */ this);
         POS_CHECK_POINTER(this->runtime);
         this->runtime->init();
 
         // create worker
-        this->worker = new POSWorker_CUDA<T_POSTransport>( /* ws */ this );
+        this->worker = new POSWorker_CUDA( /* ws */ this );
         POS_CHECK_POINTER(this->worker);
         this->worker->init();
 
