@@ -6,7 +6,7 @@
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
 #include "pos/include/transport.h"
-#include "pos/include/runtime.h"
+#include "pos/include/parser.h"
 #include "pos/cuda_impl/client.h"
 
 #include "pos/cuda_impl/api_index.h"
@@ -53,10 +53,10 @@ namespace rt_functions {
  *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
  *          3. Scheduler:   launch unfinished / previously-failed call to worker
  */
-class POSRuntime_CUDA : public POSRuntime {
+class POSParser_CUDA : public POSParser {
  public:
-    POSRuntime_CUDA(POSWorkspace* ws) : POSRuntime(ws){}
-    ~POSRuntime_CUDA() = default;
+    POSParser_CUDA(POSWorkspace* ws) : POSParser(ws){}
+    ~POSParser_CUDA() = default;
 
  private:
     /*!
@@ -191,9 +191,7 @@ class POSRuntime_CUDA : public POSRuntime {
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {
-        #if POS_CKPT_OPT_LEVAL == 1
-            return __checkpoint_insertion_o1_o2(wqe);
-        #elif POS_CKPT_OPT_LEVAL == 2
+        #if POS_CKPT_OPT_LEVAL == 1 || POS_CKPT_OPT_LEVAL == 2
             return __checkpoint_insertion_o1_o2(wqe);
         #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;

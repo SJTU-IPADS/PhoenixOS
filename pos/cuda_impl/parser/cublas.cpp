@@ -7,7 +7,7 @@
 #include "pos/include/dag.h"
 
 #include "pos/cuda_impl/handle.h"
-#include "pos/cuda_impl/runtime.h"
+#include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_context.h"
 #include "pos/cuda_impl/utils/fatbin.h"

@@ -33,7 +33,7 @@ enum pos_queue_type_t : uint8_t {
 
 class POSWorker;
 
-class POSRuntime;
+class POSParser;
 
 /*!
  * \brief   base workspace of PhoenixOS
@@ -558,7 +558,7 @@ class POSWorkspace {
     std::vector<uint64_t> stateful_handle_type_idx;
 
     // pos runtime
-    POSRuntime *runtime;
+    POSParser *runtime;
 
     // pos worker
     POSWorker *worker;

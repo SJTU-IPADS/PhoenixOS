@@ -47,8 +47,8 @@ static std::string demangle(const char* name) {
 
 #if POS_PRINT_ERROR
 /*!
-    * \brief   print error message (internal-used)
-    */
+ * \brief   print error message (internal-used)
+ */
 #define _POS_ERROR(...)                                         \
 {                                                               \
 if constexpr(POS_PRINT_WITH_COLOR)                              \

@@ -5,10 +5,10 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/workspace.h"
-#include "pos/include/runtime.h"
+#include "pos/include/parser.h"
 
 #include "pos/cuda_impl/client.h"
-#include "pos/cuda_impl/runtime.h"
+#include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/worker.h"
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/api_context.h"
@@ -27,7 +27,7 @@ class POSWorkspace_CUDA : public POSWorkspace{
      */
     pos_retval_t init() override {
         // create runtime
-        this->runtime = new POSRuntime_CUDA(/* ws */ this);
+        this->runtime = new POSParser_CUDA(/* ws */ this);
         POS_CHECK_POINTER(this->runtime);
         this->runtime->init();
 

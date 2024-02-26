@@ -33,19 +33,17 @@ namespace rt_functions {
 };  // namespace rt_functions
 
 /*!
- *  \brief  POS Runtime
- *  \note   1. Parser:      parsing each API call, translate virtual handles to physicall handles;
- *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
+ *  \brief  POS Parser
  */
-class POSRuntime {
+class POSParser {
  public:
-    POSRuntime(POSWorkspace* ws) : _ws(ws), _stop_flag(false) {   
+    POSParser(POSWorkspace* ws) : _ws(ws), _stop_flag(false) {   
         int rc;
 
         this->checkpoint_interval_tick = ((double)POS_CKPT_INTERVAL / 1000.f) * (double)(POS_TSC_FREQ);
 
         // start daemon thread
-        _daemon_thread = new std::thread(&POSRuntime::daemon, this);
+        _daemon_thread = new std::thread(&POSParser::daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
 
         POS_LOG_C(
@@ -59,7 +57,7 @@ class POSRuntime {
     /*!
      *  \brief  deconstructor
      */
-    ~POSRuntime(){ shutdown(); }
+    ~POSParser(){ shutdown(); }
     
     /*!
      *  \brief  function insertion
@@ -167,7 +165,6 @@ class POSRuntime {
                     goto checkpoint_entrance;
                 }
                 
-
                 /*!
                  *  \note       for api in type of Delete_Resource, one can directly send
                  *              response to the client right after operating on mocked resources
