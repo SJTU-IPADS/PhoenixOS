@@ -127,6 +127,36 @@ class POSCheckpointBag {
         return retval;
     }
 
+    /*!
+     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
+     *          (used by async checkpoint)
+     *  \return POS_SUCCESS for successfully invalidate
+     *          POS_NOT_READY for no checkpoint had been record
+     */
+    inline pos_retval_t invalidate_latest_checkpoint() {
+        pos_retval_t retval = POS_SUCCESS;
+        void *data;
+        uint64_t version, size;
+
+        // check whether checkpoint exit
+        retval = get_latest_checkpoint(&data, version, size);
+        if(POS_SUCCESS != retval){
+            goto exit;
+        }
+
+        // invalidate checkpoint by reset its version
+        if(_use_front){
+            POS_ASSERT(version == _back_version);
+            _back_version = 0;
+        } else { // _use_front == false
+            POS_ASSERT(version == _front_version);
+            _front_version = 0;
+        }
+
+    exit:
+        return retval;
+    }
+
  private:
     // indicate which checkpoint slot to use (front / back)
     bool _use_front;

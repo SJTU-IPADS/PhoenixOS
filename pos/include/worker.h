@@ -209,7 +209,7 @@ class POSWorker {
                         // check whether the previous checkpoint has finished, 
                         // abandon this checkpoint if it's
                         if(unlikely(ckpt_cxt.is_active == true)){
-                            // we need to cache those handles that need to be checkpointed
+                            // TODO: we need to cache those handles that need to be checkpointed
                             goto ckpt_finished;
                         }
                         
@@ -252,6 +252,10 @@ class POSWorker {
                 #endif
 
                     // invalidate handles
+                    for(auto &inout_handle_view : wqe->inout_handle_views){
+                        ckpt_cxt.invalidated_handles.push_back(inout_handle_view.handle);
+                    }
+
                     for(auto &output_handle_view : wqe->output_handle_views){
                         ckpt_cxt.invalidated_handles.push_back(output_handle_view.handle);
                     }

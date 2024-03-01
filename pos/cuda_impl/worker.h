@@ -243,15 +243,13 @@ class POSWorker_CUDA : public POSWorker {
                     /* version_id */ wqe->dag_vertex_id,
                     /* stream_id */ (uint64_t)(_ckpt_stream)
                 );
-                if(unlikely(POS_SUCCESS != retval)){
-                    POS_WARN_C("failed to checkpoint handle");
-                    retval = POS_FAILED;
-                    goto exit;
-                }
+                POS_ASSERT(retval == POS_SUCCESS);
 
                 if(unlikely(
                     std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
                 )){
+                    retval = handle->invalidate_latest_checkpoint();
+                    POS_ASSERT(retval == POS_SUCCESS);
                     wqe->nb_abandon_handles += 1;
                     wqe->abandon_ckpt_size += handle->state_size;
                 } else {

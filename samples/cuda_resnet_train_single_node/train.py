@@ -6,7 +6,7 @@ import torch.optim as optim
 from utils.readData import read_dataset
 from utils.ResNet import ResNet50
 import time
-import nvtx
+# import nvtx
 
 torch.backends.cudnn.enabled = False
 
@@ -71,6 +71,7 @@ for epoch in tqdm(range(1, n_epochs+1)):
         __nvtx_pop(rng_fwd)
 
         # NOTE: comment out to mock inference
+        # TODO: use nsight system to see whether this part has multi-threads
         rng_bwd = __nvtx_push(message=f"backward", color="green")
         optimizer.zero_grad()
         loss = criterion(output, target)

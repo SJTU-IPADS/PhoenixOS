@@ -309,6 +309,16 @@ class POSHandle {
     }
 
     /*!
+     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
+     *          (used by async checkpoint)
+     *  \return POS_SUCCESS for successfully invalidate
+     *          POS_NOT_READY for no checkpoint had been record
+     */
+    virtual pos_retval_t invalidate_latest_checkpoint() {
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
      *  \brief  restore the current handle when it becomes broken status
      *  \return POS_SUCCESS for successfully restore
      */

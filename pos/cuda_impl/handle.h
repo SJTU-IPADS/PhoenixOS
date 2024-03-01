@@ -412,6 +412,16 @@ class POSHandle_CUDA_Memory : public POSHandle {
     }
 
     /*!
+     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
+     *          (used by async checkpoint)
+     *  \return POS_SUCCESS for successfully invalidate
+     *          POS_NOT_READY for no checkpoint had been record
+     */
+    pos_retval_t invalidate_latest_checkpoint() override {
+        return this->ckpt_bag->invalidate_latest_checkpoint();
+    }
+
+    /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
