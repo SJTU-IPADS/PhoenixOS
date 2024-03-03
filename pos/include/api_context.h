@@ -291,7 +291,9 @@ typedef struct POSAPIContext_QE {
     uint64_t ckpt_memory_consumption;
 
     // handles that will be checkpointed by this checkpoint op
-    std::map<pos_resource_typeid_t, std::set<POSHandle*>> checkpoint_handles;
+    // std::map<pos_resource_typeid_t, std::set<POSHandle*>> checkpoint_handles;
+    std::set<POSHandle*> checkpoint_handles;
+
     /* ======= end of checkpoint op specific fields ======== */
 
     /*!
@@ -376,7 +378,8 @@ typedef struct POSAPIContext_QE {
      *  \param  handle_set  sets of handles
      */
     inline void record_checkpoint_handles(pos_resource_typeid_t id, std::set<POSHandle*>& handle_set){
-        checkpoint_handles[id] = handle_set;
+        // TODO: fix here!!
+        checkpoint_handles.insert();
     }
 
     /*!

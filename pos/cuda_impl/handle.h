@@ -417,7 +417,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    pos_retval_t invalidate_latest_checkpoint() override {
+    pos_retval_t invalidate_latest_checkpoint() const override {
         return this->ckpt_bag->invalidate_latest_checkpoint();
     }
 

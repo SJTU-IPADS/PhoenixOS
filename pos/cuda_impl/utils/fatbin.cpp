@@ -166,7 +166,11 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& ke
                     if(clang_isConstQualifiedType(pointeeType)){ // constant pointer type
                         vm->function_desp->input_pointer_params.push_back(vm->param_index);
                     } else {
-                        vm->function_desp->output_pointer_params.push_back(vm->param_index);
+                        /*!
+                         *  \note   for non-const pointers, we need to classify them as non-const
+                         *          pointers, as they might also be read by the kernel
+                         */
+                        vm->function_desp->inout_pointer_params.push_back(vm->param_index);
                     }
                 }
                 vm->param_index += 1;

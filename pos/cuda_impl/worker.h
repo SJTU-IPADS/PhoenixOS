@@ -244,6 +244,23 @@ class POSWorker_CUDA : public POSWorker {
                     /* stream_id */ (uint64_t)(_ckpt_stream)
                 );
                 POS_ASSERT(retval == POS_SUCCESS);
+            }
+        }
+        
+        // make sure the checkpoint is finished
+        cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C("failed to synchronize after checkpointing");
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // invalidate conflict checkpoints
+        for(map_iter=wqe->checkpoint_handles.begin(); map_iter!=wqe->checkpoint_handles.end(); map_iter++){
+            std::set<POSHandle*>& target_set = map_iter->second;
+            for(set_iter=target_set.begin(); set_iter!=target_set.end(); set_iter++){
+                const POSHandle *handle = *set_iter;
+                POS_CHECK_POINTER(handle);
 
                 if(unlikely(
                     std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
@@ -257,14 +274,6 @@ class POSWorker_CUDA : public POSWorker {
                     wqe->ckpt_size += handle->state_size;
                 }
             }
-        }
-        
-        // make sure the checkpoint is finished
-        cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C("failed to synchronize after checkpointing");
-            retval = POS_FAILED;
-            goto exit;
         }
 
     exit:

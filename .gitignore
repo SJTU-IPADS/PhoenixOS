@@ -17,4 +17,6 @@
 **/env
 **/*.nsys-rep
 
+**/__pycache__
+
 remoting/cuda_old

@@ -314,7 +314,7 @@ class POSHandle {
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    virtual pos_retval_t invalidate_latest_checkpoint() {
+    virtual pos_retval_t invalidate_latest_checkpoint() const {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
