@@ -154,7 +154,7 @@ class POSWorker {
      */
     virtual void checkpoint_async_thread(checkpoint_async_cxt_t* cxt){
         POS_CHECK_POINTER(cxt);
-        POS_LOG("#checkpoint handles: %lu", cxt->wqe->checkpoint_handles[8].size());
+        POS_LOG("#checkpoint handles: %lu", cxt->wqe->checkpoint_handles.size());
         cxt->is_active = false;
     }
 
@@ -182,6 +182,7 @@ class POSWorker {
 
         std::thread *ckpt_thread = nullptr;
         checkpoint_async_cxt_t ckpt_cxt;
+        ckpt_cxt.is_active = false;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -206,12 +207,8 @@ class POSWorker {
                             goto ckpt_finished;
                         }
 
-                        // check whether the previous checkpoint has finished, 
-                        // abandon this checkpoint if it's
-                        if(unlikely(ckpt_cxt.is_active == true)){
-                            // TODO: we need to cache those handles that need to be checkpointed
-                            goto ckpt_finished;
-                        }
+                        // we need to wait until last checkpoint finished
+                        while(ckpt_cxt.is_active == true){}
                         
                         // start new checkpoint thread
                         ckpt_cxt.wqe = wqe;

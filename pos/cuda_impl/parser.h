@@ -174,8 +174,7 @@ class POSParser_CUDA : public POSParser {
             POS_CHECK_POINTER(hm);
             std::set<POSHandle*>& modified_handles = hm->get_modified_handles();
             if(likely(modified_handles.size() > 0)){
-                // TODO: buggy here
-                ckpt_wqe->record_checkpoint_handles(stateful_handle_id, modified_handles);
+                ckpt_wqe->record_checkpoint_handles(modified_handles);
             }
             hm->clear_modified_handle();
         }

@@ -162,26 +162,22 @@ class POSWorker_CUDA : public POSWorker {
         wqe->ckpt_size = 0;
         wqe->ckpt_memory_consumption = 0;
 
-        for(map_iter=wqe->checkpoint_handles.begin(); map_iter!=wqe->checkpoint_handles.end(); map_iter++){
-            std::set<POSHandle*>& target_set = map_iter->second;
+        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+            const POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
 
-            for(set_iter=target_set.begin(); set_iter!=target_set.end(); set_iter++){
-                const POSHandle *handle = *set_iter;
-                POS_CHECK_POINTER(handle);
-
-                retval = handle->checkpoint(
-                    /* version_id */ wqe->dag_vertex_id,
-                    /* stream_id */ 0
-                );
-                if(unlikely(POS_SUCCESS != retval)){
-                    POS_WARN_C("failed to checkpoint handle");
-                    retval = POS_FAILED;
-                    goto exit;
-                }
-
-                wqe->nb_ckpt_handles += 1;
-                wqe->ckpt_size += handle->state_size;
+            retval = handle->checkpoint(
+                /* version_id */ wqe->dag_vertex_id,
+                /* stream_id */ 0
+            );
+            if(unlikely(POS_SUCCESS != retval)){
+                POS_WARN_C("failed to checkpoint handle");
+                retval = POS_FAILED;
+                goto exit;
             }
+
+            wqe->nb_ckpt_handles += 1;
+            wqe->ckpt_size += handle->state_size;
         }
         
         // make sure the checkpoint is finished
@@ -231,20 +227,17 @@ class POSWorker_CUDA : public POSWorker {
         wqe->nb_ckpt_handles = 0;
         wqe->ckpt_size = 0;
         wqe->ckpt_memory_consumption = 0;
+        
+        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+            const POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
 
-        for(map_iter=wqe->checkpoint_handles.begin(); map_iter!=wqe->checkpoint_handles.end(); map_iter++){
-            std::set<POSHandle*>& target_set = map_iter->second;
+            retval = handle->checkpoint(
+                /* version_id */ wqe->dag_vertex_id,
+                /* stream_id */ (uint64_t)(_ckpt_stream)
+            );
 
-            for(set_iter=target_set.begin(); set_iter!=target_set.end(); set_iter++){
-                const POSHandle *handle = *set_iter;
-                POS_CHECK_POINTER(handle);
-
-                retval = handle->checkpoint(
-                    /* version_id */ wqe->dag_vertex_id,
-                    /* stream_id */ (uint64_t)(_ckpt_stream)
-                );
-                POS_ASSERT(retval == POS_SUCCESS);
-            }
+            POS_ASSERT(retval == POS_SUCCESS);
         }
         
         // make sure the checkpoint is finished
@@ -256,31 +249,30 @@ class POSWorker_CUDA : public POSWorker {
         }
 
         // invalidate conflict checkpoints
-        for(map_iter=wqe->checkpoint_handles.begin(); map_iter!=wqe->checkpoint_handles.end(); map_iter++){
-            std::set<POSHandle*>& target_set = map_iter->second;
-            for(set_iter=target_set.begin(); set_iter!=target_set.end(); set_iter++){
-                const POSHandle *handle = *set_iter;
-                POS_CHECK_POINTER(handle);
+        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+            const POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
 
-                if(unlikely(
-                    std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
-                )){
-                    retval = handle->invalidate_latest_checkpoint();
-                    POS_ASSERT(retval == POS_SUCCESS);
-                    wqe->nb_abandon_handles += 1;
-                    wqe->abandon_ckpt_size += handle->state_size;
-                } else {
-                    wqe->nb_ckpt_handles += 1;
-                    wqe->ckpt_size += handle->state_size;
-                }
+            if(unlikely(
+                std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
+            )){
+                retval = handle->invalidate_latest_checkpoint();
+                POS_ASSERT(retval == POS_SUCCESS);
+                wqe->nb_abandon_handles += 1;
+                wqe->abandon_ckpt_size += handle->state_size;
+            } else {
+                wqe->nb_ckpt_handles += 1;
+                wqe->ckpt_size += handle->state_size;
             }
+            
         }
-
-    exit:
+    
         POS_LOG(
             "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
             wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
         );
+
+    exit:
         cxt->is_active = false;
     }
 

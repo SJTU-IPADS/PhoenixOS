@@ -63,7 +63,10 @@ typedef struct POSCudaFunctionDesp {
     // index of those parameter which is a input pointer (const pointer)
     std::vector<uint32_t> input_pointer_params;
 
-    // index of those parameter which is a output pointer (non-const pointer)
+    // index of those parameter which is a inout pointer
+    std::vector<uint32_t> inout_pointer_params;
+
+    // index of those parameter which is a output pointer
     std::vector<uint32_t> output_pointer_params;
 
     // index of those non-pointer parameters that may carry pointer inside their values

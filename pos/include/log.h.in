@@ -67,12 +67,12 @@ fprintf(stdout, "\n");                                          \
 {                                                           \
 if constexpr(POS_PRINT_WITH_COLOR)                          \
     fprintf(stdout,                                         \
-        "\033[101m\033[97m POS Error \033[0m [%s @ %p]\n",  \
+        "\033[101m\033[97m POS Error \033[0m [%s @ %p]  ",  \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 else                                                        \
     fprintf(stdout,                                         \
-        "|-POS Error-| [%s @ %p]\n",                        \
+        "|-POS Error-| [%s @ %p]  ",                        \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 fprintf(stdout, __VA_ARGS__);                               \
@@ -153,12 +153,12 @@ fprintf(stdout, "\n");                                          \
 {                                                           \
 if constexpr(POS_PRINT_WITH_COLOR)                          \
     fprintf(stdout,                                         \
-        "\033[103m\033[97m POS Warn \033[0m [%s @ %p]\n",   \
+        "\033[103m\033[97m POS Warn \033[0m [%s @ %p]  ",   \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 else                                                        \
     fprintf(stdout,                                         \
-        "|-POS Warn-| [%s @ %p]\n",                         \
+        "|-POS Warn-| [%s @ %p]  ",                         \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 fprintf(stdout, __VA_ARGS__);                               \
@@ -214,12 +214,12 @@ fprintf(stdout, "\n");                                      \
 {                                                           \
 if constexpr(POS_PRINT_WITH_COLOR)                          \
     fprintf(stdout,                                         \
-        "\033[104m\033[97m POS Log \033[0m [%s @ %p]\n",    \
+        "\033[104m\033[97m POS Log \033[0m [%s @ %p]  ",    \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 else                                                        \
     fprintf(stdout,                                         \
-        "|-POS Log-| [%s @ %p]\n",                          \
+        "|-POS Log-| [%s @ %p]  ",                          \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 fprintf(stdout, __VA_ARGS__);                               \
@@ -275,12 +275,12 @@ fprintf(stdout, "\n");                                          \
 {                                                           \
 if constexpr(POS_PRINT_WITH_COLOR)                          \
     fprintf(stdout,                                         \
-        "\033[104m\033[42m POS Debug \033[0m [%s @ %p]\n",  \
+        "\033[104m\033[42m POS Debug \033[0m [%s @ %p]  ",  \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 else                                                        \
     fprintf(stdout,                                         \
-        "|-POS Debug-| [%s @ %p]\n",                        \
+        "|-POS Debug-| [%s @ %p]  ",                        \
         demangle(typeid(*this).name()).c_str(), this        \
     );                                                      \
 fprintf(stdout, __VA_ARGS__);                               \

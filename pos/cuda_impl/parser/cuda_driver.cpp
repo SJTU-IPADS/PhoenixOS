@@ -271,6 +271,7 @@ namespace cu_module_get_function {
         function_handle->cbank_param_size = function_desp->cbank_param_size;
         function_handle->name = function_desp->name;
         function_handle->input_pointer_params = function_desp->input_pointer_params;
+        function_handle->inout_pointer_params = function_desp->inout_pointer_params;
         function_handle->output_pointer_params = function_desp->output_pointer_params;
         function_handle->suspicious_params = function_desp->suspicious_params;
         function_handle->has_verified_params = function_desp->has_verified_params;

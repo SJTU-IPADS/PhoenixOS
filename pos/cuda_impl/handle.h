@@ -64,7 +64,7 @@ class POSHandle_CUDA_Context : public POSHandle {
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore(){
+    pos_retval_t restore() override {
         cudaError_t cuda_rt_res;
         CUresult cuda_dv_res;
         CUcontext pctx;
@@ -226,7 +226,10 @@ class POSHandle_CUDA_Function : public POSHandle {
     // index of those parameter which is a input pointer (const pointer)
     std::vector<uint32_t> input_pointer_params;
 
-    // index of those parameter which is a output pointer (non-const pointer)
+    // index of those parameter which is a inout pointer
+    std::vector<uint32_t> inout_pointer_params;
+
+    // index of those parameter which is a output pointer
     std::vector<uint32_t> output_pointer_params;
 
     // index of those non-pointer parameters that may carry pointer inside their values
@@ -474,6 +477,24 @@ class POSHandle_CUDA_Stream : public POSHandle {
     }
 
     /*!
+     *  \brief  restore the current handle when it becomes broken state
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore() override {
+        cudaError_t cuda_rt_res;
+        cudaStream_t stream_addr;
+
+        if((cuda_rt_res = cudaStreamCreate(&stream_addr)) != cudaSuccess){
+            POS_ERROR_C_DETAIL("cudaStreamCreate failed: %d", cuda_rt_res);
+        }
+
+        this->set_server_addr((void*)(stream_addr));
+        this->mark_status(kPOS_HandleStatus_Active);
+
+        return POS_SUCCESS;
+    }
+
+    /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
@@ -563,7 +584,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
     POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context* ctx_handle) : POSHandleManager() {
         POSHandle_CUDA_Stream *stream_handle;
 
-        // allocate mocked stream
+        // allocate mocked stream for execute computation
         if(unlikely(POS_SUCCESS != this->allocate_mocked_resource(
             /* handle */ &stream_handle,
             /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
@@ -574,9 +595,14 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
         ))){
             POS_ERROR_C_DETAIL("failed to allocate mocked CUDA stream in the manager");
         }
-        stream_handle->set_server_addr((void*)(0));
-        stream_handle->mark_status(kPOS_HandleStatus_Active);
-
+        
+        /*!
+         *  \note   we won't use the default stream, and we will create a new non-default stream 
+         *          during the restore process, so that we can achieve overlap checkpointing
+         */
+        // stream_handle->set_server_addr((void*)(0));
+        // stream_handle->mark_status(kPOS_HandleStatus_Active);
+        
         // record in the manager
         this->_handles.push_back(stream_handle);
         this->latest_used_handle = this->_handles[0];

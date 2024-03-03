@@ -54,7 +54,10 @@ class POSWorkspace {
     /*!
      *  \brief  deconstructor
      */
-    ~POSWorkspace(){ clear(); }
+    ~POSWorkspace(){ 
+        POS_LOG("enter deinit");
+        clear(); 
+    }
 
     /*!
      *  \brief  initialize the workspace, including raise the runtime and worker threads
@@ -71,14 +74,14 @@ class POSWorkspace {
         typename std::map<pos_client_uuid_t, POSTransport*>::iterator trsp_iter;
         typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
 
-        POS_LOG_C("clearing POS Workspace...")
+        POS_LOG("clearing POS Workspace...")
 
         if(likely(_oob_server != nullptr)){
             delete _oob_server;
-            POS_LOG_C("shutdowned out-of-band server");
+            POS_LOG("shutdowned out-of-band server");
         }
         
-        POS_LOG_C("cleaning all transports ...");
+        POS_LOG("cleaning all transports...");
         for(trsp_iter = _transport_maps.begin(); trsp_iter != _transport_maps.end(); trsp_iter++){
             if(trsp_iter->second != nullptr){
                 trsp_iter->second->clear();
@@ -86,7 +89,7 @@ class POSWorkspace {
             }
         }
         
-        POS_LOG_C("cleaning all clients ...");
+        POS_LOG("cleaning all clients...");
         for(clnt_iter = _client_map.begin(); clnt_iter != _client_map.end(); clnt_iter++){
             if(clnt_iter->second != nullptr){
                 clnt_iter->second->deinit();
@@ -96,12 +99,12 @@ class POSWorkspace {
 
         if(runtime != nullptr){ 
             delete runtime;
-            POS_LOG_C("shutdowned runtime thread");
+            POS_LOG("shutdowned runtime thread");
         }
 
         if(worker != nullptr){
             delete worker;
-            POS_LOG_C("shutdowned worker thread");
+            POS_LOG("shutdowned worker thread");
         }
     }
 

@@ -377,9 +377,8 @@ typedef struct POSAPIContext_QE {
      *  \param  id          resource type index
      *  \param  handle_set  sets of handles
      */
-    inline void record_checkpoint_handles(pos_resource_typeid_t id, std::set<POSHandle*>& handle_set){
-        // TODO: fix here!!
-        checkpoint_handles.insert();
+    inline void record_checkpoint_handles(std::set<POSHandle*>& handle_set){
+        checkpoint_handles.insert(handle_set.begin(), handle_set.end());
     }
 
     /*!
