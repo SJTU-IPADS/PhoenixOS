@@ -46,7 +46,7 @@
  */
 typedef struct POSCudaFunctionDesp {
     // name of the kernel
-    std::shared_ptr<char[]> name;
+    std::string name;
     
     // kernel signature
     std::string signature;
@@ -78,17 +78,6 @@ typedef struct POSCudaFunctionDesp {
 
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
-
-    /*!
-     *  \brief  setup the name of the function
-     *  \param  name_   the name to be set
-     */
-    inline void set_name(const char* name_){
-        POS_ASSERT(name.get() == nullptr);  // we can only set the name once
-        name = std::make_unique<char[]>(strlen(name_)+1);
-        POS_CHECK_POINTER(name.get());
-        strcpy(name.get(), name_);
-    }
 
     POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0), has_verified_params(false) {}
     ~POSCudaFunctionDesp(){}
@@ -663,21 +652,21 @@ class POSUtil_CUDA_Fatbin {
             POS_CHECK_POINTER(elf); POS_CHECK_POINTER(function_desp); POS_CHECK_POINTER(memory);
 
             // obtain the section that contains the kernel
-            if ((section_name = get_kernel_section_name_from_kernel_name((*function_desp)->name.get())) == NULL) { 
-                POS_WARN("failed to form section name based on kernel's name: kernel_name(%s)", (*function_desp)->name.get());
+            if ((section_name = get_kernel_section_name_from_kernel_name((*function_desp)->name.c_str())) == NULL) { 
+                POS_WARN("failed to form section name based on kernel's name: kernel_name(%s)", (*function_desp)->name.c_str());
                 return POS_FAILED_NOT_EXIST; 
             }
             if (get_section_by_name(elf, section_name, &section) != 0) {
                 POS_WARN(
                     "failed to get section based on kernel's name: kernel_name(%s), section_name(%s)",
-                    (*function_desp)->name.get(), section_name
+                    (*function_desp)->name.c_str(), section_name
                 );
                 return POS_FAILED;
             }
             if ((data = elf_getdata(section, NULL)) == NULL) {
                 POS_WARN(
                     "failed to get kernel section data: kernel_name(%s), section_name(%s)",
-                    (*function_desp)->name.get(), section_name
+                    (*function_desp)->name.c_str(), section_name
                 );
                 return POS_FAILED;
             }
@@ -817,7 +806,7 @@ class POSUtil_CUDA_Fatbin {
              */
             is_duplicated = false;
             for(j=0; j<desps->size(); j++){
-                if(unlikely(!strcmp(kernel_str, (*desps)[j]->name.get()))){
+                if(unlikely(!strcmp(kernel_str, (*desps)[j]->name.c_str()))){
                     is_duplicated = true;
                     break;
                 }
@@ -825,13 +814,18 @@ class POSUtil_CUDA_Fatbin {
             if(unlikely(is_duplicated)){ continue; }
 
             // check whether this function is cached
-            if(likely(cached_desp_map.count(std::string(kernel_str)) > 0)){
-                function_desp = cached_desp_map[std::string(kernel_str)];
+            if(unlikely(cached_desp_map.size() > 0)){
+                if(likely(cached_desp_map.count(std::string(kernel_str)) > 0)){
+                    function_desp = cached_desp_map[std::string(kernel_str)];
+                    desps->push_back(function_desp);
+                } else {
+                    POS_DEBUG_DETAIL("found uncached kernel, which might cause nsys to crash, so we skip: name(%s)", kernel_str);
+                }
             } else {
                 function_desp = new POSCudaFunctionDesp_t();
                 POS_CHECK_POINTER(function_desp);
 
-                function_desp->set_name(kernel_str);
+                function_desp->name = std::string(kernel_str);
 
                 // analyse the parameters of the kernel
                 retval = get_params_for_kernel(elf, &function_desp, memory, memsize);
@@ -846,9 +840,9 @@ class POSUtil_CUDA_Fatbin {
                     POS_WARN_DETAIL("failed to extract parameter hints (pointer, direction): kernel_name(%s), won't be recorded!", kernel_str);
                     continue;
                 }
-            }
 
-            desps->push_back(function_desp);
+                desps->push_back(function_desp);
+            }
         }
 
     exit_POSUtil_CUDA_Fatbin___extract_kernel_info:

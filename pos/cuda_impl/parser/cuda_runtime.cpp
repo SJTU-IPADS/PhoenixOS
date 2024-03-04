@@ -345,7 +345,7 @@ namespace cuda_launch_kernel {
                 POS_WARN(
                     "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
                     "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->name.get(), arg_value
+                    param_index, function_handle->signature.c_str(), arg_value
                 );
                 continue;
             }
@@ -359,6 +359,46 @@ namespace cuda_launch_kernel {
             // all_tick += (e_tick - s_tick);
         }
         
+        /*!
+         *  \note   record all inout memory areas
+         */
+        for(i=0; i<function_handle->inout_pointer_params.size(); i++){
+            param_index = function_handle->inout_pointer_params[i];
+
+            arg_addr = args + function_handle->param_offsets[param_index];
+            POS_CHECK_POINTER(arg_addr);
+            arg_value = *((void**)arg_addr);
+            
+            /*!
+             *  \note   sometimes one would launch kernel with some pointer params are nullptr (at least pytorch did),
+             *          this is probably normal, so we just ignore this situation
+             */
+            if(unlikely(arg_value == nullptr)){
+                continue;
+            }
+
+            tmp_retval = hm_memory->get_handle_by_client_addr(
+                /* client_addr */ arg_value,
+                /* handle */ &memory_handle
+            );
+
+            if(unlikely(tmp_retval != POS_SUCCESS)){
+                POS_WARN(
+                    "%lu(th) parameter of kernel %s is marked as inout during kernel parsing phrase, "
+                    "yet it contains non-exist memory address during launching: given client addr(%p)",
+                    param_index, function_handle->signature.c_str(), arg_value
+                );
+                continue;
+            }
+
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                /* handle */ memory_handle,
+                /* param_index */ param_index
+            });
+
+            hm_memory->record_modified_handle(memory_handle);
+        }
+
         /*!
          *  \note   record all output memory areas
          */
@@ -386,7 +426,7 @@ namespace cuda_launch_kernel {
                 POS_WARN(
                     "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
                     "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->name.get(), arg_value
+                    param_index, function_handle->signature.c_str(), arg_value
                 );
                 continue;
             }
@@ -449,7 +489,7 @@ namespace cuda_launch_kernel {
                             /* offset */ j  
                         });
 
-                        wqe->record_handle<kPOS_Edge_Direction_Out>({
+                        wqe->record_handle<kPOS_Edge_Direction_InOut>({
                             /* handle */ memory_handle,
                             /* param_index */ param_index
                         });
@@ -488,7 +528,7 @@ namespace cuda_launch_kernel {
                     POS_WARN(
                         "%lu(th) parameter of kernel %s is marked as suspicious output during kernel parsing phrase, "
                         "yet it contains non-exist memory address during launching: given client addr(%p)",
-                        param_index, function_handle->name.get(), arg_value
+                        param_index, function_handle->signature.c_str(), arg_value
                     );
                     continue;
                 }
@@ -518,7 +558,7 @@ namespace cuda_launch_kernel {
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(
             "parse(cuda_launch_kernel): function(%s), stream(%p), grid_dim(%u,%u,%u), block_dim(%u,%u,%u), SM_size(%lu)",
-            function_handle->name.get(), stream_handle->server_addr,
+            function_handle->name.c_str(), stream_handle->server_addr,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->x,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->y,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->z,

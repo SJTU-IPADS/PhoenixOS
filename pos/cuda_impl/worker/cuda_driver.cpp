@@ -75,7 +75,7 @@ namespace cu_module_get_function {
         module_handle = function_handle->parent_handles[0];
 
         wqe->api_cxt->return_code = cuModuleGetFunction(
-            &function, (CUmodule)(module_handle->server_addr), function_handle->name.get()
+            &function, (CUmodule)(module_handle->server_addr), function_handle->name.c_str()
         );
 
         // record server address

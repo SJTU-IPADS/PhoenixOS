@@ -169,7 +169,7 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cudaGetDevice"
                 }
             },
-            { 
+            {
                 /* api_id */ CUDA_STREAM_SYNCHRONIZE, 
                 {
                     /* is_sync */       true,

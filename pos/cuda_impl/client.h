@@ -113,6 +113,14 @@ class POSClient_CUDA : public POSClient {
      *  \example    CUDA function manager should export the metadata of functions
      */
     void deinit_handle_managers() override {
+        this->__dump_cuda_functions();
+    }
+
+ private:
+    /*!
+     *  \brief  export the metadata of functions
+     */
+    void __dump_cuda_functions() {
         uint64_t nb_functions, i;
         POSHandleManager_CUDA_Function *hm_function;
         POSHandle_CUDA_Function *function_handle;
@@ -121,68 +129,80 @@ class POSClient_CUDA : public POSClient {
 
         auto dump_function_metas = [](POSHandle_CUDA_Function* function_handle) -> std::string {
             std::string output_str("");
+            std::string delimiter("|");
             uint64_t i;
-
+            
             POS_CHECK_POINTER(function_handle);
 
             // mangled name of the kernel
-            output_str += std::string(function_handle->name.get()) + std::string(",");
+            output_str += function_handle->name + std::string(delimiter);
+            
+            // signature of the kernel
+            output_str += function_handle->signature + std::string(delimiter);
 
             // number of paramters
             output_str += std::to_string(function_handle->nb_params);
-            output_str += std::string(",");
+            output_str += std::string(delimiter);
 
             // parameter offsets
             for(i=0; i<function_handle->nb_params; i++){
                 output_str += std::to_string(function_handle->param_offsets[i]);
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
             }
 
             // parameter sizes
             for(i=0; i<function_handle->nb_params; i++){
                 output_str += std::to_string(function_handle->param_sizes[i]);
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
             }
 
             // input paramters
             output_str += std::to_string(function_handle->input_pointer_params.size());
-            output_str += std::string(",");
+            output_str += std::string(delimiter);
             for(i=0; i<function_handle->input_pointer_params.size(); i++){
                 output_str += std::to_string(function_handle->input_pointer_params[i]);
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
             }
 
             // output paramters
             output_str += std::to_string(function_handle->output_pointer_params.size());
-            output_str += std::string(",");
+            output_str += std::string(delimiter);
             for(i=0; i<function_handle->output_pointer_params.size(); i++){
                 output_str += std::to_string(function_handle->output_pointer_params[i]);
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
+            }
+
+            // inout parameters
+            output_str += std::to_string(function_handle->inout_pointer_params.size());
+            output_str += std::string(delimiter);
+            for(i=0; i<function_handle->inout_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->inout_pointer_params[i]);
+                output_str += std::string(delimiter);
             }
 
             // suspicious paramters
             output_str += std::to_string(function_handle->suspicious_params.size());
-            output_str += std::string(",");
+            output_str += std::string(delimiter);
             for(i=0; i<function_handle->suspicious_params.size(); i++){
                 output_str += std::to_string(function_handle->suspicious_params[i]);
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
             }
 
             // has verified suspicious paramters
             if(function_handle->has_verified_params){
-                output_str += std::string("1,");
+                output_str += std::string("1") + std::string(delimiter);
 
                 // inout paramters
                 output_str += std::to_string(function_handle->confirmed_suspicious_params.size());
-                output_str += std::string(",");
+                output_str += std::string(delimiter);
                 for(i=0; i<function_handle->confirmed_suspicious_params.size(); i++){
                     output_str += std::to_string(function_handle->confirmed_suspicious_params[i].first);    // param_index
-                    output_str += std::string(",");
+                    output_str += std::string(delimiter);
                     output_str += std::to_string(function_handle->confirmed_suspicious_params[i].second);   // offset
-                    output_str += std::string(",");
+                    output_str += std::string(delimiter);
                 }
             } else {
-                output_str += std::string("0,");
+                output_str += std::string("0") + std::string(delimiter);
             }
 
             // cbank parameters
@@ -215,6 +235,4 @@ class POSClient_CUDA : public POSClient {
     exit:
         ;
     }
-
- private:
 };

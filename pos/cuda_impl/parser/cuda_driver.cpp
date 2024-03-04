@@ -125,7 +125,7 @@ namespace cu_module_load_data {
 
                 POS_DEBUG(
                     "function_name(%s), offsets(%s), param_sizes(%s)",
-                    desp->name.get(), offsets_info, sizes_info
+                    desp->name.c_str(), offsets_info, sizes_info
                 );
 
                 free(offsets_info);
@@ -225,7 +225,7 @@ namespace cu_module_get_function {
         for(i=0; i<module_handle->function_desps.size(); i++){
             if(unlikely(
                 !strcmp(
-                    module_handle->function_desps[i]->name.get(),
+                    module_handle->function_desps[i]->name.c_str(),
                     (const char*)(pos_api_param_addr(wqe, 3))
                 )
             )){

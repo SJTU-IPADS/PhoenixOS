@@ -210,7 +210,7 @@ class POSHandle_CUDA_Function : public POSHandle {
     std::string get_resource_name(){ return std::string("CUDA Function"); }
 
     // name of the kernel
-    std::shared_ptr<char[]> name;
+    std::string name;
 
     std::string signature;
 
@@ -687,6 +687,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
         uint64_t i;
         std::string line, stream;
         POSCudaFunctionDesp_t *new_desp;
+        char delimiter = '|';
 
         auto generate_desp_from_meta = [](std::vector<std::string>& metas) -> POSCudaFunctionDesp_t* {
             uint64_t i;
@@ -694,40 +695,46 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
             std::vector<uint32_t> param_sizes;
             std::vector<uint32_t> input_pointer_params;
             std::vector<uint32_t> output_pointer_params;
+            std::vector<uint32_t> inout_pointer_params;
             std::vector<uint32_t> suspicious_params;
             std::vector<std::pair<uint32_t,uint64_t>> confirmed_suspicious_params;
             bool confirmed;
-            uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_suspicious_params, nb_inout_params, has_verified_params;
+            uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_inout_pointer_params, 
+                    nb_suspicious_params, nb_confirmed_suspicious_params, has_verified_params;
             uint64_t ptr;
 
             POSCudaFunctionDesp_t *new_desp = new POSCudaFunctionDesp_t();
             POS_CHECK_POINTER(new_desp);
 
             ptr = 0;
-
+            
             // mangled name of the kernel
-            new_desp->set_name(metas[ptr].c_str());
+            new_desp->name = metas[ptr];
+            ptr++;
+
+            // signature of the kernel
+            new_desp->signature = metas[ptr];
             ptr++;
 
             // number of paramters
             new_desp->nb_params = std::stoul(metas[ptr]);
             ptr++;
 
-            // offset of each parameter
+            // parameter offsets
             for(i=0; i<new_desp->nb_params; i++){
                 param_offsets.push_back(std::stoul(metas[ptr+i]));   
             }
             ptr += new_desp->nb_params;
             new_desp->param_offsets = param_offsets;
 
-            // size of each parameter
+            // parameter sizes
             for(i=0; i<new_desp->nb_params; i++){
                 param_sizes.push_back(std::stoul(metas[ptr+i]));
             }
             ptr += new_desp->nb_params;
             new_desp->param_sizes = param_sizes;
 
-            // index of those parameter which is a input pointer (const pointer)
+            // input paramters
             nb_input_pointer_params = std::stoul(metas[ptr]);
             ptr++;
             for(i=0; i<nb_input_pointer_params; i++){
@@ -736,7 +743,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
             ptr += nb_input_pointer_params;
             new_desp->input_pointer_params = input_pointer_params;
 
-            // index of those parameter which is a output pointer (non-const pointer)
+            // output paramters
             nb_output_pointer_params = std::stoul(metas[ptr]);
             ptr++;
             for(i=0; i<nb_output_pointer_params; i++){
@@ -745,7 +752,16 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
             ptr += nb_output_pointer_params;
             new_desp->output_pointer_params = output_pointer_params;
 
-            // index of those parameter which is a output pointer (non-const pointer)
+            // inout paramters
+            nb_inout_pointer_params = std::stoul(metas[ptr]);
+            ptr++;
+            for(i=0; i<nb_inout_pointer_params; i++){
+                inout_pointer_params.push_back(std::stoul(metas[ptr+i]));
+            }
+            ptr += nb_inout_pointer_params;
+            new_desp->inout_pointer_params = inout_pointer_params;
+
+            // suspicious paramters
             nb_suspicious_params = std::stoul(metas[ptr]);
             ptr++;
             for(i=0; i<nb_suspicious_params; i++){
@@ -761,14 +777,14 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
             if(has_verified_params == 1){
                 // index of those parameter which is a structure (contains pointers)
-                nb_inout_params = std::stoul(metas[ptr]);
+                nb_confirmed_suspicious_params = std::stoul(metas[ptr]);
                 ptr++;
-                for(i=0; i<nb_inout_params; i++){
+                for(i=0; i<nb_confirmed_suspicious_params; i++){
                     confirmed_suspicious_params.push_back({
                         /* param_index */ std::stoul(metas[ptr+2*i]), /* offset */ std::stoul(metas[ptr+2*i+1])
                     });
                 }
-                ptr += nb_inout_params;
+                ptr += nb_confirmed_suspicious_params;
                 new_desp->confirmed_suspicious_params = confirmed_suspicious_params;
             }
 
@@ -780,21 +796,24 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
         std::ifstream file(file_path.c_str(), std::ios::in);
         if(likely(file.is_open())){
-            POS_LOG("parsing cached kernel metas from file %s...", i, file_path.c_str());
+            POS_LOG("parsing cached kernel metas from file %s...", file_path.c_str());
             i = 0;
             while (std::getline(file, line)) {
                 // split by ","
                 std::stringstream ss(line);
                 std::string segment;
                 std::vector<std::string> metas;
-                while (std::getline(ss, segment, ',')) { metas.push_back(segment); }
+                while (std::getline(ss, segment, delimiter)) { metas.push_back(segment); }
 
                 // parse
                 new_desp = generate_desp_from_meta(metas);
-                cached_function_desps[std::string(new_desp->name.get())] = new_desp;
+                cached_function_desps.insert(
+                    std::pair<std::string, POSCudaFunctionDesp_t*>(new_desp->name, new_desp)
+                );
 
                 i++;
             }
+
             POS_LOG("parsed %lu of cached kernel metas from file %s", i, file_path.c_str());
             file.close();
         } else {

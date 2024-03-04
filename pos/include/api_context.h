@@ -227,7 +227,6 @@ typedef struct POSHandleView {
     /*!
      *  \brief  constructor
      *  \param  handle_             pointer to the handle which is view targeted on
-     *  \param  dir_                direction of the view to use this handle
      *  \param  param_index_        index of the corresponding parameter of this handle view
      *  \param  offset_             offset from the base address of the handle
      */
@@ -329,9 +328,9 @@ typedef struct POSAPIContext_QE {
         // reserve space
         input_handle_views.reserve(5);
         output_handle_views.reserve(5);
+        inout_handle_views.reserve(5);
         create_handle_views.reserve(1);
         delete_handle_views.reserve(1);
-        inout_handle_views.reserve(2);
     }
     
     /*!
@@ -361,14 +360,19 @@ typedef struct POSAPIContext_QE {
     inline void record_handle(POSHandleView_t&& handle_view){
         if constexpr (dir == kPOS_Edge_Direction_In){
             input_handle_views.emplace_back(handle_view);
+            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_In;
         } else if (dir == kPOS_Edge_Direction_Out){
             output_handle_views.emplace_back(handle_view);
+            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Out;
         } else if (dir == kPOS_Edge_Direction_Create){
             create_handle_views.emplace_back(handle_view);
+            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Create;
         } else if (dir == kPOS_Edge_Direction_Delete){
             delete_handle_views.emplace_back(handle_view);
+            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Delete;
         } else { // inout
             inout_handle_views.emplace_back(handle_view);
+            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_InOut;
         }
     }
 

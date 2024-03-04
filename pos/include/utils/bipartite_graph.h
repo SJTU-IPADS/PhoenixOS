@@ -60,7 +60,7 @@ class POSBipartiteGraph {
         );
 
         uint64_t i;
-        POSNeighborMap_t *reserved_topo_map_t1, *reserved_topo_map_t2;
+        POSNeighborMap_t *reserved_topo_map;
         POSBgVertex_t<T1> *reserved_vertex_t1;
         POSBgVertex_t<T2> *reserved_vertex_t2;
 
@@ -70,13 +70,9 @@ class POSBipartiteGraph {
         _t1s.reserve(kPOSBG_PREFILL_SIZE);
         _t2s.reserve(kPOSBG_PREFILL_SIZE);
         for(i=0; i<kPOSBG_PREFILL_SIZE; i++){
-            reserved_topo_map_t1 = new POSNeighborMap_t();
-            POS_CHECK_POINTER(reserved_topo_map_t1);
-            _topo_t1_cache[i] = reserved_topo_map_t1;
-
-            reserved_topo_map_t2 = new POSNeighborMap_t();
-            POS_CHECK_POINTER(reserved_topo_map_t2);
-            _topo[i] = reserved_topo_map_t2;
+            reserved_topo_map = new POSNeighborMap_t();
+            POS_CHECK_POINTER(reserved_topo_map);
+            _topo[i] = reserved_topo_map;
 
             reserved_vertex_t1 = new POSBgVertex_t<T1>();
             POS_CHECK_POINTER(reserved_vertex_t1);
@@ -101,7 +97,6 @@ class POSBipartiteGraph {
         }
 
         _topo.clear();
-        _topo_t1_cache.clear();
     }
 
     /*!
@@ -123,12 +118,7 @@ class POSBipartiteGraph {
 
         pos_retval_t retval = POS_SUCCESS;
         POSBgVertex_t<T> *new_vertex;
-        POSNeighborMap_t* new_topo_map;
-
-        uint64_t s_tick, e_tick;
-        
-        // make sure the adding process won't conflict with the merging process
-        // std::lock_guard<std::mutex> lk(__merge_lock_mtx);
+        POSNeighborMap_t::const_iterator neigh_iter;
 
         POS_CHECK_POINTER(id);
 
@@ -159,50 +149,42 @@ class POSBipartiteGraph {
         }
     #endif
 
+        // update maximum index of the vertex
         if constexpr (std::is_same_v<T, T1>){
             *id = max_t1_id; max_t1_id += 1;
         } else { // T2
             *id = max_t2_id; max_t2_id += 1;
         }
-        
-        // s_tick = POSUtilTimestamp::get_tsc();
 
-        // add neighbor topology to corresponding list
+        // obtain / create vertex instance
         if(unlikely(*id >= kPOSBG_PREFILL_SIZE)){
-            // POS_CHECK_POINTER(new_topo_map = new POSNeighborMap_t());
             POS_CHECK_POINTER(new_vertex = new POSBgVertex_t<T>());
-        } else {
-            if constexpr (std::is_same_v<T, T1>){ 
-                // POS_CHECK_POINTER(new_topo_map = _topo_t1_cache[*id]);    
-                POS_CHECK_POINTER(new_vertex = _t1s[*id]);
-            } else { 
-                // POS_CHECK_POINTER(new_topo_map = _topo[*id]); 
-                POS_CHECK_POINTER(new_vertex = _t2s[*id]);
-            }
-        }
-        // new_topo_map->insert(neighbor.begin(), neighbor.end());
-        new_vertex->data = (T*)data;
-        new_vertex->id = *id;
-        
-        // e_tick = POSUtilTimestamp::get_tsc();
-
-        // POS_LOG("allocate new topo map: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
-
-        // s_tick = POSUtilTimestamp::get_tsc();
-
-        if(unlikely(*id >= kPOSBG_PREFILL_SIZE)){
             if constexpr (std::is_same_v<T, T1>){
                 _t1s.push_back(new_vertex);
-                // _topo_t1_cache[*id] = new_topo_map;
-            } else { // T2
+            } else {
                 _t2s.push_back(new_vertex);
-                // _topo[*id] = new_topo_map;
+            }
+        } else {
+            if constexpr (std::is_same_v<T, T1>){
+                new_vertex = _t1s[*id];
+            } else {
+                new_vertex = _t2s[*id];
             }
         }
+       
+        // setup metadata of the vertex
+        new_vertex->data = (T*)data;
+        new_vertex->id = *id;
 
-        // e_tick = POSUtilTimestamp::get_tsc();
-
-        // POS_LOG("attach new topo map: %lf us, id: %lu", POS_TSC_TO_USEC(e_tick-s_tick), *id);
+        // insert neighbor info to topo
+        if constexpr (std::is_same_v<T, T1>){
+            for(neigh_iter = neighbor.begin(); neigh_iter != neighbor.end(); neigh_iter++){
+                POS_CHECK_POINTER(_topo[neigh_iter->first]);
+                _topo[neigh_iter->first]->insert(
+                    std::pair<pos_vertex_id_t, pos_edge_direction_t>(*id, neigh_iter->second)
+                );
+            }
+        }
 
     exit:
         return retval;
@@ -240,9 +222,6 @@ class POSBipartiteGraph {
         POS_ERROR_C_DETAIL("don't invoke this function!");
         
         POSNeighborMap_t *retval = nullptr;
-
-        // NOTE: this must be slow, but how slow?
-        __join_topo();
 
         if constexpr (std::is_same_v<T, T1>) {
             // TODO: we might need to store a transpose matrix of _topo to accelerate searching
@@ -286,16 +265,13 @@ class POSBipartiteGraph {
         std::string serilization_result;
         uint64_t i;
         
-        // obtain comprehensive topology
-        __join_topo();
-
         output_file.open(file_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
 
         // first line: nb_t1s, nb_t2s, tsc_freq
-        output_file << _t1s.size() << ", " << _t2s.size() << ", " << POS_TSC_FREQ << std::endl;
+        output_file << max_t1_id << ", " << max_t2_id << ", " << POS_TSC_FREQ << std::endl;
 
         // next nb_t1s line: info of t1s
-        for(i=0;i<_t1s.size(); i++){
+        for(i=0;i<max_t1_id; i++){
             POS_CHECK_POINTER(t1v = _t1s[i]);
             if(unlikely(t1v->data == nullptr)){
                 continue;
@@ -309,7 +285,7 @@ class POSBipartiteGraph {
         }
 
         // next nb_t2s line: info of t2s
-        for(i=0;i<_t2s.size(); i++){
+        for(i=0;i<max_t2_id; i++){
             POS_CHECK_POINTER(t2v = _t2s[i]);
             if(unlikely(t2v->data == nullptr)){
                 continue;
@@ -329,6 +305,10 @@ class POSBipartiteGraph {
         for(topo_iter=_topo.begin(); topo_iter!=_topo.end(); topo_iter++){
             vid = topo_iter->first;
             POS_CHECK_POINTER(direction_map = topo_iter->second);
+            
+            if(unlikely(vid >= max_t2_id)){
+                break;
+            }
 
             if(likely(direction_map->size() > 0)){
                 output_file << vid << ", " << direction_map->size() << ", ";
@@ -364,47 +344,4 @@ class POSBipartiteGraph {
      *  \brief  the final topology storage from the view of T2
      */
     std::map<pos_vertex_id_t, POSNeighborMap_t*> _topo;
-
-    /*!
-     *  \brief  we cache the topology inserted while add T1 vertex here, to accelerate the insertion of T1;
-     *  \note   this cache will be merged into _topo when _topo is needed, by invoking __join_topo
-     */ 
-    std::map<pos_vertex_id_t, POSNeighborMap_t*> _topo_t1_cache;
-    
-    /*!
-     *  \brief  start merging _topo_t1_cache into _topo if _topo_t1_cache isn't empty, to obtain comprehensive _topo
-     */
-    inline void __join_topo(){
-        if(likely(_topo_t1_cache.size() != 0)){
-            __merge_topo_cache();
-        }
-    }
-
-    // mutex lock to protect merging process
-    std::mutex __merge_lock_mtx;
-    
-    /*!
-     *  \brief  merge _topo_t1_cache into _topo
-     */
-    inline void __merge_topo_cache(){
-        typename std::map<pos_vertex_id_t, POSNeighborMap_t*>::iterator outter_iter;
-        typename POSNeighborMap_t::iterator inner_iter;
-        pos_vertex_id_t t1_vid;
-        POSNeighborMap_t *t1_nmap, *t2_nmap;
-        
-        // make sure the merging process won't conflict with the adding process
-        std::lock_guard<std::mutex> lk(__merge_lock_mtx);
-
-        for(outter_iter=_topo_t1_cache.begin(); outter_iter!=_topo_t1_cache.end(); outter_iter++){
-            t1_vid = outter_iter->first;
-            POS_CHECK_POINTER(t1_nmap = outter_iter->second);
-
-            for(inner_iter=t1_nmap->begin(); inner_iter!=t1_nmap->end(); inner_iter++){
-                POS_CHECK_POINTER(t2_nmap = _topo[inner_iter->first]);
-                (*t2_nmap)[t1_vid] = inner_iter->second;
-            }
-        }
-
-        _topo_t1_cache.clear();
-    }
 };
