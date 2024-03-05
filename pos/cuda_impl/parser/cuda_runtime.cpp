@@ -342,11 +342,11 @@ namespace cuda_launch_kernel {
             );
 
             if(unlikely(tmp_retval != POS_SUCCESS)){
-                POS_WARN(
-                    "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
-                    "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->signature.c_str(), arg_value
-                );
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
                 continue;
             }
 
@@ -383,11 +383,11 @@ namespace cuda_launch_kernel {
             );
 
             if(unlikely(tmp_retval != POS_SUCCESS)){
-                POS_WARN(
-                    "%lu(th) parameter of kernel %s is marked as inout during kernel parsing phrase, "
-                    "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->signature.c_str(), arg_value
-                );
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as inout during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
                 continue;
             }
 
@@ -423,11 +423,11 @@ namespace cuda_launch_kernel {
             );
 
             if(unlikely(tmp_retval != POS_SUCCESS)){
-                POS_WARN(
-                    "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
-                    "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->signature.c_str(), arg_value
-                );
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
                 continue;
             }
 
@@ -525,11 +525,11 @@ namespace cuda_launch_kernel {
                 );
 
                 if(unlikely(tmp_retval != POS_SUCCESS)){
-                    POS_WARN(
-                        "%lu(th) parameter of kernel %s is marked as suspicious output during kernel parsing phrase, "
-                        "yet it contains non-exist memory address during launching: given client addr(%p)",
-                        param_index, function_handle->signature.c_str(), arg_value
-                    );
+                    // POS_WARN(
+                    //     "%lu(th) parameter of kernel %s is marked as suspicious output during kernel parsing phrase, "
+                    //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                    //     param_index, function_handle->signature.c_str(), arg_value
+                    // );
                     continue;
                 }
 

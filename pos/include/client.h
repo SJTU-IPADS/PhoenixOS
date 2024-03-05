@@ -8,6 +8,7 @@
 
 class POSClient;
 
+#include "pos/include/common.h"
 #include "pos/include/client.h"
 #include "pos/include/handle.h"
 #include "pos/include/dag.h"
@@ -35,6 +36,7 @@ class POSClient {
     void init(){
         this->init_handle_managers();
         this->init_dag();
+        this->init_restore_resources();
     }
 
     /*!
@@ -43,9 +45,13 @@ class POSClient {
      *          that implemented by derived class
      */
     void deinit(){
-        this->deinit_handle_managers();
-    }
+        this->deinit_dump_handle_managers();
 
+        // drain out the dag, and dump checkpoint to file
+        this->dag.drain();
+        this->deinit_dump_checkpoints();
+    }
+    
     /*!
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
@@ -54,16 +60,27 @@ class POSClient {
     virtual void init_handle_managers(){}
 
     /*!
-     *  \brief      deinit handle manager for all used resources
-     *  \example    CUDA function manager should export the metadata of functions
-     */
-    virtual void deinit_handle_managers(){}
-
-    /*!
      *  \brief  initialization of the DAG
      *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
      */
     virtual void init_dag(){};
+
+    /*!
+     *  \brief  restore resources from checkpointed file
+     */
+    virtual void init_restore_resources(){}
+
+
+    /*!
+     *  \brief      deinit handle manager for all used resources
+     *  \example    CUDA function manager should export the metadata of functions
+     */
+    virtual void deinit_dump_handle_managers(){}
+
+    /*!
+     *  \brief  dump checkpoints to file
+     */
+    virtual void deinit_dump_checkpoints(){}
 
     // client identifier
     uint64_t id;

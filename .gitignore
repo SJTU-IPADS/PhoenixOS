@@ -16,6 +16,7 @@
 **/.cmake
 **/env
 **/*.nsys-rep
+**/*.bat
 
 **/__pycache__
 

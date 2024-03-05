@@ -97,7 +97,7 @@ class POSWorker_CUDA : public POSWorker {
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle);
 
-                retval = handle->checkpoint(
+                retval = handle->checkpoint_sync(
                     /* version_id */ wqe->dag_vertex_id,
                     /* stream_id */ 0
                 );
@@ -134,6 +134,11 @@ class POSWorker_CUDA : public POSWorker {
             }
         }
 
+        // POS_LOG(
+        //     "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
+        //     wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+        // );
+
         return retval;
     }
 
@@ -166,7 +171,7 @@ class POSWorker_CUDA : public POSWorker {
             const POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
 
-            retval = handle->checkpoint(
+            retval = handle->checkpoint_sync(
                 /* version_id */ wqe->dag_vertex_id,
                 /* stream_id */ 0
             );
@@ -198,8 +203,8 @@ class POSWorker_CUDA : public POSWorker {
      *  \return POS_SUCCESS for successfully checkpointing
      */
     pos_retval_t checkpoint_sync(POSAPIContext_QE* wqe) override {
-        // return __checkpoint_sync_naive(wqe); // singularity
-        return __checkpoint_sync_selective(wqe);
+        return __checkpoint_sync_naive(wqe); // singularity
+        // return __checkpoint_sync_selective(wqe);
     }
 
     /*!
@@ -232,7 +237,7 @@ class POSWorker_CUDA : public POSWorker {
             const POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
 
-            retval = handle->checkpoint(
+            retval = handle->checkpoint_async(
                 /* version_id */ wqe->dag_vertex_id,
                 /* stream_id */ (uint64_t)(_ckpt_stream)
             );

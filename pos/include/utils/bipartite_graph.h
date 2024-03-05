@@ -177,14 +177,15 @@ class POSBipartiteGraph {
         new_vertex->id = *id;
 
         // insert neighbor info to topo
-        if constexpr (std::is_same_v<T, T1>){
-            for(neigh_iter = neighbor.begin(); neigh_iter != neighbor.end(); neigh_iter++){
-                POS_CHECK_POINTER(_topo[neigh_iter->first]);
-                _topo[neigh_iter->first]->insert(
-                    std::pair<pos_vertex_id_t, pos_edge_direction_t>(*id, neigh_iter->second)
-                );
-            }
-        }
+        // NOTE: this is very time consuming!!
+        // if constexpr (std::is_same_v<T, T1>){
+        //     for(neigh_iter = neighbor.begin(); neigh_iter != neighbor.end(); neigh_iter++){
+        //         POS_CHECK_POINTER(_topo[neigh_iter->first]);
+        //         _topo[neigh_iter->first]->insert(
+        //             std::pair<pos_vertex_id_t, pos_edge_direction_t>(*id, neigh_iter->second)
+        //         );
+        //     }
+        // }
 
     exit:
         return retval;
@@ -244,14 +245,14 @@ class POSBipartiteGraph {
      *  \param  vertex  the vertex to be dumped
      *  \param  result  dumping result, in string
      */
-    using serilize_t1_func_t = void(*)(T1* vertex, std::string& result);
-    using serilize_t2_func_t = void(*)(T2* vertex, std::string& result);
+    using serialize_t1_func_t = void(*)(T1* vertex, std::string& result);
+    using serialize_t2_func_t = void(*)(T2* vertex, std::string& result);
 
     /*!
      *  \brief  dump the captured graph to a file
      *  \param  file_path   path to store the dumped graph
      */
-    void dump_graph_to_file(const char* file_path, serilize_t1_func_t serilize_t1, serilize_t2_func_t serilize_t2){
+    void dump_graph_to_file(const char* file_path, serialize_t1_func_t serialize_t1, serialize_t2_func_t serialize_t2){
         std::ofstream output_file;
         typename std::map<pos_vertex_id_t, POSBgVertex_t<T1>*>::iterator t1s_iter;
         typename std::map<pos_vertex_id_t, POSBgVertex_t<T2>*>::iterator t2s_iter;
@@ -277,9 +278,9 @@ class POSBipartiteGraph {
                 continue;
             }
             
-            // serilize vertex data
+            // serialize vertex data
             serilization_result.clear();
-            serilize_t1(t1v->data, serilization_result);
+            serialize_t1(t1v->data, serilization_result);
     
             output_file << serilization_result << std::endl;
         }
@@ -291,9 +292,9 @@ class POSBipartiteGraph {
                 continue;
             }
             
-            // serilize vertex data
+            // serialize vertex data
             serilization_result.clear();
-            serilize_t2(t2v->data, serilization_result);
+            serialize_t2(t2v->data, serilization_result);
     
             output_file << serilization_result << std::endl;
         }

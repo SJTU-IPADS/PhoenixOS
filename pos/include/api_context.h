@@ -360,19 +360,19 @@ typedef struct POSAPIContext_QE {
     inline void record_handle(POSHandleView_t&& handle_view){
         if constexpr (dir == kPOS_Edge_Direction_In){
             input_handle_views.emplace_back(handle_view);
-            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_In;
+            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_In;
         } else if (dir == kPOS_Edge_Direction_Out){
             output_handle_views.emplace_back(handle_view);
-            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Out;
+            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Out;
         } else if (dir == kPOS_Edge_Direction_Create){
             create_handle_views.emplace_back(handle_view);
-            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Create;
+            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Create;
         } else if (dir == kPOS_Edge_Direction_Delete){
             delete_handle_views.emplace_back(handle_view);
-            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Delete;
+            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Delete;
         } else { // inout
             inout_handle_views.emplace_back(handle_view);
-            flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_InOut;
+            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_InOut;
         }
     }
 

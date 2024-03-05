@@ -32,6 +32,15 @@ class POSCheckpointBag {
     ~POSCheckpointBag() = default;
     
     /*!
+     *  \brief  clear current checkpoint bag
+     */
+    void clear(){
+        _use_front = true;
+        _front_version = 0;
+        _back_version = 0;
+    }
+
+    /*!
      *  \brief  allocate a new checkpoint slot inside this bag
      *  \param  version     version (i.e., dag index) of this checkpoint
      *  \param  ptr         pointer to the checkpoint slot
@@ -155,6 +164,26 @@ class POSCheckpointBag {
 
     exit:
         return retval;
+    }
+
+    /*!
+     *  \brief  load checkpoint data into this bag
+     *  \note   this function will be invoked during the restore process
+     *  \param  version     version of this checkpoint
+     *  \param  size        size of the checkpoint data
+     *  \param  ckpt_data   pointer to the buffer that stores the checkpointed data
+     *  \return POS_SUCCESS for successfully loading
+     */
+    inline pos_retval_t load(uint64_t version, uint64_t size, void* ckpt_data){
+        POS_ASSERT(size == this->_state_size);
+        POS_CHECK_POINTER(ckpt_data);
+
+        this->clear();
+
+        _front_version = version;
+        memcpy(_ckpt_front->expose_pointer(), ckpt_data, size);
+
+        return POS_SUCCESS;
     }
 
  private:

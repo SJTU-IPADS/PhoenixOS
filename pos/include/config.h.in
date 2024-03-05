@@ -29,6 +29,9 @@ typedef struct pos_global_config_server {
     std::string kernel_meta_path;
     bool is_load_kernel_from_cache;
 
+    std::string checkpoint_file_path;
+    bool is_starting_with_checkpoint;
+
     pos_global_config_server() : is_load_kernel_from_cache(false) {}
 } pos_global_config_server_t;
 

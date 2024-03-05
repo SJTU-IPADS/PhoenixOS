@@ -32,11 +32,11 @@ typedef struct pos_op_meta {
 class POSDag {
  private:
     /*!
-     *  \brief  serilize metadata of an op on the DAG while dumping to file
+     *  \brief  serialize metadata of an op on the DAG while dumping to file
      *  \param  meta    metadata of a OP (vertex on the DAG)
      *  \param  result  dump result
      */
-    static void _serilize_op(pos_op_meta* meta, std::string& result){
+    static void _serialize_op(pos_op_meta* meta, std::string& result){
         uint64_t i;
         POSAPIContext_QE *wqe;
         std::vector<std::function<void()>> dump_flow;
@@ -73,11 +73,11 @@ class POSDag {
     }
 
     /*!
-     *  \brief  serilize metadata of an handle on the DAG while dumping to file
+     *  \brief  serialize metadata of an handle on the DAG while dumping to file
      *  \param  meta    metadata of a handle (vertex on the DAG)
      *  \param  result  dump result
      */
-    static void _serilize_handle(pos_handle_meta* meta, std::string& result){
+    static void _serialize_handle(pos_handle_meta* meta, std::string& result){
         uint64_t i;
         POSHandle *handle;
         char t[128] = {0};
@@ -125,11 +125,18 @@ class POSDag {
         if(_pc > 0){
             _graph.dump_graph_to_file(
                 /* file_path */ POS_LOG_FILE_PATH,
-                /* serilize_t1 */ POSDag::_serilize_op,
-                /* serilize_t2 */ POSDag::_serilize_handle
+                /* serialize_t1 */ POSDag::_serialize_op,
+                /* serialize_t2 */ POSDag::_serialize_handle
             );
         }
     };
+
+    /*!
+     *  \brief  block until the dag is drained out
+     */
+    void drain(){
+        while(this->has_pending_op()){}
+    }
 
     /*!
      *  \brief  add a new handle to the DAG

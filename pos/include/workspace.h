@@ -55,7 +55,6 @@ class POSWorkspace {
      *  \brief  deconstructor
      */
     ~POSWorkspace(){ 
-        POS_LOG("enter deinit");
         clear(); 
     }
 
@@ -588,19 +587,26 @@ class POSWorkspace {
 
     void parse_command_line_options(int argc, char *argv[]){
         int opt;
-        const char *op_string = "n:k:";
+        const char *op_string = "n:k:c:";
 
         while((opt = getopt(argc, argv, op_string)) != -1){
             switch (opt)
             {
+            // job names
             case 'n':
                 pos_gconfig_server.job_name = std::string(optarg);
                 break;
 
+            // kernel meta file path
             case 'k':
                 pos_gconfig_server.kernel_meta_path = std::string(optarg);
                 break;
             
+            // checkpoint file path
+            case 'c':
+                pos_gconfig_server.checkpoint_file_path = std::string(optarg);
+                break;
+
             default:
                 POS_ERROR("unknown command line parameter: %c", op_string);
             }
@@ -608,6 +614,10 @@ class POSWorkspace {
 
         if(unlikely(pos_gconfig_server.job_name.size() == 0)){
             POS_ERROR_C("must assign a job name with -n option: -n resnet");
+        }
+
+        if(unlikely(pos_gconfig_server.kernel_meta_path.size() > 0 && pos_gconfig_server.checkpoint_file_path.size()) >0){
+            POS_ERROR_C("please either -c or -k, don't coexist!");
         }
     }
 };

@@ -53,6 +53,7 @@ build_cuda() {
             if [ -d "./build" ]; then
                 rm -rf ./build
             fi
+            rm /lib/x86_64-linux-gnu/libpos.so
         echo "[3] cleaning remoting framework (cricket)"
             cd $script_dir
             cd remoting/cuda/submodules/libtirpc

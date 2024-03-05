@@ -52,6 +52,16 @@ class POSHandle_CUDA_Context : public POSHandle {
     }
 
     /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Context(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Context;
+    }
+
+    /*!
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Context(size_t size_, void* hm, size_t state_size_=0)
@@ -118,6 +128,16 @@ class POSHandle_CUDA_Module : public POSHandle {
     }
 
     /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Module(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
+    }
+
+    /*!
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Module(size_t size_, void* hm, size_t state_size_=0)
@@ -151,6 +171,16 @@ class POSHandle_CUDA_Var : public POSHandle {
      */
     POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
         : POSHandle(client_addr_, size_, hm, state_size_)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
+    }
+
+    /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Var(void* hm) : POSHandle(hm)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
     }
@@ -194,6 +224,16 @@ class POSHandle_CUDA_Function : public POSHandle {
         this->has_verified_params = false;
     }
     
+    /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Function(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Function;
+    }
+
     /*!
      *  \note   never called, just for passing compilation
      */
@@ -267,6 +307,16 @@ class POSHandle_CUDA_Device : public POSHandle {
     }
     
     /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Device(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
+    }
+
+    /*!
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Device(size_t size_, void* hm, size_t state_size_=0)
@@ -311,6 +361,16 @@ class POSHandle_CUDA_Memory : public POSHandle {
     }
 
     /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Memory(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
+    }
+
+    /*!
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
@@ -348,13 +408,59 @@ class POSHandle_CUDA_Memory : public POSHandle {
     }
 
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle
+     *  \brief  checkpoint the state of the resource behind this handle (sync)
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0) const override { 
+    pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const override { 
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        POSCheckpointSlot* ckpt_slot;
+
+        struct rusage s_r_usage, e_r_usage;
+        uint64_t s_tick = 0, e_tick = 0;
+        double duration_us = 0;
+        
+        // apply new checkpoint slot
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag->apply_new_checkpoint(/* version */ version_id, /* ptr */ &ckpt_slot)
+        )){
+            POS_WARN_C("failed to apply checkpoint slot");
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // checkpoint
+        cuda_rt_retval = cudaMemcpy(
+            /* dst */ ckpt_slot->expose_pointer(), 
+            /* src */ this->server_addr,
+            /* size */ this->state_size,
+            /* kind */ cudaMemcpyDeviceToHost
+        );
+
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C(
+                "failed to checkpoint memory handle: server_addr(%p), retval(%d)",
+                this->server_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+    
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) const override { 
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         POSCheckpointSlot* ckpt_slot;
@@ -468,6 +574,16 @@ class POSHandle_CUDA_Stream : public POSHandle {
     }
 
     /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Stream(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Stream;
+    }
+
+    /*!
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Stream(size_t size_, void* hm, size_t state_size_=0)
@@ -518,6 +634,16 @@ class POSHandle_CUDA_Event : public POSHandle {
      */
     POSHandle_CUDA_Event(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
         : POSHandle(client_addr_, size_, hm, state_size_)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Event;
+    }
+
+    /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Event(void* hm) : POSHandle(hm)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Event;
     }
@@ -1110,7 +1236,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *  \note   the memory manager is a passthrough manager, which means that the client-side
      *          and server-side handle address are equal
      */
-    POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true) {}
+    POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true, /* is_stateful */ true) {}
 
     /*!
      *  \brief  allocate new mocked CUDA memory within the manager
