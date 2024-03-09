@@ -170,28 +170,23 @@ class POSCheckpointBag {
      *  \brief  load checkpoint data into this bag
      *  \note   this function will be invoked during the restore process
      *  \param  version     version of this checkpoint
-     *  \param  size        size of the checkpoint data
      *  \param  ckpt_data   pointer to the buffer that stores the checkpointed data
      *  \return POS_SUCCESS for successfully loading
      */
-    inline pos_retval_t load(uint64_t version, uint64_t size, void* ckpt_data){
+    inline pos_retval_t load(uint64_t version, void* ckpt_data){
         pos_retval_t retval = POS_SUCCESS;
         POSCheckpointSlot *ckpt_slot;
 
-        POS_ASSERT(size == this->_state_size);
         POS_CHECK_POINTER(ckpt_data);
 
         retval = apply_checkpoint_slot(version, &ckpt_slot);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C(
-                "failed to apply new checkpoiont slot while loading in restore: version(%lu), size(%lu)",
-                version, size
-            );
+            POS_WARN_C("failed to apply new checkpoiont slot while loading in restore: version(%lu)", version);
             goto exit;
         }
         POS_CHECK_POINTER(ckpt_slot);
 
-        memcpy(ckpt_slot->expose_pointer(), ckpt_data, size);
+        memcpy(ckpt_slot->expose_pointer(), ckpt_data, this->_state_size);
 
     exit:
         return retval;

@@ -637,7 +637,7 @@ class POSHandle {
         uint64_t i;
         uint64_t _nb_parent_handles;
         pos_vertex_id_t parent_handle_dag_id;
-        uint64_t nb_ckpt_version, ckpt_version, ckpt_size;
+        uint64_t nb_ckpt_version, ckpt_version;
 
         void *ptr = raw_data;
         POS_CHECK_POINTER(ptr);
@@ -664,10 +664,11 @@ class POSHandle {
             POS_CHECK_POINTER(this->ckpt_bag);
 
             POSHandle::__deserialize_read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
+
             for(i=0; i<nb_ckpt_version; i++){
                 POSHandle::__deserialize_read_field(&ckpt_version, &ptr, sizeof(uint64_t));
                 
-                tmp_retval = this->ckpt_bag->load(ckpt_version, ckpt_size, ptr);
+                tmp_retval = this->ckpt_bag->load(ckpt_version, ptr);
                 if(unlikely(tmp_retval != POS_SUCCESS)){
                     POS_ERROR_C(
                         "failed to load checkpoint while restoring: client_addr(%p), version(%lu)",
@@ -675,7 +676,7 @@ class POSHandle {
                     );
                 }
 
-                ptr += ckpt_size;
+                ptr += this->state_size;
             }
         }
 
