@@ -118,7 +118,7 @@ class POSParser {
         }
         
         while(!_stop_flag){
-            _ws->poll_runtime_wq(&wqes);
+            _ws->poll_parser_wq(&wqes);
 
         #if POS_ENABLE_DEBUG_CHECK
             if(wqes.size() > 0){
@@ -160,7 +160,7 @@ class POSParser {
                     );
                     wqe->status = kPOS_API_Execute_Status_Parse_Failed;
                     wqe->return_tick = POSUtilTimestamp::get_tsc();                    
-                    _ws->template push_cq<kPOS_Queue_Position_Runtime>(wqe);
+                    _ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
 
                     goto checkpoint_entrance;
                 }
@@ -181,7 +181,7 @@ class POSParser {
                  */
                 if(wqe->status == kPOS_API_Execute_Status_Return_After_Parse){
                     wqe->return_tick = POSUtilTimestamp::get_tsc();
-                    _ws->template push_cq<kPOS_Queue_Position_Runtime>(wqe);
+                    _ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
                 }
 
             checkpoint_entrance:

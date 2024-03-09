@@ -128,7 +128,7 @@ class POSUtil_CUDA_Kernel_Parser {
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
                 "failed parsing kernel prototype: parsing failed: kernel_str(%s), kernel_prototype(%s)",
-                kernel_str, kernel_prototype
+                kernel_str, kernel_prototype.c_str()
             );
             goto exit;
         }

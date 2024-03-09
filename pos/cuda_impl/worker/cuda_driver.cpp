@@ -19,7 +19,6 @@ namespace cu_module_load_data {
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *module_handle;
-        uint8_t *fatbin_binary;
         CUresult res;
         CUmodule module = NULL;
 
@@ -29,9 +28,10 @@ namespace cu_module_load_data {
         module_handle = pos_api_create_handle(wqe, 0);
         POS_CHECK_POINTER(module_handle);
 
-        fatbin_binary = module_handle->host_value_map[wqe->dag_vertex_id].first;
-
-        wqe->api_cxt->return_code = cuModuleLoadData(&module, fatbin_binary);
+        wqe->api_cxt->return_code = cuModuleLoadData(
+            /* module */ &module,
+            /* image */  pos_api_param_addr(wqe, 1)
+        );
 
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){

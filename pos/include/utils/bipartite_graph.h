@@ -15,7 +15,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/timestamp.h"
-
+#include "pos/include/utils/serializer.h"
 
 using pos_vertex_id_t = uint64_t;
 
@@ -64,9 +64,6 @@ using POSNeighborList_t = std::vector<POSBgEdge_t>;
 template<typename T1, typename T2>
 class POSBipartiteGraph {
  public:
-    #define kPOSBG_PREFILL_NB_VERTEX         65536 // 1 << 16
-    #define kPOSBG_PREFILL_NB_NEIGHBOR       65536 // 1 << 16
-
     POSBipartiteGraph() : max_t1_id(0), max_t2_id(0) {
         static_assert(!std::is_same_v<T1, T2>,
             "POSBipartiteGraph couldn't support only one type of node exist in the graph"
@@ -81,11 +78,11 @@ class POSBipartiteGraph {
         /*!
          *  \brief  prefill is important, otherwise the runtime performance will significantly decrease
          */
-        _t1s.reserve(kPOSBG_PREFILL_NB_VERTEX);
-        _t2s.reserve(kPOSBG_PREFILL_NB_VERTEX);
-        _topo_t2.reserve(kPOSBG_PREFILL_NB_VERTEX);
+        _t1s.reserve(POS_NB_PREFILL_DAG_VERTEX);
+        _t2s.reserve(POS_NB_PREFILL_DAG_VERTEX);
+        _topo_t2.reserve(POS_NB_PREFILL_DAG_VERTEX);
 
-        for(i=0; i<kPOSBG_PREFILL_NB_VERTEX; i++){
+        for(i=0; i<POS_NB_PREFILL_DAG_VERTEX; i++){
             reserved_vertex_t1 = new POSBgVertex_t<T1>();
             POS_CHECK_POINTER(reserved_vertex_t1);
             _t1s.push_back(reserved_vertex_t1);
@@ -96,7 +93,7 @@ class POSBipartiteGraph {
 
             reserved_neighbor_list = new POSNeighborList_t();
             POS_CHECK_POINTER(reserved_neighbor_list);
-            reserved_neighbor_list->reserve(kPOSBG_PREFILL_NB_NEIGHBOR);
+            reserved_neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
             _topo_t2.push_back(reserved_neighbor_list);
         }
         POS_DEBUG("pos bipartite graph prefill done");
@@ -177,7 +174,7 @@ class POSBipartiteGraph {
         }
 
         // obtain / create vertex instance
-        if(unlikely(*id >= kPOSBG_PREFILL_NB_VERTEX)){
+        if(unlikely(*id >= POS_NB_PREFILL_DAG_VERTEX)){
             POS_CHECK_POINTER(new_vertex = new POSBgVertex_t<T>());
             if constexpr (std::is_same_v<T, T1>){
                 _t1s.push_back(new_vertex);
@@ -188,7 +185,7 @@ class POSBipartiteGraph {
                 // add neighbor list
                 new_neighbor_list = new POSNeighborList_t();
                 POS_CHECK_POINTER(new_neighbor_list);
-                new_neighbor_list->reserve(kPOSBG_PREFILL_NB_NEIGHBOR);
+                new_neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
                 _topo_t2.push_back(new_neighbor_list);
             }
         } else {
@@ -202,7 +199,7 @@ class POSBipartiteGraph {
         // setup metadata of the vertex
         new_vertex->data = (T*)data;
         new_vertex->id = *id;
-
+        
         /*!
          *  \note  the performance of this part is good
          */
@@ -338,6 +335,59 @@ class POSBipartiteGraph {
 
         output_file.close();
         POS_LOG("finish dump DAG file to %s", file_path);
+    }
+
+    /*!
+     *  \brief  obtain serialize size of current graph
+     *  \return serialize size of current graph
+     */
+    uint64_t get_serialize_size(){
+        uint64_t i, nb_edges = 0;
+        POSNeighborList_t *neighbor_list;
+
+        for(i=0; i<_topo_t2.size(); i++){
+            POS_CHECK_POINTER(neighbor_list = _topo_t2[i]);
+            nb_edges += neighbor_list->size();
+        }
+
+        return (
+            /* nb_t2_v */   sizeof(uint64_t)
+            /* nb_edges */  + _topo_t2.size() * sizeof(uint64_t)
+            /* edges */     + nb_edges * sizeof(POSBgEdge_t)
+        );
+    }
+
+    /*!
+     *  \brief  serialize the current current graph into the binary area
+     *  \param  serialized_area  pointer to the binary area
+     */
+    inline void serialize(void** serialized_area){
+        void *ptr;
+        uint64_t i, j, nb_t2_v, nb_edges;
+        POSNeighborList_t *neighbor_list;
+        
+        POS_CHECK_POINTER(serialized_area);
+        *serialized_area = malloc(get_serialize_size());
+        POS_CHECK_POINTER(*serialized_area);
+
+        ptr = *serialized_area;
+
+        // field: nb_t2_v
+        nb_t2_v = max_t2_id;
+        POSUtil_Serializer::write_field(&ptr, &(nb_t2_v), sizeof(uint64_t));
+
+        for(i=0; i<_topo_t2.size(); i++){
+            POS_CHECK_POINTER(neighbor_list = _topo_t2[i]);
+
+            // field: nb_edges
+            nb_edges = neighbor_list->size();
+            POSUtil_Serializer::write_field(&ptr, &(nb_edges), sizeof(uint64_t));
+
+            // field: edges
+            for(j=0; j<nb_edges; j++){
+                POSUtil_Serializer::write_field(&ptr, &((*neighbor_list)[j]), sizeof(POSBgEdge_t));
+            }
+        }
     }
 
  private:

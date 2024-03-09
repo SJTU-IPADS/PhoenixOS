@@ -13,6 +13,19 @@ class POSClient;
 #include "pos/include/handle.h"
 #include "pos/include/dag.h"
 
+
+/*!
+ *  \brief  context of the client
+ */
+typedef struct pos_client_cxt {
+    // api id of the checkpoint operation
+    uint64_t checkpoint_api_id;
+} pos_client_cxt_t;
+
+
+#define POS_CLIENT_CXT_HEAD pos_client_cxt cxt_base;
+
+
 /*!
  *  \brief  base state of a remote client
  */
@@ -20,11 +33,18 @@ class POSClient {
  public:
     /*!
      *  \param  id  client identifier
-     *  \param  ws  pointer to the workspace related to this client
+     *  \param  cxt context to initialize this client
      */
-    POSClient(uint64_t id, void* ws) : id(id), _api_inst_pc(0), dag(id), _ws(ws) {}
+    POSClient(uint64_t id, pos_client_cxt_t cxt) 
+        :   id(id),
+            dag({ .checkpoint_api_id = cxt.checkpoint_api_id }),
+            _api_inst_pc(0), 
+            _cxt(cxt)
+    {}
 
-    POSClient() : id(0), dag(0) {}
+    POSClient() : id(0), dag({ .checkpoint_api_id = 0 }) {
+        POS_ERROR_C("shouldn't call, just for passing compilation");
+    }
     
     ~POSClient(){}
     
@@ -105,8 +125,8 @@ class POSClient {
     // api instance pc
     uint64_t _api_inst_pc;
 
-    // workspace that this client belongs to
-    void *_ws;
+    // context to initialize this client
+    pos_client_cxt_t _cxt;
 };
 
 #define pos_get_client_typed_hm(client, resource_id, hm_type)  \

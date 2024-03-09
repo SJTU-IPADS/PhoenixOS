@@ -9,17 +9,27 @@
 #include "pos/cuda_impl/handle/cublas.h"
 #include "pos/cuda_impl/api_index.h"
 
+
+/*!
+ *  \brief  context of CUDA client
+ */
+typedef struct pos_client_cxt_CUDA {
+    POS_CLIENT_CXT_HEAD;
+} pos_client_cxt_CUDA_t;
+
+
 class POSClient_CUDA : public POSClient {
  public:
     /*!
      *  \param  id  client identifier
-     *  \param  ws  pointer to the workspace related to this client
+     *  \param  cxt context to initialize this client
      */
-    POSClient_CUDA(uint64_t id, void* ws) : POSClient(id, ws){}
+    POSClient_CUDA(uint64_t id, pos_client_cxt_CUDA_t cxt) 
+        : POSClient(id, cxt.cxt_base), _cxt_CUDA(cxt){}
 
     POSClient_CUDA(){}
     ~POSClient_CUDA(){};
-
+    
     /*!
      *  \brief  instantiate handle manager for all used CUDA resources
      *  \note   the children class should replace this method to initialize their 
@@ -139,7 +149,7 @@ class POSClient_CUDA : public POSClient {
                     var = (*((type*)(pointer)));                \
                     pointer += sizeof(type);
 
-        // TODO: it's ugly to write gconfig here
+        // TODO: it's ugly to write gconfig here, try to use client context instead
         if(pos_gconfig_server.checkpoint_file_path.size() > 0){
             // open checkpoint file
             file.open(pos_gconfig_server.checkpoint_file_path.c_str(), std::ios::in|std::ios::binary);
@@ -206,7 +216,7 @@ class POSClient_CUDA : public POSClient {
             // TODO:
         
             /* --------- step 3: restore handle tree --------- */
-            // TODO:
+            // TODO: 
 
             /* --------- step 4: recompute missing checkpoints --------- */
             // TODO:
@@ -232,21 +242,28 @@ class POSClient_CUDA : public POSClient {
     void deinit_dump_checkpoints() override {
         std::string file_path;
         std::ofstream output_file;
+
         typename std::map<pos_resource_typeid_t, void*>::iterator hm_map_iter;
         POSHandleManager<POSHandle> *hm;
         uint64_t nb_handles, nb_resource_types, i;
         POSHandle *handle;
-        void *handle_serialize_area;
+        
+        uint64_t nb_api_cxt;
+        POSAPIContext_QE_t *api_cxt;
+
+        void *serialize_area;
         uint64_t serialize_area_size;
 
         file_path = std::string("./") + pos_gconfig_server.job_name + std::string("_checkpoints_") + std::to_string(this->id) + std::string(".bat");
         output_file.open(file_path.c_str(), std::ios::binary);
 
+        POS_LOG("dumping checkpoints...");
+
+        /* ------------------ step 1: dump handles ------------------ */
         // field: # resource type
         nb_resource_types = this->handle_managers.size();
         output_file.write((const char*)(&(nb_resource_types)), sizeof(uint64_t));
 
-        // step 1: dump handles
         for(hm_map_iter = this->handle_managers.begin(); hm_map_iter != handle_managers.end(); hm_map_iter++){
             POS_CHECK_POINTER(hm = (POSHandleManager<POSHandle>*)(hm_map_iter->second));
             nb_handles = hm->get_nb_handles();
@@ -260,11 +277,11 @@ class POSClient_CUDA : public POSClient {
             for(i=0; i<nb_handles; i++){
                 POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
 
-                if(unlikely(POS_SUCCESS != handle->serialize(&handle_serialize_area))){
+                if(unlikely(POS_SUCCESS != handle->serialize(&serialize_area))){
                     POS_WARN_C("failed to serialize handle: client_addr(%p)", handle->client_addr);
                     continue;
                 }
-                POS_CHECK_POINTER(handle_serialize_area);
+                POS_CHECK_POINTER(serialize_area);
 
                 serialize_area_size = handle->get_serialize_size();
 
@@ -273,27 +290,67 @@ class POSClient_CUDA : public POSClient {
 
                 if(likely(serialize_area_size > 0)){
                     // field: serialized data
-                    output_file.write((const char*)(handle_serialize_area), serialize_area_size);
+                    output_file.write((const char*)(serialize_area), serialize_area_size);
                 }
-
                 output_file.flush();
-
-                POS_CHECK_POINTER(handle_serialize_area);
-                free(handle_serialize_area);
+                free(serialize_area);
             }
         }
 
-        // step 2: dump API call flow
-        
+        POS_LOG("    => dumped checkpoints of handles");
 
-        // step 3: dump dag
-        // TODO:
+        /* ------------------ step 2: dump api context ------------------ */
+        // field: # api context
+        nb_api_cxt = this->dag.get_nb_api_cxt();
+        output_file.write((const char*)(&(nb_api_cxt)), sizeof(uint64_t));
+
+        for(i=0; i<nb_api_cxt; i++){
+            POS_CHECK_POINTER(api_cxt = this->dag.get_api_cxt_by_id(i));
+
+            api_cxt->serialize(&serialize_area);
+            POS_CHECK_POINTER(serialize_area);
+
+            // field: size of the serialized area of this api context
+            serialize_area_size = api_cxt->get_serialize_size();
+            output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            
+            // field: serialized data
+            output_file.write((const char*)(serialize_area), serialize_area_size);
+            
+            output_file.flush();
+            free(serialize_area);
+        }
+
+        POS_LOG("    => dumped checkpoints of api contexts");
+
+        /* ------------------ step 3: dump dag ------------------ */
+        /*!
+         *  \note   actually, after dumping handle and api context, we already can construct DAG while restoring,
+         *          as the api context contains information about which handles each API would operates on, we still
+         *          dump the DAG here to accelerate the re-execute algorithm in restore
+         */
+        this->dag.serialize(&serialize_area);
+        POS_CHECK_POINTER(serialize_area);
+
+        // field: size of the serialized area of this dag topo
+        serialize_area_size = this->dag.get_serialize_size();
+        output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+
+        // field: serialized data
+        output_file.write((const char*)(serialize_area), serialize_area_size);
+        
+        output_file.flush();
+        free(serialize_area);
+
+        POS_LOG("    => dumped checkpoints of DAG");
 
         output_file.close();
         POS_LOG("finish dump checkpoints to %s", file_path.c_str());
     }
 
  private:
+    pos_client_cxt_CUDA _cxt_CUDA;
+
     /*!
      *  \brief  export the metadata of functions
      */

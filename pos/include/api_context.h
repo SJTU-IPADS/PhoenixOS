@@ -13,6 +13,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/serializer.h"
 #include "pos/include/handle.h"
 #include "pos/include/utils/bipartite_graph.h"
 
@@ -159,6 +160,9 @@ typedef struct POSAPIContext {
     // parameter list of the called API
     std::vector<POSAPIParam_t*> params;
 
+    // overall size of all parameters
+    uint64_t overall_param_size;
+
     // pointer to the area to store the return result
     void *ret_data;
 
@@ -166,6 +170,46 @@ typedef struct POSAPIContext {
     int return_code;
 
     uint64_t retval_size;
+
+    /*!
+     *  \brief  obtain serialize size of current api context
+     *  \return serialize size of current api context
+     */
+    inline uint64_t get_serialize_size(){
+        uint64_t nb_params;
+
+        nb_params = params.size();
+
+        return (
+            /* api id */        sizeof(uint64_t)
+            /* nb_params */     + sizeof(uint64_t)
+            /* param_sizes */   + nb_params * sizeof(uint64_t)
+            /* param_data */    + overall_param_size
+        );
+    }
+
+    /*!
+     *  \brief  serialize the current current api context into the binary area
+     *  \param  serialized_area  pointer to the binary area
+     */
+    inline void serialize(void* serialized_area){
+        void *ptr = serialized_area;
+        uint64_t i, nb_params;
+        POSAPIParam_t *param;
+
+        POS_CHECK_POINTER(ptr);
+
+        nb_params = params.size();
+
+        POSUtil_Serializer::write_field(&ptr, &(api_id), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(nb_params), sizeof(uint64_t));
+
+        for(i=0; i<nb_params; i++){
+            POS_CHECK_POINTER(param = params[i]);
+            POSUtil_Serializer::write_field(&ptr, &(param->param_size), sizeof(uint64_t));
+            POSUtil_Serializer::write_field(&ptr, param->param_value, param->param_size);
+        }
+    }
 
     /*!
      *  \brief  constructor
@@ -179,12 +223,14 @@ typedef struct POSAPIContext {
     {
         POSAPIParam_t *param;
 
+        overall_param_size = 0;
         params.reserve(16);
 
         // insert parameters
-        for(auto param_desp : param_desps){
+        for(auto& param_desp : param_desps){
             POS_CHECK_POINTER(param = new POSAPIParam_t(param_desp.value, param_desp.size));
             params.push_back(param);
+            overall_param_size += param_desp.size;
         }
     }
 
@@ -193,7 +239,7 @@ typedef struct POSAPIContext {
      *  \note   this constructor is for checkpointing ops
      *  \param  id  specialized API index of the checkpointing op
      */
-    POSAPIContext(uint64_t id) : api_id(id) {}
+    POSAPIContext(uint64_t id) : api_id(id), overall_param_size(0) {}
 
     ~POSAPIContext(){
         for(auto param : params){ POS_CHECK_POINTER(param); delete param; }
@@ -223,6 +269,33 @@ typedef struct POSHandleView {
      *              within the worker launching function
      */
     uint64_t offset;
+
+    /*!
+     *  \brief  obtain serialize size of handle view
+     *  \return serialize size of handle view
+     */
+    static inline uint64_t get_serialize_size(){
+        return (
+            /* handle_dag_id */ sizeof(pos_vertex_id_t)
+            /* param_index */   + sizeof(uint64_t)
+            /* offset */        + sizeof(uint64_t)
+        );
+    }
+
+    /*!
+     *  \brief  serialize the current handle view into the binary area
+     *  \param  serialized_area  pointer to the binary area
+     */
+    inline void serialize(void* serialized_area){
+        void *ptr = serialized_area;
+        POS_CHECK_POINTER(ptr);
+
+        POS_CHECK_POINTER(handle);
+
+        POSUtil_Serializer::write_field(&ptr, &(handle->dag_vertex_id), sizeof(pos_vertex_id_t));
+        POSUtil_Serializer::write_field(&ptr, &(param_index), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(offset), sizeof(uint64_t));
+    }
 
     /*!
      *  \brief  constructor
@@ -357,6 +430,81 @@ typedef struct POSAPIContext_QE {
      */
     ~POSAPIContext_QE(){
         // TODO: release handle views
+    }
+    
+    /*!
+     *  \brief  obtain the size of serialize area of this api conetxt
+     *  \return size of serialize area of this api conetxt
+     */
+    inline uint64_t get_serialize_size(){
+        uint64_t nb_handle_views = 0;
+            
+        nb_handle_views += input_handle_views.size();
+        nb_handle_views += output_handle_views.size();
+        nb_handle_views += inout_handle_views.size();
+        nb_handle_views += create_handle_views.size();
+        nb_handle_views += delete_handle_views.size();
+
+        POS_CHECK_POINTER(api_cxt);
+
+        return (
+            // part 1: base field
+            /* dag_vertex_id */             sizeof(pos_vertex_id_t)
+
+            // part 2: api context
+            /* api context */               + api_cxt->get_serialize_size()
+
+            // part 3: handle views
+            /* nb of input handle views */  + sizeof(uint64_t)
+            /* nb of output handle views */ + sizeof(uint64_t)
+            /* nb of inout handle views */  + sizeof(uint64_t)
+            /* nb of create handle views */ + sizeof(uint64_t)
+            /* nb of delete handle views */ + sizeof(uint64_t)
+            /* handle_views */              + nb_handle_views * POSHandleView_t::get_serialize_size()
+        );
+    }
+
+    /*!
+     *  \brief  serialize this api context
+     *  \param  serialized_area pointer to the area that stores the serialized data
+     */
+    inline void serialize(void** serialized_area){
+        void *ptr;
+
+        // serialize one type of handle views
+        auto __serialize_handle_views = [](void** ptr, std::vector<POSHandleView_t>& hv_vector){
+            uint64_t nb_handle_views;
+            nb_handle_views = hv_vector.size();
+
+            POSUtil_Serializer::write_field(ptr, &(nb_handle_views), sizeof(uint64_t));
+            for(auto &hv : hv_vector){
+                hv.serialize(*ptr);
+                (*ptr) += POSHandleView_t::get_serialize_size();
+            }
+        };
+
+        POS_CHECK_POINTER(serialized_area);
+
+        uint64_t allocate_size = get_serialize_size();
+        
+        *serialized_area = malloc(allocate_size);
+        POS_CHECK_POINTER(*serialized_area);
+        
+        ptr = *serialized_area;
+
+        // part 1: base field
+        POSUtil_Serializer::write_field(&ptr, &(dag_vertex_id), sizeof(pos_vertex_id_t));
+
+        // part 2: serialize api context
+        api_cxt->serialize(ptr);
+        ptr += api_cxt->get_serialize_size();
+
+        // part 3: serialize handle views
+        __serialize_handle_views(&ptr, input_handle_views);
+        __serialize_handle_views(&ptr, output_handle_views);
+        __serialize_handle_views(&ptr, inout_handle_views);
+        __serialize_handle_views(&ptr, create_handle_views);
+        __serialize_handle_views(&ptr, delete_handle_views);
     }
 
     /*!

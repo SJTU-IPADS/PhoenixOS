@@ -15,6 +15,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/bipartite_graph.h"
+#include "pos/include/utils/serializer.h"
 #include "pos/include/checkpoint.h"
 
 #define kPOS_HandleDefaultSize   (1<<4)
@@ -290,25 +291,6 @@ class POSHandle {
 
 
     /*!
-     *  \brief  record host value of the handle under specific version
-     *  \param  data    pointer to the remoting buffer, which contains the host-side value
-     *  \param  size    size of the host-side value
-     *  \param  version version (pc index) of the host-side value
-     */
-    inline void record_host_value(void* data, uint64_t size, uint64_t version){
-        uint8_t* host_value;
-
-        POS_CHECK_POINTER(data);
-        POS_ASSERT(size > 0);
-
-        host_value = (uint8_t*)malloc(size);
-        POS_CHECK_POINTER(host_value);
-        memcpy(host_value, data, size);
-
-        host_value_map[version] = { host_value, size };
-    }
-
-    /*!
      *  \brief  checkpoint the state of the resource behind this handle (sync)
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id  version of this checkpoint
@@ -426,11 +408,11 @@ class POSHandle {
     std::vector<POSHandle*> parent_handles;
 
     /*!
-     *  \brief  dag indices of parent handles of this handle
+     *  \brief  resource type and dag indices of parent handles of this handle
      *  \note   this field is filled during restore process, for temporily store the indices
      *          of all parent handles of this handle
      */
-    std::vector<pos_vertex_id_t> parent_handles_dag_idx;
+    std::vector<std::pair<pos_resource_typeid_t, pos_vertex_id_t>> parent_handles_waitlist;
 
     // id of the DAG vertex of this handle
     pos_vertex_id_t dag_vertex_id;
@@ -456,17 +438,6 @@ class POSHandle {
      *          init_ckpt_bag
      */
     POSCheckpointBag *ckpt_bag;
-
-    /*!
-     *  \brief  map between (1) dag pc to (2) host-side new value of 
-     *          the resource behind this handle
-     *  \note   1. for those APIs which bring new value to handle from the host-side,
-     *          we need to cache the host-side value in case we would reply this
-     *          API call later
-     *  \note   2. we might need to cache multiple versions of host-side new values,
-     *          so we use a map here
-     */
-    std::map<uint64_t, std::pair<uint8_t*, uint64_t>> host_value_map;
     
  protected:
     /*!
@@ -496,7 +467,7 @@ class POSHandle {
                 /* client_addr */           + sizeof(uint64_t)
                 /* server_addr */           + sizeof(uint64_t)
                 /* nb_parent_handle */      + sizeof(uint64_t)
-                /* parent_handle_indices */ + parent_handles.size() * sizeof(pos_vertex_id_t)
+                /* parent_handle_indices */ + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
                 /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
                 /* size */                  + sizeof(uint64_t)
                 /* state_size */            + sizeof(uint64_t)
@@ -513,7 +484,7 @@ class POSHandle {
                 /* client_addr */           + sizeof(uint64_t)
                 /* server_addr */           + sizeof(uint64_t)
                 /* nb_parent_handle */      + sizeof(uint64_t)
-                /* parent_handle_indices */ + parent_handles.size() * sizeof(pos_vertex_id_t)
+                /* parent_handle_indices */ + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
                 /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
                 /* size */                  + sizeof(uint64_t)
                 /* state_size */            + sizeof(uint64_t)
@@ -530,19 +501,6 @@ class POSHandle {
      */
     virtual uint64_t __get_extra_serialize_size(){
         return 0;
-    }
-
-    /*!
-     *  \brief  serialize spefic field of the handle to the serilization area
-     *  \param  dptr    pointer of pointer to the serilization memory for storing the field
-     *  \param  sptr    address of the field to be serialized
-     *  \param  size    size of the field to be serialized
-     */
-    static void __serialize_write_field(void** dptr, void* sptr, uint64_t size){
-        if(likely(size > 0)){
-            memcpy(*dptr, sptr, size);
-        }
-        (*dptr) += size;
     }
 
     /*!
@@ -565,16 +523,17 @@ class POSHandle {
         
         nb_parent_handles = this->parent_handles.size();
 
-        POSHandle::__serialize_write_field(&ptr, &(this->resource_type_id), sizeof(pos_resource_typeid_t));
-        POSHandle::__serialize_write_field(&ptr, &(this->client_addr), sizeof(uint64_t));
-        POSHandle::__serialize_write_field(&ptr, &(this->server_addr), sizeof(uint64_t));
-        POSHandle::__serialize_write_field(&ptr, &(nb_parent_handles), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->resource_type_id), sizeof(pos_resource_typeid_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->client_addr), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->server_addr), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(nb_parent_handles), sizeof(uint64_t));
         for(auto& parent_handle : this->parent_handles){
-            POSHandle::__serialize_write_field(&ptr, &(parent_handle->dag_vertex_id), sizeof(pos_vertex_id_t));
+            POSUtil_Serializer::write_field(&ptr, &(parent_handle->resource_type_id), sizeof(pos_resource_typeid_t));
+            POSUtil_Serializer::write_field(&ptr, &(parent_handle->dag_vertex_id), sizeof(pos_vertex_id_t));
         }
-        POSHandle::__serialize_write_field(&ptr, &(this->dag_vertex_id), sizeof(pos_vertex_id_t));
-        POSHandle::__serialize_write_field(&ptr, &(this->size), sizeof(uint64_t));
-        POSHandle::__serialize_write_field(&ptr, &(this->state_size), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->dag_vertex_id), sizeof(pos_vertex_id_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->size), sizeof(uint64_t));
+        POSUtil_Serializer::write_field(&ptr, &(this->state_size), sizeof(uint64_t));
 
         // we only serialize checkpoint for stateful resource
         if(state_size > 0){
@@ -583,7 +542,7 @@ class POSHandle {
             ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
             nb_ckpt_version = ckpt_version_set.size();
 
-            POSHandle::__serialize_write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
+            POSUtil_Serializer::write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
 
             for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
                 ckpt_version = *set_iter;
@@ -595,8 +554,8 @@ class POSHandle {
                     );
                 }
                 POS_CHECK_POINTER(ckpt_slot);
-                POSHandle::__serialize_write_field(&ptr, &ckpt_version, sizeof(uint64_t));
-                POSHandle::__serialize_write_field(&ptr, ckpt_slot->expose_pointer(), state_size);
+                POSUtil_Serializer::write_field(&ptr, &ckpt_version, sizeof(uint64_t));
+                POSUtil_Serializer::write_field(&ptr, ckpt_slot->expose_pointer(), state_size);
             }
         }
 
@@ -614,19 +573,6 @@ class POSHandle {
     }
 
     /*!
-     *  \brief  deserialize spefic field of the handle to variable
-     *  \param  var     the area to store the deserialized data
-     *  \param  sptr    pointer to the pointer of the field to be read
-     *  \param  size    size of the data to be deserialized
-     */
-    static void __deserialize_read_field(void* dptr, void** sptr, uint64_t size){
-        POS_CHECK_POINTER(dptr);
-        POS_CHECK_POINTER(*sptr);
-        memcpy(dptr, *sptr, size);
-        (*sptr) += size;
-    }
-
-    /*!
      *  \brief  deserialize basic field of this handle
      *  \param  raw_data    raw data area that store the serialized data
      *  \return POS_SUCCESS for successfully deserialize
@@ -636,26 +582,30 @@ class POSHandle {
 
         uint64_t i;
         uint64_t _nb_parent_handles;
+        pos_resource_typeid_t parent_resource_id;
         pos_vertex_id_t parent_handle_dag_id;
         uint64_t nb_ckpt_version, ckpt_version;
 
         void *ptr = raw_data;
         POS_CHECK_POINTER(ptr);
 
-        POSHandle::__deserialize_read_field(&(this->resource_type_id), &ptr, sizeof(pos_resource_typeid_t));
+        POSUtil_Deserializer::read_field(&(this->resource_type_id), &ptr, sizeof(pos_resource_typeid_t));
 
-        POSHandle::__deserialize_read_field(&(this->client_addr), &ptr, sizeof(uint64_t));
-        POSHandle::__deserialize_read_field(&(this->server_addr), &ptr, sizeof(uint64_t));
-        POSHandle::__deserialize_read_field(&_nb_parent_handles, &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(this->client_addr), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(this->server_addr), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&_nb_parent_handles, &ptr, sizeof(uint64_t));
 
         for(i=0; i<_nb_parent_handles; i++){
-            POSHandle::__deserialize_read_field(&parent_handle_dag_id, &ptr, sizeof(pos_vertex_id_t));
-            this->parent_handles_dag_idx.push_back(parent_handle_dag_id);
+            POSUtil_Deserializer::read_field(&parent_resource_id, &ptr, sizeof(pos_resource_typeid_t));
+            POSUtil_Deserializer::read_field(&parent_handle_dag_id, &ptr, sizeof(pos_vertex_id_t));
+            this->parent_handles_waitlist.push_back(
+                std::pair<pos_resource_typeid_t, pos_vertex_id_t>(parent_resource_id, parent_handle_dag_id)
+            );
         }
 
-        POSHandle::__deserialize_read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
-        POSHandle::__deserialize_read_field(&(this->size), &ptr, sizeof(uint64_t));
-        POSHandle::__deserialize_read_field(&(this->state_size), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
+        POSUtil_Deserializer::read_field(&(this->size), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(this->state_size), &ptr, sizeof(uint64_t));
 
         if(this->state_size > 0){
             if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
@@ -663,10 +613,10 @@ class POSHandle {
             }
             POS_CHECK_POINTER(this->ckpt_bag);
 
-            POSHandle::__deserialize_read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
+            POSUtil_Deserializer::read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
 
             for(i=0; i<nb_ckpt_version; i++){
-                POSHandle::__deserialize_read_field(&ckpt_version, &ptr, sizeof(uint64_t));
+                POSUtil_Deserializer::read_field(&ckpt_version, &ptr, sizeof(uint64_t));
                 
                 tmp_retval = this->ckpt_bag->load(ckpt_version, ptr);
                 if(unlikely(tmp_retval != POS_SUCCESS)){

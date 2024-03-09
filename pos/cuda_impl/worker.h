@@ -134,10 +134,10 @@ class POSWorker_CUDA : public POSWorker {
             }
         }
 
-        // POS_LOG(
-        //     "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
-        //     wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
-        // );
+        POS_LOG(
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+        );
 
         return retval;
     }

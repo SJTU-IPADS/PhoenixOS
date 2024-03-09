@@ -29,7 +29,7 @@ namespace register_client {
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         oob_payload_t *payload;
 
-        POSClient_CUDA *clnt;
+        POSClient *clnt;
         POSTransport_SHM *trans;
 
         POS_CHECK_POINTER(remote);
@@ -39,8 +39,7 @@ namespace register_client {
         payload = (oob_payload_t*)msg->payload;
         
         // create client
-        // todo: we need to select client type
-        ws->create_client<POSClient_CUDA>(&clnt, &(msg->client_meta.uuid));
+        ws->create_client(&clnt, &(msg->client_meta.uuid));
 
         // create queue pair
         if(unlikely(POS_SUCCESS != ws->create_qp(msg->client_meta.uuid))){

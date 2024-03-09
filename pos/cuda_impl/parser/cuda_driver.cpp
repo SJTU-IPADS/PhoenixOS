@@ -89,13 +89,6 @@ namespace cu_module_load_data {
         // set current handle as the latest used handle
         hm_module->latest_used_handle = module_handle;
 
-        // cache the host-side value
-        module_handle->record_host_value(
-            /* data */ pos_api_param_addr(wqe, 1),
-            /* size */ pos_api_param_size(wqe, 1),
-            /* version */ client->dag.get_current_pc_runtime()
-        );
-
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ module_handle
