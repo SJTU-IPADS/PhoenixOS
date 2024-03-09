@@ -6,11 +6,14 @@ import torch.optim as optim
 from utils.readData import read_dataset
 from utils.ResNet import ResNet50
 import time
+import os
 # import nvtx
 
 torch.backends.cudnn.enabled = False
 
 # torch.set_num_threads(1)
+
+print(f"process id: {os.getpid()}")
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 batch_size = 128
@@ -72,13 +75,13 @@ for epoch in tqdm(range(1, n_epochs+1)):
 
         # NOTE: comment out to mock inference
         # TODO: use nsight system to see whether this part has multi-threads
-        # rng_bwd = __nvtx_push(message=f"backward", color="green")
-        # optimizer.zero_grad()
-        # loss = criterion(output, target)
-        # loss.backward()
-        # optimizer.step()
-        # train_loss += loss.item()*data.size(0)
-        # __nvtx_pop(rng_bwd)
+        rng_bwd = __nvtx_push(message=f"backward", color="green")
+        optimizer.zero_grad()
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        train_loss += loss.item()*data.size(0)
+        __nvtx_pop(rng_bwd)
 
         nb_iteration += 1
         

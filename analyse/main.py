@@ -25,7 +25,7 @@ class POSOp:
     def __init__(
             self, id:int, api_id:int, return_code:int, 
             c_tick:int, r_tick:int, runtime_s_tick:int, runtime_e_tick:int, worker_s_tick:int, worker_e_tick:int, queue_len_before_parse:int, tsc_freq:int,
-            nb_ckpt_handles:int = 0, ckpt_size:int = 0, ckpt_memory_consumption:int = 0
+            nb_ckpt_handles:int = 0, ckpt_size:int = 0, nb_abandon_handles:int = 0, abandon_ckpt_size:int = 0, ckpt_memory_consumption:int = 0
     ) -> None:
         self.id = id
         self.api_id = api_id
@@ -49,6 +49,8 @@ class POSOp:
 
         self.nb_ckpt_handles = nb_ckpt_handles
         self.ckpt_size = ckpt_size
+        self.nb_abandon_handles = nb_abandon_handles
+        self.abandon_ckpt_size = abandon_ckpt_size
         self.ckpt_memory_consumption = ckpt_memory_consumption
 
     def add_handle_id(self, hid:int, direction:int):
@@ -125,12 +127,12 @@ class POSDag:
             if(id <= self.nb_ops):
                 vid, api_id, return_code,                                                                               \
                 c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse,   \
-                nb_ckpt_handles, ckpt_size, ckpt_memory_consumption                                                     \
+                nb_ckpt_handles, ckpt_size, nb_abandon_handles, abandon_ckpt_size, ckpt_memory_consumption              \
                     = [int(x.strip()) for x in line.split(',')]
                 op = POSOp(
                     vid, api_id, return_code,
                     c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse, self.tsc_freq, 
-                    nb_ckpt_handles, ckpt_size, ckpt_memory_consumption
+                    nb_ckpt_handles, ckpt_size, nb_abandon_handles, abandon_ckpt_size, ckpt_memory_consumption
                 )
                 self.ops[vid] = op
                 continue
@@ -199,8 +201,8 @@ class POSDag:
             self.dag_mat.append(handle_vector)
 
     def analyse_dag(self, figure_dir_path:str):
-        # self._analyse_ckpt(figure_dir_path)
-        self._analyse_ops()
+        self._analyse_ckpt(figure_dir_path)
+        # self._analyse_ops()
 
     def _analyse_ops(self):
         print(">>> analysing ops...")
@@ -268,22 +270,41 @@ class POSDag:
         normal_ops_duration : int = 0
         checkpoint_ops_duration : int = 0
         checkpoint_size : int = 0
+        abandon_checkpoint_size : int = 0
+
+        ckpt_avail_list = []
 
         for id, op in self.ops.items():
             if op.api_id == 6666:
                 checkpoint_ops.append(op)
                 checkpoint_ops_duration += op.worker_duration
                 checkpoint_size += op.ckpt_size
+                abandon_checkpoint_size += op.abandon_ckpt_size
+
+                if op.ckpt_size + op.abandon_ckpt_size == 0:
+                    continue
+
+                avail_rate = (op.ckpt_size) / (op.ckpt_size + op.abandon_ckpt_size)
+                ckpt_avail_list.append(avail_rate)
+
+                print(f"ckpt op: ckpt_size({op.ckpt_size}), abandon_ckpt_size({op.abandon_ckpt_size}), avail_rate({avail_rate})")
+
             else:
                 normal_ops.append(op)
                 # normal_ops_duration += op.runtime_duration + op.worker_duration
                 normal_ops_duration += op.worker_duration
 
+        print(f"ckpt availability rate: {(checkpoint_size) / (checkpoint_size + abandon_checkpoint_size)}")
+
+        ckpt_avail_np_array = np.array(ckpt_avail_list)
         print(
-            f"normal ops duration: {normal_ops_duration} us, ckpt ops duration: {checkpoint_ops_duration} us, times of ckpt: {len(checkpoint_ops)}"
+            "ckpt availability rate: "
+            f"p10: {np.percentile(ckpt_avail_np_array, 10):.2f}, "
+            f"p50: {np.percentile(ckpt_avail_np_array, 50):.2f}, "
+            f"p99: {np.percentile(ckpt_avail_np_array, 99):.2f}"
         )
 
-        print(f"ckpt size: {checkpoint_size / 1024 / 1024 / 1024} GB")
+        return
 
         # draw figure
         # >>>>>>>>>> Draw checkpoint op series figure <<<<<<<<<<

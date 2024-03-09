@@ -178,7 +178,7 @@ class POSClient_CUDA : public POSClient {
                     if(likely(serialize_area_size > 0)){
 
                         /*!
-                         *  \note   if the resource is cuda memory, then we need to uas POSHandleManager with
+                         *  \note   if the resource is cuda memory, then we need to use POSHandleManager with
                          *          specific type, in order to invoke derived function of POSHandle (e.g., 
                          *          init_ckpt_bag) inside allocate_mocked_resource_from_binary
                          *  \todo   kind of ugly here :-(
@@ -283,7 +283,10 @@ class POSClient_CUDA : public POSClient {
             }
         }
 
-        // step 2: dump dag
+        // step 2: dump API call flow
+        
+
+        // step 3: dump dag
         // TODO:
 
         output_file.close();

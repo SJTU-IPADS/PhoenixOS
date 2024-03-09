@@ -59,6 +59,8 @@ class POSDag {
             /* =========== checkpoint op specific fields =========== */
             /* nb_ckpt_handles */           [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
             /* ckpt_size */                 [&](){ result += std::to_string(wqe->ckpt_size); },
+            /* nb_abandon_handles */        [&](){ result += std::to_string(wqe->nb_abandon_handles); },
+            /* abandon_ckpt_size */         [&](){ result += std::to_string(wqe->abandon_ckpt_size); },
             /* ckpt_memory_consumption */   
                                             [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
         });
@@ -147,6 +149,7 @@ class POSDag {
     inline pos_retval_t allocate_handle(POSHandle* handle){
         pos_retval_t retval = POS_SUCCESS;
         pos_vertex_id_t vertex_id;
+        POSNeighborList_t empty_neighbor_list;
 
         pos_handle_meta_t *h_meta = new pos_handle_meta_t(handle, _end_pc);
         POS_CHECK_POINTER(h_meta);
@@ -154,7 +157,7 @@ class POSDag {
         if(unlikely(POS_SUCCESS != (retval =
             _graph.add_vertex<pos_handle_meta_t>(
                 /* data */ h_meta,
-                /* neighbor */ std::map<pos_vertex_id_t, pos_edge_direction_t>(),
+                /* neighbor */ empty_neighbor_list,
                 /* id */ &(handle->dag_vertex_id)
             )
         ))){
@@ -168,41 +171,6 @@ class POSDag {
         );
 
     exit_POSDag_add_handle:
-        return retval;
-    }
-
-    /*!
-     *  \brief  given a range of op idx, return the positions that the specified handle be modified
-     *  \param  handle_id       specified handle id
-     *  \param  start_op_id     start index of the op range
-     *  \param  end_op_id       end index of the op range
-     *  \param  positions       pointer of the vector to store the result
-     *  \return POS_SUCCESS for succesfully querying
-     */
-    inline pos_retval_t get_handle_modified_position(
-        uint64_t handle_id, uint64_t start_op_id, uint64_t end_op_id, std::vector<uint64_t>* positions
-    ){
-        pos_retval_t retval = POS_SUCCESS;
-        POSNeighborMap_t *neigh_ops;
-
-        POS_CHECK_POINTER(positions);
-
-        neigh_ops = _graph.get_vertex_neighbors_by_id<pos_handle_meta_t>(handle_id);
-        if(unlikely(neigh_ops == nullptr)){
-            POS_WARN_C_DETAIL("failed to obtain neighbor ops of handle: vertex_id(%lu)", handle_id);
-            retval = POS_FAILED_NOT_EXIST;
-        } else {
-            positions->clear();
-
-            auto start_iter = neigh_ops->lower_bound(start_op_id);
-            auto end_iter = neigh_ops->upper_bound(end_op_id);
-            for (auto iter=start_iter; iter!=end_iter; iter++) {
-                if(iter->second == kPOS_Edge_Direction_InOut || iter->second == kPOS_Edge_Direction_Out){
-                    positions->push_back(iter->first);
-                }
-            }
-        }
-
         return retval;
     }
     
@@ -228,7 +196,7 @@ class POSDag {
 
         retval =_graph.add_vertex<pos_op_meta_t>(
             /* data */ o_meta,
-            /* neighbor */ wqe->flat_neighbor_map,
+            /* neighbor */ wqe->dag_neighbors,
             /* id */ &(wqe->dag_vertex_id)
         );
 

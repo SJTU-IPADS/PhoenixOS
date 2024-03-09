@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 
 #include <stdint.h>
 
@@ -33,7 +34,37 @@ class POSCheckpointBag {
      *  \param  ptr         pointer to the new checkpoint slot
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t apply_new_checkpoint(uint64_t version, POSCheckpointSlot** ptr){
+    pos_retval_t apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  obtain checkpointed data by given checkpoint version
+     *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
+     *  \param  size        size of the checkpoin data
+     *  \param  version     the specified version
+     *  \return POS_SUCCESS for successfully obtained
+     *          POS_FAILED_NOT_EXIST for no checkpoint is found
+     */
+    inline pos_retval_t get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  obtain the checkpoint version list
+     *  \return the checkpoint version list
+     */
+    std::set<uint64_t> get_checkpoint_version_set(){
+        return std::set<uint64_t>();
+    }
+
+    /*!
+     *  \brief  invalidate the checkpoint from this bag
+     *  \param  version version of the checkpoint to be removed
+     *  \return POS_SUCCESS for successfully invalidate
+     *          POS_NOT_READY for no checkpoint had been record
+     */
+    inline pos_retval_t invalidate_by_version(uint64_t version) {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
@@ -43,40 +74,6 @@ class POSCheckpointBag {
      */
     inline uint64_t get_memory_consumption(){
         return 0;
-    }
-
-    /*!
-     *  \brief  obtain checkpointed data by given checkpoint version
-     *  \param  data        pointer for obtaining data
-     *  \param  size        size of the checkpoin data
-     *  \param  version     the specified version
-     *  \param  get_latest  whether to get the latest version of checkpoint,
-     *                      if this field is true, the version field will be ignored
-     *  \return POS_SUCCESS for successfully obtained
-     */
-    inline pos_retval_t get_checkpoint_data_by_version(void** data, uint64_t& size, uint64_t version=0, bool get_latest=true){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    /*!
-     *  \brief  obtain the latest checkpoint data with its checkpoint version
-     *  \param  data        pointer for obtaining data
-     *  \param  version     the resulted version
-     *  \param  size        size of the checkpoin data
-     *  \return POS_SUCCESS for successfully obtained
-     */
-    inline pos_retval_t get_latest_checkpoint(void **data, uint64_t& version, uint64_t& size){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    /*!
-     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
-     *          (used by async checkpoint)
-     *  \return POS_SUCCESS for successfully invalidate
-     *          POS_NOT_READY for no checkpoint had been record
-     */
-    inline pos_retval_t invalidate_latest_checkpoint() {
-        return POS_SUCCESS;
     }
 
     /*!

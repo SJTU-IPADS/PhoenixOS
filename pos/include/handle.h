@@ -331,16 +331,6 @@ class POSHandle {
     }
 
     /*!
-     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
-     *          (used by async checkpoint)
-     *  \return POS_SUCCESS for successfully invalidate
-     *          POS_NOT_READY for no checkpoint had been record
-     */
-    virtual pos_retval_t invalidate_latest_checkpoint() const {
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    /*!
      *  \brief  restore the current handle when it becomes broken status
      *  \return POS_SUCCESS for successfully restore
      */
@@ -492,7 +482,10 @@ class POSHandle {
         pos_retval_t tmp_retval;
         void *ckpt_data;
         uint64_t ckpt_version, ckpt_size;
-        std::pair<uint8_t*, uint64_t> host_ckpt;
+
+        std::set<uint64_t> ckpt_version_set;
+        uint64_t nb_ckpt, ckpt_serialization_size;
+
 
         if(state_size == 0){
             /*!
@@ -512,22 +505,8 @@ class POSHandle {
             /*!
              *  \note   for stateful handle, the size of the basic serialized fields is influenced by checkpoint
              */
-            tmp_retval = this->ckpt_bag->get_latest_checkpoint(&ckpt_data, ckpt_version, ckpt_size);
-            if(unlikely(tmp_retval == POS_FAILED_NOT_READY)){
-                // no checkpoint found, we need to use the state passed from the host
-                if(likely(this->host_value_map.size() > 0)){
-                    ckpt_version = (this->host_value_map.rbegin())->first;
-                    host_ckpt = (this->host_value_map.rbegin())->second;
-                    ckpt_data = host_ckpt.first;
-                    ckpt_size = host_ckpt.second;
-                } else {
-                    ckpt_version = 0;
-                    ckpt_size = 0;
-                }
-            } else if(unlikely(tmp_retval != POS_SUCCESS)){
-                ckpt_version = 0;
-                ckpt_size = 0;
-            }
+            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
+            ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
 
             return (
                 /* resource_type_id */      sizeof(pos_resource_typeid_t)
@@ -539,10 +518,8 @@ class POSHandle {
                 /* size */                  + sizeof(uint64_t)
                 /* state_size */            + sizeof(uint64_t)
 
-                // TODO: in the future we might serialize multiple versions of checkpoint
-                /* checkpoint version */    + sizeof(uint64_t)
-                /* checkpoint size */       + sizeof(uint64_t)
-                /* ckpt_state */            + ckpt_size
+                /* nb ckpt version */       + sizeof(uint64_t)
+                /* ckpt_version + data */   + ckpt_serialization_size
             );
         }
     }
@@ -576,19 +553,22 @@ class POSHandle {
     pos_retval_t __serialize_basic(void* serialized_area){
         pos_retval_t retval = POS_SUCCESS;
         void *ptr = serialized_area;
-        void *ckpt_data;
-        uint64_t ckpt_version, ckpt_size;
-        uint64_t _nb_parent_handles;
-        std::pair<uint8_t*, uint64_t> host_ckpt;
+
+        uint64_t nb_parent_handles;
+
+        POSCheckpointSlot *ckpt_slot;
+        uint64_t ckpt_version, ckpt_size, nb_ckpt_version;
+        std::set<uint64_t> ckpt_version_set;
+        typename std::set<uint64_t>::iterator set_iter;
 
         POS_CHECK_POINTER(ptr);
         
-        _nb_parent_handles = this->parent_handles.size();
+        nb_parent_handles = this->parent_handles.size();
 
         POSHandle::__serialize_write_field(&ptr, &(this->resource_type_id), sizeof(pos_resource_typeid_t));
         POSHandle::__serialize_write_field(&ptr, &(this->client_addr), sizeof(uint64_t));
         POSHandle::__serialize_write_field(&ptr, &(this->server_addr), sizeof(uint64_t));
-        POSHandle::__serialize_write_field(&ptr, &(_nb_parent_handles), sizeof(uint64_t));
+        POSHandle::__serialize_write_field(&ptr, &(nb_parent_handles), sizeof(uint64_t));
         for(auto& parent_handle : this->parent_handles){
             POSHandle::__serialize_write_field(&ptr, &(parent_handle->dag_vertex_id), sizeof(pos_vertex_id_t));
         }
@@ -600,29 +580,23 @@ class POSHandle {
         if(state_size > 0){
             POS_CHECK_POINTER(this->ckpt_bag);
 
-            // copy checkpoint
-            retval = this->ckpt_bag->get_latest_checkpoint(&ckpt_data, ckpt_version, ckpt_size);
-            if(unlikely(retval == POS_FAILED_NOT_READY)){
-                // no checkpoint found, we need to use the state passed from the host
-                if(likely(this->host_value_map.size() > 0)){
-                    ckpt_version = (this->host_value_map.rbegin())->first;
-                    host_ckpt = (this->host_value_map.rbegin())->second;
-                    ckpt_data = host_ckpt.first;
-                    ckpt_size = host_ckpt.second;
-                } else {
-                    ckpt_version = 0;
-                    ckpt_size = 0;
-                }
-            } else if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_C_DETAIL("failed to obtain checkpoint while serilizing, is checkpointing turned on?");
-                ckpt_version = 0;
-                ckpt_size = 0;
-            }
+            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
+            nb_ckpt_version = ckpt_version_set.size();
 
-            POSHandle::__serialize_write_field(&ptr, &ckpt_version, sizeof(uint64_t));
-            POSHandle::__serialize_write_field(&ptr, &ckpt_size, sizeof(uint64_t));
-            if(likely(ckpt_size > 0)){
-                POSHandle::__serialize_write_field(&ptr, ckpt_data, state_size);
+            POSHandle::__serialize_write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
+
+            for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
+                ckpt_version = *set_iter;
+                retval =  this->ckpt_bag->get_checkpoint_slot(&ckpt_slot, ckpt_size, ckpt_version);
+                if(unlikely(retval != POS_SUCCESS)){
+                    POS_ERROR_C(
+                        "failed to obtain checkpoint by version within the version set, this's a bug: client_addr(%p), version(%lu)",
+                        this->client_addr, ckpt_version
+                    );
+                }
+                POS_CHECK_POINTER(ckpt_slot);
+                POSHandle::__serialize_write_field(&ptr, &ckpt_version, sizeof(uint64_t));
+                POSHandle::__serialize_write_field(&ptr, ckpt_slot->expose_pointer(), state_size);
             }
         }
 
@@ -658,12 +632,12 @@ class POSHandle {
      *  \return POS_SUCCESS for successfully deserialize
      */
     pos_retval_t __deserialize_basic(void* raw_data){
-        pos_retval_t retval = POS_SUCCESS;
+        pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         uint64_t i;
         uint64_t _nb_parent_handles;
         pos_vertex_id_t parent_handle_dag_id;
-        uint64_t ckpt_version, ckpt_size;
+        uint64_t nb_ckpt_version, ckpt_version, ckpt_size;
 
         void *ptr = raw_data;
         POS_CHECK_POINTER(ptr);
@@ -688,10 +662,19 @@ class POSHandle {
                 POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
             }
             POS_CHECK_POINTER(this->ckpt_bag);
-            POSHandle::__deserialize_read_field(&ckpt_version, &ptr, sizeof(uint64_t));
-            POSHandle::__deserialize_read_field(&ckpt_size, &ptr, sizeof(uint64_t));
-            if(likely(ckpt_size > 0)){
-                this->ckpt_bag->load(ckpt_version, ckpt_size, ptr);
+
+            POSHandle::__deserialize_read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
+            for(i=0; i<nb_ckpt_version; i++){
+                POSHandle::__deserialize_read_field(&ckpt_version, &ptr, sizeof(uint64_t));
+                
+                tmp_retval = this->ckpt_bag->load(ckpt_version, ckpt_size, ptr);
+                if(unlikely(tmp_retval != POS_SUCCESS)){
+                    POS_ERROR_C(
+                        "failed to load checkpoint while restoring: client_addr(%p), version(%lu)",
+                        this->client_addr, ckpt_version
+                    );
+                }
+
                 ptr += ckpt_size;
             }
         }

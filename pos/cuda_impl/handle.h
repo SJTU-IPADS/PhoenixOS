@@ -425,7 +425,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
         
         // apply new checkpoint slot
         if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_new_checkpoint(/* version */ version_id, /* ptr */ &ckpt_slot)
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot(/* version */ version_id, /* ptr */ &ckpt_slot)
         )){
             POS_WARN_C("failed to apply checkpoint slot");
             retval = POS_FAILED;
@@ -471,7 +471,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
         
         // apply new checkpoint slot
         if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_new_checkpoint(/* version */ version_id, /* ptr */ &ckpt_slot)
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot(/* version */ version_id, /* ptr */ &ckpt_slot)
         )){
             POS_WARN_C("failed to apply checkpoint slot");
             retval = POS_FAILED;
@@ -518,16 +518,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
     
     exit:
         return retval;
-    }
-
-    /*!
-     *  \brief  invalidate the latest checkpoint due to computation / checkpoint conflict
-     *          (used by async checkpoint)
-     *  \return POS_SUCCESS for successfully invalidate
-     *          POS_NOT_READY for no checkpoint had been record
-     */
-    pos_retval_t invalidate_latest_checkpoint() const override {
-        return this->ckpt_bag->invalidate_latest_checkpoint();
     }
 
     /*!

@@ -44,7 +44,19 @@ struct POSBgVertex_t {
     POSBgVertex_t(T* data_, pos_vertex_id_t vid) : data(data_), id(vid) {}
 };
 
-using POSNeighborMap_t = std::map<pos_vertex_id_t, pos_edge_direction_t>;
+/*!
+ *  \brief  edge for bipartite graph of POS
+ */
+typedef struct POSBgEdge_t {
+    // index of the destination vertex of this edge
+    pos_vertex_id_t d_vid;
+
+    // direction of this edge
+    pos_edge_direction_t dir;
+};
+
+using POSNeighborList_t = std::vector<POSBgEdge_t>;
+
 
 /*!
  *  \note   T1 and T2 should be different, or this class will have unexpected behaviour
@@ -52,7 +64,8 @@ using POSNeighborMap_t = std::map<pos_vertex_id_t, pos_edge_direction_t>;
 template<typename T1, typename T2>
 class POSBipartiteGraph {
  public:
-    #define kPOSBG_PREFILL_SIZE         1048576 // 1 << 20
+    #define kPOSBG_PREFILL_NB_VERTEX         65536 // 1 << 16
+    #define kPOSBG_PREFILL_NB_NEIGHBOR       65536 // 1 << 16
 
     POSBipartiteGraph() : max_t1_id(0), max_t2_id(0) {
         static_assert(!std::is_same_v<T1, T2>,
@@ -60,20 +73,19 @@ class POSBipartiteGraph {
         );
 
         uint64_t i;
-        POSNeighborMap_t *reserved_topo_map;
+        
         POSBgVertex_t<T1> *reserved_vertex_t1;
         POSBgVertex_t<T2> *reserved_vertex_t2;
+        POSNeighborList_t *reserved_neighbor_list;
 
         /*!
          *  \brief  prefill is important, otherwise the runtime performance will significantly decrease
          */
-        _t1s.reserve(kPOSBG_PREFILL_SIZE);
-        _t2s.reserve(kPOSBG_PREFILL_SIZE);
-        for(i=0; i<kPOSBG_PREFILL_SIZE; i++){
-            reserved_topo_map = new POSNeighborMap_t();
-            POS_CHECK_POINTER(reserved_topo_map);
-            _topo[i] = reserved_topo_map;
+        _t1s.reserve(kPOSBG_PREFILL_NB_VERTEX);
+        _t2s.reserve(kPOSBG_PREFILL_NB_VERTEX);
+        _topo_t2.reserve(kPOSBG_PREFILL_NB_VERTEX);
 
+        for(i=0; i<kPOSBG_PREFILL_NB_VERTEX; i++){
             reserved_vertex_t1 = new POSBgVertex_t<T1>();
             POS_CHECK_POINTER(reserved_vertex_t1);
             _t1s.push_back(reserved_vertex_t1);
@@ -81,36 +93,43 @@ class POSBipartiteGraph {
             reserved_vertex_t2 = new POSBgVertex_t<T2>();
             POS_CHECK_POINTER(reserved_vertex_t2);
             _t2s.push_back(reserved_vertex_t2);
+
+            reserved_neighbor_list = new POSNeighborList_t();
+            POS_CHECK_POINTER(reserved_neighbor_list);
+            reserved_neighbor_list->reserve(kPOSBG_PREFILL_NB_NEIGHBOR);
+            _topo_t2.push_back(reserved_neighbor_list);
         }
         POS_DEBUG("pos bipartite graph prefill done");
     }
 
     ~POSBipartiteGraph(){
         uint64_t i;
-        typename std::map<pos_vertex_id_t, POSNeighborMap_t*>::iterator topo_iter;
 
         for(i=0; i<_t1s.size(); i++){
             if(likely(_t1s[i] != nullptr)){ delete _t1s[i]; }
         }
+
         for(i=0; i<_t2s.size(); i++){
             if(likely(_t2s[i] != nullptr)){ delete _t2s[i]; }
         }
 
-        _topo.clear();
+        for(i=0; i<_topo_t2.size(); i++){
+            if(likely(_topo_t2[i] != nullptr)){ delete _topo_t2[i]; }
+        }
     }
 
     /*!
      *  \brief  add vertex into the bipartite graph
      *  \tparam T           type of the added vertex, should be either T1 or T2
      *  \param  data        data payload within the added vertex
-     *  \param  neighbor    neighbor of the added vertex
+     *  \param  neighbors   list of neighbors of the added vertex
      *  \param  id          pointer to the variable to store the return index of the created vertex
      *  \return 1. POS_SUCCESS for successfully creating;
      *          2. POS_FAILED_NOT_EXIST for no neighbor vertex were founded with specified index
      */
     template<typename T>
     pos_retval_t add_vertex(
-        void* data, const POSNeighborMap_t& neighbor, pos_vertex_id_t* id
+        void* data, POSNeighborList_t& neighbors, pos_vertex_id_t* id
     ){
         static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
             "try to add invalid type of vertex into the graph, this is a bug!"
@@ -118,29 +137,30 @@ class POSBipartiteGraph {
 
         pos_retval_t retval = POS_SUCCESS;
         POSBgVertex_t<T> *new_vertex;
-        POSNeighborMap_t::const_iterator neigh_iter;
+        uint64_t i;
+        POSNeighborList_t *new_neighbor_list;
 
         POS_CHECK_POINTER(id);
 
         // make sure all provided neighbor idx are valid
     #if POS_ENABLE_DEBUG_CHECK
-        typename POSNeighborMap_t::iterator n_iter;
 
-        for(n_iter=neighbor.begin(); n_iter!=neighbor.end(); n_iter++){
+        for(i=0; i<neighbors.size(); i++){
+            POSBgEdge_t &edge = neighbors[i];
             if constexpr (std::is_same_v<T, T1>){
-                if(unlikely(_t2s.size() < n_iter->first)){
+                if(unlikely(_t2s.size() < edge.d_vid)){
                     POS_WARN_C_DETAIL(
                         "failed to create new vertex, no %s node with id %lu were founded",
-                        typeid(T2).name(), n_iter->first
+                        typeid(T2).name(), edge.d_vid
                     );
                     retval = POS_FAILED_NOT_EXIST;
                     goto exit;
                 }
             } else { // T2
-                if(unlikely(_t1s.size() < n_iter->first)){
+                if(unlikely(_t1s.size() < edge.d_vid)){
                     POS_WARN_C_DETAIL(
                         "failed to create new vertex, no %s node with id %lu were founded",
-                        typeid(T1).name(), n_iter->first
+                        typeid(T1).name(), edge.d_vid
                     );
                     retval = POS_FAILED_NOT_EXIST;
                     goto exit;
@@ -157,12 +177,19 @@ class POSBipartiteGraph {
         }
 
         // obtain / create vertex instance
-        if(unlikely(*id >= kPOSBG_PREFILL_SIZE)){
+        if(unlikely(*id >= kPOSBG_PREFILL_NB_VERTEX)){
             POS_CHECK_POINTER(new_vertex = new POSBgVertex_t<T>());
             if constexpr (std::is_same_v<T, T1>){
                 _t1s.push_back(new_vertex);
             } else {
+                // add vertex
                 _t2s.push_back(new_vertex);
+
+                // add neighbor list
+                new_neighbor_list = new POSNeighborList_t();
+                POS_CHECK_POINTER(new_neighbor_list);
+                new_neighbor_list->reserve(kPOSBG_PREFILL_NB_NEIGHBOR);
+                _topo_t2.push_back(new_neighbor_list);
             }
         } else {
             if constexpr (std::is_same_v<T, T1>){
@@ -176,16 +203,19 @@ class POSBipartiteGraph {
         new_vertex->data = (T*)data;
         new_vertex->id = *id;
 
-        // insert neighbor info to topo
-        // NOTE: this is very time consuming!!
-        // if constexpr (std::is_same_v<T, T1>){
-        //     for(neigh_iter = neighbor.begin(); neigh_iter != neighbor.end(); neigh_iter++){
-        //         POS_CHECK_POINTER(_topo[neigh_iter->first]);
-        //         _topo[neigh_iter->first]->insert(
-        //             std::pair<pos_vertex_id_t, pos_edge_direction_t>(*id, neigh_iter->second)
-        //         );
-        //     }
-        // }
+        /*!
+         *  \note  the performance of this part is good
+         */
+        if constexpr (std::is_same_v<T, T1>){
+            for(i=0; i < neighbors.size(); i++){
+                POSBgEdge_t &edge = neighbors[i];
+                POS_CHECK_POINTER(_topo_t2[edge.d_vid]);
+                _topo_t2[edge.d_vid]->push_back({.d_vid = *id, .dir = edge.dir});
+            }
+        } else {
+            _topo_t2[*id]->clear();
+            _topo_t2[*id]->insert(_topo_t2[*id]->end(), neighbors.begin(), neighbors.end());
+        }
 
     exit:
         return retval;
@@ -214,36 +244,11 @@ class POSBipartiteGraph {
     }
 
 
-    template<typename T>
-    POSNeighborMap_t* get_vertex_neighbors_by_id(pos_vertex_id_t id){
-        static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
-            "try to get neighbor of invalid type of vertex from the graph, this is a bug!"
-        );
-
-        POS_ERROR_C_DETAIL("don't invoke this function!");
-        
-        POSNeighborMap_t *retval = nullptr;
-
-        if constexpr (std::is_same_v<T, T1>) {
-            // TODO: we might need to store a transpose matrix of _topo to accelerate searching
-            POS_ERROR_C_DETAIL("not implemented yet");
-        } else { // T2
-            if(likely(_topo.count(id) != 0)){ 
-                POS_CHECK_POINTER(retval = _topo[id])
-            } else { 
-                POS_WARN_C_DETAIL("no topology record of T2 id %lu", id);
-            }
-        }
-        
-    exit:
-        return retval;
-    }
-
-
     /*!
      *  \brief  functions for serilze T1 and T2 node, for dumping the graph to file
      *  \param  vertex  the vertex to be dumped
      *  \param  result  dumping result, in string
+     *  \todo   remove this function, as we will dump graph as binary file instead of text file
      */
     using serialize_t1_func_t = void(*)(T1* vertex, std::string& result);
     using serialize_t2_func_t = void(*)(T2* vertex, std::string& result);
@@ -256,11 +261,8 @@ class POSBipartiteGraph {
         std::ofstream output_file;
         typename std::map<pos_vertex_id_t, POSBgVertex_t<T1>*>::iterator t1s_iter;
         typename std::map<pos_vertex_id_t, POSBgVertex_t<T2>*>::iterator t2s_iter;
-        typename std::map<pos_vertex_id_t, POSNeighborMap_t*>::iterator topo_iter;
-        typename POSNeighborMap_t::iterator dir_iter;
         pos_vertex_id_t vid, nvid;
         pos_edge_direction_t dir;
-        POSNeighborMap_t *direction_map;
         POSBgVertex_t<T1>* t1v;
         POSBgVertex_t<T2>* t2v;
         std::string serilization_result;
@@ -303,34 +305,36 @@ class POSBipartiteGraph {
          *  \note       next nb_t2s line: info of t2s' topology
          *  \example    vertex_id, #neighbor, n1, dir1, n2, dir2, ...
          */
-        for(topo_iter=_topo.begin(); topo_iter!=_topo.end(); topo_iter++){
-            vid = topo_iter->first;
-            POS_CHECK_POINTER(direction_map = topo_iter->second);
+        // TODO:
+        // for(i=0; i<_topo_t2.size(); i++){
+        //     POSBgEdge_t &edge = _topo_t2[i];
+        //     vid = topo_iter->first;
+        //     POS_CHECK_POINTER(direction_map = topo_iter->second);
             
-            if(unlikely(vid >= max_t2_id)){
-                break;
-            }
+        //     if(unlikely(vid >= max_t2_id)){
+        //         break;
+        //     }
 
-            if(likely(direction_map->size() > 0)){
-                output_file << vid << ", " << direction_map->size() << ", ";
-            } else {
-                output_file << vid << ", " << direction_map->size() << std::endl;
-            }
+        //     if(likely(direction_map->size() > 0)){
+        //         output_file << vid << ", " << direction_map->size() << ", ";
+        //     } else {
+        //         output_file << vid << ", " << direction_map->size() << std::endl;
+        //     }
             
-            for(dir_iter=direction_map->begin(); dir_iter!=direction_map->end(); dir_iter++){
-                nvid = dir_iter->first;
-                dir = dir_iter->second;
+        //     for(dir_iter=direction_map->begin(); dir_iter!=direction_map->end(); dir_iter++){
+        //         nvid = dir_iter->first;
+        //         dir = dir_iter->second;
 
-                typename POSNeighborMap_t::iterator temp_iter = dir_iter;
-                temp_iter++;
+        //         typename POSNeighborMap_t::iterator temp_iter = dir_iter;
+        //         temp_iter++;
 
-                if(unlikely(temp_iter == direction_map->end())){
-                    output_file << nvid << ", " << dir << std::endl;
-                } else {
-                    output_file << nvid << ", " << dir << ", ";
-                }
-            }
-        }
+        //         if(unlikely(temp_iter == direction_map->end())){
+        //             output_file << nvid << ", " << dir << std::endl;
+        //         } else {
+        //             output_file << nvid << ", " << dir << ", ";
+        //         }
+        //     }
+        // }
 
         output_file.close();
         POS_LOG("finish dump DAG file to %s", file_path);
@@ -344,5 +348,5 @@ class POSBipartiteGraph {
     /*!
      *  \brief  the final topology storage from the view of T2
      */
-    std::map<pos_vertex_id_t, POSNeighborMap_t*> _topo;
+    std::vector<POSNeighborList_t*> _topo_t2;
 };

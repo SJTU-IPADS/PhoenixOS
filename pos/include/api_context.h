@@ -269,7 +269,7 @@ typedef struct POSAPIContext_QE {
     std::vector<POSHandleView_t> inout_handle_views;
 
     // flatten recording of involved handles of this wqe (to accelerate launch_op)
-    POSNeighborMap_t flat_neighbor_map;
+    POSNeighborList_t dag_neighbors;
 
     /* =========== profiling fields =========== */
     uint64_t create_tick, return_tick;
@@ -331,6 +331,7 @@ typedef struct POSAPIContext_QE {
         inout_handle_views.reserve(5);
         create_handle_views.reserve(1);
         delete_handle_views.reserve(1);
+        dag_neighbors.reserve(5);
     }
     
     /*!
@@ -342,6 +343,13 @@ typedef struct POSAPIContext_QE {
     POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client) {
         api_cxt = new POSAPIContext_t(api_id);
         POS_CHECK_POINTER(api_cxt);
+
+        // initialization of checkpoint op specific fields
+        nb_ckpt_handles = 0;
+        nb_abandon_handles = 0;
+        ckpt_size = 0;
+        abandon_ckpt_size = 0;
+        ckpt_memory_consumption = 0;
     }
 
     /*!
@@ -360,19 +368,19 @@ typedef struct POSAPIContext_QE {
     inline void record_handle(POSHandleView_t&& handle_view){
         if constexpr (dir == kPOS_Edge_Direction_In){
             input_handle_views.emplace_back(handle_view);
-            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_In;
+            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_In});
         } else if (dir == kPOS_Edge_Direction_Out){
             output_handle_views.emplace_back(handle_view);
-            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Out;
+            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Out});
         } else if (dir == kPOS_Edge_Direction_Create){
             create_handle_views.emplace_back(handle_view);
-            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Create;
+            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Create});
         } else if (dir == kPOS_Edge_Direction_Delete){
             delete_handle_views.emplace_back(handle_view);
-            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_Delete;
+            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Delete});
         } else { // inout
             inout_handle_views.emplace_back(handle_view);
-            // flat_neighbor_map[handle_view.handle->dag_vertex_id] = kPOS_Edge_Direction_InOut;
+            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_InOut});
         }
     }
 

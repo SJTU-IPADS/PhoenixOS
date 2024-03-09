@@ -192,8 +192,8 @@ class POSParser_CUDA : public POSParser {
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {
         #if POS_CKPT_OPT_LEVAL == 1 || POS_CKPT_OPT_LEVAL == 2
-            return __checkpoint_insertion_naive(wqe);
-            // return __checkpoint_insertion_o1_o2(wqe);
+            // return __checkpoint_insertion_naive(wqe);
+            return __checkpoint_insertion_o1_o2(wqe);
         #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;
         #endif

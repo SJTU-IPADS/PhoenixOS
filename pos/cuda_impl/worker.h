@@ -231,6 +231,8 @@ class POSWorker_CUDA : public POSWorker {
 
         wqe->nb_ckpt_handles = 0;
         wqe->ckpt_size = 0;
+        wqe->nb_abandon_handles = 0;
+        wqe->abandon_ckpt_size = 0;
         wqe->ckpt_memory_consumption = 0;
         
         for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
@@ -241,27 +243,23 @@ class POSWorker_CUDA : public POSWorker {
                 /* version_id */ wqe->dag_vertex_id,
                 /* stream_id */ (uint64_t)(_ckpt_stream)
             );
-
             POS_ASSERT(retval == POS_SUCCESS);
-        }
         
-        // make sure the checkpoint is finished
-        cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C("failed to synchronize after checkpointing");
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // invalidate conflict checkpoints
-        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
-            const POSHandle *handle = *set_iter;
-            POS_CHECK_POINTER(handle);
-
+            /*!
+             *  \note   we wait until the checkpoint of this handle to be completed here, so then we can judge whether
+             *          we should invalidate this checkpoint
+             */
+            cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_C("failed to synchronize after start checkpointing handle: client_addr(%p)", handle->client_addr);
+                retval = POS_FAILED;
+                goto exit;
+            }
+            
             if(unlikely(
                 std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
             )){
-                retval = handle->invalidate_latest_checkpoint();
+                retval = handle->ckpt_bag->invalidate_by_version(/* version */ wqe->dag_vertex_id);
                 POS_ASSERT(retval == POS_SUCCESS);
                 wqe->nb_abandon_handles += 1;
                 wqe->abandon_ckpt_size += handle->state_size;
@@ -269,7 +267,6 @@ class POSWorker_CUDA : public POSWorker {
                 wqe->nb_ckpt_handles += 1;
                 wqe->ckpt_size += handle->state_size;
             }
-            
         }
     
         POS_LOG(
