@@ -212,6 +212,30 @@ typedef struct POSAPIContext {
     }
 
     /*!
+     *  \brief  deserialize this api context
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    inline void deserialize(void* raw_data){
+        void *ptr = raw_data;
+        uint64_t i, nb_params, param_size;
+        POSAPIParam_t *param;
+
+        POS_CHECK_POINTER(ptr);
+
+        POSUtil_Deserializer::read_field(&(this->api_id), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(nb_params), &ptr, sizeof(uint64_t));
+        
+        for(i=0; i<nb_params; i++){
+            POSUtil_Deserializer::read_field(&(param_size), &ptr, sizeof(uint64_t));
+            POS_CHECK_POINTER(param = new POSAPIParam_t(ptr, param_size));
+            ptr += param_size;
+
+            params.push_back(param);
+            overall_param_size += param_size;
+        }
+    }
+
+    /*!
      *  \brief  constructor
      *  \param  id              index of the called API
      *  \param  param_desps     descriptors of all involved parameters
@@ -241,6 +265,12 @@ typedef struct POSAPIContext {
      */
     POSAPIContext(uint64_t id) : api_id(id), overall_param_size(0) {}
 
+    /*!
+     *  \brief  constructor
+     *  \note   this constructor is used during restore phrase
+     */
+    POSAPIContext() : api_id(0), overall_param_size(0) {}
+
     ~POSAPIContext(){
         for(auto param : params){ POS_CHECK_POINTER(param); delete param; }
     }
@@ -253,6 +283,12 @@ typedef struct POSAPIContext {
 typedef struct POSHandleView {
     // pointer to the used handle
     POSHandle *handle;
+
+    /*!
+     *  \brief  dag index of the handle
+     *  \note   this field is only used during restoring phrase
+     */
+    pos_vertex_id_t handle_dag_id;
 
     /*!
      *  \brief      index of the corresponding parameter of this handle view
@@ -296,6 +332,20 @@ typedef struct POSHandleView {
         POSUtil_Serializer::write_field(&ptr, &(param_index), sizeof(uint64_t));
         POSUtil_Serializer::write_field(&ptr, &(offset), sizeof(uint64_t));
     }
+    
+    /*!
+     *  \brief  deserialize this handle view
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    void deserialize(void* raw_data){
+        void *ptr = raw_data;
+
+        POS_CHECK_POINTER(ptr);
+
+        POSUtil_Deserializer::read_field(&(handle_dag_id), &ptr, sizeof(pos_vertex_id_t));
+        POSUtil_Deserializer::read_field(&(param_index), &ptr, sizeof(uint64_t));
+        POSUtil_Deserializer::read_field(&(offset), &ptr, sizeof(uint64_t));
+    }
 
     /*!
      *  \brief  constructor
@@ -305,7 +355,13 @@ typedef struct POSHandleView {
      */
     POSHandleView(
         POSHandle* handle_, uint64_t param_index_ = 0, uint64_t offset_ = 0
-    ) : handle(handle_), param_index(param_index_), offset(offset_){}
+    ) : handle(handle_), handle_dag_id(0), param_index(param_index_), offset(offset_){}
+
+    /*!
+     *  \brief  constructor
+     *  \note   this constructor is used only during restore phrase
+     */
+    POSHandleView() : handle(nullptr), handle_dag_id(0), param_index(0), offset(0){}
 } POSHandleView_t;
 
 /*!
@@ -426,6 +482,13 @@ typedef struct POSAPIContext_QE {
     }
 
     /*!
+     *  \brief  constructor
+     *  \note   this constructor is used only during restore phrase
+     *  \param  pos_client          pointer to the POSClient instance
+     */
+    POSAPIContext_QE(void* pos_client) : client(pos_client) {}
+
+    /*!
      *  \brief  deconstructor
      */
     ~POSAPIContext_QE(){
@@ -448,10 +511,11 @@ typedef struct POSAPIContext_QE {
         POS_CHECK_POINTER(api_cxt);
 
         return (
-            // part 1: base field
+            // part 1: base fields
             /* dag_vertex_id */             sizeof(pos_vertex_id_t)
 
             // part 2: api context
+            /* size of api_context */       + sizeof(uint64_t)
             /* api context */               + api_cxt->get_serialize_size()
 
             // part 3: handle views
@@ -470,6 +534,7 @@ typedef struct POSAPIContext_QE {
      */
     inline void serialize(void** serialized_area){
         void *ptr;
+        uint64_t api_cxt_serialize_size;
 
         // serialize one type of handle views
         auto __serialize_handle_views = [](void** ptr, std::vector<POSHandleView_t>& hv_vector){
@@ -492,19 +557,61 @@ typedef struct POSAPIContext_QE {
         
         ptr = *serialized_area;
 
-        // part 1: base field
+        // part 1: base fields
         POSUtil_Serializer::write_field(&ptr, &(dag_vertex_id), sizeof(pos_vertex_id_t));
 
-        // part 2: serialize api context
-        api_cxt->serialize(ptr);
-        ptr += api_cxt->get_serialize_size();
+        // part 2: api context
+        api_cxt_serialize_size = api_cxt->get_serialize_size();
+        POSUtil_Serializer::write_field(&ptr, &(api_cxt_serialize_size), sizeof(uint64_t));
 
-        // part 3: serialize handle views
+        api_cxt->serialize(ptr);
+        ptr += api_cxt_serialize_size;
+
+        // part 3: handle views
         __serialize_handle_views(&ptr, input_handle_views);
         __serialize_handle_views(&ptr, output_handle_views);
         __serialize_handle_views(&ptr, inout_handle_views);
         __serialize_handle_views(&ptr, create_handle_views);
         __serialize_handle_views(&ptr, delete_handle_views);
+    }
+
+    /*!
+     *  \brief  deserialize this api context
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    inline void deserialize(void* raw_data){
+        void *ptr = raw_data;
+        uint64_t api_cxt_serialize_size;
+
+        auto __deserialize_handle_views = [](void** ptr, std::vector<POSHandleView_t>& hv_vector){
+            uint64_t i, nb_handle_views;
+            nb_handle_views = hv_vector.size();
+            POSUtil_Deserializer::read_field(&(nb_handle_views), ptr, sizeof(uint64_t));
+
+            for(i=0; i<nb_handle_views; i++){
+                POSHandleView_t &hv = hv_vector.emplace_back();
+                hv.deserialize(*ptr);
+                (*ptr) += POSHandleView_t::get_serialize_size();
+            }
+        };
+
+        POS_CHECK_POINTER(ptr);
+
+        // part 1: base fields
+        POSUtil_Deserializer::read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
+
+        // part 2: api context
+        POSUtil_Deserializer::read_field(&(api_cxt_serialize_size), &ptr, sizeof(uint64_t));
+        POS_CHECK_POINTER(api_cxt = new POSAPIContext_t());
+        api_cxt->deserialize(ptr);
+        ptr += api_cxt_serialize_size;
+
+        // part 3: handle views
+        __deserialize_handle_views(&ptr, input_handle_views);
+        __deserialize_handle_views(&ptr, output_handle_views);
+        __deserialize_handle_views(&ptr, inout_handle_views);
+        __deserialize_handle_views(&ptr, create_handle_views);
+        __deserialize_handle_views(&ptr, delete_handle_views);
     }
 
     /*!

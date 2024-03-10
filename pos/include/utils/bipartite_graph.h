@@ -361,16 +361,14 @@ class POSBipartiteGraph {
      *  \brief  serialize the current current graph into the binary area
      *  \param  serialized_area  pointer to the binary area
      */
-    inline void serialize(void** serialized_area){
+    inline void serialize(void* serialized_area){
         void *ptr;
         uint64_t i, j, nb_t2_v, nb_edges;
         POSNeighborList_t *neighbor_list;
         
         POS_CHECK_POINTER(serialized_area);
-        *serialized_area = malloc(get_serialize_size());
-        POS_CHECK_POINTER(*serialized_area);
 
-        ptr = *serialized_area;
+        ptr = serialized_area;
 
         // field: nb_t2_v
         nb_t2_v = max_t2_id;
@@ -389,6 +387,46 @@ class POSBipartiteGraph {
             }
         }
     }
+
+
+    /*!
+     *  \brief  deserialize basic field of this graph
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    inline void deserialize(void* raw_data){
+        void *ptr = raw_data;
+        uint64_t i, j, fill_size, nb_edges;
+        POSNeighborList_t *neighbor_list;
+        POSBgEdge_t restored_edge;
+
+        POS_CHECK_POINTER(ptr);
+
+        // field: nb_t2_v
+        POSUtil_Deserializer::read_field(&(this->max_t2_id), &ptr, sizeof(uint64_t));
+
+        // we need to deal with large handle set
+        fill_size = this->max_t2_id > _topo_t2.size() ? this->max_t2_id - _topo_t2.size() : 0;
+        if(unlikely(fill_size > 0)){
+            neighbor_list = new POSNeighborList_t();
+            POS_CHECK_POINTER(neighbor_list);
+            neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
+            _topo_t2.push_back(neighbor_list);
+        }
+
+        for(i=0; i<this->max_t2_id; i++){
+            POS_CHECK_POINTER(neighbor_list = _topo_t2[i]);
+
+            // field: nb_edges
+            POSUtil_Deserializer::read_field(&(nb_edges), &ptr, sizeof(uint64_t));
+
+            // field: edges
+            for(j=0; j<nb_edges; j++){
+                POSUtil_Deserializer::read_field(&(restored_edge), &ptr, sizeof(POSBgEdge_t));
+                neighbor_list->push_back(restored_edge);
+            }
+        }
+    }
+
 
  private:
     pos_vertex_id_t max_t1_id, max_t2_id;

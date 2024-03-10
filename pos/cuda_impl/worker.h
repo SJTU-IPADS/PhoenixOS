@@ -98,7 +98,7 @@ class POSWorker_CUDA : public POSWorker {
                 POS_CHECK_POINTER(handle);
 
                 retval = handle->checkpoint_sync(
-                    /* version_id */ wqe->dag_vertex_id,
+                    /* version_id */ handle->latest_version,
                     /* stream_id */ 0
                 );
                 if(unlikely(POS_SUCCESS != retval)){
@@ -172,7 +172,7 @@ class POSWorker_CUDA : public POSWorker {
             POS_CHECK_POINTER(handle);
 
             retval = handle->checkpoint_sync(
-                /* version_id */ wqe->dag_vertex_id,
+                /* version_id */ handle->latest_version,
                 /* stream_id */ 0
             );
             if(unlikely(POS_SUCCESS != retval)){
@@ -214,6 +214,7 @@ class POSWorker_CUDA : public POSWorker {
      */
     void checkpoint_async_thread(checkpoint_async_cxt_t* cxt) override {
         uint64_t i;
+        pos_vertex_id_t checkpoint_version;
         cudaError_t cuda_rt_retval;
         pos_retval_t retval = POS_SUCCESS;
         POSAPIContext_QE *wqe;
@@ -222,12 +223,13 @@ class POSWorker_CUDA : public POSWorker {
         typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
         typename std::set<POSHandle*>::iterator set_iter;
 
+        POS_CHECK_POINTER(cxt);
+
         if(unlikely(_ckpt_stream == nullptr)){
             POS_ASSERT(cudaSuccess == cudaStreamCreate(&_ckpt_stream));
         }
 
-        wqe = cxt->wqe;
-        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(wqe = cxt->wqe);
 
         wqe->nb_ckpt_handles = 0;
         wqe->ckpt_size = 0;
@@ -236,11 +238,18 @@ class POSWorker_CUDA : public POSWorker {
         wqe->ckpt_memory_consumption = 0;
         
         for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
-            const POSHandle *handle = *set_iter;
+            POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
 
+            if(unlikely(cxt->checkpoint_version_map.count(handle) == 0)){
+                POS_WARN_C("failed to checkpoint handle, no checkpoint version provided: client_addr(%p)", handle->client_addr);
+                continue;
+            }
+
+            checkpoint_version = cxt->checkpoint_version_map[handle];
+
             retval = handle->checkpoint_async(
-                /* version_id */ wqe->dag_vertex_id,
+                /* version_id */ checkpoint_version,
                 /* stream_id */ (uint64_t)(_ckpt_stream)
             );
             POS_ASSERT(retval == POS_SUCCESS);
@@ -259,7 +268,7 @@ class POSWorker_CUDA : public POSWorker {
             if(unlikely(
                 std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
             )){
-                retval = handle->ckpt_bag->invalidate_by_version(/* version */ wqe->dag_vertex_id);
+                retval = handle->ckpt_bag->invalidate_by_version(/* version */ checkpoint_version);
                 POS_ASSERT(retval == POS_SUCCESS);
                 wqe->nb_abandon_handles += 1;
                 wqe->abandon_ckpt_size += handle->state_size;

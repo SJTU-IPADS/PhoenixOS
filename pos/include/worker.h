@@ -36,6 +36,10 @@ typedef struct checkpoint_async_cxt {
     // checkpoint op context
     POSAPIContext_QE *wqe;
 
+    // (latest) version of each handle to be checkpointed
+    std::map<POSHandle*, pos_vertex_id_t> checkpoint_version_map;
+
+    // handles whose checkpoint might need to be invalidated due to computation / checkpoint conflict
     std::vector<POSHandle*> invalidated_handles;
 
     checkpoint_async_cxt() : is_active(false), invalidated_handles(32) {}
@@ -115,10 +119,25 @@ class POSWorker {
      */
     static inline void __done(POSWorkspace* ws, POSAPIContext_QE* wqe){
         POSClient *client;
+        uint64_t i;
+
+        POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
 
         // forward the DAG pc
         client->dag.forward_pc();
+
+        // set the latest version of all output handles
+        for(i=0; i<wqe->output_handle_views.size(); i++){
+            POSHandleView_t &hv = wqe->output_handle_views[i];
+            hv.handle->latest_version = wqe->dag_vertex_id;
+        }
+
+        // set the latest version of all inout handles
+        for(i=0; i<wqe->inout_handle_views.size(); i++){
+            POSHandleView_t &hv = wqe->inout_handle_views[i];
+            hv.handle->latest_version = wqe->dag_vertex_id;
+        }
     }
 
     /*!
@@ -183,6 +202,8 @@ class POSWorker {
         std::thread *ckpt_thread = nullptr;
         checkpoint_async_cxt_t ckpt_cxt;
         ckpt_cxt.is_active = false;
+        typename std::set<POSHandle*>::iterator handle_set_iter;
+        POSHandle *handle;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -219,8 +240,20 @@ class POSWorker {
                             delete ckpt_thread;
                         }
 
-                        // raise new checkpoint thread
+                        // clear old invalidation hint
                         ckpt_cxt.invalidated_handles.clear();
+
+                        // reset checkpoint version map
+                        ckpt_cxt.checkpoint_version_map.clear();
+                        for(handle_set_iter = wqe->checkpoint_handles.begin(); 
+                            handle_set_iter != wqe->checkpoint_handles.end(); 
+                            handle_set_iter++)
+                        {
+                            POS_CHECK_POINTER(handle = *handle_set_iter);
+                            ckpt_cxt.checkpoint_version_map[handle] = handle->latest_version;
+                        }
+
+                        // raise new checkpoint thread
                         ckpt_thread = new std::thread(&POSWorker::checkpoint_async_thread, this, &ckpt_cxt);
                         POS_CHECK_POINTER(ckpt_thread);
                         ckpt_cxt.is_active = true;

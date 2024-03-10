@@ -122,15 +122,19 @@ class POSClient_CUDA : public POSClient {
 
     /*!
      *  \brief  restore resources from checkpointed file
+     *  TODO:   move this function to base class
      */
     void init_restore_resources() override {
+        uint64_t i, j;
         std::ifstream file;
         uint8_t *checkpoint_bin, *bin_ptr;
         uint64_t file_size;
 
-        uint64_t i, j;
         pos_resource_typeid_t resource_type_id;
         uint64_t nb_handles, nb_resource_types, serialize_area_size;
+
+        uint64_t nb_api_cxt;
+        POSAPIContext_QE_t *wqe;
 
         POSHandleManager<POSHandle> *hm;
         POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;
@@ -179,19 +183,16 @@ class POSClient_CUDA : public POSClient {
                 // field: # handles under this manager 
                 __READ_TYPED_BINARY_AND_FWD(nb_handles, uint64_t, bin_ptr);
 
-                POS_LOG("nb_handles: %lu", nb_handles);
-
                 for(j=0; j<nb_handles; j++){
                     // field: size of the serialized area of this handle
                     __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
 
                     if(likely(serialize_area_size > 0)){
-
                         /*!
                          *  \note   if the resource is cuda memory, then we need to use POSHandleManager with
                          *          specific type, in order to invoke derived function of POSHandle (e.g., 
                          *          init_ckpt_bag) inside allocate_mocked_resource_from_binary
-                         *  \todo   kind of ugly here :-(
+                         *  TODO:   kind of ugly here, try to extract this part as a virtual function
                          */
                         if(resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
                             POS_CHECK_POINTER(
@@ -209,16 +210,38 @@ class POSClient_CUDA : public POSClient {
                     }
                 }
 
-                POS_LOG("deserialize state of %lu handles for resource type %u", nb_handles, resource_type_id);
+                POS_LOG("  => deserialized state of %lu handles for resource type %u", nb_handles, resource_type_id);
             }
 
-            /* --------- step 2: read DAG --------- */
-            // TODO:
-        
-            /* --------- step 3: restore handle tree --------- */
-            // TODO: 
+            /* --------- step 2: read api context --------- */
+            // field: # api context
+            __READ_TYPED_BINARY_AND_FWD(nb_api_cxt, uint64_t, bin_ptr);
 
-            /* --------- step 4: recompute missing checkpoints --------- */
+            for(i=0; i<nb_api_cxt; i++){
+                // field: size of the serialized area of this api context
+                __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
+                
+                POS_CHECK_POINTER(wqe = new POSAPIContext_QE_t(/* pos_client */ this));
+                wqe->deserialize(bin_ptr);
+                this->dag.record_op(wqe);
+                
+                bin_ptr += serialize_area_size;
+            }
+
+            POS_LOG("  => deserialized %lu of api contexts", nb_api_cxt);
+
+            /* --------- step 3: read DAG --------- */
+            // field: size of the serialized area of this dag topo
+            __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
+            this->dag.deserialize(bin_ptr);
+            bin_ptr += serialize_area_size;
+
+            POS_LOG("  => deserialized DAG");
+        
+            /* --------- step 4: restore handle tree --------- */
+            // TODO:
+
+            /* --------- step 5: recompute missing checkpoints --------- */
             // TODO:
 
             POS_LOG("restore finished");

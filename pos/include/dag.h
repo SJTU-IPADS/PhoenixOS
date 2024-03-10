@@ -97,7 +97,7 @@ class POSDag {
     /*!
      *  \brief  add a new operator to the DAG
      *  \param  wqe pointer to the work QE to be added
-     *  \note   this function will be called by the runtime thread
+     *  \note   this function will be called by the parser thread
      *  \return POS_SUCCESS for successfully adding operator
      */
     inline pos_retval_t launch_op(POSAPIContext_QE* wqe){
@@ -134,6 +134,8 @@ class POSDag {
         // record the api context to the list
         if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
             _api_cxts.push_back(wqe);
+        } else {
+            _latest_checkpoint_version = wqe->dag_vertex_id;
         }
 
         POS_DEBUG_C(
@@ -150,6 +152,18 @@ class POSDag {
     exit_POSDag_add_op:
         return retval;
     }
+
+
+    /*!
+     *  \brief  record an operator to the DAG
+     *  \note   this function is invoked during restore phrase
+     *  \param  wqe pointer to the work QE to be added
+     */
+    inline void record_op(POSAPIContext_QE* wqe){
+        POS_CHECK_POINTER(wqe);
+        _api_cxts.push_back(wqe);
+    }
+
 
     /*!
      *  \brief  obtain the earlist pending op from the DAG
@@ -247,7 +261,10 @@ class POSDag {
      *  \return serialize size of current dag topo
      */
     uint64_t get_serialize_size(){
-        return _graph.get_serialize_size();
+        return (
+            /* latest_checkpoint_version*/  sizeof(pos_vertex_id_t)
+            /* graph topo */                + _graph.get_serialize_size()
+        );
     }
 
     /*!
@@ -255,7 +272,35 @@ class POSDag {
      *  \param  serialized_area  pointer to the binary area
      */
     inline void serialize(void** serialized_area){
-        _graph.serialize(serialized_area);
+        void *ptr;
+
+        POS_CHECK_POINTER(serialized_area);
+        *serialized_area = malloc(get_serialize_size());
+        POS_CHECK_POINTER(*serialized_area);
+        
+        ptr = *serialized_area;
+
+        // field: latest_checkpoint_version
+        POSUtil_Serializer::write_field(&ptr, &(_latest_checkpoint_version), sizeof(pos_vertex_id_t));
+
+        // field: graph topo
+        _graph.serialize(ptr);
+    }
+
+
+    /*!
+     *  \brief  deserialize this dag topo
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    inline void deserialize(void* raw_data){
+        void *ptr = raw_data;
+        POS_CHECK_POINTER(ptr);
+
+        // field: latest_checkpoint_version
+        POSUtil_Deserializer::read_field(&(this->_latest_checkpoint_version), &ptr, sizeof(pos_vertex_id_t));
+
+        // field: graph topo
+        _graph.deserialize(ptr);
     }
 
  private:
@@ -287,6 +332,9 @@ class POSDag {
      *  \note   this field should be both wrote and read by worker thread
      */
     uint64_t _pc;
+
+    // dag vertex id of latest checkpoint op
+    pos_vertex_id_t _latest_checkpoint_version;
 
     /*!
      *  \brief  serialize metadata of an op on the DAG while dumping to file

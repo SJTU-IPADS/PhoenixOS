@@ -101,8 +101,9 @@ class POSHandle {
     ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-        ckpt_bag(nullptr), _hm(hm) {}
+        latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
     
+
     /*!
      *  \param  size_           size of the resources represented by this handle
      *  \param  hm              handle manager which this handle belongs to
@@ -114,8 +115,9 @@ class POSHandle {
         :   client_addr(nullptr), server_addr(nullptr), size(size_),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(nullptr), _hm(hm) {}
-    
+            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+
+
     /*!
      *  \param  hm  handle manager which this handle belongs to
      *  \note   this constructor is invoked during restore process, where the content of 
@@ -125,16 +127,18 @@ class POSHandle {
         :   client_addr(nullptr), server_addr(nullptr), size(0),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(0),
-            ckpt_bag(nullptr), _hm(hm) {}
+            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
 
     virtual ~POSHandle() = default;
+
 
     /*!
      *  \brief  setting the server-side address of the handle after finishing allocation
      *  \param  addr  the server-side address of the handle
      */
     inline void set_server_addr(void *addr){ server_addr = addr; }
-    
+
+
     /*!
      *  \brief  setting both the client-side and server-side address of the handle 
      *          after finishing allocation
@@ -145,6 +149,7 @@ class POSHandle {
      */
     pos_retval_t set_passthrough_addr(void *addr, POSHandle* handle_ptr);
 
+
     /*!
     *  \brief  record a new parent handle of current handle
     */
@@ -153,7 +158,9 @@ class POSHandle {
         parent_handles.push_back(parent);
     }
 
+
     struct _pos_broken_handle_list_iter;
+
 
     /*!
      *  \brief  wrapper map to store broken handles
@@ -239,6 +246,7 @@ class POSHandle {
         }
     } pos_broken_handle_list_t;
 
+
     /*!
      *  \brief  collect all broken handles along the handle trees
      *  \note   this function will call recursively, aware of performance issue!
@@ -261,6 +269,7 @@ class POSHandle {
         }
     }
 
+
     /*!
      *  \brief  identify whether a given address is located within the resource
      *          that current handle represents
@@ -282,6 +291,7 @@ class POSHandle {
         return result;
     }
 
+
     /*!
      *  \brief  mark the status of this handle
      *  \param  status the status to mark
@@ -301,6 +311,7 @@ class POSHandle {
         return POS_FAILED_NOT_IMPLEMENTED; 
     }
 
+
     /*!
      *  \brief  checkpoint the state of the resource behind this handle (async)
      *  \note   only handle of stateful resource should implement this method
@@ -311,6 +322,7 @@ class POSHandle {
     virtual pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) const { 
         return POS_FAILED_NOT_IMPLEMENTED; 
     }
+
 
     /*!
      *  \brief  restore the current handle when it becomes broken status
@@ -324,6 +336,7 @@ class POSHandle {
      *  \return resource name begind this handle
      */
     virtual std::string get_resource_name(){ return std::string("unknown"); }
+
 
     /*!
      *  \brief  serialize the state of current handle into the binary area
@@ -354,6 +367,7 @@ class POSHandle {
         return retval;
     }
 
+
     /*!
      *  \brief  obtain the size of the serialize area of this handle
      *  \return size of the serialize area of this handle
@@ -361,6 +375,7 @@ class POSHandle {
     uint64_t get_serialize_size(){
         return this->__get_basic_serialize_size() + this->__get_extra_serialize_size();
     }
+
 
     /*!
      *  \brief  deserialize the state of current handle from binary area
@@ -387,6 +402,7 @@ class POSHandle {
     exit:
         return retval;
     }
+
 
     /*!
     *  \brief  the typeid of the resource kind which this handle represents
@@ -438,12 +454,20 @@ class POSHandle {
      *          init_ckpt_bag
      */
     POSCheckpointBag *ckpt_bag;
+
+    /*!
+     *  \brief  latest modified version of this handle
+     *  \note   this field should be updated after the succesful execution of API within worker thread
+     *          (and the API inout/output this handle)
+     */
+    pos_vertex_id_t latest_version;
     
  protected:
     /*!
      *  \note   the belonging handle manager
      */
     void *_hm;
+
 
     /*!
      *  \brief  obtain the serilization size of basic fields of POSHandle
@@ -495,6 +519,7 @@ class POSHandle {
         }
     }
 
+
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -502,6 +527,7 @@ class POSHandle {
     virtual uint64_t __get_extra_serialize_size(){
         return 0;
     }
+
 
     /*!
      *  \brief  serialize the basic state of current handle into the binary area
@@ -563,6 +589,7 @@ class POSHandle {
         return retval;
     }
 
+
     /*!
      *  \brief  serialize the extra state of current handle into the binary area
      *  \param  serialized_area  pointer to the binary area
@@ -571,6 +598,7 @@ class POSHandle {
     virtual pos_retval_t __serialize_extra(void* serialized_area){
         return POS_SUCCESS;
     }
+
 
     /*!
      *  \brief  deserialize basic field of this handle
@@ -634,6 +662,7 @@ class POSHandle {
         return retval;
     }
 
+
     /*!
      *  \brief  deserialize extra field of this handle
      *  \param  sraw_data    raw data area that store the serialized data
@@ -642,6 +671,7 @@ class POSHandle {
     virtual pos_retval_t __deserialize_extra(void* raw_data){
         return POS_SUCCESS;
     }
+
 
     /*!
      *  \brief  initialize checkpoint bag of this handle
