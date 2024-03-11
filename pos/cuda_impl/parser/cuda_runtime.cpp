@@ -626,7 +626,7 @@ namespace cuda_memcpy_h2d {
             );
             goto exit;
         } else {
-            wqe->record_handle<kPOS_Edge_Direction_Out>({
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
                 /* handle */ memory_handle
             });
             hm_memory->record_modified_handle(memory_handle);
@@ -634,6 +634,19 @@ namespace cuda_memcpy_h2d {
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cuda_memcpy_h2d): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(memory_handle->ckpt_bag);
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
 
     exit:
         return retval;
@@ -845,7 +858,7 @@ namespace cuda_memcpy_h2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle<kPOS_Edge_Direction_Out>({
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
                 /* handle */ memory_handle
             });
             hm_memory->record_modified_handle(memory_handle);
@@ -867,9 +880,22 @@ namespace cuda_memcpy_h2d_async {
                 /* handle */ stream_handle
             });
         }
-
+        
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cuda_memcpy_h2d_async): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(memory_handle->ckpt_bag);
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
 
     exit:
         return retval;
@@ -1518,6 +1544,7 @@ namespace cuda_event_create_with_flags {
             memset(wqe->api_cxt->ret_data, 0, sizeof(cudaEvent_t));
             goto exit;
         } else {
+            event_handle->flags = pos_api_param_value(wqe, 0, int);
             memcpy(wqe->api_cxt->ret_data, &(event_handle->client_addr), sizeof(cudaEvent_t));
         }
         

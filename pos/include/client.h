@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <map>
+#include <set>
 
 #include <stdint.h>
 #include <assert.h>
@@ -9,7 +10,6 @@
 class POSClient;
 
 #include "pos/include/common.h"
-#include "pos/include/client.h"
 #include "pos/include/handle.h"
 #include "pos/include/dag.h"
 
@@ -20,6 +20,16 @@ class POSClient;
 typedef struct pos_client_cxt {
     // api id of the checkpoint operation
     uint64_t checkpoint_api_id;
+
+    // name of the job
+    std::string job_name;
+
+    // kernel meta path
+    std::string kernel_meta_path;
+    bool is_load_kernel_from_cache;
+
+    // checkpoint file path (if any)
+    std::string checkpoint_file_path;
 } pos_client_cxt_t;
 
 
@@ -56,7 +66,10 @@ class POSClient {
     void init(){
         this->init_handle_managers();
         this->init_dag();
-        this->init_restore_resources();
+
+        if(this->_cxt.checkpoint_file_path.size() > 0){
+            this->init_restore_resources();
+        }
     }
 
     /*!
@@ -67,9 +80,14 @@ class POSClient {
     void deinit(){
         this->deinit_dump_handle_managers();
 
+    #if POS_CKPT_OPT_LEVAL > 0
         // drain out the dag, and dump checkpoint to file
         this->dag.drain();
-        this->deinit_dump_checkpoints();
+
+        if(this->_cxt.checkpoint_file_path.size() == 0){
+            this->deinit_dump_checkpoints();
+        }
+    #endif
     }
     
     /*!
@@ -88,7 +106,7 @@ class POSClient {
     /*!
      *  \brief  restore resources from checkpointed file
      */
-    virtual void init_restore_resources(){}
+    void init_restore_resources();
 
 
     /*!
@@ -100,7 +118,7 @@ class POSClient {
     /*!
      *  \brief  dump checkpoints to file
      */
-    virtual void deinit_dump_checkpoints(){}
+    void deinit_dump_checkpoints();
 
     // client identifier
     uint64_t id;
@@ -127,6 +145,38 @@ class POSClient {
 
     // context to initialize this client
     pos_client_cxt_t _cxt;
+
+    /*!
+     *  \brief  allocate mocked resource in the handle manager according to given type
+     *  \note   this function is used during restore phrase
+     *  \param  type_id specified resource type index
+     *  \param  bin_ptr pointer to the binary area
+     *  \return POS_SUCCESS for successfully allocated
+     */
+    virtual pos_retval_t __allocate_typed_resource_from_binary(pos_resource_typeid_t type_id, void* bin_ptr){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  obtain all resource type indices of this client
+     *  \return all resource type indices of this client
+     */
+    virtual std::set<pos_resource_typeid_t> __get_resource_idx();
+
+    
+    /*!
+     *  \brief  get handle manager by given resource index
+     *  \param  rid    resource index
+     *  \return specified handle manager
+     */
+    POSHandleManager<POSHandle>* __get_handle_manager_by_resource_id(pos_resource_typeid_t rid){
+        if(unlikely(this->handle_managers.count(rid) == 0)){
+            POS_ERROR_C_DETAIL(
+                "no handle manager with specified type registered, this is a bug: type_id(%lu)", rid
+            );
+        }
+        return static_cast<POSHandleManager<POSHandle>*>(this->handle_managers[rid]);
+    }
 };
 
 #define pos_get_client_typed_hm(client, resource_id, hm_type)  \

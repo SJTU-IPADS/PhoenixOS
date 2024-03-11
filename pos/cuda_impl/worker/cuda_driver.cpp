@@ -123,7 +123,7 @@ namespace cu_module_get_global {
         module_handle = var_handle->parent_handles[0];
 
         wqe->api_cxt->return_code = cuModuleGetGlobal(
-            &dptr, &d_size, (CUmodule)(module_handle->server_addr), var_handle->name.get()
+            &dptr, &d_size, (CUmodule)(module_handle->server_addr), var_handle->name.c_str()
         );
 
         // record server address

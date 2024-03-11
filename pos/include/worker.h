@@ -268,6 +268,7 @@ class POSWorker {
                     api_meta = _ws->api_mgnr->api_metas[api_id];
 
                     // check and restore broken handles
+                    // TODO: we need to also restore the stateful handle's state here??
                     if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
                         POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
                         continue;
@@ -437,24 +438,19 @@ class POSWorker {
                     }
 
                     /*!
-                        *  \note   we don't need to restore the bottom handle while haven't create them yet
-                        */
+                     *  \note   we don't need to restore the bottom handle while haven't create them yet
+                     */
                     if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
                         if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
                             continue;
                         }
                     }
-
-                    /*!
-                     *  \todo   restore from remote
-                     *  \todo   replay based on DAG
-                     */
                     
                     // restore locally
                     if(unlikely(POS_SUCCESS != broken_handle->restore())){
                         POS_ERROR_C(
-                            "failed to restore broken handle: resource_type_id(%lu), client_addr(%p), server_addr(%p), state(%u)",
-                            broken_handle->resource_type_id, broken_handle->client_addr, broken_handle->server_addr,
+                            "failed to restore broken handle: resource_type(%s), client_addr(%p), server_addr(%p), state(%u)",
+                            broken_handle->get_resource_name().c_str(), broken_handle->client_addr, broken_handle->server_addr,
                             broken_handle->status
                         );
                     } else {

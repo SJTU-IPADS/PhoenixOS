@@ -16,7 +16,7 @@ class POSUtil_Serializer {
      *  \param  sptr    address of the field to be serialized
      *  \param  size    size of the field to be serialized
      */
-    static void write_field(void** dptr, void* sptr, uint64_t size){
+    static void write_field(void** dptr, const void* sptr, uint64_t size){
         POS_CHECK_POINTER(*dptr);
         POS_CHECK_POINTER(sptr);
         if(likely(size > 0)){

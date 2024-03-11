@@ -44,13 +44,13 @@ class POSDag {
     }
     
     ~POSDag(){
-        if(_pc > 0){
-            _graph.dump_graph_to_file(
-                /* file_path */ POS_LOG_FILE_PATH,
-                /* serialize_t1 */ POSDag::_serialize_op,
-                /* serialize_t2 */ POSDag::_serialize_handle
-            );
-        }
+        // if(_pc > 0){
+        //     _graph.dump_graph_to_file(
+        //         /* file_path */ POS_LOG_FILE_PATH,
+        //         /* serialize_t1 */ POSDag::_serialize_op,
+        //         /* serialize_t2 */ POSDag::_serialize_handle
+        //     );
+        // }
     };
 
     /*!
@@ -254,6 +254,27 @@ class POSDag {
     inline POSAPIContext_QE_t* get_api_cxt_by_id(uint64_t id){
         POS_ASSERT(id < _api_cxts.size());
         return _api_cxts[id];
+    }
+
+    /*!
+     *  \brief  obtain a api context wqe by given dag index
+     *  \todo   this function is slow!
+     *  \param  vid  the specified dag index
+     *  \return pointer to the founed api context wqe or nullptr
+     */
+    inline POSAPIContext_QE_t* get_api_cxt_by_dag_id(pos_vertex_id_t vid){
+        POSAPIContext_QE_t *retval = nullptr;
+        uint64_t i;
+
+        for(i=0; i<_api_cxts.size(); i++){
+            POS_CHECK_POINTER(_api_cxts[i]);
+            if(unlikely(_api_cxts[i]->dag_vertex_id == vid)){
+                retval = _api_cxts[i];
+                break;
+            }
+        }
+
+        return retval;
     }
 
     /*!

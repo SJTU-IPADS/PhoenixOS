@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iostream>
+#include <set>
+
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
@@ -40,13 +42,15 @@ class POSClient_CUDA : public POSClient {
         POSHandleManager_CUDA_Context *ctx_mgr;
         POSHandleManager_CUDA_Module *module_mgr;
 
-        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context());
+        bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
+
+        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context(is_restoring));
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
 
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = new POSHandleManager_CUDA_Module();
@@ -56,11 +60,10 @@ class POSClient_CUDA : public POSClient {
         POS_CHECK_POINTER(module_mgr);
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
 
-        // TODO: it's ugly to write gconfig here
-        if(pos_gconfig_server.kernel_meta_path.size() > 0){
-            retval = module_mgr->load_cached_function_metas(pos_gconfig_server.kernel_meta_path);
+        if(this->_cxt.kernel_meta_path.size() > 0){
+            retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
             if(likely(retval == POS_SUCCESS)){
-                pos_gconfig_server.is_load_kernel_from_cache = true;
+                this->_cxt.is_load_kernel_from_cache = true;
             }
         }
         
@@ -91,6 +94,8 @@ class POSClient_CUDA : public POSClient {
         POSHandleManager_CUDA_Stream *stream_mgr;
         POSHandleManager_CUDA_Device *device_mgr;
 
+        bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
+
         ctx_mgr = (POSHandleManager_CUDA_Context*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Context]);
         POS_CHECK_POINTER(ctx_mgr);
         stream_mgr = (POSHandleManager_CUDA_Stream*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
@@ -98,156 +103,32 @@ class POSClient_CUDA : public POSClient {
         device_mgr = (POSHandleManager_CUDA_Device*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
         POS_CHECK_POINTER(device_mgr);
 
-        // insert the one and only initial CUDA context
-        retval = this->dag.allocate_handle(ctx_mgr->latest_used_handle);
-        if(unlikely(POS_SUCCESS != retval)){
-            POS_ERROR_C_DETAIL("failed to allocate initial cocntext handle in the DAG");
-        }
-
-        // insert the one and only initial CUDA stream
-        retval = this->dag.allocate_handle(stream_mgr->latest_used_handle);
-        if(unlikely(POS_SUCCESS != retval)){
-            POS_ERROR_C_DETAIL("failed to allocate initial stream_mgr handle in the DAG");
-        }
-
-        // insert all device handle
-        nb_devices = device_mgr->get_nb_handles();
-        for(i=0; i<nb_devices; i++){
-            retval = this->dag.allocate_handle(device_mgr->get_handle_by_id(i));
+        /*!
+         *  \note   we only inserting new handles to the DAG while NOT restoring
+         *  TODO:   we have no need to record handles in the DAG, remove it
+         */
+        if(is_restoring == false){
+            // insert the one and only initial CUDA context
+            retval = this->dag.allocate_handle(ctx_mgr->latest_used_handle);
             if(unlikely(POS_SUCCESS != retval)){
-                POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
-            }
-        }
-    }
-
-    /*!
-     *  \brief  restore resources from checkpointed file
-     *  TODO:   move this function to base class
-     */
-    void init_restore_resources() override {
-        uint64_t i, j;
-        std::ifstream file;
-        uint8_t *checkpoint_bin, *bin_ptr;
-        uint64_t file_size;
-
-        pos_resource_typeid_t resource_type_id;
-        uint64_t nb_handles, nb_resource_types, serialize_area_size;
-
-        uint64_t nb_api_cxt;
-        POSAPIContext_QE_t *wqe;
-
-        POSHandleManager<POSHandle> *hm;
-        POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;
-
-        auto __get_binary_file_size = [](std::ifstream& file) -> uint64_t {
-            file.seekg(0, std::ios::end);
-            return file.tellg();
-        };
-
-        auto __copy_binary_file_to_buffer = [](std::ifstream& file, uint64_t size, uint8_t *buffer) {
-            file.seekg(0, std::ios::beg);
-            file.read((char*)(buffer), size);
-        };
-
-        #define __READ_TYPED_BINARY_AND_FWD(var, type, pointer) \
-                    var = (*((type*)(pointer)));                \
-                    pointer += sizeof(type);
-
-        // TODO: it's ugly to write gconfig here, try to use client context instead
-        if(pos_gconfig_server.checkpoint_file_path.size() > 0){
-            // open checkpoint file
-            file.open(pos_gconfig_server.checkpoint_file_path.c_str(), std::ios::in|std::ios::binary);
-            if(unlikely(!file.good())){
-                POS_ERROR_C("failed to open checkpoint binary file from %s", pos_gconfig_server.checkpoint_file_path.c_str());
+                POS_ERROR_C_DETAIL("failed to allocate initial cocntext handle in the DAG");
             }
 
-            POS_LOG("restoring from binary file...");
+            // insert the one and only initial CUDA stream
+            retval = this->dag.allocate_handle(stream_mgr->latest_used_handle);
+            if(unlikely(POS_SUCCESS != retval)){
+                POS_ERROR_C_DETAIL("failed to allocate initial stream_mgr handle in the DAG");
+            }
 
-            // obtain its size
-            file_size = __get_binary_file_size(file);
-            POS_ASSERT(file_size > 0);
-
-            // allocate buffer and readin data to the buffer
-            POS_CHECK_POINTER(checkpoint_bin = (uint8_t*)malloc(file_size));
-            __copy_binary_file_to_buffer(file, file_size, checkpoint_bin);
-            bin_ptr = checkpoint_bin;
-
-            /* --------- step 1: read handles --------- */
-            // field: # resource type
-            __READ_TYPED_BINARY_AND_FWD(nb_resource_types, uint64_t, bin_ptr);
-
-            for(i=0; i<nb_resource_types; i++){
-                // field: # resource type id
-                __READ_TYPED_BINARY_AND_FWD(resource_type_id, pos_resource_typeid_t, bin_ptr);
-
-                // field: # handles under this manager 
-                __READ_TYPED_BINARY_AND_FWD(nb_handles, uint64_t, bin_ptr);
-
-                for(j=0; j<nb_handles; j++){
-                    // field: size of the serialized area of this handle
-                    __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
-
-                    if(likely(serialize_area_size > 0)){
-                        /*!
-                         *  \note   if the resource is cuda memory, then we need to use POSHandleManager with
-                         *          specific type, in order to invoke derived function of POSHandle (e.g., 
-                         *          init_ckpt_bag) inside allocate_mocked_resource_from_binary
-                         *  TODO:   kind of ugly here, try to extract this part as a virtual function
-                         */
-                        if(resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
-                            POS_CHECK_POINTER(
-                                hm_memory = (POSHandleManager<POSHandle_CUDA_Memory>*)(this->handle_managers[resource_type_id])
-                            );
-                            hm_memory->allocate_mocked_resource_from_binary(bin_ptr);
-                        } else {
-                            POS_CHECK_POINTER(
-                                hm = (POSHandleManager<POSHandle>*)(this->handle_managers[resource_type_id])
-                            );
-                            hm->allocate_mocked_resource_from_binary(bin_ptr);
-                        }
-                        
-                        bin_ptr += serialize_area_size;
-                    }
+            // insert all device handle
+            nb_devices = device_mgr->get_nb_handles();
+            for(i=0; i<nb_devices; i++){
+                retval = this->dag.allocate_handle(device_mgr->get_handle_by_id(i));
+                if(unlikely(POS_SUCCESS != retval)){
+                    POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
                 }
-
-                POS_LOG("  => deserialized state of %lu handles for resource type %u", nb_handles, resource_type_id);
             }
-
-            /* --------- step 2: read api context --------- */
-            // field: # api context
-            __READ_TYPED_BINARY_AND_FWD(nb_api_cxt, uint64_t, bin_ptr);
-
-            for(i=0; i<nb_api_cxt; i++){
-                // field: size of the serialized area of this api context
-                __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
-                
-                POS_CHECK_POINTER(wqe = new POSAPIContext_QE_t(/* pos_client */ this));
-                wqe->deserialize(bin_ptr);
-                this->dag.record_op(wqe);
-                
-                bin_ptr += serialize_area_size;
-            }
-
-            POS_LOG("  => deserialized %lu of api contexts", nb_api_cxt);
-
-            /* --------- step 3: read DAG --------- */
-            // field: size of the serialized area of this dag topo
-            __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
-            this->dag.deserialize(bin_ptr);
-            bin_ptr += serialize_area_size;
-
-            POS_LOG("  => deserialized DAG");
-        
-            /* --------- step 4: restore handle tree --------- */
-            // TODO:
-
-            /* --------- step 5: recompute missing checkpoints --------- */
-            // TODO:
-
-            POS_LOG("restore finished");
         }
-
-        #undef  __READ_TYPED_BINARY_AND_FWD
     }
 
     /*!
@@ -258,118 +139,147 @@ class POSClient_CUDA : public POSClient {
         this->__dump_hm_cuda_functions();
     }
 
+ 
+ protected:
     /*!
-     *  \brief  dump checkpoints to file
-     *  \todo   this function can be move to parent class
+     *  \brief  allocate mocked resource in the handle manager according to given type
+     *  \note   this function is used during restore phrase
+     *  \param  type_id specified resource type index
+     *  \param  bin_ptr pointer to the binary area
+     *  \return POS_SUCCESS for successfully allocated
      */
-    void deinit_dump_checkpoints() override {
-        std::string file_path;
-        std::ofstream output_file;
-
-        typename std::map<pos_resource_typeid_t, void*>::iterator hm_map_iter;
-        POSHandleManager<POSHandle> *hm;
-        uint64_t nb_handles, nb_resource_types, i;
-        POSHandle *handle;
+    pos_retval_t __allocate_typed_resource_from_binary(pos_resource_typeid_t type_id, void* bin_ptr) override {
+        pos_retval_t retval = POS_SUCCESS;
         
-        uint64_t nb_api_cxt;
-        POSAPIContext_QE_t *api_cxt;
+        if(unlikely(this->handle_managers.count(type_id) == 0)){
+            POS_ERROR_C_DETAIL(
+                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
+            );
+        }
 
-        void *serialize_area;
-        uint64_t serialize_area_size;
+        switch (type_id)
+        {
+        case kPOS_ResourceTypeId_CUDA_Context:
+            POSHandleManager<POSHandle_CUDA_Context> *hm_context;
+            POS_CHECK_POINTER(
+                hm_context = (POSHandleManager<POSHandle_CUDA_Context>*)(this->handle_managers[type_id])
+            );
+            hm_context->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
 
-        file_path = std::string("./") + pos_gconfig_server.job_name + std::string("_checkpoints_") + std::to_string(this->id) + std::string(".bat");
-        output_file.open(file_path.c_str(), std::ios::binary);
+        case kPOS_ResourceTypeId_CUDA_Module:
+            /*!
+             *  \note   if the resource is cuda module, then we need to use POSHandleManager with
+             *          specific type, in order to invoke specified init_ckpt_bag for CUDA module, 
+             *          as CUDA module would contains host-side checkpoint record
+             */
+            POSHandleManager<POSHandle_CUDA_Module> *hm_module;
+            POS_CHECK_POINTER(
+                hm_module = (POSHandleManager<POSHandle_CUDA_Module>*)(this->handle_managers[type_id])
+            );
+            hm_module->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
 
-        POS_LOG("dumping checkpoints...");
+        case kPOS_ResourceTypeId_CUDA_Function:
+            POSHandleManager<POSHandle_CUDA_Function> *hm_function;
+            POS_CHECK_POINTER(
+                hm_function = (POSHandleManager<POSHandle_CUDA_Function>*)(this->handle_managers[type_id])
+            );
+            hm_function->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
 
-        /* ------------------ step 1: dump handles ------------------ */
-        // field: # resource type
-        nb_resource_types = this->handle_managers.size();
-        output_file.write((const char*)(&(nb_resource_types)), sizeof(uint64_t));
+        case kPOS_ResourceTypeId_CUDA_Var:
+            POSHandleManager<POSHandle_CUDA_Var> *hm_var;
+            POS_CHECK_POINTER(
+                hm_var = (POSHandleManager<POSHandle_CUDA_Var>*)(this->handle_managers[type_id])
+            );
+            hm_var->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
 
-        for(hm_map_iter = this->handle_managers.begin(); hm_map_iter != handle_managers.end(); hm_map_iter++){
-            POS_CHECK_POINTER(hm = (POSHandleManager<POSHandle>*)(hm_map_iter->second));
-            nb_handles = hm->get_nb_handles();
+        case kPOS_ResourceTypeId_CUDA_Device:
+            /*!
+             *  \note   if the resource is cuda device, then we need to use POSHandleManager with
+             *          specific type, as we need to setup the lastest-used handle inside the
+             *          handle manager
+             */
+            POSHandleManager<POSHandle_CUDA_Device> *hm_device;
+            POSHandle_CUDA_Device *device_handle;
+            POS_CHECK_POINTER(
+                hm_device = (POSHandleManager<POSHandle_CUDA_Device>*)(this->handle_managers[type_id])
+            );
+            POS_CHECK_POINTER(device_handle = hm_device->allocate_mocked_resource_from_binary(bin_ptr));
 
-            // field: resource type id
-            output_file.write((const char*)(&(hm_map_iter->first)), sizeof(pos_resource_typeid_t));
-
-            // field: # handles under this manager 
-            output_file.write((const char*)(&nb_handles), sizeof(uint64_t));
-
-            for(i=0; i<nb_handles; i++){
-                POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-
-                if(unlikely(POS_SUCCESS != handle->serialize(&serialize_area))){
-                    POS_WARN_C("failed to serialize handle: client_addr(%p)", handle->client_addr);
-                    continue;
-                }
-                POS_CHECK_POINTER(serialize_area);
-
-                serialize_area_size = handle->get_serialize_size();
-
-                // field: size of the serialized area of this handle
-                output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
-
-                if(likely(serialize_area_size > 0)){
-                    // field: serialized data
-                    output_file.write((const char*)(serialize_area), serialize_area_size);
-                }
-                output_file.flush();
-                free(serialize_area);
+            if(device_handle->is_lastest_used_handle == true){
+                hm_device->latest_used_handle = device_handle;
             }
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Memory:
+            /*!
+             *  \note   if the resource is CUDA memory, then we need to use POSHandleManager with
+             *          specific type, in order to invoke specified init_ckpt_bag for CUDA memory 
+             *          inside the function allocate_mocked_resource_from_binary
+             */
+            POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;
+            POS_CHECK_POINTER(
+                hm_memory = (POSHandleManager<POSHandle_CUDA_Memory>*)(this->handle_managers[type_id])
+            );
+            hm_memory->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Stream:
+            POSHandleManager<POSHandle_CUDA_Stream> *hm_stream;
+            POS_CHECK_POINTER(
+                hm_stream = (POSHandleManager<POSHandle_CUDA_Stream>*)(this->handle_managers[type_id])
+            );
+            hm_stream->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Event:
+            POSHandleManager<POSHandle_CUDA_Event> *hm_event;
+            POS_CHECK_POINTER(
+                hm_event = (POSHandleManager<POSHandle_CUDA_Event>*)(this->handle_managers[type_id])
+            );
+            hm_event->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_cuBLAS_Context:
+            POSHandleManager<POSHandle_cuBLAS_Context> *hm_cublas_cxt;
+            POS_CHECK_POINTER(
+                hm_cublas_cxt = (POSHandleManager<POSHandle_cuBLAS_Context>*)(this->handle_managers[type_id])
+            );
+            hm_cublas_cxt->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        default:
+            POS_ERROR_C_DETAIL(
+                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
+            );
         }
 
-        POS_LOG("    => dumped checkpoints of handles");
-
-        /* ------------------ step 2: dump api context ------------------ */
-        // field: # api context
-        nb_api_cxt = this->dag.get_nb_api_cxt();
-        output_file.write((const char*)(&(nb_api_cxt)), sizeof(uint64_t));
-
-        for(i=0; i<nb_api_cxt; i++){
-            POS_CHECK_POINTER(api_cxt = this->dag.get_api_cxt_by_id(i));
-
-            api_cxt->serialize(&serialize_area);
-            POS_CHECK_POINTER(serialize_area);
-
-            // field: size of the serialized area of this api context
-            serialize_area_size = api_cxt->get_serialize_size();
-            output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
-            
-            // field: serialized data
-            output_file.write((const char*)(serialize_area), serialize_area_size);
-            
-            output_file.flush();
-            free(serialize_area);
-        }
-
-        POS_LOG("    => dumped checkpoints of api contexts");
-
-        /* ------------------ step 3: dump dag ------------------ */
-        /*!
-         *  \note   actually, after dumping handle and api context, we already can construct DAG while restoring,
-         *          as the api context contains information about which handles each API would operates on, we still
-         *          dump the DAG here to accelerate the re-execute algorithm in restore
-         */
-        this->dag.serialize(&serialize_area);
-        POS_CHECK_POINTER(serialize_area);
-
-        // field: size of the serialized area of this dag topo
-        serialize_area_size = this->dag.get_serialize_size();
-        output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
-
-        // field: serialized data
-        output_file.write((const char*)(serialize_area), serialize_area_size);
-        
-        output_file.flush();
-        free(serialize_area);
-
-        POS_LOG("    => dumped checkpoints of DAG");
-
-        output_file.close();
-        POS_LOG("finish dump checkpoints to %s", file_path.c_str());
+    exit:
+        return retval;
     }
+
+
+    /*!
+     *  \brief  obtain all resource type indices of this client
+     *  \return all resource type indices of this client
+     */
+    std::set<pos_resource_typeid_t> __get_resource_idx() override {
+        return  std::set<pos_resource_typeid_t>({
+            kPOS_ResourceTypeId_CUDA_Context,
+            kPOS_ResourceTypeId_CUDA_Module,
+            kPOS_ResourceTypeId_CUDA_Function,
+            kPOS_ResourceTypeId_CUDA_Var,
+            kPOS_ResourceTypeId_CUDA_Device,
+            kPOS_ResourceTypeId_CUDA_Memory,
+            kPOS_ResourceTypeId_CUDA_Stream,
+            kPOS_ResourceTypeId_CUDA_Event,
+            kPOS_ResourceTypeId_cuBLAS_Context
+        });
+    }
+
 
  private:
     pos_client_cxt_CUDA _cxt_CUDA;
@@ -469,7 +379,7 @@ class POSClient_CUDA : public POSClient {
         };
 
         // if we have already save the kernels, we can skip
-        if(likely(pos_gconfig_server.is_load_kernel_from_cache == true)){
+        if(likely(this->_cxt.is_load_kernel_from_cache == true)){
             goto exit;
         }
         
@@ -477,7 +387,7 @@ class POSClient_CUDA : public POSClient {
             = (POSHandleManager_CUDA_Function*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
         POS_CHECK_POINTER(hm_function);
 
-        file_path = std::string("./") + pos_gconfig_server.job_name + std::string("_kernel_metas.txt");
+        file_path = std::string("./") + this->_cxt.job_name + std::string("_kernel_metas.txt");
         output_file.open(file_path.c_str(), std::fstream::in | std::fstream::out | std::fstream::app);
 
         nb_functions = hm_function->get_nb_handles();

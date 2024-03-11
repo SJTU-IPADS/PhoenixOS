@@ -4,6 +4,7 @@ LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../build 
 
 # run with restore
 # LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../build ../../remoting/cuda/cpu/cricket-rpc-server -n resnet -c ./resnet_checkpoints_0.bat
+# LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../build gdb --args ../../remoting/cuda/cpu/cricket-rpc-server -n resnet -c ./resnet_checkpoints_0.bat
 
 # run with gdb
 # LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../build gdb --args ../../remoting/cuda/cpu/cricket-rpc-server -n resnet -k ./resnet_kernel_metas.txt

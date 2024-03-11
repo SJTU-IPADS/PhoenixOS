@@ -57,12 +57,9 @@ class POSWorkspace_CUDA : public POSWorkspace{
      *  \return POS_SUCCESS for successfully added
      */
     pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid) override {
-
-        pos_client_cxt_CUDA_t client_cxt = {
-            .cxt_base = {
-                .checkpoint_api_id = this->checkpoint_api_id
-            }
-        };
+        pos_client_cxt_CUDA_t client_cxt;
+        client_cxt.cxt_base = this->_template_client_cxt;
+        client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
 
         POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();

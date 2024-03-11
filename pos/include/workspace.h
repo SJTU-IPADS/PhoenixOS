@@ -142,9 +142,8 @@ class POSWorkspace {
      *  \return POS_SUCCESS for successfully added
      */
     virtual pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid){
-        pos_client_cxt_t client_cxt = {
-            .checkpoint_api_id = this->checkpoint_api_id
-        };
+        pos_client_cxt_t client_cxt = this->_template_client_cxt;
+        client_cxt.checkpoint_api_id = this->checkpoint_api_id;
 
         POS_CHECK_POINTER(*clnt = new POSClient(/* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();
@@ -588,6 +587,9 @@ class POSWorkspace {
     // the max uuid that has been recorded
     pos_client_uuid_t _current_max_uuid;
 
+    // template context to create client
+    pos_client_cxt_t _template_client_cxt;
+
     void parse_command_line_options(int argc, char *argv[]){
         int opt;
         const char *op_string = "n:k:c:";
@@ -595,19 +597,19 @@ class POSWorkspace {
         while((opt = getopt(argc, argv, op_string)) != -1){
             switch (opt)
             {
-            // job names
+            // client job names
             case 'n':
-                pos_gconfig_server.job_name = std::string(optarg);
+                _template_client_cxt.job_name = std::string(optarg);
                 break;
 
-            // kernel meta file path
+            // client kernel meta file path
             case 'k':
-                pos_gconfig_server.kernel_meta_path = std::string(optarg);
+                _template_client_cxt.kernel_meta_path = std::string(optarg);
                 break;
             
-            // checkpoint file path
+            // client checkpoint file path
             case 'c':
-                pos_gconfig_server.checkpoint_file_path = std::string(optarg);
+                _template_client_cxt.checkpoint_file_path = std::string(optarg);
                 break;
 
             default:
@@ -615,11 +617,14 @@ class POSWorkspace {
             }
         }
 
-        if(unlikely(pos_gconfig_server.job_name.size() == 0)){
+        if(unlikely(_template_client_cxt.job_name.size() == 0)){
             POS_ERROR_C("must assign a job name with -n option: -n resnet");
         }
 
-        if(unlikely(pos_gconfig_server.kernel_meta_path.size() > 0 && pos_gconfig_server.checkpoint_file_path.size()) >0){
+        if(unlikely(
+            _template_client_cxt.kernel_meta_path.size() > 0 
+            && _template_client_cxt.checkpoint_file_path.size()) >0
+        ){
             POS_ERROR_C("please either -c or -k, don't coexist!");
         }
     }

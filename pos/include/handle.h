@@ -23,7 +23,7 @@
 /*!
  *  \brief  idx of base resource types
  */
-enum pos_handle_type_id_t : uint64_t {
+enum : pos_resource_typeid_t {
     kPOS_ResourceTypeId_Unknown = 0,
     kPOS_ResourceTypeId_Device,
     kPOS_ResourceTypeId_Memory,
@@ -253,21 +253,7 @@ class POSHandle {
      *  \param  broken_handle_list  list of broken handles, 
      *  \param  layer_id            index of the layer at this call
      */
-    inline void collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id = 0){
-        uint64_t i;
-
-        POS_CHECK_POINTER(broken_handle_list);
-
-        // insert itself to the nonactive_handles map if itsn't active
-        if(unlikely(status != kPOS_HandleStatus_Active && status != kPOS_HandleStatus_Delete_Pending)){
-            broken_handle_list->add_handle(layer_id, this);
-        }
-        
-        // iterate over its parent
-        for(i=0; i<parent_handles.size(); i++){
-            parent_handles[i]->collect_broken_handles(broken_handle_list, layer_id+1);
-        }
-    }
+    void collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id = 0);
 
 
     /*!
@@ -343,37 +329,19 @@ class POSHandle {
      *  \param  serialized_area  pointer to the binary area
      *  \return POS_SUCCESS for successfully serilization
      */
-    pos_retval_t serialize(void** serialized_area){
-        pos_retval_t retval = POS_SUCCESS;
-        
-        POS_CHECK_POINTER(serialized_area);
-
-        *serialized_area = malloc(this->get_serialize_size());
-        POS_CHECK_POINTER(*serialized_area);
-
-        retval = this->__serialize_basic(*serialized_area);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to serialize basic fields of handle");
-            goto exit;
-        }
-
-        retval = this->__serialize_extra((*(serialized_area)) + this->__get_basic_serialize_size());
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to serialize extra fields of handle");
-            goto exit;
-        }
-        
-    exit:
-        return retval;
-    }
+    pos_retval_t serialize(void** serialized_area);
 
 
     /*!
      *  \brief  obtain the size of the serialize area of this handle
      *  \return size of the serialize area of this handle
      */
-    uint64_t get_serialize_size(){
-        return this->__get_basic_serialize_size() + this->__get_extra_serialize_size();
+    inline uint64_t get_serialize_size(){
+        return (
+            /* size of basic field */   sizeof(uint64_t)
+            /* basic field */           + this->__get_basic_serialize_size() 
+            /* extra field */           + this->__get_extra_serialize_size()
+        );
     }
 
 
@@ -382,26 +350,7 @@ class POSHandle {
      *  \param  raw_area    raw data area
      *  \return POS_SUCCESS for successfully serialization
      */
-    pos_retval_t deserialize(void* raw_area){
-        pos_retval_t retval = POS_SUCCESS;
-
-        POS_CHECK_POINTER(raw_area);
-
-        retval = this->__deserialize_basic(raw_area);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to deserialize basic fields of handle");
-            goto exit;
-        }
-
-        retval = this->__deserialize_extra(raw_area + this->__get_basic_serialize_size());
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to deserialize extra fields of handle");
-            goto exit;
-        }
-
-    exit:
-        return retval;
-    }
+    pos_retval_t deserialize(void* raw_area);
 
 
     /*!
@@ -462,6 +411,12 @@ class POSHandle {
      */
     pos_vertex_id_t latest_version;
     
+    /*!
+     *  \brief  identify whether current handle is the latest used handle in the manager
+     *  \note   this field is only used during restore phrase
+     */
+    bool is_lastest_used_handle;
+
  protected:
     /*!
      *  \note   the belonging handle manager
@@ -473,51 +428,7 @@ class POSHandle {
      *  \brief  obtain the serilization size of basic fields of POSHandle
      *  \return the serilization size of basic fields of POSHandle
      */
-    inline uint64_t __get_basic_serialize_size(){
-        pos_retval_t tmp_retval;
-        void *ckpt_data;
-        uint64_t ckpt_version, ckpt_size;
-
-        std::set<uint64_t> ckpt_version_set;
-        uint64_t nb_ckpt, ckpt_serialization_size;
-
-
-        if(state_size == 0){
-            /*!
-             *  \note   for non-stateful handle, it's easy to determine the size of the basic serialized fields
-             */
-            return (
-                /* resource_type_id */      sizeof(pos_resource_typeid_t)
-                /* client_addr */           + sizeof(uint64_t)
-                /* server_addr */           + sizeof(uint64_t)
-                /* nb_parent_handle */      + sizeof(uint64_t)
-                /* parent_handle_indices */ + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
-                /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
-                /* size */                  + sizeof(uint64_t)
-                /* state_size */            + sizeof(uint64_t)
-            );
-        } else {
-            /*!
-             *  \note   for stateful handle, the size of the basic serialized fields is influenced by checkpoint
-             */
-            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
-            ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
-
-            return (
-                /* resource_type_id */      sizeof(pos_resource_typeid_t)
-                /* client_addr */           + sizeof(uint64_t)
-                /* server_addr */           + sizeof(uint64_t)
-                /* nb_parent_handle */      + sizeof(uint64_t)
-                /* parent_handle_indices */ + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
-                /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
-                /* size */                  + sizeof(uint64_t)
-                /* state_size */            + sizeof(uint64_t)
-
-                /* nb ckpt version */       + sizeof(uint64_t)
-                /* ckpt_version + data */   + ckpt_serialization_size
-            );
-        }
-    }
+    uint64_t __get_basic_serialize_size();
 
 
     /*!
@@ -534,60 +445,7 @@ class POSHandle {
      *  \param  serialized_area  pointer to the binary area
      *  \return POS_SUCCESS for successfully serilization
      */
-    pos_retval_t __serialize_basic(void* serialized_area){
-        pos_retval_t retval = POS_SUCCESS;
-        void *ptr = serialized_area;
-
-        uint64_t nb_parent_handles;
-
-        POSCheckpointSlot *ckpt_slot;
-        uint64_t ckpt_version, ckpt_size, nb_ckpt_version;
-        std::set<uint64_t> ckpt_version_set;
-        typename std::set<uint64_t>::iterator set_iter;
-
-        POS_CHECK_POINTER(ptr);
-        
-        nb_parent_handles = this->parent_handles.size();
-
-        POSUtil_Serializer::write_field(&ptr, &(this->resource_type_id), sizeof(pos_resource_typeid_t));
-        POSUtil_Serializer::write_field(&ptr, &(this->client_addr), sizeof(uint64_t));
-        POSUtil_Serializer::write_field(&ptr, &(this->server_addr), sizeof(uint64_t));
-        POSUtil_Serializer::write_field(&ptr, &(nb_parent_handles), sizeof(uint64_t));
-        for(auto& parent_handle : this->parent_handles){
-            POSUtil_Serializer::write_field(&ptr, &(parent_handle->resource_type_id), sizeof(pos_resource_typeid_t));
-            POSUtil_Serializer::write_field(&ptr, &(parent_handle->dag_vertex_id), sizeof(pos_vertex_id_t));
-        }
-        POSUtil_Serializer::write_field(&ptr, &(this->dag_vertex_id), sizeof(pos_vertex_id_t));
-        POSUtil_Serializer::write_field(&ptr, &(this->size), sizeof(uint64_t));
-        POSUtil_Serializer::write_field(&ptr, &(this->state_size), sizeof(uint64_t));
-
-        // we only serialize checkpoint for stateful resource
-        if(state_size > 0){
-            POS_CHECK_POINTER(this->ckpt_bag);
-
-            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
-            nb_ckpt_version = ckpt_version_set.size();
-
-            POSUtil_Serializer::write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
-
-            for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
-                ckpt_version = *set_iter;
-                retval =  this->ckpt_bag->get_checkpoint_slot(&ckpt_slot, ckpt_size, ckpt_version);
-                if(unlikely(retval != POS_SUCCESS)){
-                    POS_ERROR_C(
-                        "failed to obtain checkpoint by version within the version set, this's a bug: client_addr(%p), version(%lu)",
-                        this->client_addr, ckpt_version
-                    );
-                }
-                POS_CHECK_POINTER(ckpt_slot);
-                POSUtil_Serializer::write_field(&ptr, &ckpt_version, sizeof(uint64_t));
-                POSUtil_Serializer::write_field(&ptr, ckpt_slot->expose_pointer(), state_size);
-            }
-        }
-
-    exit:
-        return retval;
-    }
+    pos_retval_t __serialize_basic(void* serialized_area);
 
 
     /*!
@@ -605,62 +463,7 @@ class POSHandle {
      *  \param  raw_data    raw data area that store the serialized data
      *  \return POS_SUCCESS for successfully deserialize
      */
-    pos_retval_t __deserialize_basic(void* raw_data){
-        pos_retval_t retval = POS_SUCCESS, tmp_retval;
-
-        uint64_t i;
-        uint64_t _nb_parent_handles;
-        pos_resource_typeid_t parent_resource_id;
-        pos_vertex_id_t parent_handle_dag_id;
-        uint64_t nb_ckpt_version, ckpt_version;
-
-        void *ptr = raw_data;
-        POS_CHECK_POINTER(ptr);
-
-        POSUtil_Deserializer::read_field(&(this->resource_type_id), &ptr, sizeof(pos_resource_typeid_t));
-
-        POSUtil_Deserializer::read_field(&(this->client_addr), &ptr, sizeof(uint64_t));
-        POSUtil_Deserializer::read_field(&(this->server_addr), &ptr, sizeof(uint64_t));
-        POSUtil_Deserializer::read_field(&_nb_parent_handles, &ptr, sizeof(uint64_t));
-
-        for(i=0; i<_nb_parent_handles; i++){
-            POSUtil_Deserializer::read_field(&parent_resource_id, &ptr, sizeof(pos_resource_typeid_t));
-            POSUtil_Deserializer::read_field(&parent_handle_dag_id, &ptr, sizeof(pos_vertex_id_t));
-            this->parent_handles_waitlist.push_back(
-                std::pair<pos_resource_typeid_t, pos_vertex_id_t>(parent_resource_id, parent_handle_dag_id)
-            );
-        }
-
-        POSUtil_Deserializer::read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
-        POSUtil_Deserializer::read_field(&(this->size), &ptr, sizeof(uint64_t));
-        POSUtil_Deserializer::read_field(&(this->state_size), &ptr, sizeof(uint64_t));
-
-        if(this->state_size > 0){
-            if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
-                POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
-            }
-            POS_CHECK_POINTER(this->ckpt_bag);
-
-            POSUtil_Deserializer::read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
-
-            for(i=0; i<nb_ckpt_version; i++){
-                POSUtil_Deserializer::read_field(&ckpt_version, &ptr, sizeof(uint64_t));
-                
-                tmp_retval = this->ckpt_bag->load(ckpt_version, ptr);
-                if(unlikely(tmp_retval != POS_SUCCESS)){
-                    POS_ERROR_C(
-                        "failed to load checkpoint while restoring: client_addr(%p), version(%lu)",
-                        this->client_addr, ckpt_version
-                    );
-                }
-
-                ptr += this->state_size;
-            }
-        }
-
-    exit:
-        return retval;
-    }
+    pos_retval_t __deserialize_basic(void* raw_data);
 
 
     /*!
@@ -727,29 +530,33 @@ class POSHandleManager {
      *  \brief  allocate new mocked resource within the manager, based on checkpoint in the binary
      *  \note   this function is invoked during restore process
      *  \param  ckpt_raw_data   pointer to the checkpoint binary
-     *  \return POS_SUCCESS for successfully allocation and deserialization
+     *  \return pointer to the newly allocated handle if successfully allocated
+     *          nullptr is failed to allocate
      */
-    pos_retval_t allocate_mocked_resource_from_binary(void* ckpt_raw_data){
-        pos_retval_t retval = POS_SUCCESS;
-        T_POSHandle *handle;
+    T_POSHandle* allocate_mocked_resource_from_binary(void* ckpt_raw_data){
+        T_POSHandle *handle = nullptr;
 
         POS_CHECK_POINTER(ckpt_raw_data);
 
         handle = new T_POSHandle(this);
         POS_CHECK_POINTER(handle);
 
-        if(likely(retval = handle->deserialize(ckpt_raw_data) == POS_SUCCESS)){
+        if(likely(handle->deserialize(ckpt_raw_data) == POS_SUCCESS)){
             this->_handles.push_back(handle);
-            if(likely((uint64_t)(handle->client_addr) > _base_ptr)){
-                _base_ptr = (uint64_t)(handle->client_addr);
+            if(likely((uint64_t)(handle->client_addr) > this->_base_ptr)){
+                this->_base_ptr = (uint64_t)(handle->client_addr);
             }
         } else {
             POS_WARN_C("failed to deserialize handle");
             delete handle;
         }
         
+        if(handle->is_lastest_used_handle){
+            this->latest_used_handle = handle;
+        }
+
     exit:
-        return retval;
+        return handle;
     }
     
     /*!
@@ -810,6 +617,26 @@ class POSHandleManager {
         } else {
             return _handles[id];
         }
+    }
+
+    /*!
+     *  \brief  obtain a handle by given dag index
+     *  \todo   this function is slow!
+     *  \param  did  the specified dag index
+     *  \return pointer to the founed handle or nullptr
+     */
+    inline T_POSHandle* get_handle_by_dag_id(uint64_t did){
+        uint64_t i;
+        T_POSHandle *handle = nullptr;
+
+        for(i=0; i<_handles.size(); i++){
+            if(unlikely(_handles[i]->dag_vertex_id == did)){
+                handle = _handles[i];
+                break;
+            }
+        }
+
+        return handle;
     }
 
     inline pos_retval_t mark_handle_status(T_POSHandle *handle, pos_handle_status_t status){

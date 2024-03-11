@@ -3,6 +3,7 @@
 #include "pos/include/common.h"
 #include "pos/include/utils/bipartite_graph.h"
 #include "pos/include/dag.h"
+#include "pos/include/checkpoint.h"
 
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/parser.h"
@@ -93,7 +94,6 @@ namespace cu_module_load_data {
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ module_handle
         });
-        
 
         // analyse the fatbin and stores the function attributes in the handle
         retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
@@ -134,6 +134,19 @@ namespace cu_module_load_data {
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cu_module_load_data): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(module_handle->ckpt_bag);
+        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -384,18 +397,13 @@ namespace cu_module_get_global {
         }
 
         // record the name of the var in the handle
-        var_handle->name = std::make_unique<char[]>(pos_api_param_size(wqe, 3));
-        POS_CHECK_POINTER(var_handle->name.get());
-        strcpy(
-            var_handle->name.get(),
-            (const char*)(pos_api_param_addr(wqe, 3))
-        );
-
+        var_handle->name = std::string((const char*)(pos_api_param_addr(wqe, 3)));
+        
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ var_handle
         });
-
+            
         // allocate the var handle in the dag
         retval = client->dag.allocate_handle(var_handle);
         if(unlikely(retval != POS_SUCCESS)){

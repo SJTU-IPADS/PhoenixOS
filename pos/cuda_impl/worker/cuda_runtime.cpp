@@ -195,7 +195,7 @@ namespace cuda_memcpy_h2d {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        memory_handle = pos_api_output_handle(wqe, 0);
+        memory_handle = pos_api_inout_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
@@ -308,7 +308,7 @@ namespace cuda_memcpy_h2d_async {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        memory_handle = pos_api_output_handle(wqe, 0);
+        memory_handle = pos_api_inout_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
         stream_handle = pos_api_input_handle(wqe, 0);

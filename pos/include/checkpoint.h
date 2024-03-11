@@ -56,10 +56,142 @@ class POSCheckpointSlot {
 };
 
 
-#if POS_CKPT_OPT_LEVAL == 1
-    #include "pos/include/checkpoint_o1_o2.h"
-#elif POS_CKPT_OPT_LEVAL == 2
-    #include "pos/include/checkpoint_o1_o2.h"
-#else // POS_CKPT_OPT_LEVAL == 0
-    #include "pos/include/checkpoint_o0.h"
-#endif
+// forward declaration
+typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+
+
+/*!
+ *  \brief  host-side value checkpoint record
+ */
+typedef struct pos_host_ckpt {
+    // corresponding api context wqe that stores the host-side value
+    POSAPIContext_QE_t *wqe;
+
+    // index of the parameter that stores the host-side value
+    uint32_t param_index;
+} pos_host_ckpt_t;
+
+
+class POSCheckpointBag {
+ public:
+    POSCheckpointBag(
+        uint64_t state_size,
+        pos_custom_ckpt_allocate_func_t allocator,
+        pos_custom_ckpt_deallocate_func_t deallocator
+    )
+        : _state_size(state_size), _allocate_func(allocator), _deallocate_func(deallocator)
+    {
+        // TODO: prefill
+    }
+
+    ~POSCheckpointBag() = default;
+    
+    /*!
+     *  \brief  clear current checkpoint bag
+     */
+    void clear();
+
+    /*!
+     *  \brief  allocate a new checkpoint slot inside this bag
+     *  \param  version     version (i.e., dag index) of this checkpoint
+     *  \param  ptr         pointer to the checkpoint slot
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    pos_retval_t apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr);
+
+    /*!
+     *  \brief  obtain checkpointed data by given checkpoint version
+     *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
+     *  \param  size        size of the checkpoin data
+     *  \param  version     the specified version
+     *  \return POS_SUCCESS for successfully obtained
+     *          POS_FAILED_NOT_EXIST for no checkpoint is found
+     */
+    pos_retval_t get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version);
+
+
+    /*!
+     *  \brief  obtain the checkpoint version list
+     *  \return the checkpoint version list
+     */
+    inline std::set<uint64_t> get_checkpoint_version_set(){
+        return _ckpt_version_set;
+    }
+
+
+    /*!
+     *  \brief  invalidate the checkpoint from this bag
+     *  \param  version version of the checkpoint to be removed
+     *  \return POS_SUCCESS for successfully invalidate
+     *          POS_NOT_READY for no checkpoint had been record
+     */
+    pos_retval_t invalidate_by_version(uint64_t version);
+
+
+    /*!
+     *  \brief  obtain overall memory consumption of this checkpoint bag
+     *  \return overall memory consumption of this checkpoint bag
+     */
+    inline uint64_t get_memory_consumption(){
+        return _ckpt_map.size() * _state_size;
+    }
+
+
+    /*!
+     *  \brief  load binary checkpoint data into this bag
+     *  \note   this function will be invoked during the restore process
+     *  \param  version     version of this checkpoint
+     *  \param  ckpt_data   pointer to the buffer that stores the checkpointed data
+     *  \return POS_SUCCESS for successfully loading
+     */
+    pos_retval_t load(uint64_t version, void* ckpt_data);
+
+    /*!
+     *  \brief  record a new host-side checkpoint of this bag
+     *  \note   this function is invoked within parser thread
+     *  \param  ckpt    host-side checkpoint record
+     *  \return POS_SUCCESS for successfully recorded
+     *          POS_FAILED_ALREADY_EXIST for duplicated version
+     */
+    pos_retval_t set_host_checkpoint_record(pos_host_ckpt_t ckpt);
+
+    /*!
+     *  \brief  obtain all host-side checkpoint records
+     *  \note   this function only return those api context that hasn't been pruned by checkpoint system
+     *  \return all host-side checkpoint records
+     */
+    std::vector<pos_host_ckpt_t> get_host_checkpoint_records();
+
+    // waitlist of the host-side checkpoint record, populated during restore phrase
+    std::vector<std::pair<pos_vertex_id_t, uint32_t>> host_ckpt_waitlist;
+
+ private:
+    /*!
+     *  \brief  checkpoint version map
+     *  \note   key: version
+     *  \note   value: checkpoint slot  
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _ckpt_map;
+
+    /*!
+     *  \brief  checkpoint version that has been invalidated
+     *  \note   we store thost invalidated version so that we can reuse their memory
+     *          space in the next time we apply for a new checkpoint slot
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _invalidate_ckpt_map;
+
+    /*!
+     *  \brief  list of host-side checkpoint
+     */
+    std::unordered_map<uint64_t, pos_host_ckpt_t> _host_ckpt_map;
+    
+    // all versions that this bag stored
+    std::set<uint64_t> _ckpt_version_set;
+
+    // state size of each checkpoint
+    uint64_t _state_size;
+
+    // allocator and deallocator of checkpoint memory
+    pos_custom_ckpt_allocate_func_t _allocate_func;
+    pos_custom_ckpt_deallocate_func_t _deallocate_func;
+};

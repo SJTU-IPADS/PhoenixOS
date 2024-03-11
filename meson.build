@@ -129,7 +129,14 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += ['pos/src/handle.cpp', 'pos/src/config.cpp', 'pos/src/oob.cpp']
+sources += ['pos/src/handle.cpp', 'pos/src/oob.cpp', 'pos/src/api_context.cpp', 'pos/src/client.cpp']
+
+if ckpt_opt_level == 0
+    sources += ['pos/src/checkpoint_o0.cpp']
+elif ckpt_opt_level == 1 or ckpt_opt_level == 2
+    sources += ['pos/src/checkpoint_o1_o2.cpp']
+endif
+
 if target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',
