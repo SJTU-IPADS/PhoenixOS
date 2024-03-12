@@ -60,6 +60,7 @@ class POSWorkspace_CUDA : public POSWorkspace{
         pos_client_cxt_CUDA_t client_cxt;
         client_cxt.cxt_base = this->_template_client_cxt;
         client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
+        client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
 
         POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();

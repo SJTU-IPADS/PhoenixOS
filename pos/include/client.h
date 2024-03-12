@@ -30,6 +30,9 @@ typedef struct pos_client_cxt {
 
     // checkpoint file path (if any)
     std::string checkpoint_file_path;
+
+    // indices of stateful handle type
+    std::vector<uint64_t> stateful_handle_type_idx;
 } pos_client_cxt_t;
 
 
@@ -68,7 +71,8 @@ class POSClient {
         this->init_dag();
 
         if(this->_cxt.checkpoint_file_path.size() > 0){
-            this->init_restore_resources();
+            this->init_restore_load_resources();
+            this->init_restore_generate_recompute_scheme();
         }
     }
 
@@ -106,8 +110,12 @@ class POSClient {
     /*!
      *  \brief  restore resources from checkpointed file
      */
-    void init_restore_resources();
+    void init_restore_load_resources();
 
+    /*!
+     *  \brief  generate recompute wqe sequence
+     */
+    void init_restore_generate_recompute_scheme();
 
     /*!
      *  \brief      deinit handle manager for all used resources

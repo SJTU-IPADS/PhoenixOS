@@ -135,7 +135,7 @@ class POSDag {
         if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
             _api_cxts.push_back(wqe);
         } else {
-            _latest_checkpoint_version = wqe->dag_vertex_id;
+            latest_checkpoint_version = wqe->dag_vertex_id;
         }
 
         POS_DEBUG_C(
@@ -278,6 +278,52 @@ class POSDag {
     }
 
     /*!
+     *  \brief  check whether a specified handle is missing checkpoint, return the missing version if it's
+     *  \param  handle_vid  dag vertex index of the handle to be checked
+     *  \param  vh          latest checkpoint version of this handle
+     *  \param  vg          global latest checkpoint version
+     *  \param  is_missing  identify whether the specified handle is missing checkpoint
+     *  \param  vo          missing checkpoint version
+     *  \note   vh < vo < vg  
+     */
+    void check_missing_ckpt(pos_vertex_id_t handle_vid, pos_vertex_id_t vh, pos_vertex_id_t vg, bool& is_missing, pos_vertex_id_t& vo){
+        uint64_t i;
+        POSNeighborList_t *neighbor_list;
+        POSAPIContext_QE_t *wqe;
+
+        POS_ASSERT(vh <= vg);
+
+        POS_CHECK_POINTER(neighbor_list = this->_graph.get_neighbor_list(handle_vid));
+
+        // no api context operate on this handle, so it wouldn't miss checkpoint
+        if(unlikely(neighbor_list->size() == 0)){
+            is_missing = false;
+            goto exit;
+        }
+
+        // traverse the neighbor list in reverse order
+        for(i=neighbor_list->size()-1; i>=0; i--){
+            POSBgEdge_t &edge = (*neighbor_list)[i];
+            if(edge.d_vid <= vh){
+                is_missing = false;
+                goto exit;
+            }
+
+            if(edge.dir == kPOS_Edge_Direction_Out || edge.dir == kPOS_Edge_Direction_InOut){
+                if(edge.d_vid <= vg){
+                    is_missing = true;
+                    vo = edge.d_vid;
+                    goto exit;
+                }
+            }
+        }
+
+    exit:
+        ;
+    }
+
+
+    /*!
      *  \brief  obtain serialize size of current dag topo
      *  \return serialize size of current dag topo
      */
@@ -302,7 +348,7 @@ class POSDag {
         ptr = *serialized_area;
 
         // field: latest_checkpoint_version
-        POSUtil_Serializer::write_field(&ptr, &(_latest_checkpoint_version), sizeof(pos_vertex_id_t));
+        POSUtil_Serializer::write_field(&ptr, &(latest_checkpoint_version), sizeof(pos_vertex_id_t));
 
         // field: graph topo
         _graph.serialize(ptr);
@@ -318,11 +364,14 @@ class POSDag {
         POS_CHECK_POINTER(ptr);
 
         // field: latest_checkpoint_version
-        POSUtil_Deserializer::read_field(&(this->_latest_checkpoint_version), &ptr, sizeof(pos_vertex_id_t));
+        POSUtil_Deserializer::read_field(&(this->latest_checkpoint_version), &ptr, sizeof(pos_vertex_id_t));
 
         // field: graph topo
         _graph.deserialize(ptr);
     }
+
+    // dag vertex id of latest checkpoint op
+    pos_vertex_id_t latest_checkpoint_version;
 
  private:
     // context of this dag
@@ -353,9 +402,6 @@ class POSDag {
      *  \note   this field should be both wrote and read by worker thread
      */
     uint64_t _pc;
-
-    // dag vertex id of latest checkpoint op
-    pos_vertex_id_t _latest_checkpoint_version;
 
     /*!
      *  \brief  serialize metadata of an op on the DAG while dumping to file

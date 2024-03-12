@@ -257,6 +257,12 @@ typedef struct POSHandleView {
     pos_vertex_id_t handle_dag_id;
 
     /*!
+     *  \brief  resource type index of the handle
+     *  \note   this field is only used during restoring phrase
+     */
+    pos_resource_typeid_t resource_type_id;
+
+    /*!
      *  \brief      index of the corresponding parameter of this handle view
      *  \example    for API such as launchKernel, we need to know which parameter this handle 
      *              is corresponding to, in order to translating the address in the worker 
@@ -278,9 +284,10 @@ typedef struct POSHandleView {
      */
     static inline uint64_t get_serialize_size(){
         return (
-            /* handle_dag_id */ sizeof(pos_vertex_id_t)
-            /* param_index */   + sizeof(uint64_t)
-            /* offset */        + sizeof(uint64_t)
+            /* handle_dag_id */         sizeof(pos_vertex_id_t)
+            /* handle_resource_typeid*/ + sizeof(pos_resource_typeid_t)
+            /* param_index */           + sizeof(uint64_t)
+            /* offset */                + sizeof(uint64_t)
         );
     }
 

@@ -144,6 +144,7 @@ class POSWorkspace {
     virtual pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid){
         pos_client_cxt_t client_cxt = this->_template_client_cxt;
         client_cxt.checkpoint_api_id = this->checkpoint_api_id;
+        client_cxt.stateful_handle_type_idx = this->stateful_handle_type_idx;
 
         POS_CHECK_POINTER(*clnt = new POSClient(/* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();

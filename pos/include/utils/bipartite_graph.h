@@ -428,6 +428,25 @@ class POSBipartiteGraph {
     }
 
 
+    /*!
+     *  \brief  obtain neighbor list of specified vertex of type T2
+     *  \param  t2_vid  specified index of the T2 vertex
+     *  \return neighbor list of specified vertex of type T2
+     */
+    inline POSNeighborList_t* get_neighbor_list(pos_vertex_id_t t2_vid){
+        POSNeighborList_t *retval = nullptr;
+
+        if(unlikely(t2_vid >= max_t2_id)){
+            POS_WARN_C_DETAIL("failed to obtain neighbor list, vertex index exceed range: t2_vid(%lu), max_t2_id(%lu)", t2_vid, max_t2_id);
+        } else {
+            POS_CHECK_POINTER(retval = _topo_t2[t2_vid])
+        }
+
+    exit:
+        return retval;
+    }
+
+
  private:
     pos_vertex_id_t max_t1_id, max_t2_id;
     std::vector<POSBgVertex_t<T1>*> _t1s;
