@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <sstream>
+#include <map>
 
 #include <libelf.h>
 #include <gelf.h>
@@ -45,7 +46,10 @@
  */
 typedef struct POSCudaFunctionDesp {
     // name of the kernel
-    std::shared_ptr<char[]> name;
+    std::string name;
+    
+    // kernel signature
+    std::string signature;
 
     // number of parameters within this function
     uint32_t nb_params;
@@ -59,30 +63,25 @@ typedef struct POSCudaFunctionDesp {
     // index of those parameter which is a input pointer (const pointer)
     std::vector<uint32_t> input_pointer_params;
 
-    // index of those parameter which is a output pointer (non-const pointer)
+    // index of those parameter which is a inout pointer
+    std::vector<uint32_t> inout_pointer_params;
+
+    // index of those parameter which is a output pointer
     std::vector<uint32_t> output_pointer_params;
 
     // index of those non-pointer parameters that may carry pointer inside their values
     std::vector<uint32_t> suspicious_params;
+    bool has_verified_params;
+
+    // confirmed suspicious parameters: index of the parameter -> offset from the base address
+    std::vector<std::pair<uint32_t,uint64_t>> confirmed_suspicious_params;
 
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
 
-    /*!
-     *  \brief  setup the name of the function
-     *  \param  name_   the name to be set
-     */
-    inline void set_name(const char* name_){
-        POS_ASSERT(name.get() == nullptr);  // we can only set the name once
-        name = std::make_unique<char[]>(strlen(name_)+1);
-        POS_CHECK_POINTER(name.get());
-        strcpy(name.get(), name_);
-    }
-
-    POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0) {}
+    POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0), has_verified_params(false) {}
     ~POSCudaFunctionDesp(){}
 } POSCudaFunctionDesp_t;
-using POSCudaFunctionDesp_ptr = std::shared_ptr<POSCudaFunctionDesp_t>;
 
 
 /*！
@@ -95,7 +94,7 @@ class POSUtil_CUDA_Kernel_Parser {
      *          the behaviour is represent by its parameter (i.e., whether it's a pointer), and the direction of the
      *          pointer (i.e., whether this pointer is an const pointer)
      *  \param  kernel_str      low-level (mangles) identifiers of the kernel
-     *  \param  function_desp   shared_ptr of function descriptor
+     *  \param  function_desp   pointer of function descriptor
      *  \example    mangles:    _Z8kernel_1PKfPfS1_S1_i
      *              demangles:  kernel_1(const float *, float *, float *, float *, int)
      *  \note   this function will use binary utilites "cu++filt" to obtain the kernel prototype, and
@@ -104,12 +103,12 @@ class POSUtil_CUDA_Kernel_Parser {
      *  \return POS_SUCCESS for successfully parsing
      *          POS_FAILED for failed parsing
      */
-    static pos_retval_t parse_by_prototype(const char *kernel_str, POSCudaFunctionDesp_ptr function_desp){
+    static pos_retval_t parse_by_prototype(const char *kernel_str, POSCudaFunctionDesp* function_desp){
         pos_retval_t retval = POS_SUCCESS;
         std::string kernel_demangles_name, kernel_prototype;
 
         POS_CHECK_POINTER(kernel_str);
-        POS_CHECK_POINTER(function_desp.get());
+        POS_CHECK_POINTER(function_desp);
 
         retval = __preprocess_prototype(kernel_str, kernel_demangles_name);
         if(unlikely(retval != POS_SUCCESS)){
@@ -123,11 +122,13 @@ class POSUtil_CUDA_Kernel_Parser {
             goto exit;
         }
 
+        function_desp->signature = kernel_prototype;
+
         retval = __parse_prototype(kernel_prototype, function_desp);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
                 "failed parsing kernel prototype: parsing failed: kernel_str(%s), kernel_prototype(%s)",
-                kernel_str, kernel_prototype
+                kernel_str, kernel_prototype.c_str()
             );
             goto exit;
         }
@@ -158,11 +159,11 @@ class POSUtil_CUDA_Kernel_Parser {
     /*!
      *  \brief  parsing the kernel prototype
      *  \param  kernel_prototype        the generated kernel prototype
-     *  \param  function_desp           shared_ptr of function descriptor
+     *  \param  function_desp           pointer of function descriptor
      *  \return POS_SUCCESS for successfully processed
      *          POS_FAILED for failed processed
      */
-    static pos_retval_t __parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp_ptr function_desp);
+    static pos_retval_t __parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp* function_desp);
 };
 
 
@@ -173,16 +174,18 @@ class POSUtil_CUDA_Fatbin {
  public:
     /*!
      *  \brief  obtain metadata of CUDA functions from given fatbin
-     *  \param  fatbin  pointer to the memory area that stores the fatbin
-     *                  (note: the content should start from the fatbin ELF header)
-     *  \param  desps   vector to store the extracted function metadata
+     *  \param  fatbin      pointer to the memory area that stores the fatbin
+     *                      (note: the content should start from the fatbin ELF header)
+     *  \param  desps       vector to store the extracted function metadata
+     *  \param  cached_deps cached function metadata
      *  \return POS_SUCCESS for successfully extraction
      */
     static pos_retval_t obtain_functions_from_fatbin(
-        uint8_t* fatbin, std::vector<POSCudaFunctionDesp_ptr>* desps
+        uint8_t* fatbin, std::vector<POSCudaFunctionDesp*>* desps,
+        std::map<std::string, POSCudaFunctionDesp*>& cached_desp_map
     ){
         pos_retval_t retval = POS_SUCCESS;
-        POSCudaFunctionDesp_ptr new_desp;
+        POSCudaFunctionDesp* new_desp;
         const uint8_t *input_pos = NULL;
         uint8_t *text_data = NULL;
         size_t text_data_size = 0;
@@ -254,7 +257,7 @@ class POSUtil_CUDA_Fatbin {
                 input_pos += fatbin_text_hdr->size;
             }
 
-            retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps);
+            retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
             if(unlikely(retval != POS_SUCCESS)){
                 goto exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin;
             }
@@ -494,12 +497,14 @@ class POSUtil_CUDA_Fatbin {
 
     /*!
      *  \brief  extract kernel infos from a given fatbin text section
-     *  \param  memory  pointer to the target fatbin text section
-     *  \param  memsize size of the given fatbin text section
-     *  \param  desps   vector to store the extracted function metadata
+     *  \param  memory          pointer to the target fatbin text section
+     *  \param  memsize         size of the given fatbin text section
+     *  \param  desps           vector to store the extracted function metadata
+     *  \param  cached_desp_map map of cached function metadata
      */
     static pos_retval_t __extract_kernel_infos(
-        void* memory, size_t memsize, std::vector<POSCudaFunctionDesp_ptr>* desps
+        void* memory, size_t memsize, std::vector<POSCudaFunctionDesp*>* desps,
+        std::map<std::string, POSCudaFunctionDesp*>& cached_desp_map
     ){
         /* =================== ELF utility functions =================== */
 
@@ -629,7 +634,7 @@ class POSUtil_CUDA_Fatbin {
         /*!
          *  \brief  extract parameter info of the kernel within the ELF
          *  \param  elf             descriptor of target ELF file
-         *  \param  function_desp   pointer to the shared_ptr of function descriptor
+         *  \param  function_desp   pointer to the pointer of function descriptor
          *  \param  memory          data area of target ELF file
          *  \param  memsize         size of the data area of target ELF file
          *  \return POS_SUCCESS for successfully extraction
@@ -637,7 +642,7 @@ class POSUtil_CUDA_Fatbin {
          *          POS_FAILED_NOT_EXIST for no section was founded
          */
         auto get_params_for_kernel = [&](
-            Elf *elf, POSCudaFunctionDesp_ptr *function_desp, void* memory, size_t memsize
+            Elf *elf, POSCudaFunctionDesp** function_desp, void* memory, size_t memsize
         ) -> pos_retval_t {
             char *section_name = NULL;
             Elf_Scn *section = NULL;
@@ -647,21 +652,21 @@ class POSUtil_CUDA_Fatbin {
             POS_CHECK_POINTER(elf); POS_CHECK_POINTER(function_desp); POS_CHECK_POINTER(memory);
 
             // obtain the section that contains the kernel
-            if ((section_name = get_kernel_section_name_from_kernel_name((*function_desp)->name.get())) == NULL) { 
-                POS_WARN("failed to form section name based on kernel's name: kernel_name(%s)", (*function_desp)->name.get());
+            if ((section_name = get_kernel_section_name_from_kernel_name((*function_desp)->name.c_str())) == NULL) { 
+                POS_WARN("failed to form section name based on kernel's name: kernel_name(%s)", (*function_desp)->name.c_str());
                 return POS_FAILED_NOT_EXIST; 
             }
             if (get_section_by_name(elf, section_name, &section) != 0) {
                 POS_WARN(
                     "failed to get section based on kernel's name: kernel_name(%s), section_name(%s)",
-                    (*function_desp)->name.get(), section_name
+                    (*function_desp)->name.c_str(), section_name
                 );
                 return POS_FAILED;
             }
             if ((data = elf_getdata(section, NULL)) == NULL) {
                 POS_WARN(
                     "failed to get kernel section data: kernel_name(%s), section_name(%s)",
-                    (*function_desp)->name.get(), section_name
+                    (*function_desp)->name.c_str(), section_name
                 );
                 return POS_FAILED;
             }
@@ -682,7 +687,7 @@ class POSUtil_CUDA_Fatbin {
                      *  \note   for those parameters that larger that 64, we suspect it might contains device pointer,
                      *          and we will conduct checking when user first launch this kernel
                      */
-                    if(unlikely(kparam->size >= 64)){
+                    if(unlikely(kparam->size >= 8)){
                         (*function_desp)->suspicious_params.push_back(kparam->ordinal);
                     }
 
@@ -718,7 +723,7 @@ class POSUtil_CUDA_Fatbin {
         int i = 0, j;
         GElf_Sym sym;
         const char *kernel_str;
-        POSCudaFunctionDesp_ptr function_desp;
+        POSCudaFunctionDesp *function_desp;
         bool is_duplicated;
 
         POS_CHECK_POINTER(memory); POS_CHECK_POINTER(desps);
@@ -801,33 +806,43 @@ class POSUtil_CUDA_Fatbin {
              */
             is_duplicated = false;
             for(j=0; j<desps->size(); j++){
-                if(unlikely(!strcmp(kernel_str, (*desps)[j]->name.get()))){
+                if(unlikely(!strcmp(kernel_str, (*desps)[j]->name.c_str()))){
                     is_duplicated = true;
                     break;
                 }
             }
             if(unlikely(is_duplicated)){ continue; }
 
-            function_desp = std::make_shared<POSCudaFunctionDesp_t>();
-            POS_CHECK_POINTER(function_desp);
+            // check whether this function is cached
+            if(unlikely(cached_desp_map.size() > 0)){
+                if(likely(cached_desp_map.count(std::string(kernel_str)) > 0)){
+                    function_desp = cached_desp_map[std::string(kernel_str)];
+                    desps->push_back(function_desp);
+                } else {
+                    POS_DEBUG_DETAIL("found uncached kernel, which might cause nsys to crash, so we skip: name(%s)", kernel_str);
+                }
+            } else {
+                function_desp = new POSCudaFunctionDesp_t();
+                POS_CHECK_POINTER(function_desp);
 
-            function_desp->set_name(kernel_str);
+                function_desp->name = std::string(kernel_str);
 
-            // analyse the parameters of the kernel
-            retval = get_params_for_kernel(elf, &function_desp, memory, memsize);
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_DETAIL("failed to extract parameter out of the kernel in the ELF: kernel_name(%s)", kernel_str);
-                goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+                // analyse the parameters of the kernel
+                retval = get_params_for_kernel(elf, &function_desp, memory, memsize);
+                if(unlikely(retval != POS_SUCCESS)){
+                    POS_WARN_DETAIL("failed to extract parameter out of the kernel in the ELF: kernel_name(%s)", kernel_str);
+                    goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+                }
+
+                // parsing the parameters hints (e.g., whether it's a pointer, direction of the pointer)
+                retval = POSUtil_CUDA_Kernel_Parser::parse_by_prototype(kernel_str, function_desp);
+                if(unlikely(retval != POS_SUCCESS)){
+                    POS_WARN_DETAIL("failed to extract parameter hints (pointer, direction): kernel_name(%s), won't be recorded!", kernel_str);
+                    continue;
+                }
+
+                desps->push_back(function_desp);
             }
-
-            // parsing the parameters hints (e.g., whether it's a pointer, direction of the pointer)
-            retval = POSUtil_CUDA_Kernel_Parser::parse_by_prototype(kernel_str, function_desp);
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_DETAIL("failed to extract parameter hints (pointer, direction): kernel_name(%s), won't be recorded!", kernel_str);
-                continue;
-            }
-
-            desps->push_back(function_desp);
         }
 
     exit_POSUtil_CUDA_Fatbin___extract_kernel_info:

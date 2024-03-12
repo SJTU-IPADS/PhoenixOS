@@ -6,6 +6,10 @@
 #include "pos/include/log.h"
 #include "pos/include/transport.h"
 #include "pos/include/api_context.h"
+#include "pos/include/workspace.h"
+#include "pos/include/agent.h"
+
+#include "pos/cuda_impl/client.h"
 
 namespace oob_functions {
 
@@ -22,11 +26,11 @@ namespace register_client {
     } oob_payload_t;
 
     // server
-    POS_OOB_FUNC_S(){
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         oob_payload_t *payload;
 
-        T_POSClient *clnt;
-        T_POSTransport* trans;
+        POSClient *clnt;
+        POSTransport_SHM *trans;
 
         POS_CHECK_POINTER(remote);
         POS_CHECK_POINTER(msg);
@@ -35,10 +39,7 @@ namespace register_client {
         payload = (oob_payload_t*)msg->payload;
         
         // create client
-        POS_CHECK_POINTER(clnt = new T_POSClient());
-        clnt->init();
-        ws->create_client(clnt, &(msg->client_meta.uuid));
-        POS_DEBUG("create client: uuid(%lu)", msg->client_meta.uuid);
+        ws->create_client(&clnt, &(msg->client_meta.uuid));
 
         // create queue pair
         if(unlikely(POS_SUCCESS != ws->create_qp(msg->client_meta.uuid))){
@@ -47,14 +48,8 @@ namespace register_client {
         POS_DEBUG("create queue pair: uuid(%lu)", msg->client_meta.uuid);
 
         // create transport
-        trans = new T_POSTransport( 
-            /* id*/ msg->client_meta.uuid,
-            /* non_blocking */ true,
-            /* role */ kPOS_Transport_RoleId_Server,
-            /* timeout */ 5000
-        );
-        POS_CHECK_POINTER(trans);
-        ws->create_transport(trans, msg->client_meta.uuid);
+        // todo: we need to select transport type
+        ws->create_transport<POSTransport_SHM>(&trans, msg->client_meta.uuid);
 
         payload->is_registered = true;
 
@@ -64,7 +59,9 @@ namespace register_client {
     }
 
     // client
-    POS_OOB_FUNC_C(){
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
         int retval = POS_SUCCESS;
         oob_payload_t *payload;
 
@@ -93,7 +90,7 @@ namespace register_client {
 
 namespace unregister_client {
     // server
-    POS_OOB_FUNC_S(){
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         POS_CHECK_POINTER(remote);
         POS_CHECK_POINTER(msg);
         POS_CHECK_POINTER(ws);
@@ -111,7 +108,9 @@ namespace unregister_client {
     }
 
     // client
-    POS_OOB_FUNC_C(){
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
         msg->msg_type = kPOS_Oob_Unregister_Client;
         __POS_OOB_SEND();
         __POS_OOB_RECV();
@@ -132,10 +131,10 @@ namespace connect_transport {
     } oob_payload_t;
 
     // server
-    POS_OOB_FUNC_S(){
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         oob_payload_t *payload;
 
-        T_POSTransport *trpt;
+        POSTransport *trpt;
 
         POS_CHECK_POINTER(remote);
         POS_CHECK_POINTER(msg);
@@ -163,7 +162,9 @@ namespace connect_transport {
     }
 
     // client
-    POS_OOB_FUNC_C(){
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
         int retval = POS_SUCCESS;
         oob_payload_t *payload;
 
@@ -221,7 +222,7 @@ namespace mock_api_call {
     } oob_payload_t;
 
     // server
-    POS_OOB_FUNC_S(){
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         pos_retval_t retval = POS_SUCCESS;
         oob_payload_t *payload;
         uint64_t i;
@@ -254,7 +255,9 @@ namespace mock_api_call {
     }
 
     // client
-    POS_OOB_FUNC_C(){
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i;
         api_call_meta_t *api_call_meta;

@@ -36,7 +36,6 @@ enum pos_retval {
 #define POS_ASSERT(x)           assert(x);
 #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 
-
 /*!
  *  \brief  type for resource typeid
  */

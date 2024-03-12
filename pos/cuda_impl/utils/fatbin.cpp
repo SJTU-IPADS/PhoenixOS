@@ -65,7 +65,7 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__generate_prototype(const std::string&
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN(
             "failed to analyse paramter details of kernel %s due to failed cu++filt execution: cmd(%s)",
-            cmd.c_str()
+            kernel_demangles_name.c_str(), cmd.c_str()
         );
         goto exit;
     }
@@ -77,11 +77,11 @@ exit:
 /*!
  *  \brief  parsing the kernel prototype
  *  \param  kernel_prototype        the generated kernel prototype
- *  \param  function_desp           shared_ptr of function descriptor
+ *  \param  function_desp           pointer to the function descriptor
  *  \return POS_SUCCESS for successfully processed
  *          POS_FAILED for failed processed
  */
-pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp_ptr function_desp){
+pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& kernel_prototype, POSCudaFunctionDesp *function_desp){
     pos_retval_t retval = POS_SUCCESS;
     CXIndex index;
     CXErrorCode cx_retval;
@@ -92,7 +92,7 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& ke
     std::string cast_kernel_prototype;
 
     typedef struct __visit_meta {
-        POSCudaFunctionDesp_ptr function_desp;
+        POSCudaFunctionDesp *function_desp;
         uint32_t param_index;
     };
     
@@ -166,7 +166,11 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__parse_prototype(const std::string& ke
                     if(clang_isConstQualifiedType(pointeeType)){ // constant pointer type
                         vm->function_desp->input_pointer_params.push_back(vm->param_index);
                     } else {
-                        vm->function_desp->output_pointer_params.push_back(vm->param_index);
+                        /*!
+                         *  \note   for non-const pointers, we need to classify them as non-const
+                         *          pointers, as they might also be read by the kernel
+                         */
+                        vm->function_desp->inout_pointer_params.push_back(vm->param_index);
                     }
                 }
                 vm->param_index += 1;

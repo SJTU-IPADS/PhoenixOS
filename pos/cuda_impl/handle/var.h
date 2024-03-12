@@ -1,12 +1,13 @@
 #pragma once
 
 #include <iostream>
+#include <string>
+#include <cstdlib>
 
+#include <sys/resource.h>
 #include <stdint.h>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include <cublas_v2.h>
-#include <cublas_api.h>
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
@@ -16,45 +17,50 @@
 
 
 /*!
- *  \brief  handle for cuBLAS context
+ *  \brief  handle for cuda variable
  */
-class POSHandle_cuBLAS_Context : public POSHandle {
+class POSHandle_CUDA_Var : public POSHandle {
  public:
     /*!
      *  \brief  constructor
      *  \param  client_addr     the mocked client-side address of the handle
      *  \param  size_           size of the handle it self
      *  \param  hm              handle manager which this handle belongs to
-     *  \param  state_size      size of resource state behind this handle  
+     *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, uint64_t state_size=0)
-        : POSHandle(client_addr_, size_, hm, state_size)
+    POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, state_size_)
     {
-        this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
+    }
+
+    /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA_Var(void* hm) : POSHandle(hm)
+    {
+        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
     }
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_cuBLAS_Context(size_t size_, void* hm, uint64_t state_size=0) : POSHandle(size_, hm, state_size){
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
-
-     /*!
-     *  \param  hm  handle manager which this handle belongs to
-     *  \note   this constructor is invoked during restore process, where the content of 
-     *          the handle will be resume by deserializing from checkpoint binary
-     */
-    POSHandle_cuBLAS_Context(void* hm) : POSHandle(hm)
+    POSHandle_CUDA_Var(size_t size_, void* hm, size_t state_size_=0)
+        : POSHandle(size_, hm, state_size_)
     {
-        this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
+        POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
-    std::string get_resource_name(){ return std::string("cuBLAS Context"); }
+    std::string get_resource_name(){ return std::string("CUDA Var"); }
+
+    // name of the kernel
+    std::string name;
 
     /*!
      *  \brief  restore the current handle when it becomes broken state
@@ -62,19 +68,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      */
     pos_retval_t restore() override {
         pos_retval_t retval = POS_SUCCESS;
-        cublasHandle_t actual_handle;
-        cublasStatus_t cublas_retval;
-
-        cublas_retval = cublasCreate_v2(&actual_handle);
-        if(likely(CUBLAS_STATUS_SUCCESS == cublas_retval)){
-            this->set_server_addr((void*)(actual_handle));
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            retval = POS_FAILED;
-            POS_WARN_C_DETAIL("failed to restore cublas context: %d", cublas_retval);
-        }
-
-        return retval;
+        
     }
 
  protected:
@@ -83,7 +77,10 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \return the serilization size of extra fields of POSHandle
      */
     uint64_t __get_extra_serialize_size() override {
-        return 0;
+        return (
+            /* name_size */     sizeof(uint64_t)
+            /* name */          + (this->name.size() > 0 ? this->name.size() + 1 : 0)
+        );
     }
 
     /*!
@@ -92,27 +89,57 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \return POS_SUCCESS for successfully serilization
      */
     pos_retval_t __serialize_extra(void* serialized_area) override {
-        return POS_SUCCESS;
+        pos_retval_t retval = POS_SUCCESS;
+        void *ptr = serialized_area;
+        uint64_t tmp_size;
+        char eos = '\0';
+
+        POS_CHECK_POINTER(ptr);
+        
+        tmp_size = this->name.size();
+        POSUtil_Serializer::write_field(&ptr, &(tmp_size), sizeof(uint64_t));
+        if(tmp_size > 0){
+            POSUtil_Serializer::write_field(&ptr, this->name.c_str(), tmp_size);
+            POSUtil_Serializer::write_field(&ptr, &(eos), 1);
+        }
+        
+        return retval;
     }
 
     /*!
      *  \brief  deserialize extra field of this handle
-     *  \param  sraw_data    raw data area that store the serialized data
+     *  \param  raw_data    raw data area that store the serialized data
      *  \return POS_SUCCESS for successfully deserilization
      */
     pos_retval_t __deserialize_extra(void* raw_data) override {
-        return POS_SUCCESS;
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t tmp_size;
+        void *ptr = raw_data;
+        char *temp_str;
+        
+        POS_CHECK_POINTER(ptr);
+
+        POSUtil_Deserializer::read_field(&(tmp_size), &ptr, sizeof(uint64_t));
+        if(likely(tmp_size > 0)){
+            POS_CHECK_POINTER(temp_str = (char*)malloc(tmp_size+1));
+            memset(temp_str, 0, tmp_size+1);
+            POSUtil_Deserializer::read_field(temp_str, &ptr, tmp_size);
+            this->name = std::string(static_cast<const char*>(temp_str));
+            free(temp_str);
+        }
+
+        return retval;
     }
 };
 
 
 /*!
- *  \brief   manager for handles of POSHandle_cuBLAS_Context
+ *  \brief   manager for handles of POSHandle_CUDA_Var
  */
-class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS_Context> {
+class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
  public:
     /*!
-     *  \brief  allocate new mocked cuBLAS context within the manager
+     *  \brief  allocate new mocked CUDA var within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
      *  \param  related_handles all related handles for helping allocate the mocked resource
      *                          (note: these related handles might be other types)
@@ -123,34 +150,35 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        POSHandle_cuBLAS_Context** handle,
+        POSHandle_CUDA_Var** handle,
         std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle *context_handle;
+        POSHandle *module_handle;
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
     #if POS_ENABLE_DEBUG_CHECK
-        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
-            POS_WARN_C("no binded context provided to created the CUDA module");
+        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Module) == 0)){
+            POS_WARN_C("no binded module provided to create the CUDA var");
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         }
     #endif
 
-        context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
+        module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
+        POS_CHECK_POINTER(module_handle);
 
         retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked cuBLAS context in the manager");
+            POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
             goto exit;
         }
-        
-        (*handle)->record_parent_handle(context_handle);
+
+        (*handle)->record_parent_handle(module_handle);
 
     exit:
         return retval;

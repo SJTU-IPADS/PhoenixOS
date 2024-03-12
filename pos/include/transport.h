@@ -211,7 +211,7 @@ class POSTransport_SHM : public POSTransport {
             );
             if(_send_elt_id_mq == nullptr){
                 POS_WARN_C_DETAIL(
-                    "failed to create boost-managed send_elt_id_mq: name(%s), len(%lu)",
+                    "failed to create boost-managed send_elt_id_mq: name(%s), len(%d)",
                     name, POS_TRANSPORT_SHM_MQ_LEN
                 );
                 retval = POS_FAILED;
@@ -219,14 +219,14 @@ class POSTransport_SHM : public POSTransport {
             }
         } catch(...) {
             POS_WARN_C_DETAIL(
-                "failed to create boost-managed send_elt_id_mq: name(%s), len(%lu)",
+                "failed to create boost-managed send_elt_id_mq: name(%s), len(%d)",
                 name, POS_TRANSPORT_SHM_MQ_LEN
             );
             retval = POS_FAILED;
             goto POSTransport_SHM_init_th_clean_resource;
         }
         POS_DEBUG_C(
-            "create boost-managed send_elt_id_mq: addr(%p), name(%s), len(%lu)",
+            "create boost-managed send_elt_id_mq: addr(%p), name(%s), len(%d)",
             _send_elt_id_mq, name, POS_TRANSPORT_SHM_MQ_LEN
         );
 
@@ -242,7 +242,7 @@ class POSTransport_SHM : public POSTransport {
             );
             if(_send_batch_size_mq == nullptr){
                 POS_WARN_C_DETAIL(
-                    "failed to create boost-managed send_batch_size_mq: name(%s), len(%lu)",
+                    "failed to create boost-managed send_batch_size_mq: name(%s), len(%d)",
                     name, POS_TRANSPORT_SHM_MQ_LEN
                 );
                 retval = POS_FAILED;
@@ -250,14 +250,14 @@ class POSTransport_SHM : public POSTransport {
             }
         } catch(...) {
             POS_WARN_C_DETAIL(
-                "failed to create boost-managed send_batch_size_mq: name(%s), len(%lu)",
+                "failed to create boost-managed send_batch_size_mq: name(%s), len(%d)",
                 name, POS_TRANSPORT_SHM_MQ_LEN
             );
             retval = POS_FAILED;
             goto POSTransport_SHM_init_th_clean_resource;
         }
         POS_DEBUG_C(
-            "create boost-managed send_batch_size_mq: addr(%p), name(%s), len(%lu)",
+            "create boost-managed send_batch_size_mq: addr(%p), name(%s), len(%d)",
             _send_batch_size_mq, name, POS_TRANSPORT_SHM_MQ_LEN
         );
 

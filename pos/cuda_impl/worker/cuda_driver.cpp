@@ -18,33 +18,31 @@ namespace cu_module_load_data {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSMem_ptr fatbin_binary;
+        POSHandle *module_handle;
         CUresult res;
         CUmodule module = NULL;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        module_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Module, 0);
+        module_handle = pos_api_create_handle(wqe, 0);
         POS_CHECK_POINTER(module_handle);
 
-        fatbin_binary = module_handle->host_value_map[wqe->dag_vertex_id].first;
-
-        wqe->api_cxt->return_code = cuModuleLoadData(&module, fatbin_binary.get());
+        wqe->api_cxt->return_code = cuModuleLoadData(
+            /* module */ &module,
+            /* image */  pos_api_param_addr(wqe, 1)
+        );
 
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
-            module_handle = pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Module, 0);
-            POS_CHECK_POINTER(module_handle);
             module_handle->set_server_addr((void*)module);
             module_handle->mark_status(kPOS_HandleStatus_Active);
         }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -63,22 +61,22 @@ namespace cu_module_get_function {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSHandle_CUDA_Function_ptr function_handle;
+        POSHandle *module_handle;
+        POSHandle_CUDA_Function *function_handle;
         CUfunction function = NULL;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
     
-        function_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Function>(
-            pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Function, 0)
-        );
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_create_handle(wqe, 0));
         POS_CHECK_POINTER(function_handle);
 
         POS_ASSERT(function_handle->parent_handles.size() > 0);
         module_handle = function_handle->parent_handles[0];
 
-        wqe->api_cxt->return_code = cuModuleGetFunction(&function, module_handle->server_addr, function_handle->name.get());
+        wqe->api_cxt->return_code = cuModuleGetFunction(
+            &function, (CUmodule)(module_handle->server_addr), function_handle->name.c_str()
+        );
 
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
@@ -88,11 +86,11 @@ namespace cu_module_get_function {
 
         // TODO: skip checking
         // if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
-        //     POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+        //     POSWorker::__restore(ws, wqe);
         // } else {
-        //     POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        //     POSWorker::__done(ws, wqe);
         // }
-        POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+        POSWorker::__done(ws, wqe);
 
     exit:
         return retval;
@@ -108,8 +106,8 @@ namespace cu_module_get_global {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr module_handle;
-        POSHandle_CUDA_Var_ptr var_handle;
+        POSHandle *module_handle;
+        POSHandle_CUDA_Var *var_handle;
         CUfunction function = NULL;
 
         CUdeviceptr dptr = 0;
@@ -118,15 +116,15 @@ namespace cu_module_get_global {
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        var_handle = std::dynamic_pointer_cast<POSHandle_CUDA_Var>(
-            pos_api_handle(wqe, kPOS_ResourceTypeId_CUDA_Var, 0)
-        );
+        var_handle = (POSHandle_CUDA_Var*)(pos_api_create_handle(wqe, 0));
         POS_CHECK_POINTER(var_handle);
 
         POS_ASSERT(var_handle->parent_handles.size() > 0);
         module_handle = var_handle->parent_handles[0];
 
-        wqe->api_cxt->return_code = cuModuleGetGlobal(&dptr, &d_size, module_handle->server_addr, var_handle->name.get());
+        wqe->api_cxt->return_code = cuModuleGetGlobal(
+            &dptr, &d_size, (CUmodule)(module_handle->server_addr), var_handle->name.c_str()
+        );
 
         // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
@@ -140,9 +138,9 @@ namespace cu_module_get_global {
         }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
     exit:
@@ -161,13 +159,13 @@ namespace cu_device_primary_ctx_get_state {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        device_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Device, POSHandle_CUDA_Device, 0);
-        POS_CHECK_POINTER(device_handle.get());
+        device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
+        POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cuDevicePrimaryCtxGetState(
             device_handle->device_id,
@@ -176,9 +174,9 @@ namespace cu_device_primary_ctx_get_state {
         );
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
-            POSWorker<T_POSTransport, T_POSClient>::__restore(ws, wqe);
+            POSWorker::__restore(ws, wqe);
         } else {
-            POSWorker<T_POSTransport, T_POSClient>::__done(ws, wqe);
+            POSWorker::__done(ws, wqe);
         }
 
         return retval;

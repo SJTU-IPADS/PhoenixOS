@@ -1,7 +1,3 @@
-#pragma once
-
-#pragma once
-
 #include <iostream>
 
 #include "cublas_v2.h"
@@ -11,7 +7,7 @@
 #include "pos/include/dag.h"
 
 #include "pos/cuda_impl/handle.h"
-#include "pos/cuda_impl/runtime.h"
+#include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_context.h"
 #include "pos/cuda_impl/utils/fatbin.h"
@@ -28,9 +24,9 @@ namespace cublas_create {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandleManager<POSHandle_CUDA_Context>* hm_context;
-        POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandleManager_CUDA_Context* hm_context;
+        POSHandleManager_cuBLAS_Context* hm_cublas_context;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -38,17 +34,22 @@ namespace cublas_create {
         client = (POSClient_CUDA*)(wqe->client);
         POS_CHECK_POINTER(client);
 
-        hm_context = client->handle_managers[kPOS_ResourceTypeId_CUDA_Context];
-        hm_cublas_context = client->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context];
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
         POS_CHECK_POINTER(hm_context);
+        
+        hm_cublas_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
+        );
         POS_CHECK_POINTER(hm_cublas_context);
 
         // operate on handler manager
         retval = hm_cublas_context->allocate_mocked_resource(
             /* handle */ &cublas_context_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Context, 
-                /* handles */ std::vector<POSHandle_ptr>({hm_context->latest_used_handle}) 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ sizeof(cublasHandle_t)
         );
@@ -65,10 +66,9 @@ namespace cublas_create {
         }
 
         // record the related handle to QE
-        wqe->record_handle(
-            kPOS_ResourceTypeId_cuBLAS_Context,
-            POSHandleView_t(cublas_context_handle, kPOS_Edge_Direction_Create)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ cublas_context_handle
+        });
 
         // allocate new handle in the dag
         retval = client->dag.allocate_handle(cublas_context_handle);
@@ -100,10 +100,10 @@ namespace cublas_set_stream {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
-        POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandleManager_CUDA_Stream *hm_stream;
+        POSHandleManager_cuBLAS_Context *hm_cublas_context;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -123,9 +123,14 @@ namespace cublas_set_stream {
         }
     #endif
 
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
-        hm_cublas_context = client->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context];
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
+
+        hm_cublas_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
+        );
         POS_CHECK_POINTER(hm_cublas_context);
 
         // operate on handler manager
@@ -140,9 +145,9 @@ namespace cublas_set_stream {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ stream_handle
+        });
 
         retval = hm_cublas_context->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
@@ -155,9 +160,9 @@ namespace cublas_set_stream {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_cuBLAS_Context, POSHandleView_t(cublas_context_handle, kPOS_Edge_Direction_In)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ cublas_context_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
@@ -180,8 +185,8 @@ namespace cublas_set_math_mode {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandleManager_cuBLAS_Context *hm_cublas_context;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -201,7 +206,9 @@ namespace cublas_set_math_mode {
         }
     #endif
 
-        hm_cublas_context = client->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context];
+        hm_cublas_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
+        );
         POS_CHECK_POINTER(hm_cublas_context);
 
         // operate on handler manager
@@ -216,10 +223,10 @@ namespace cublas_set_math_mode {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_cuBLAS_Context, POSHandleView_t(cublas_context_handle, kPOS_Edge_Direction_In)
-        );
-
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ cublas_context_handle
+        });
+        
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
 
@@ -241,10 +248,10 @@ namespace cublas_sgemm {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_cuBLAS_Context_ptr cublas_context_handle;
-        POSHandle_CUDA_Memory_ptr memory_handle_A, memory_handle_B, memory_handle_C;
-        POSHandleManager<POSHandle_cuBLAS_Context>* hm_cublas_context;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
+        POSHandleManager_cuBLAS_Context *hm_cublas_context;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -264,9 +271,14 @@ namespace cublas_sgemm {
         }
     #endif
 
-        hm_cublas_context = client->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context];
+        hm_cublas_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
+        );
         POS_CHECK_POINTER(hm_cublas_context);
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // operate on handler manager
@@ -281,12 +293,11 @@ namespace cublas_sgemm {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_cuBLAS_Context, 
-            POSHandleView_t(cublas_context_handle, kPOS_Edge_Direction_In)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ cublas_context_handle
+        });
 
-        // operate on handler manager
+        // operate on memory manager
         retval = hm_memory->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 7, uint64_t),
             /* handle */ &memory_handle_A
@@ -298,14 +309,10 @@ namespace cublas_sgemm {
             );
             goto exit;
         }
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-            /* handle_view */ POSHandleView_t(
-                /* handle_ */ memory_handle_A,
-                /* dir_ */ kPOS_Edge_Direction_In,
-                /* param_index_ */ 7
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ memory_handle_A,
+            /* param_index */ 7
+        });
 
         retval = hm_memory->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 9, uint64_t),
@@ -318,14 +325,10 @@ namespace cublas_sgemm {
             );
             goto exit;
         }
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-            /* handle_view */ POSHandleView_t(
-                /* handle_ */ memory_handle_B,
-                /* dir_ */ kPOS_Edge_Direction_In,
-                /* param_index_ */ 9
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ memory_handle_B,
+            /* param_index */ 9
+        });
 
         retval = hm_memory->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 12, uint64_t),
@@ -338,14 +341,11 @@ namespace cublas_sgemm {
             );
             goto exit;
         }
-        wqe->record_handle(
-            /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-            /* handle_view */ POSHandleView_t(
-                /* handle_ */ memory_handle_C,
-                /* dir_ */ kPOS_Edge_Direction_Out,
-                /* param_index_ */ 12
-            )
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Out>({
+            /* handle */ memory_handle_C,
+            /* param_index */ 12
+        });
+
         hm_memory->record_modified_handle(memory_handle_C);
 
         // launch the op to the dag

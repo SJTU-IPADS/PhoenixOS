@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <type_traits>
 
@@ -14,6 +15,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/bipartite_graph.h"
+#include "pos/include/utils/serializer.h"
 #include "pos/include/checkpoint.h"
 
 #define kPOS_HandleDefaultSize   (1<<4)
@@ -21,7 +23,7 @@
 /*!
  *  \brief  idx of base resource types
  */
-enum pos_handle_type_id_t : uint64_t {
+enum : pos_resource_typeid_t {
     kPOS_ResourceTypeId_Unknown = 0,
     kPOS_ResourceTypeId_Device,
     kPOS_ResourceTypeId_Memory,
@@ -99,8 +101,9 @@ class POSHandle {
     ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-        ckpt_bag(nullptr), _hm(hm) {}
+        latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
     
+
     /*!
      *  \param  size_           size of the resources represented by this handle
      *  \param  hm              handle manager which this handle belongs to
@@ -112,35 +115,52 @@ class POSHandle {
         :   client_addr(nullptr), server_addr(nullptr), size(size_),
             dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
             status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            ckpt_bag(nullptr), _hm(hm) {}
-    
+            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+
+
+    /*!
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle(void* hm)
+        :   client_addr(nullptr), server_addr(nullptr), size(0),
+            dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+            status(kPOS_HandleStatus_Create_Pending), state_size(0),
+            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+
     virtual ~POSHandle() = default;
+
 
     /*!
      *  \brief  setting the server-side address of the handle after finishing allocation
      *  \param  addr  the server-side address of the handle
      */
     inline void set_server_addr(void *addr){ server_addr = addr; }
-    
+
+
     /*!
      *  \brief  setting both the client-side and server-side address of the handle 
      *          after finishing allocation
      *  \param  addr        the setting address of the handle
-     *  \param  handle_ptr  shared pointer to current handle
+     *  \param  handle_ptr  pointer to current handle
      *  \return POS_SUCCESS for successfully setting
      *          POS_FAILED_ALREADY_EXIST for duplication failed;
      */
-    pos_retval_t set_passthrough_addr(void *addr, std::shared_ptr<POSHandle> handle_ptr);
+    pos_retval_t set_passthrough_addr(void *addr, POSHandle* handle_ptr);
+
 
     /*!
     *  \brief  record a new parent handle of current handle
     */
-    inline void record_parent_handle(std::shared_ptr<POSHandle> parent){
+    inline void record_parent_handle(POSHandle* parent){
         POS_CHECK_POINTER(parent);
         parent_handles.push_back(parent);
     }
 
+
     struct _pos_broken_handle_list_iter;
+
 
     /*!
      *  \brief  wrapper map to store broken handles
@@ -226,27 +246,15 @@ class POSHandle {
         }
     } pos_broken_handle_list_t;
 
+
     /*!
      *  \brief  collect all broken handles along the handle trees
      *  \note   this function will call recursively, aware of performance issue!
      *  \param  broken_handle_list  list of broken handles, 
      *  \param  layer_id            index of the layer at this call
      */
-    inline void collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id = 0){
-        uint64_t i;
+    void collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id = 0);
 
-        POS_CHECK_POINTER(broken_handle_list);
-
-        // insert itself to the nonactive_handles map if itsn't active
-        if(unlikely(status != kPOS_HandleStatus_Active && status != kPOS_HandleStatus_Delete_Pending)){
-            broken_handle_list->add_handle(layer_id, this);
-        }
-        
-        // iterate over its parent
-        for(i=0; i<parent_handles.size(); i++){
-            parent_handles[i]->collect_broken_handles(broken_handle_list, layer_id+1);
-        }
-    }
 
     /*!
      *  \brief  identify whether a given address is located within the resource
@@ -269,6 +277,7 @@ class POSHandle {
         return result;
     }
 
+
     /*!
      *  \brief  mark the status of this handle
      *  \param  status the status to mark
@@ -278,34 +287,28 @@ class POSHandle {
 
 
     /*!
-     *  \brief  record host value of the handle under specific version
-     *  \param  data    pointer to the remoting buffer, which contains the host-side value
-     *  \param  size    size of the host-side value
-     *  \param  version version (pc index) of the host-side value
-     */
-    inline void record_host_value(void* data, uint64_t size, uint64_t version){
-        POSMem_ptr host_value;
-
-        POS_CHECK_POINTER(data);
-        POS_ASSERT(size > 0);
-
-        host_value = std::make_unique<uint8_t[]>(size);
-        POS_CHECK_POINTER(host_value);
-        memcpy(host_value.get(), data, size);
-
-        host_value_map[version] = { host_value, size };
-    }
-
-    /*!
-     *  \brief  checkpoint the state of the resource behind this handle
+     *  \brief  checkpoint the state of the resource behind this handle (sync)
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t checkpoint(uint64_t version_id, uint64_t stream_id=0){ 
+    virtual pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const { 
         return POS_FAILED_NOT_IMPLEMENTED; 
     }
+
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) const { 
+        return POS_FAILED_NOT_IMPLEMENTED; 
+    }
+
 
     /*!
      *  \brief  restore the current handle when it becomes broken status
@@ -320,38 +323,35 @@ class POSHandle {
      */
     virtual std::string get_resource_name(){ return std::string("unknown"); }
 
+
     /*!
-     *  \brief  serilize the state of current handle into the binary area
-     *  \param  serilized_area  pointer to the binary area
+     *  \brief  serialize the state of current handle into the binary area
+     *  \param  serialized_area  pointer to the binary area
      *  \return POS_SUCCESS for successfully serilization
      */
-    pos_retval_t serilize(POSMem_ptr& serilized_area){
-        pos_retval_t retval = POS_SUCCESS;
-        uint64_t offset = 0;
-        POSMem_ptr tmp_serilized_area;
+    pos_retval_t serialize(void** serialized_area);
 
-        serilized_area = std::make_unique<uint8_t[]>(
-            this->__get_basic_serilize_size() + this->__get_extra_serilize_size()
+
+    /*!
+     *  \brief  obtain the size of the serialize area of this handle
+     *  \return size of the serialize area of this handle
+     */
+    inline uint64_t get_serialize_size(){
+        return (
+            /* size of basic field */   sizeof(uint64_t)
+            /* basic field */           + this->__get_basic_serialize_size() 
+            /* extra field */           + this->__get_extra_serialize_size()
         );
-        POS_CHECK_POINTER(serilized_area.get());
-
-        retval = this->__serilize_basic(serilized_area, offset);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to serilize basic fields of handle");
-            goto exit;
-        }
-
-        retval = this->__serilize_extra(serilized_area, offset);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to serilize extra fields of handle");
-            goto exit;
-        }
-
-        serilized_area = tmp_serilized_area;
-        
-    exit:
-        return retval;
     }
+
+
+    /*!
+     *  \brief  deserialize the state of current handle from binary area
+     *  \param  raw_area    raw data area
+     *  \return POS_SUCCESS for successfully serialization
+     */
+    pos_retval_t deserialize(void* raw_area);
+
 
     /*!
     *  \brief  the typeid of the resource kind which this handle represents
@@ -370,7 +370,14 @@ class POSHandle {
     void *server_addr;
 
     // pointer to the instance of parent handle
-    std::vector<std::shared_ptr<POSHandle>> parent_handles;
+    std::vector<POSHandle*> parent_handles;
+
+    /*!
+     *  \brief  resource type and dag indices of parent handles of this handle
+     *  \note   this field is filled during restore process, for temporily store the indices
+     *          of all parent handles of this handle
+     */
+    std::vector<std::pair<pos_resource_typeid_t, pos_vertex_id_t>> parent_handles_waitlist;
 
     // id of the DAG vertex of this handle
     pos_vertex_id_t dag_vertex_id;
@@ -398,134 +405,76 @@ class POSHandle {
     POSCheckpointBag *ckpt_bag;
 
     /*!
-     *  \brief  map between (1) dag pc to (2) host-side new value of 
-     *          the resource behind this handle
-     *  \note   1. for those APIs which bring new value to handle from the host-side,
-     *          we need to cache the host-side value in case we would reply this
-     *          API call later
-     *  \note   2. we might need to cache multiple versions of host-side new values,
-     *          so we use a map here
+     *  \brief  latest modified version of this handle
+     *  \note   this field should be updated after the succesful execution of API within worker thread
+     *          (and the API inout/output this handle)
      */
-    std::map<uint64_t, std::pair<POSMem_ptr, uint64_t>> host_value_map;
+    pos_vertex_id_t latest_version;
     
+    /*!
+     *  \brief  identify whether current handle is the latest used handle in the manager
+     *  \note   this field is only used during restore phrase
+     */
+    bool is_lastest_used_handle;
+
  protected:
     /*!
      *  \note   the belonging handle manager
      */
     void *_hm;
 
+
     /*!
      *  \brief  obtain the serilization size of basic fields of POSHandle
      *  \return the serilization size of basic fields of POSHandle
      */
-    inline uint64_t __get_basic_serilize_size(){
-        return (
-            /* resource_type_id */      sizeof(pos_resource_typeid_t)
-            /* client_addr */           + sizeof(uint64_t)
-            /* server_addr */           + sizeof(uint64_t)
-            /* nb_parent_handle */      + sizeof(uint64_t)
-            /* parent_handle_indices */ + parent_handles.size() * sizeof(pos_vertex_id_t)
-            /* dag_vertex_id */         + sizeof(pos_vertex_id_t)
-            /* size */                  + sizeof(uint64_t)
-            /* state_size */            + sizeof(uint64_t)
+    uint64_t __get_basic_serialize_size();
 
-            // TODO: in the future we might serilize multiple versions of checkpoint
-            /* checkpoint version */    + sizeof(uint64_t)
-            /* checkpoint size */       + sizeof(uint64_t)
-            /* ckpt_state */            + state_size
-        );
-    }
 
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
      */
-    virtual uint64_t __get_extra_serilize_size(){
+    virtual uint64_t __get_extra_serialize_size(){
         return 0;
     }
 
-    /*!
-     *  \brief  serilize spefic field of the handle to the serilization area
-     *  \param  dptr    the serilization memory to store the field
-     *  \param  sptr    address of the field to be serilized
-     *  \param  size    size of the field to be serilized
-     *  \param  offset  offset from the base of serilization area after serilization this field
-     */
-    static void __serilize_write_field(void* dptr, void* sptr, uint64_t size, uint64_t& offset){
-        if(likely(size > 0)){
-            memcpy(dptr, sptr, size);
-            dptr += size;
-            offset += size;
-        }
-    }
 
     /*!
-     *  \brief  serilize the basic state of current handle into the binary area
-     *  \param  serilized_area  pointer to the binary area
-     *  \param  offset          offset within the serlized_area after serilize basic fields
+     *  \brief  serialize the basic state of current handle into the binary area
+     *  \param  serialized_area  pointer to the binary area
      *  \return POS_SUCCESS for successfully serilization
      */
-    pos_retval_t __serilize_basic(POSMem_ptr& serilized_area, uint64_t& offset){
-        pos_retval_t retval = POS_SUCCESS;
-        void *ptr = serilized_area.get();
-        void *ckpt_data;
-        uint64_t ckpt_version, ckpt_size;
-        uint64_t _nb_parent_handles;
-        std::pair<POSMem_ptr, uint64_t> host_ckpt;
+    pos_retval_t __serialize_basic(void* serialized_area);
 
-        POS_CHECK_POINTER(ptr);
-        
-        _nb_parent_handles = parent_handles.size();
-
-        POSHandle::__serilize_write_field(ptr, &resource_type_id, sizeof(pos_resource_typeid_t), offset);
-        POSHandle::__serilize_write_field(ptr, &client_addr, sizeof(uint64_t), offset);
-        POSHandle::__serilize_write_field(ptr, &server_addr, sizeof(uint64_t), offset);
-        POSHandle::__serilize_write_field(ptr, &_nb_parent_handles, sizeof(uint64_t), offset);
-        for(auto& parent_handle : parent_handles){
-            POSHandle::__serilize_write_field(ptr, &(parent_handle->dag_vertex_id), sizeof(uint64_t), offset);
-        }
-        POSHandle::__serilize_write_field(ptr, &dag_vertex_id, sizeof(pos_vertex_id_t), offset);
-        POSHandle::__serilize_write_field(ptr, &size, sizeof(uint64_t), offset);
-        POSHandle::__serilize_write_field(ptr, &state_size, sizeof(uint64_t), offset);
-
-        // copy checkpoint
-        retval = ckpt_bag->get_latest_checkpoint(&ckpt_data, ckpt_version, ckpt_size);
-        if(unlikely(retval == POS_FAILED_NOT_READY)){
-            // no checkpoint found, we need to use the state passed from the host
-            if(likely(host_value_map.size() > 0)){
-                ckpt_version = (host_value_map.rbegin())->first;
-                host_ckpt = (host_value_map.rbegin())->second;
-                ckpt_data = host_ckpt.first.get();
-                ckpt_size = host_ckpt.second;
-            } else {
-                ckpt_version = 0;
-                ckpt_size = 0;
-            }
-        } else if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C_DETAIL("failed to obtain checkpoint while serilizing, is checkpointing turned on?");
-            ckpt_version = 0;
-            ckpt_size = 0;
-        }
-
-        POSHandle::__serilize_write_field(ptr, &ckpt_version, sizeof(uint64_t), offset);
-        POSHandle::__serilize_write_field(ptr, &ckpt_size, sizeof(uint64_t), offset);
-        if(likely(ckpt_size > 0)){
-            POSHandle::__serilize_write_field(ptr, ckpt_data, state_size, offset);
-        }
-        
-    exit:
-        return retval;
-    }
 
     /*!
-     *  \brief  serilize the extra state of current handle into the binary area
-     *  \param  serilized_area  pointer to the binary area
-     *  \param  offset          offset within the serlized_area after serilize basic fields
+     *  \brief  serialize the extra state of current handle into the binary area
+     *  \param  serialized_area  pointer to the binary area
      *  \return POS_SUCCESS for successfully serilization
      */
-    virtual pos_retval_t __serilize_extra(POSMem_ptr& serilized_area, uint64_t& offset){
+    virtual pos_retval_t __serialize_extra(void* serialized_area){
         return POS_SUCCESS;
     }
+
+
+    /*!
+     *  \brief  deserialize basic field of this handle
+     *  \param  raw_data    raw data area that store the serialized data
+     *  \return POS_SUCCESS for successfully deserialize
+     */
+    pos_retval_t __deserialize_basic(void* raw_data);
+
+
+    /*!
+     *  \brief  deserialize extra field of this handle
+     *  \param  sraw_data    raw data area that store the serialized data
+     *  \return POS_SUCCESS for successfully deserilization
+     */
+    virtual pos_retval_t __deserialize_extra(void* raw_data){
+        return POS_SUCCESS;
+    }
+
 
     /*!
      *  \brief  initialize checkpoint bag of this handle
@@ -535,7 +484,6 @@ class POSHandle {
      */
     virtual pos_retval_t init_ckpt_bag(){ return POS_FAILED_NOT_IMPLEMENTED; }
 };
-using POSHandle_ptr = std::shared_ptr<POSHandle>;
 
 /*!
  *  \brief   manager for handles of a specific kind of resource
@@ -552,9 +500,10 @@ class POSHandleManager {
      *  \brief  constructor
      *  \param  passthrough indicate whether the handle's client-side and server-side address
      *                      are equal (true for hardware resource, false for software resource)
+     *  \param  is_stateful indicate whether the resource behind such handle conatains state
      */
-    POSHandleManager(bool passthrough = false) 
-        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough) {}
+    POSHandleManager(bool passthrough = false, bool is_stateful = false)
+        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough), _is_stateful(is_stateful) {}
 
     ~POSHandleManager() = default;
     
@@ -570,35 +519,68 @@ class POSHandleManager {
      *          POS_SUCCESS for successfully allocation
      */
     virtual pos_retval_t allocate_mocked_resource(
-        std::shared_ptr<T_POSHandle>* handle, std::map</* type */ uint64_t,
-        std::vector<std::shared_ptr<POSHandle>>> related_handles,
+        T_POSHandle** handle, 
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size = kPOS_HandleDefaultSize,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     );
+
+    /*!
+     *  \brief  allocate new mocked resource within the manager, based on checkpoint in the binary
+     *  \note   this function is invoked during restore process
+     *  \param  ckpt_raw_data   pointer to the checkpoint binary
+     *  \return pointer to the newly allocated handle if successfully allocated
+     *          nullptr is failed to allocate
+     */
+    T_POSHandle* allocate_mocked_resource_from_binary(void* ckpt_raw_data){
+        T_POSHandle *handle = nullptr;
+
+        POS_CHECK_POINTER(ckpt_raw_data);
+
+        handle = new T_POSHandle(this);
+        POS_CHECK_POINTER(handle);
+
+        if(likely(handle->deserialize(ckpt_raw_data) == POS_SUCCESS)){
+            this->_handles.push_back(handle);
+            if(likely((uint64_t)(handle->client_addr) > this->_base_ptr)){
+                this->_base_ptr = (uint64_t)(handle->client_addr);
+            }
+        } else {
+            POS_WARN_C("failed to deserialize handle");
+            delete handle;
+        }
+        
+        if(handle->is_lastest_used_handle){
+            this->latest_used_handle = handle;
+        }
+
+    exit:
+        return handle;
+    }
     
     /*!
      *  \brief  record a new handle that will be modified
      *  \param  handle  the handle that will be modified
      */
-    inline void record_modified_handle(std::shared_ptr<T_POSHandle> handle){
-        POS_CHECK_POINTER(handle.get());
-        _modified_handles_map[(uint64_t)(handle->client_addr)] = handle;
+    inline void record_modified_handle(T_POSHandle* handle){
+        POS_CHECK_POINTER(handle);
+        _modified_handles.insert(handle);
     }
 
     /*!
      *  \brief  clear all records of modified handles
      */
     inline void clear_modified_handle(){ 
-        _modified_handles_map.clear();
+        _modified_handles.clear();
     }
 
     /*!
      *  \brief  get all records of modified handles
      *  \return all records of modified handles
      */
-    inline std::map<uint64_t, std::shared_ptr<T_POSHandle>>& get_modified_handles(){
-        return _modified_handles_map;
+    inline std::set<T_POSHandle*>& get_modified_handles(){
+        return _modified_handles;
     }
 
     /*!
@@ -609,14 +591,14 @@ class POSHandleManager {
      *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
      *          POS_SUCCESS for successfully founded
      */
-    virtual pos_retval_t get_handle_by_client_addr(void* client_addr, std::shared_ptr<T_POSHandle>* handle, uint64_t* offset=nullptr);
+    virtual pos_retval_t get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset=nullptr);
 
     /*!
      *  \brief    last-used handle
      *  \example  for device handle manager, one need to record the last-used device for later usage
      *            (e.g., cudaGetDevice, cudaMalloc)
      */
-    std::shared_ptr<T_POSHandle> latest_used_handle;
+    T_POSHandle* latest_used_handle;
 
     /*!
      *  \brief  obtain the number of recorded handles
@@ -629,21 +611,36 @@ class POSHandleManager {
      *  \param  id  the specified index
      *  \return pointer to the founed handle or nullptr
      */
-    inline std::shared_ptr<T_POSHandle> get_handle_by_id(uint64_t id){
+    inline T_POSHandle* get_handle_by_id(uint64_t id){
         if(unlikely(id >= this->get_nb_handles())){
-            return std::shared_ptr<T_POSHandle>(nullptr);
+            return nullptr;
         } else {
             return _handles[id];
         }
     }
 
-    inline pos_retval_t mark_handle_status(std::shared_ptr<T_POSHandle> handle, pos_handle_status_t status){
-        POS_CHECK_POINTER(handle.get());
-        return mark_handle_status(handle.get(), status);
+    /*!
+     *  \brief  obtain a handle by given dag index
+     *  \todo   this function is slow!
+     *  \param  did  the specified dag index
+     *  \return pointer to the founed handle or nullptr
+     */
+    inline T_POSHandle* get_handle_by_dag_id(uint64_t did){
+        uint64_t i;
+        T_POSHandle *handle = nullptr;
+
+        for(i=0; i<_handles.size(); i++){
+            if(unlikely(_handles[i]->dag_vertex_id == did)){
+                handle = _handles[i];
+                break;
+            }
+        }
+
+        return handle;
     }
 
     inline pos_retval_t mark_handle_status(T_POSHandle *handle, pos_handle_status_t status){
-        typename std::map<uint64_t, std::shared_ptr<T_POSHandle>>::iterator handle_map_iter;
+        typename std::map<uint64_t, T_POSHandle*>::iterator handle_map_iter;
         
         POS_CHECK_POINTER(handle);
         
@@ -681,7 +678,7 @@ class POSHandleManager {
             if (likely(handle_map_iter != _handle_address_map.end())) {
                 _deleted_handle_address_map.insert({
                     /* client_addr */ (uint64_t)(handle->client_addr),
-                    /* handle_ptr */ handle_map_iter->second
+                    /* handle */ handle_map_iter->second
                 });
                 _handle_address_map.erase((uint64_t)(handle->client_addr));   
             }
@@ -701,7 +698,7 @@ class POSHandleManager {
                 POS_WARN_C_DETAIL("remove handle from address map when mark it as deleted, is this a bug?");
                 _deleted_handle_address_map.insert({
                     /* client_addr */ (uint64_t)(handle->client_addr),
-                    /* handle_ptr */ handle_map_iter->second
+                    /* handle */ handle_map_iter->second
                 });
                 _handle_address_map.erase((uint64_t)(handle->client_addr));
             }
@@ -727,17 +724,17 @@ class POSHandleManager {
      *  \return POS_SUCCESS for successfully recorded;
      *          POS_FAILED_ALREADY_EXIST for duplication failed
      */
-    inline pos_retval_t record_handle_address(void* addr, std::shared_ptr<T_POSHandle> handle){
+    inline pos_retval_t record_handle_address(void* addr, T_POSHandle* handle){
         pos_retval_t retval = POS_SUCCESS;
-        std::shared_ptr<T_POSHandle> __tmp;
+        T_POSHandle *__tmp;
         uint64_t addr_u64 = (uint64_t)(addr);
 
-        POS_CHECK_POINTER(handle.get());
+        POS_CHECK_POINTER(handle);
 
         if(likely(POS_FAILED_NOT_EXIST == __get_handle_by_client_addr(addr, &__tmp))){
             _handle_address_map[addr_u64] = handle;
         } else {
-            POS_CHECK_POINTER(__tmp.get());
+            POS_CHECK_POINTER(__tmp);
 
             /*!
              *  \note   no need to be failed here, some handle will record duplicated resources on purpose, 
@@ -763,14 +760,19 @@ class POSHandleManager {
      */
     bool _passthrough;
 
-    std::vector<std::shared_ptr<T_POSHandle>> _handles;
+    /*!
+     *  \brief  indicate whether the resource behind such handle contains state
+     */
+    bool _is_stateful;
+
+    std::vector<T_POSHandle*> _handles;
 
     /*!
      *  \brief  this map records all modified buffers since last checkpoint, 
      *          will be updated during parsing, and cleared during launching
      *          checkpointing op
      */
-    std::map<uint64_t, std::shared_ptr<T_POSHandle>> _modified_handles_map;
+    std::set<T_POSHandle*> _modified_handles;
 
     /*!
      *  \brief  allocate new mocked resource within the manager
@@ -783,7 +785,7 @@ class POSHandleManager {
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t __allocate_mocked_resource(
-        std::shared_ptr<T_POSHandle>* handle, size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr=0, uint64_t state_size = 0
+        T_POSHandle** handle, size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr=0, uint64_t state_size = 0
     );
 
     /*!
@@ -796,11 +798,11 @@ class POSHandleManager {
      *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
      *          POS_SUCCESS for successfully founded
      */
-    pos_retval_t __get_handle_by_client_addr(void* client_addr, std::shared_ptr<T_POSHandle>* handle, uint64_t* offset=nullptr);
+    pos_retval_t __get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset=nullptr);
 
  private:
-    std::map<uint64_t, std::shared_ptr<T_POSHandle>> _handle_address_map;
-    std::unordered_map<uint64_t, std::shared_ptr<T_POSHandle>> _deleted_handle_address_map;
+    std::map<uint64_t, T_POSHandle*> _handle_address_map;
+    std::unordered_map<uint64_t, T_POSHandle*> _deleted_handle_address_map;
 };
 
 
@@ -816,8 +818,8 @@ class POSHandleManager {
  */
 template<class T_POSHandle>
 pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
-    std::shared_ptr<T_POSHandle>* handle,
-    std::map</* type */ uint64_t, std::vector<POSHandle_ptr>> related_handles,
+    T_POSHandle** handle,
+    std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
     size_t size,
     uint64_t expected_addr,
     uint64_t state_size
@@ -837,7 +839,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
  */
 template<class T_POSHandle>
 pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
-    std::shared_ptr<T_POSHandle>* handle,
+    T_POSHandle** handle,
     size_t size,
     uint64_t expected_addr,
     uint64_t state_size
@@ -847,8 +849,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
     POS_CHECK_POINTER(handle);
 
     if(this->_passthrough){
-        *handle = std::make_shared<T_POSHandle>(size, this, state_size);
-        POS_CHECK_POINTER((*handle).get());
+        *handle = new T_POSHandle(size, this, state_size);
+        POS_CHECK_POINTER(*handle);
     } else {
         // if one want to create on an expected address, we directly move the pointer forward
         if(unlikely(expected_addr != 0)){
@@ -866,8 +868,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
             goto exit;
         }
 
-        *handle = std::make_shared<T_POSHandle>((void*)_base_ptr, size, this, state_size);
-        POS_CHECK_POINTER((*handle).get());
+        *handle = new T_POSHandle((void*)_base_ptr, size, this, state_size);
+        POS_CHECK_POINTER(*handle);
 
         // record client-side address to the map
         retval = record_handle_address((void*)(_base_ptr), *handle);
@@ -883,7 +885,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         _base_ptr, size, (*handle)->resource_type_id
     );
 
-    _handles.push_back(*handle);
+    this->_handles.push_back(*handle);
 
   exit:
     return retval;
@@ -894,12 +896,11 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
  *  \param  client_addr the given client-side address
  *  \param  handle      the resulted handle
  *  \param  offset      pointer to store the offset of the given address from the base address
- *  \TODO:  we need to accelerate this function!
  *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
  *          POS_SUCCESS for successfully founded
  */
 template<class T_POSHandle>
-pos_retval_t POSHandleManager<T_POSHandle>::get_handle_by_client_addr(void* client_addr, std::shared_ptr<T_POSHandle>* handle, uint64_t* offset){
+pos_retval_t POSHandleManager<T_POSHandle>::get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset){
     return __get_handle_by_client_addr(client_addr, handle, offset);
 }
 
@@ -908,19 +909,18 @@ pos_retval_t POSHandleManager<T_POSHandle>::get_handle_by_client_addr(void* clie
  *  \param  client_addr the given client-side address
  *  \param  handle      the resulted handle
  *  \param  offset      pointer to store the offset of the given address from the base address
- *  \TODO:  we need to accelerate this function!
  *  \note   this function should be internally invoked by get_handle_by_client_addr, which leave to children class to implement
  *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
  *          POS_SUCCESS for successfully founded
  */
 template<class T_POSHandle>
-pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* client_addr, std::shared_ptr<T_POSHandle>* handle, uint64_t* offset){
+pos_retval_t POSHandleManager<T_POSHandle>::__get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset){
     pos_retval_t ret = POS_SUCCESS;
-    std::shared_ptr<T_POSHandle> handle_ptr;
+    T_POSHandle *handle_ptr;
     uint64_t i;
     uint64_t client_addr_u64 = (uint64_t)(client_addr);
 
-    typename std::map<uint64_t, std::shared_ptr<T_POSHandle>>::iterator handle_map_iter;
+    typename std::map<uint64_t, T_POSHandle*>::iterator handle_map_iter;
 
     POS_CHECK_POINTER(handle);
     
@@ -981,86 +981,3 @@ not_found:
 exit:
     return ret;
 }
-
-typedef struct pos_ckpt_overlap_scheme {
-    // ckpt step index -> handles to be ckpted
-    std::vector<std::vector<POSHandle_ptr>> *_final_scheme;
-
-    // deadline index -> handles to be ckpted
-    std::vector<std::vector<POSHandle_ptr>> *_initial_scheme;
-
-    uint64_t _overlap_batch_size;
-    
-    inline void refresh(uint64_t overlap_batch_size){        
-        if(likely(_final_scheme != nullptr)){ delete _final_scheme; _final_scheme = nullptr; }
-        _final_scheme = new std::vector<std::vector<POSHandle_ptr>>(
-            /* capacity */ overlap_batch_size,
-            /* initial_value */ std::vector<POSHandle_ptr>()
-        );
-        POS_CHECK_POINTER(_final_scheme);
-
-        if(likely(_initial_scheme != nullptr)){ delete _initial_scheme; _initial_scheme = nullptr; }
-        _initial_scheme = new std::vector<std::vector<POSHandle_ptr>>(
-            /* capacity */ overlap_batch_size,
-            /* initial_value */ std::vector<POSHandle_ptr>()
-        );
-        POS_CHECK_POINTER(_initial_scheme);
-
-        _overlap_batch_size = overlap_batch_size;
-    }
-
-    inline void add_new_handle_for_distribute(uint64_t relative_deadline_position, POSHandle_ptr handle){
-        POS_ASSERT(relative_deadline_position < _overlap_batch_size);
-        (*_initial_scheme)[relative_deadline_position].push_back(handle);
-    }
-
-    inline void schedule(){
-        uint64_t i, j;
-        std::vector<POSHandle_ptr> handles;
-        std::vector<uint64_t> op_ckpt_budget(
-            /* capacity */ _overlap_batch_size,
-            /* initial_value */ 0
-        );
-        typename std::vector<uint64_t>::iterator op_ckpt_budget_iter;
-        uint64_t min_burden_op_pos;
-
-        auto get_overall_state_size = [](std::vector<POSHandle_ptr> &handles) -> uint64_t {
-            uint64_t overall_state_size = 0;
-            for(auto& handle : handles){ overall_state_size += handle->state_size; }
-            return overall_state_size;
-        };
-
-        for(i=0; i<_overlap_batch_size; i++){
-            handles = (*_initial_scheme)[i];
-
-            /*!
-             *  \note   for handles must be immediately ckpted by current ckpt op, we don't 
-             *          need to do the distribution scheduling below, just directly assign
-             */
-            if(unlikely(i == 0)){
-                (*_final_scheme)[i] = (*_initial_scheme)[i];
-                op_ckpt_budget[i] += get_overall_state_size(handles);
-                continue;
-            }
-
-            for(auto& handle: handles){
-                op_ckpt_budget_iter = std::min_element(op_ckpt_budget.begin(), op_ckpt_budget.begin() + i);
-                min_burden_op_pos = std::distance(op_ckpt_budget.begin(), op_ckpt_budget_iter);
-                (*_final_scheme)[min_burden_op_pos].push_back(handle);
-                op_ckpt_budget[min_burden_op_pos] += handle->state_size;
-            }            
-        }
-    }
-
-    inline std::vector<POSHandle_ptr>* get_overlap_scheme_by_ckpt_step_id(uint64_t ckpt_step_id){
-        if(unlikely(ckpt_step_id >= _overlap_batch_size)){
-            POS_WARN_DETAIL("ckpt step exceed range: ckpt_step_id(%lu)", ckpt_step_id);
-            return nullptr;
-        } else {
-            return &((*_final_scheme)[ckpt_step_id]);
-        }
-    }
-
-    pos_ckpt_overlap_scheme() : _overlap_batch_size(0), _final_scheme(nullptr), _initial_scheme(nullptr) {}
-    ~pos_ckpt_overlap_scheme() = default;
-} pos_ckpt_overlap_scheme_t;

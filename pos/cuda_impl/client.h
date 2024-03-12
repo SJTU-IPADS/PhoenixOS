@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iostream>
+#include <set>
+
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
@@ -9,30 +11,62 @@
 #include "pos/cuda_impl/handle/cublas.h"
 #include "pos/cuda_impl/api_index.h"
 
+
+/*!
+ *  \brief  context of CUDA client
+ */
+typedef struct pos_client_cxt_CUDA {
+    POS_CLIENT_CXT_HEAD;
+} pos_client_cxt_CUDA_t;
+
+
 class POSClient_CUDA : public POSClient {
  public:
+    /*!
+     *  \param  id  client identifier
+     *  \param  cxt context to initialize this client
+     */
+    POSClient_CUDA(uint64_t id, pos_client_cxt_CUDA_t cxt) 
+        : POSClient(id, cxt.cxt_base), _cxt_CUDA(cxt){}
+
     POSClient_CUDA(){}
     ~POSClient_CUDA(){};
-
+    
     /*!
      *  \brief  instantiate handle manager for all used CUDA resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
      */
     void init_handle_managers() override {
-        POSHandleManager_CUDA_Context* ctx_mgr;
-        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context());
+        pos_retval_t retval;
+        POSHandleManager_CUDA_Context *ctx_mgr;
+        POSHandleManager_CUDA_Module *module_mgr;
+
+        bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
+
+        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context(is_restoring));
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
 
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = new POSHandleManager_CUDA_Module();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Module]);
 
+        module_mgr = new POSHandleManager_CUDA_Module();
+        POS_CHECK_POINTER(module_mgr);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
+
+        if(this->_cxt.kernel_meta_path.size() > 0){
+            retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
+            if(likely(retval == POS_SUCCESS)){
+                this->_cxt.is_load_kernel_from_cache = true;
+            }
+        }
+        
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = new POSHandleManager_CUDA_Function();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
 
@@ -60,6 +94,8 @@ class POSClient_CUDA : public POSClient {
         POSHandleManager_CUDA_Stream *stream_mgr;
         POSHandleManager_CUDA_Device *device_mgr;
 
+        bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
+
         ctx_mgr = (POSHandleManager_CUDA_Context*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Context]);
         POS_CHECK_POINTER(ctx_mgr);
         stream_mgr = (POSHandleManager_CUDA_Stream*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
@@ -67,27 +103,303 @@ class POSClient_CUDA : public POSClient {
         device_mgr = (POSHandleManager_CUDA_Device*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
         POS_CHECK_POINTER(device_mgr);
 
-        // insert the one and only initial CUDA context
-        retval = this->dag.allocate_handle(ctx_mgr->latest_used_handle);
-        if(unlikely(POS_SUCCESS != retval)){
-            POS_ERROR_C_DETAIL("failed to allocate initial cocntext handle in the DAG");
-        }
-
-        // insert the one and only initial CUDA stream
-        retval = this->dag.allocate_handle(stream_mgr->latest_used_handle);
-        if(unlikely(POS_SUCCESS != retval)){
-            POS_ERROR_C_DETAIL("failed to allocate initial stream_mgr handle in the DAG");
-        }
-
-        // insert all device handle
-        nb_devices = device_mgr->get_nb_handles();
-        for(i=0; i<nb_devices; i++){
-            retval = this->dag.allocate_handle(device_mgr->get_handle_by_id(i));
+        /*!
+         *  \note   we only inserting new handles to the DAG while NOT restoring
+         *  TODO:   we have no need to record handles in the DAG, remove it
+         */
+        if(is_restoring == false){
+            // insert the one and only initial CUDA context
+            retval = this->dag.allocate_handle(ctx_mgr->latest_used_handle);
             if(unlikely(POS_SUCCESS != retval)){
-                POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
+                POS_ERROR_C_DETAIL("failed to allocate initial cocntext handle in the DAG");
+            }
+
+            // insert the one and only initial CUDA stream
+            retval = this->dag.allocate_handle(stream_mgr->latest_used_handle);
+            if(unlikely(POS_SUCCESS != retval)){
+                POS_ERROR_C_DETAIL("failed to allocate initial stream_mgr handle in the DAG");
+            }
+
+            // insert all device handle
+            nb_devices = device_mgr->get_nb_handles();
+            for(i=0; i<nb_devices; i++){
+                retval = this->dag.allocate_handle(device_mgr->get_handle_by_id(i));
+                if(unlikely(POS_SUCCESS != retval)){
+                    POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
+                }
             }
         }
     }
 
+    /*!
+     *  \brief      deinit handle manager for all used resources
+     *  \example    CUDA function manager should export the metadata of functions
+     */
+    void deinit_dump_handle_managers() override {
+        this->__dump_hm_cuda_functions();
+    }
+
+ 
+ protected:
+    /*!
+     *  \brief  allocate mocked resource in the handle manager according to given type
+     *  \note   this function is used during restore phrase
+     *  \param  type_id specified resource type index
+     *  \param  bin_ptr pointer to the binary area
+     *  \return POS_SUCCESS for successfully allocated
+     */
+    pos_retval_t __allocate_typed_resource_from_binary(pos_resource_typeid_t type_id, void* bin_ptr) override {
+        pos_retval_t retval = POS_SUCCESS;
+        
+        if(unlikely(this->handle_managers.count(type_id) == 0)){
+            POS_ERROR_C_DETAIL(
+                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
+            );
+        }
+
+        switch (type_id)
+        {
+        case kPOS_ResourceTypeId_CUDA_Context:
+            POSHandleManager<POSHandle_CUDA_Context> *hm_context;
+            POS_CHECK_POINTER(
+                hm_context = (POSHandleManager<POSHandle_CUDA_Context>*)(this->handle_managers[type_id])
+            );
+            hm_context->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Module:
+            /*!
+             *  \note   if the resource is cuda module, then we need to use POSHandleManager with
+             *          specific type, in order to invoke specified init_ckpt_bag for CUDA module, 
+             *          as CUDA module would contains host-side checkpoint record
+             */
+            POSHandleManager<POSHandle_CUDA_Module> *hm_module;
+            POS_CHECK_POINTER(
+                hm_module = (POSHandleManager<POSHandle_CUDA_Module>*)(this->handle_managers[type_id])
+            );
+            hm_module->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Function:
+            POSHandleManager<POSHandle_CUDA_Function> *hm_function;
+            POS_CHECK_POINTER(
+                hm_function = (POSHandleManager<POSHandle_CUDA_Function>*)(this->handle_managers[type_id])
+            );
+            hm_function->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Var:
+            POSHandleManager<POSHandle_CUDA_Var> *hm_var;
+            POS_CHECK_POINTER(
+                hm_var = (POSHandleManager<POSHandle_CUDA_Var>*)(this->handle_managers[type_id])
+            );
+            hm_var->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Device:
+            /*!
+             *  \note   if the resource is cuda device, then we need to use POSHandleManager with
+             *          specific type, as we need to setup the lastest-used handle inside the
+             *          handle manager
+             */
+            POSHandleManager<POSHandle_CUDA_Device> *hm_device;
+            POSHandle_CUDA_Device *device_handle;
+            POS_CHECK_POINTER(
+                hm_device = (POSHandleManager<POSHandle_CUDA_Device>*)(this->handle_managers[type_id])
+            );
+            POS_CHECK_POINTER(device_handle = hm_device->allocate_mocked_resource_from_binary(bin_ptr));
+
+            if(device_handle->is_lastest_used_handle == true){
+                hm_device->latest_used_handle = device_handle;
+            }
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Memory:
+            /*!
+             *  \note   if the resource is CUDA memory, then we need to use POSHandleManager with
+             *          specific type, in order to invoke specified init_ckpt_bag for CUDA memory 
+             *          inside the function allocate_mocked_resource_from_binary
+             */
+            POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;
+            POS_CHECK_POINTER(
+                hm_memory = (POSHandleManager<POSHandle_CUDA_Memory>*)(this->handle_managers[type_id])
+            );
+            hm_memory->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Stream:
+            POSHandleManager<POSHandle_CUDA_Stream> *hm_stream;
+            POS_CHECK_POINTER(
+                hm_stream = (POSHandleManager<POSHandle_CUDA_Stream>*)(this->handle_managers[type_id])
+            );
+            hm_stream->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_CUDA_Event:
+            POSHandleManager<POSHandle_CUDA_Event> *hm_event;
+            POS_CHECK_POINTER(
+                hm_event = (POSHandleManager<POSHandle_CUDA_Event>*)(this->handle_managers[type_id])
+            );
+            hm_event->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        case kPOS_ResourceTypeId_cuBLAS_Context:
+            POSHandleManager<POSHandle_cuBLAS_Context> *hm_cublas_cxt;
+            POS_CHECK_POINTER(
+                hm_cublas_cxt = (POSHandleManager<POSHandle_cuBLAS_Context>*)(this->handle_managers[type_id])
+            );
+            hm_cublas_cxt->allocate_mocked_resource_from_binary(bin_ptr);
+            break;
+
+        default:
+            POS_ERROR_C_DETAIL(
+                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
+            );
+        }
+
+    exit:
+        return retval;
+    }
+
+
+    /*!
+     *  \brief  obtain all resource type indices of this client
+     *  \return all resource type indices of this client
+     */
+    std::set<pos_resource_typeid_t> __get_resource_idx() override {
+        return  std::set<pos_resource_typeid_t>({
+            kPOS_ResourceTypeId_CUDA_Context,
+            kPOS_ResourceTypeId_CUDA_Module,
+            kPOS_ResourceTypeId_CUDA_Function,
+            kPOS_ResourceTypeId_CUDA_Var,
+            kPOS_ResourceTypeId_CUDA_Device,
+            kPOS_ResourceTypeId_CUDA_Memory,
+            kPOS_ResourceTypeId_CUDA_Stream,
+            kPOS_ResourceTypeId_CUDA_Event,
+            kPOS_ResourceTypeId_cuBLAS_Context
+        });
+    }
+
+
  private:
+    pos_client_cxt_CUDA _cxt_CUDA;
+
+    /*!
+     *  \brief  export the metadata of functions
+     */
+    void __dump_hm_cuda_functions() {
+        uint64_t nb_functions, i;
+        POSHandleManager_CUDA_Function *hm_function;
+        POSHandle_CUDA_Function *function_handle;
+        std::ofstream output_file;
+        std::string file_path, dump_content;
+
+        auto dump_function_metas = [](POSHandle_CUDA_Function* function_handle) -> std::string {
+            std::string output_str("");
+            std::string delimiter("|");
+            uint64_t i;
+            
+            POS_CHECK_POINTER(function_handle);
+
+            // mangled name of the kernel
+            output_str += function_handle->name + std::string(delimiter);
+            
+            // signature of the kernel
+            output_str += function_handle->signature + std::string(delimiter);
+
+            // number of paramters
+            output_str += std::to_string(function_handle->nb_params);
+            output_str += std::string(delimiter);
+
+            // parameter offsets
+            for(i=0; i<function_handle->nb_params; i++){
+                output_str += std::to_string(function_handle->param_offsets[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // parameter sizes
+            for(i=0; i<function_handle->nb_params; i++){
+                output_str += std::to_string(function_handle->param_sizes[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // input paramters
+            output_str += std::to_string(function_handle->input_pointer_params.size());
+            output_str += std::string(delimiter);
+            for(i=0; i<function_handle->input_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->input_pointer_params[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // output paramters
+            output_str += std::to_string(function_handle->output_pointer_params.size());
+            output_str += std::string(delimiter);
+            for(i=0; i<function_handle->output_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->output_pointer_params[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // inout parameters
+            output_str += std::to_string(function_handle->inout_pointer_params.size());
+            output_str += std::string(delimiter);
+            for(i=0; i<function_handle->inout_pointer_params.size(); i++){
+                output_str += std::to_string(function_handle->inout_pointer_params[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // suspicious paramters
+            output_str += std::to_string(function_handle->suspicious_params.size());
+            output_str += std::string(delimiter);
+            for(i=0; i<function_handle->suspicious_params.size(); i++){
+                output_str += std::to_string(function_handle->suspicious_params[i]);
+                output_str += std::string(delimiter);
+            }
+
+            // has verified suspicious paramters
+            if(function_handle->has_verified_params){
+                output_str += std::string("1") + std::string(delimiter);
+
+                // inout paramters
+                output_str += std::to_string(function_handle->confirmed_suspicious_params.size());
+                output_str += std::string(delimiter);
+                for(i=0; i<function_handle->confirmed_suspicious_params.size(); i++){
+                    output_str += std::to_string(function_handle->confirmed_suspicious_params[i].first);    // param_index
+                    output_str += std::string(delimiter);
+                    output_str += std::to_string(function_handle->confirmed_suspicious_params[i].second);   // offset
+                    output_str += std::string(delimiter);
+                }
+            } else {
+                output_str += std::string("0") + std::string(delimiter);
+            }
+
+            // cbank parameters
+            output_str += std::to_string(function_handle->cbank_param_size);
+
+            return output_str;
+        };
+
+        // if we have already save the kernels, we can skip
+        if(likely(this->_cxt.is_load_kernel_from_cache == true)){
+            goto exit;
+        }
+        
+        hm_function 
+            = (POSHandleManager_CUDA_Function*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
+        POS_CHECK_POINTER(hm_function);
+
+        file_path = std::string("./") + this->_cxt.job_name + std::string("_kernel_metas.txt");
+        output_file.open(file_path.c_str(), std::fstream::in | std::fstream::out | std::fstream::app);
+
+        nb_functions = hm_function->get_nb_handles();
+        for(i=0; i<nb_functions; i++){
+            POS_CHECK_POINTER(function_handle = hm_function->get_handle_by_id(i));
+            output_file << dump_function_metas(function_handle) << std::endl;
+        }
+
+        output_file.close();
+        POS_LOG("finish dump kernel metadats to %s", file_path.c_str());
+
+    exit:
+        ;
+    }
 };

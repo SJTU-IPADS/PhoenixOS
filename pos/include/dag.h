@@ -7,13 +7,14 @@
 #include "pos/include/handle.h"
 #include "pos/include/api_context.h"
 #include "pos/include/utils/bipartite_graph.h"
+#include "pos/include/utils/lockfree_queue.h"
 
 typedef struct pos_handle_meta {
-    POSHandle_ptr handle;
+    POSHandle *handle;
     uint64_t start_pc;
     uint64_t end_pc;
 
-    pos_handle_meta(POSHandle_ptr handle_, uint64_t start_pc_) 
+    pos_handle_meta(POSHandle* handle_, uint64_t start_pc_) 
         : handle(handle_), start_pc(start_pc_) {}
 
     pos_handle_meta(pos_handle_meta const& other_) 
@@ -21,45 +22,419 @@ typedef struct pos_handle_meta {
 
 } pos_handle_meta_t;
 
-typedef struct pos_op_meta {
-    POSAPIContext_QE_ptr wqe;
 
-    pos_op_meta(POSAPIContext_QE_ptr wqe_) : wqe(wqe_) {}
+typedef struct pos_op_meta {
+    POSAPIContext_QE *wqe;
+
+    pos_op_meta(POSAPIContext_QE* wqe_) : wqe(wqe_) {}
 
     pos_op_meta(pos_op_meta const& other_) : wqe(other_.wqe) {}
 } pos_op_meta_t;
 
+
+typedef struct pos_dag_cxt {
+    uint64_t checkpoint_api_id;
+} pos_dag_cxt_t;
+
+
 class POSDag {
- private:
+ public:
+    POSDag(pos_dag_cxt cxt) : _cxt(cxt), _pc(0), _end_pc(0) {
+        _api_cxts.reserve(POS_NB_PREFILL_DAG_VERTEX);
+    }
+    
+    ~POSDag(){
+        // if(_pc > 0){
+        //     _graph.dump_graph_to_file(
+        //         /* file_path */ POS_LOG_FILE_PATH,
+        //         /* serialize_t1 */ POSDag::_serialize_op,
+        //         /* serialize_t2 */ POSDag::_serialize_handle
+        //     );
+        // }
+    };
+
     /*!
-     *  \brief  serilize metadata of an op on the DAG while dumping to file
+     *  \brief  block until the dag is drained out
+     */
+    void drain(){
+        while(this->has_pending_op()){}
+    }
+
+    /*!
+     *  \brief  add a new handle to the DAG
+     *  \param  handle  pointer to the added handle
+     *  \note   this function will be called by the runtime thread
+     *  \return POS_SUCCESS for successfully adding handle
+     */
+    inline pos_retval_t allocate_handle(POSHandle* handle){
+        pos_retval_t retval = POS_SUCCESS;
+        pos_vertex_id_t vertex_id;
+        POSNeighborList_t empty_neighbor_list;
+
+        pos_handle_meta_t *h_meta = new pos_handle_meta_t(handle, _end_pc);
+        POS_CHECK_POINTER(h_meta);
+
+        if(unlikely(POS_SUCCESS != (retval =
+            _graph.add_vertex<pos_handle_meta_t>(
+                /* data */ h_meta,
+                /* neighbor */ empty_neighbor_list,
+                /* id */ &(handle->dag_vertex_id)
+            )
+        ))){
+            POS_WARN_C_DETAIL("failed to add handle to the DAG graph");
+            goto exit_POSDag_add_handle;
+        }
+
+        POS_DEBUG_C(
+            "add new handle to the DAG: resource_type_id(%lu), pc(%lu), vertex_id(%lu)",
+            handle->resource_type_id, _end_pc, handle->dag_vertex_id
+        );
+
+    exit_POSDag_add_handle:
+        return retval;
+    }
+    
+    /*!
+     *  \brief  add a new operator to the DAG
+     *  \param  wqe pointer to the work QE to be added
+     *  \note   this function will be called by the parser thread
+     *  \return POS_SUCCESS for successfully adding operator
+     */
+    inline pos_retval_t launch_op(POSAPIContext_QE* wqe){
+        uint64_t i;
+        pos_retval_t retval = POS_SUCCESS;
+        std::vector<POSHandleView_t>* handle_view_vec;
+        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
+        std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
+
+        POS_CHECK_POINTER(wqe);
+
+        pos_op_meta_t *o_meta = new pos_op_meta_t(wqe);
+        POS_CHECK_POINTER(o_meta);
+
+        uint64_t s_tick, e_tick;
+
+        // record the API context to the DAG
+        retval =_graph.add_vertex<pos_op_meta_t>(
+            /* data */ o_meta,
+            /* neighbor */ wqe->dag_neighbors,
+            /* id */ &(wqe->dag_vertex_id)
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C_DETAIL("failed to add op to the DAG graph");
+            goto exit_POSDag_add_op;
+        }
+
+        // the vertex id of the op should be exactly the end pc
+        POS_ASSERT(wqe->dag_vertex_id == _end_pc);
+
+        // push the API context to the queue
+        _api_cxts_queue.push(wqe);
+
+        // record the api context to the list
+        if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
+            _api_cxts.push_back(wqe);
+        } else {
+            latest_checkpoint_version = wqe->dag_vertex_id;
+        }
+
+        POS_DEBUG_C(
+            "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",
+            wqe->api_cxt->api_id, _end_pc, wqe->dag_vertex_id, neighbor_map.size()
+        );
+
+        /*!
+         *  \note   adding end_pc must locate here, as the worker thread will imediately detect the laucnhed op
+         *          once this value is udpated
+         */
+        _end_pc += 1;
+
+    exit_POSDag_add_op:
+        return retval;
+    }
+
+
+    /*!
+     *  \brief  record an operator to the DAG
+     *  \note   this function is invoked during restore phrase
+     *  \param  wqe pointer to the work QE to be added
+     */
+    inline void record_op(POSAPIContext_QE* wqe){
+        POS_CHECK_POINTER(wqe);
+        _api_cxts.push_back(wqe);
+    }
+
+
+    /*!
+     *  \brief  obtain the earlist pending op from the DAG
+     *  \param  wqe             pointer to work QE of the earlist pending op
+     *                          (could be nullptr for no pending op exist)
+     *  \param  nb_pending_ops  pointer to variable that stores #pending_ops in
+     *                          the DAG currently
+     *  \note   this function will be called by the worker thread
+     *  \return POS_SUCCESS for successfully obtain;
+     *          POS_FAILED_NOT_READY for no pending op exist
+     */
+    pos_retval_t get_next_pending_op(POSAPIContext_QE** wqe, uint64_t* nb_pending_ops=nullptr){
+        pos_retval_t retval = POS_SUCCESS;
+        pos_op_meta_t *op_meta;
+        POS_CHECK_POINTER(wqe);
+        
+        if(likely(nb_pending_ops != nullptr)){
+            *nb_pending_ops = _end_pc - _pc;
+        }
+
+        if(unlikely(_pc == _end_pc)){
+            // no op is pending
+            *wqe = nullptr;
+            return POS_FAILED_NOT_READY;
+        }
+
+        *wqe = *( (POSAPIContext_QE**)(_api_cxts_queue.peek()) );
+        if(unlikely((*wqe) == nullptr)){
+            POS_WARN_C_DETAIL("failed to obtain op: vertex_id(%lu)", _pc);
+            retval = POS_FAILED_NOT_EXIST;
+        } else {
+            POS_ASSERT((*wqe)->dag_vertex_id == _pc);
+        }
+        
+        return retval;
+    }
+
+    /*!
+     *  \brief  forward the pc of the DAG
+     */
+    inline void forward_pc(){
+        if(unlikely(false == _api_cxts_queue.pop())){
+            POS_ERROR_C_DETAIL("failed to pop op: vertex_id(%lu)", _pc);
+        }
+
+        if(likely(_pc < _end_pc)){ 
+            _pc++; 
+        }
+    }
+
+    /*!
+     *  \brief  identify whether current DAG has pending op
+     *  \return identify result
+     */
+    inline bool has_pending_op(){ return _end_pc > _pc; }
+
+    /*!
+     *  \brief  obtain the number of pending operators in the DAG
+     *  \return the number of pending operators in the DAG result
+     */
+    inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
+
+    /*!
+     *  \brief  obtain the current version
+     *  \note   must be called parser function
+     *  \return the current version
+     */
+    inline uint64_t get_current_pc_parser(){ return _end_pc; }
+
+    /*!
+     *  \brief  obtain the current version
+     *  \note   must be called worker function
+     *  \return the current version
+     */
+    inline uint64_t get_current_pc_worker(){ return _pc; }
+
+    /*!
+     *  \brief  obtain the number of API context within this DAG
+     *  \return number of API context within this DAG
+     */
+    inline uint64_t get_nb_api_cxt(){ return _api_cxts.size(); }
+
+    /*!
+     *  \brief  obtain the api context by given index
+     *  \param  id  index of the api context
+     *  \return the obtained api context
+     */
+    inline POSAPIContext_QE_t* get_api_cxt_by_id(uint64_t id){
+        POS_ASSERT(id < _api_cxts.size());
+        return _api_cxts[id];
+    }
+
+    /*!
+     *  \brief  obtain a api context wqe by given dag index
+     *  \todo   this function is slow!
+     *  \param  vid  the specified dag index
+     *  \return pointer to the founed api context wqe or nullptr
+     */
+    inline POSAPIContext_QE_t* get_api_cxt_by_dag_id(pos_vertex_id_t vid){
+        POSAPIContext_QE_t *retval = nullptr;
+        uint64_t i;
+
+        for(i=0; i<_api_cxts.size(); i++){
+            POS_CHECK_POINTER(_api_cxts[i]);
+            if(unlikely(_api_cxts[i]->dag_vertex_id == vid)){
+                retval = _api_cxts[i];
+                break;
+            }
+        }
+
+        return retval;
+    }
+
+    /*!
+     *  \brief  check whether a specified handle is missing checkpoint, return the missing version if it's
+     *  \param  handle_vid  dag vertex index of the handle to be checked
+     *  \param  vh          latest checkpoint version of this handle
+     *  \param  vg          global latest checkpoint version
+     *  \param  is_missing  identify whether the specified handle is missing checkpoint
+     *  \param  vo          missing checkpoint version
+     *  \note   vh < vo < vg  
+     */
+    void check_missing_ckpt(pos_vertex_id_t handle_vid, pos_vertex_id_t vh, pos_vertex_id_t vg, bool& is_missing, pos_vertex_id_t& vo){
+        uint64_t i;
+        POSNeighborList_t *neighbor_list;
+        POSAPIContext_QE_t *wqe;
+
+        POS_ASSERT(vh <= vg);
+
+        POS_CHECK_POINTER(neighbor_list = this->_graph.get_neighbor_list(handle_vid));
+
+        // no api context operate on this handle, so it wouldn't miss checkpoint
+        if(unlikely(neighbor_list->size() == 0)){
+            is_missing = false;
+            goto exit;
+        }
+
+        // traverse the neighbor list in reverse order
+        for(i=neighbor_list->size()-1; i>=0; i--){
+            POSBgEdge_t &edge = (*neighbor_list)[i];
+            if(edge.d_vid <= vh){
+                is_missing = false;
+                goto exit;
+            }
+
+            if(edge.dir == kPOS_Edge_Direction_Out || edge.dir == kPOS_Edge_Direction_InOut){
+                if(edge.d_vid <= vg){
+                    is_missing = true;
+                    vo = edge.d_vid;
+                    goto exit;
+                }
+            }
+        }
+
+    exit:
+        ;
+    }
+
+
+    /*!
+     *  \brief  obtain serialize size of current dag topo
+     *  \return serialize size of current dag topo
+     */
+    uint64_t get_serialize_size(){
+        return (
+            /* latest_checkpoint_version*/  sizeof(pos_vertex_id_t)
+            /* graph topo */                + _graph.get_serialize_size()
+        );
+    }
+
+    /*!
+     *  \brief  serialize the current current dag topo into the binary area
+     *  \param  serialized_area  pointer to the binary area
+     */
+    inline void serialize(void** serialized_area){
+        void *ptr;
+
+        POS_CHECK_POINTER(serialized_area);
+        *serialized_area = malloc(get_serialize_size());
+        POS_CHECK_POINTER(*serialized_area);
+        
+        ptr = *serialized_area;
+
+        // field: latest_checkpoint_version
+        POSUtil_Serializer::write_field(&ptr, &(latest_checkpoint_version), sizeof(pos_vertex_id_t));
+
+        // field: graph topo
+        _graph.serialize(ptr);
+    }
+
+
+    /*!
+     *  \brief  deserialize this dag topo
+     *  \param  raw_data    raw data area that store the serialized data
+     */
+    inline void deserialize(void* raw_data){
+        void *ptr = raw_data;
+        POS_CHECK_POINTER(ptr);
+
+        // field: latest_checkpoint_version
+        POSUtil_Deserializer::read_field(&(this->latest_checkpoint_version), &ptr, sizeof(pos_vertex_id_t));
+
+        // field: graph topo
+        _graph.deserialize(ptr);
+    }
+
+    // dag vertex id of latest checkpoint op
+    pos_vertex_id_t latest_checkpoint_version;
+
+ private:
+    // context of this dag
+    pos_dag_cxt_t _cxt;
+
+    // underlying bipartite graph
+    POSBipartiteGraph<pos_op_meta_t, pos_handle_meta_t> _graph;
+
+    /*!
+     *  \brief  final pc of the DAG
+     *  \note   this field should be wrote by runtime thread, read by worker thread,
+     *          hence should be updated at the end of launch_op
+     */
+    uint64_t _end_pc;
+    
+    // context of all normal apis record in to the dag
+    std::vector<POSAPIContext_QE*> _api_cxts;
+
+    /*!
+     *  \brief  queue of pending API context
+     *  \note   API context should be enqueued by parser thread, and 
+     *          dequeued by worker thread
+     */
+    POSLockFreeQueue<POSAPIContext_QE_t*> _api_cxts_queue;
+
+    /*!
+     *  \brief  current pc of the DAG
+     *  \note   this field should be both wrote and read by worker thread
+     */
+    uint64_t _pc;
+
+    /*!
+     *  \brief  serialize metadata of an op on the DAG while dumping to file
      *  \param  meta    metadata of a OP (vertex on the DAG)
      *  \param  result  dump result
      */
-    static void _serilize_op(pos_op_meta* meta, std::string& result){
+    static void _serialize_op(pos_op_meta* meta, std::string& result){
         uint64_t i;
         POSAPIContext_QE *wqe;
         std::vector<std::function<void()>> dump_flow;
 
         POS_CHECK_POINTER(meta);
-        POS_CHECK_POINTER(wqe = meta->wqe.get());
+        POS_CHECK_POINTER(wqe = meta->wqe);
         
         dump_flow.insert(dump_flow.end(), {
-            /* vid */               [&](){ result += std::to_string(wqe->dag_vertex_id); },
-            /* api_id */            [&](){ result += std::to_string(wqe->api_cxt->api_id); },
-            /* return_code */       [&](){ result += std::to_string(wqe->api_cxt->return_code); },
-            /* create_tick */       [&](){ result += std::to_string(wqe->create_tick); },
-            /* return_tick */       [&](){ result += std::to_string(wqe->return_tick); },
-            /* runtime_s_tick */    [&](){ result += std::to_string(wqe->runtime_s_tick); },
-            /* runtime_e_tick */    [&](){ result += std::to_string(wqe->runtime_e_tick); },
-            /* worker_s_tick */     [&](){ result += std::to_string(wqe->worker_s_tick); },
-            /* worker_e_tick */     [&](){ result += std::to_string(wqe->worker_e_tick); },
+            /* vid */                       [&](){ result += std::to_string(wqe->dag_vertex_id); },
+            /* api_id */                    [&](){ result += std::to_string(wqe->api_cxt->api_id); },
+            /* return_code */               [&](){ result += std::to_string(wqe->api_cxt->return_code); },
+            /* create_tick */               [&](){ result += std::to_string(wqe->create_tick); },
+            /* return_tick */               [&](){ result += std::to_string(wqe->return_tick); },
+            /* runtime_s_tick */            [&](){ result += std::to_string(wqe->runtime_s_tick); },
+            /* runtime_e_tick */            [&](){ result += std::to_string(wqe->runtime_e_tick); },
+            /* worker_s_tick */             [&](){ result += std::to_string(wqe->worker_s_tick); },
+            /* worker_e_tick */             [&](){ result += std::to_string(wqe->worker_e_tick); },
+            /* queue_len_before_parse */    [&](){ result += std::to_string(wqe->queue_len_before_parse); },
 
             /* =========== checkpoint op specific fields =========== */
-            /* nb_ckpt_handles */   [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
-            /* ckpt_size */         [&](){ result += std::to_string(wqe->ckpt_size); },
+            /* nb_ckpt_handles */           [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
+            /* ckpt_size */                 [&](){ result += std::to_string(wqe->ckpt_size); },
+            /* nb_abandon_handles */        [&](){ result += std::to_string(wqe->nb_abandon_handles); },
+            /* abandon_ckpt_size */         [&](){ result += std::to_string(wqe->abandon_ckpt_size); },
             /* ckpt_memory_consumption */   
-                                    [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
+                                            [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
         });
         
         result.clear();
@@ -72,18 +447,18 @@ class POSDag {
     }
 
     /*!
-     *  \brief  serilize metadata of an handle on the DAG while dumping to file
+     *  \brief  serialize metadata of an handle on the DAG while dumping to file
      *  \param  meta    metadata of a handle (vertex on the DAG)
      *  \param  result  dump result
      */
-    static void _serilize_handle(pos_handle_meta* meta, std::string& result){
+    static void _serialize_handle(pos_handle_meta* meta, std::string& result){
         uint64_t i;
         POSHandle *handle;
         char t[128] = {0};
         std::vector<std::function<void()>> dump_flow;
 
         POS_CHECK_POINTER(meta);
-        POS_CHECK_POINTER(handle = meta->handle.get());
+        POS_CHECK_POINTER(handle = meta->handle);
         
         dump_flow.insert(dump_flow.end(), {
             /* vid */               [&](){ result += std::to_string(handle->dag_vertex_id); },
@@ -116,219 +491,4 @@ class POSDag {
             }
         }
     }
-
- public:
-    POSDag(pos_client_uuid_t id) : _pc(0), _end_pc(0), _client_id(id) {}
-    
-    ~POSDag(){
-        if(_pc > 0){
-            _graph.dump_graph_to_file(
-                /* file_path */ POS_LOG_FILE_PATH,
-                /* serilize_t1 */ POSDag::_serilize_op,
-                /* serilize_t2 */ POSDag::_serilize_handle
-            );
-        }
-    };
-
-    /*!
-     *  \brief  add a new handle to the DAG
-     *  \param  handle  pointer to the added handle
-     *  \note   this function will be called by the runtime thread
-     *  \return POS_SUCCESS for successfully adding handle
-     */
-    inline pos_retval_t allocate_handle(POSHandle_ptr handle){
-        pos_retval_t retval = POS_SUCCESS;
-        pos_vertex_id_t vertex_id;
-        pos_handle_meta_t handle_meta(handle, _end_pc);
-
-        if(unlikely(POS_SUCCESS != (retval =
-            _graph.add_vertex<pos_handle_meta_t>(
-                /* data */ handle_meta,
-                /* neighbor */ std::map<pos_vertex_id_t, pos_edge_direction_t>(),
-                /* id */ &(handle->dag_vertex_id)
-            )
-        ))){
-            POS_WARN_C_DETAIL("failed to add handle to the DAG graph");
-            goto exit_POSDag_add_handle;
-        }
-
-        POS_DEBUG_C(
-            "add new handle to the DAG: resource_type_id(%lu), pc(%lu), vertex_id(%lu)",
-            handle->resource_type_id, _end_pc, handle->dag_vertex_id
-        );
-
-    exit_POSDag_add_handle:
-        return retval;
-    }
-
-    /*!
-     *  \brief  given a range of op idx, return the positions that the specified handle be modified
-     *  \param  handle_id       specified handle id
-     *  \param  start_op_id     start index of the op range
-     *  \param  end_op_id       end index of the op range
-     *  \param  positions       pointer of the vector to store the result
-     *  \return POS_SUCCESS for succesfully querying
-     */
-    inline pos_retval_t get_handle_modified_position(
-        uint64_t handle_id, uint64_t start_op_id, uint64_t end_op_id, std::vector<uint64_t>* positions
-    ){
-        pos_retval_t retval = POS_SUCCESS;
-        POSNeighborMap_ptr neigh_ops;
-
-        POS_CHECK_POINTER(positions);
-
-        neigh_ops = _graph.get_vertex_neighbors_by_id<pos_handle_meta_t>(handle_id);
-        if(unlikely(neigh_ops.get() == nullptr)){
-            POS_WARN_C_DETAIL("failed to obtain neighbor ops of handle: vertex_id(%lu)", handle_id);
-            retval = POS_FAILED_NOT_EXIST;
-        } else {
-            positions->clear();
-
-            auto start_iter = neigh_ops->lower_bound(start_op_id);
-            auto end_iter = neigh_ops->upper_bound(end_op_id);
-            for (auto iter=start_iter; iter!=end_iter; iter++) {
-                if(iter->second == kPOS_Edge_Direction_InOut || iter->second == kPOS_Edge_Direction_Out){
-                    positions->push_back(iter->first);
-                }
-            }
-        }
-
-        return retval;
-    }
-    
-    /*!
-     *  \brief  add a new operator to the DAG
-     *  \param  wqe pointer to the work QE to be added
-     *  \note   this function will be called by the runtime thread
-     *  \return POS_SUCCESS for successfully adding operator
-     */
-    inline pos_retval_t launch_op(POSAPIContext_QE_ptr wqe){
-        uint64_t i;
-        pos_retval_t retval = POS_SUCCESS;
-        pos_op_meta_t op_meta(wqe);
-        std::vector<POSHandleView_t>* handle_view_vec;
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
-        std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
-
-        uint64_t s_tick, e_tick;
-
-        // s_tick = POSUtilTimestamp::get_tsc();
-
-        retval =_graph.add_vertex<pos_op_meta_t>(
-            /* data */ op_meta,
-            /* neighbor */ wqe->flat_neighbor_map,
-            /* id */ &(wqe->dag_vertex_id)
-        );
-
-        // e_tick = POSUtilTimestamp::get_tsc();
-        // POS_LOG("add vertex duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
-
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C_DETAIL("failed to add op to the DAG graph");
-            goto exit_POSDag_add_op;
-        }
-
-        // the vertex id of the op should be exactly the end pc
-        POS_ASSERT(wqe->dag_vertex_id == _end_pc);
-
-        POS_DEBUG_C(
-            "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",
-            wqe->api_cxt->api_id, _end_pc, wqe->dag_vertex_id, neighbor_map.size()
-        );
-
-        /*!
-         *  \brief  adding end_pc must locate here, as the worker thread will imediately detect the laucnhed op
-         *          once this value is udpated
-         */
-        _end_pc += 1;
-
-    exit_POSDag_add_op:
-        return retval;
-    }
-
-    /*!
-     *  \brief  obtain the earlist pending op from the DAG
-     *  \param  wqe             pointer to work QE of the earlist pending op
-     *                          (could be nullptr for no pending op exist)
-     *  \param  nb_pending_ops  pointer to variable that stores #pending_ops in
-     *                          the DAG currently
-     *  \note   this function will be called by the worker thread
-     *  \return POS_SUCCESS for successfully obtain;
-     *          POS_FAILED_NOT_READY for no pending op exist
-     */
-    pos_retval_t get_next_pending_op(POSAPIContext_QE_ptr* wqe, uint64_t* nb_pending_ops=nullptr){
-        pos_retval_t retval = POS_SUCCESS;
-        std::shared_ptr<pos_op_meta_t> op;
-        POS_CHECK_POINTER(wqe);
-        
-        if(likely(nb_pending_ops != nullptr)){
-            *nb_pending_ops = _end_pc - _pc;
-        }
-
-        if(unlikely(_pc == _end_pc)){
-            // no op is pending
-            *wqe = nullptr;
-            return POS_FAILED_NOT_READY;
-        }
-
-        op = _graph.get_vertex_by_id<pos_op_meta_t>(_pc);
-        if(unlikely(op == nullptr)){
-            POS_WARN_C_DETAIL("failed to obtain op: vertex_id(%lu)", _pc);
-            retval = POS_FAILED_NOT_EXIST;
-        } else {
-            *wqe = op->wqe;
-        }
-        
-        return retval;
-    }
-
-    /*!
-     *  \brief  forward the pc of the DAG
-     */
-    inline void forward_pc(){ if(likely(_pc < _end_pc)) _pc++; }
-
-    /*!
-     *  \brief  identify whether current DAG has pending op
-     *  \return identify result
-     */
-    inline bool has_pending_op(){ return _end_pc > _pc; }
-
-    /*!
-     *  \brief  obtain the number of pending operators in the DAG
-     *  \return the number of pending operators in the DAG result
-     */
-    inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
-
-    /*!
-     *  \brief  obtain the current version
-     *  \note   must be called runtime function
-     *  \return the current version
-     */
-    inline uint64_t get_current_pc_runtime(){ return _end_pc; }
-
-    /*!
-     *  \brief  obtain the current version
-     *  \note   must be called worker function
-     *  \return the current version
-     */
-    inline uint64_t get_current_pc_worker(){ return _pc; }
-
- private:
-    // underlying bipartite graph
-    POSBipartiteGraph<pos_op_meta_t, pos_handle_meta_t> _graph;
-
-    /*!
-     *  \brief  final pc of the DAG
-     *  \note   this field should be wrote by runtime thread, read by worker thread,
-     *          hence should be updated at the end of launch_op
-     */
-    uint64_t _end_pc;
-    
-    /*!
-     *  \brief  current pc of the DAG
-     *  \note   this field should be both wrote and read by worker thread
-     */
-    uint64_t _pc;
-
-    pos_client_uuid_t _client_id;
 };

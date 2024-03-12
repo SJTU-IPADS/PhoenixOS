@@ -7,7 +7,7 @@
 #include "pos/transport.h"
 #include "pos/api_context.h"
 
-POSAgent<POSTransport_SHM> *pos_agent; 
+POSAgent *pos_agent; 
 
 typedef struct api_call_meta {
     uint64_t api_id;

@@ -6,7 +6,7 @@
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
 #include "pos/include/transport.h"
-#include "pos/include/runtime.h"
+#include "pos/include/parser.h"
 #include "pos/cuda_impl/client.h"
 
 #include "pos/cuda_impl/api_index.h"
@@ -53,12 +53,10 @@ namespace rt_functions {
  *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
  *          3. Scheduler:   launch unfinished / previously-failed call to worker
  */
-template<class T_POSTransport>
-class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
+class POSParser_CUDA : public POSParser {
  public:
-    POSRuntime_CUDA(POSWorkspace<T_POSTransport, POSClient_CUDA>* ws)
-        : POSRuntime<T_POSTransport, POSClient_CUDA>(ws){}
-    ~POSRuntime_CUDA() = default;
+    POSParser_CUDA(POSWorkspace* ws) : POSParser(ws){}
+    ~POSParser_CUDA() = default;
 
  private:
     /*!
@@ -128,15 +126,14 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE_ptr wqe) { 
+    pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE* wqe) { 
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr handle;
-        POSAPIContext_QE_ptr ckpt_wqe;
+        POSHandle *handle;
+        POSAPIContext_QE *ckpt_wqe;
 
-        ckpt_wqe = std::make_shared<POSAPIContext_QE>(
+        ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
-            /* client */ wqe->client,
-            /* dag_vertex_id_ */ wqe->dag_vertex_id
+            /* client */ wqe->client
         );
         POS_CHECK_POINTER(ckpt_wqe);
         retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
@@ -152,19 +149,18 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE* wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandleManager<POSHandle>* hm;
-        POSAPIContext_QE_ptr ckpt_wqe;
+        POSAPIContext_QE *ckpt_wqe;
         uint64_t i;
-        typename std::map<uint64_t, POSHandle_ptr>::iterator map_iter;
 
         POS_CHECK_POINTER(wqe);
 
         client = (POSClient_CUDA*)(wqe->client);
         
-        ckpt_wqe = std::make_shared<POSAPIContext_QE>(
+        ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
             /* client */ wqe->client
         );
@@ -174,15 +170,11 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
          *  \note   we only checkpoint those resources that has been modified since last checkpoint
          */
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
-            std::map<uint64_t, POSHandle_ptr>& modified_handles = hm->get_modified_handles(); 
-            for(map_iter = modified_handles.begin(); map_iter != modified_handles.end(); map_iter++){
-                POS_CHECK_POINTER(map_iter->second.get());
-                ckpt_wqe->record_handle(
-                    stateful_handle_id,
-                    POSHandleView_t(map_iter->second, kPOS_Edge_Direction_Out, 0)
-                );
+            std::set<POSHandle*>& modified_handles = hm->get_modified_handles();
+            if(likely(modified_handles.size() > 0)){
+                ckpt_wqe->record_checkpoint_handles(modified_handles);
             }
             hm->clear_modified_handle();
         }
@@ -198,15 +190,12 @@ class POSRuntime_CUDA : public POSRuntime<T_POSTransport, POSClient_CUDA> {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t checkpoint_insertion(POSAPIContext_QE_ptr wqe) override {
-        #if POS_CKPT_OPT_LEVAL == 1
-            return __checkpoint_insertion_o1_o2(wqe);
-        #elif POS_CKPT_OPT_LEVAL == 2
+    pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {
+        #if POS_CKPT_OPT_LEVAL == 1 || POS_CKPT_OPT_LEVAL == 2
+            // return __checkpoint_insertion_naive(wqe);
             return __checkpoint_insertion_o1_o2(wqe);
         #else // POS_CKPT_OPT_LEVAL == 0
             return POS_SUCCESS;
         #endif
     }
 };
-
-#include "pos/cuda_impl/runtime/base.h"

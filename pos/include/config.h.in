@@ -1,5 +1,11 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+
+#include "pos/include/common.h"
+#include "pos/include/log.h"
+
 /*!
  *  \brief  hard-coded configurations of PhoenixOS
  */
@@ -16,3 +22,7 @@
 
 // path to output log file
 #define POS_LOG_FILE_PATH               "@pos_log_file_path@"
+
+// prefill scale to the POS DAG
+#define POS_NB_PREFILL_DAG_VERTEX               65536 // 1 << 16
+#define POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR      65536 // 1 << 16

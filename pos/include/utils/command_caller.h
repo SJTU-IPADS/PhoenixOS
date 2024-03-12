@@ -42,7 +42,7 @@ class POSUtil_Command_Caller {
 
         exit_code = WEXITSTATUS(pclose(pipe));
         if(unlikely(exit_code != 0)){
-            POS_WARN("failed execution of command %d: exit_code(%d)", exit_code);
+            POS_WARN("failed execution of command %s: exit_code(%d)", cmd.c_str(), exit_code);
             retval = POS_FAILED;
             goto exit;
         }

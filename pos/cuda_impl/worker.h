@@ -1,5 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <map>
+
 #include <cuda_runtime_api.h>
 
 #include "pos/include/common.h"
@@ -51,28 +56,12 @@ namespace wk_functions {
 /*!
  *  \brief  POS Worker (CUDA Implementation)
  */
-template<class T_POSTransport>
-class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
+class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace<T_POSTransport, POSClient_CUDA>* ws) 
-        : POSWorker<T_POSTransport, POSClient_CUDA>(ws), sample_ckpt(0) {
-        #if POS_CKPT_OPT_LEVAL == 2
-            if(unlikely(cudaSuccess != cudaStreamCreate(&_ckpt_stream))){
-                POS_ERROR_C_DETAIL("failed to create CUDA stream for checkpoint");
-            }
-        #endif
-        }
-    ~POSWorker_CUDA(){
-        #if POS_CKPT_OPT_LEVAL == 2
-            if(unlikely(cudaSuccess != cudaStreamDestroy(_ckpt_stream))){
-                POS_ERROR_C_DETAIL("failed to destroy CUDA stream for checkpoint");
-            }
-        #endif
-    };
- 
- protected:
-    uint64_t sample_ckpt;
+    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws), _ckpt_stream(nullptr) {}
+    ~POSWorker_CUDA(){};
 
+ protected:
     /*!
      *  \brief  naive implementation of the checkpoint procedure
      *  \note   this procedure checkpoints all memory handles, stores all checkpointing
@@ -81,14 +70,14 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      * \note    this is the implementation of singularity
      * \param   wqe WQ element of the checkpoint op
      */
-    pos_retval_t __checkpoint_naive(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_sync_naive(POSAPIContext_QE* wqe) {
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         uint64_t nb_handles;
         POSClient_CUDA *client;
-        POSHandle_ptr handle;
+        POSHandle *handle;
         POSHandleManager<POSHandle>* hm;
-        POSCheckpointSlot_ptr ckpt_slot;
+        POSCheckpointSlot *ckpt_slot;
         uint64_t i;
 
         POS_CHECK_POINTER(wqe);
@@ -101,15 +90,15 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         wqe->ckpt_memory_consumption = 0;
         
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
             nb_handles = hm->get_nb_handles();
             for(i=0; i<nb_handles; i++){
                 handle = hm->get_handle_by_id(i);
-                POS_CHECK_POINTER(handle.get());
+                POS_CHECK_POINTER(handle);
 
-                retval = handle->checkpoint(
-                    /* version_id */ wqe->dag_vertex_id,
+                retval = handle->checkpoint_sync(
+                    /* version_id */ handle->latest_version,
                     /* stream_id */ 0
                 );
                 if(unlikely(POS_SUCCESS != retval)){
@@ -135,15 +124,20 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
     exit:
         // collect statistics
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
             POS_CHECK_POINTER(hm);
             nb_handles = hm->get_nb_handles();
             for(i=0; i<nb_handles; i++){
                 handle = hm->get_handle_by_id(i);
-                POS_CHECK_POINTER(handle.get());
+                POS_CHECK_POINTER(handle);
                 wqe->ckpt_memory_consumption += handle->ckpt_bag->get_memory_consumption();
             }
         }
+
+        POS_LOG(
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+        );
 
         return retval;
     }
@@ -154,16 +148,18 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
      *          since last checkpointing
      * \param   wqe WQ element of the checkpoint op
      */
-    pos_retval_t __checkpoint_o1(POSAPIContext_QE_ptr wqe) {
+    pos_retval_t __checkpoint_sync_selective(POSAPIContext_QE* wqe) {
         uint64_t i;
         std::vector<POSHandleView_t>* handle_views;
         uint64_t nb_handles;
         POSClient_CUDA *client;
-        POSHandle_ptr handle;
         POSHandleManager<POSHandle>* hm;
         cudaError_t cuda_rt_retval;
-        POSCheckpointSlot_ptr ckpt_slot;
+        POSCheckpointSlot *ckpt_slot;
         pos_retval_t retval = POS_SUCCESS;
+
+        typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
+        typename std::set<POSHandle*>::iterator set_iter;
 
         POS_CHECK_POINTER(wqe);
 
@@ -171,110 +167,13 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         wqe->ckpt_size = 0;
         wqe->ckpt_memory_consumption = 0;
 
-        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            client = (POSClient_CUDA*)(wqe->client);
-            POS_CHECK_POINTER(client);
-            hm = client->handle_managers[stateful_handle_id];
-            POS_CHECK_POINTER(hm);
+        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+            const POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
 
-            // we only checkpoint those handles that been modified since last checkpointing
-            if(likely(wqe->handle_view_map.count(stateful_handle_id) == 0)){
-                continue;
-            }
-            POS_CHECK_POINTER(handle_views = wqe->handle_view_map[stateful_handle_id]);
-
-            for(i=0; i<handle_views->size(); i++){
-                handle = (*handle_views)[i].handle;
-                POS_CHECK_POINTER(handle.get());
-
-                retval = handle->checkpoint(
-                    /* version_id */ wqe->dag_vertex_id,
-                    /* stream_id */ 0
-                );
-                if(unlikely(POS_SUCCESS != retval)){
-                    POS_WARN_C("failed to checkpoint handle");
-                    retval = POS_FAILED;
-                    goto exit;
-                }
-
-                wqe->nb_ckpt_handles += 1;
-                wqe->ckpt_size += handle->state_size;
-            }
-        }
-
-        // make sure the checkpoint is finished
-        cuda_rt_retval = cudaStreamSynchronize(0);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C("failed to synchronize after checkpointing");
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-    exit:
-        // collect statistics
-        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            hm = client->handle_managers[stateful_handle_id];
-            POS_CHECK_POINTER(hm);
-            nb_handles = hm->get_nb_handles();
-            for(i=0; i<nb_handles; i++){
-                handle = hm->get_handle_by_id(i);
-                POS_CHECK_POINTER(handle.get());
-                wqe->ckpt_memory_consumption += handle->ckpt_bag->get_memory_consumption();
-            }
-        }
-
-        // POS_LOG_C(
-        //     "checkpointed %lu handles, memory consumption: %lu",
-        //     wqe->nb_ckpt_handles,
-        //     wqe->ckpt_memory_consumption
-        // );
-
-        return retval;
-    }
-
-    /*!
-     *  \brief  checkpoint procedure, should be implemented by each platform
-     *  \param  wqe     the checkpoint op
-     *  \return POS_SUCCESS for successfully checkpointing
-     */
-    pos_retval_t checkpoint(POSAPIContext_QE_ptr wqe) override {
-        #if POS_CKPT_OPT_LEVAL == 1
-            // return __checkpoint_naive(wqe); // singularity
-            return __checkpoint_o1(wqe);
-        #elif POS_CKPT_OPT_LEVAL == 2
-            POS_ERROR_C_DETAIL("shouldn't invoke this function");
-        #else // POS_CKPT_OPT_LEVAL == 0
-            return POS_SUCCESS;
-        #endif
-    }
-
-    /*!
-     *  \brief  checkpoint procedure, should be implemented by each platform
-     *  \note   this function will be invoked by level-2 ckpt
-     *  \param  wqe     the checkpoint op
-     *  \param  handles pointer to vector that stores handles to be checkpointed
-     *  \return POS_SUCCESS for successfully checkpointing
-     */
-    pos_retval_t checkpoint_async(POSAPIContext_QE_ptr wqe, std::vector<POSHandle_ptr>* handles) override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle_ptr handle;
-        uint64_t i;
-
-        POS_CHECK_POINTER(handles);
-
-        wqe->nb_ckpt_handles = 0;
-        wqe->ckpt_size = 0;
-
-        // how to collect memory consumption data?
-        wqe->ckpt_memory_consumption = 0;
-
-        for(i=0; i<handles->size(); i++){
-            handle = (*handles)[i];
-            POS_CHECK_POINTER(handle.get());
-
-            retval = handle->checkpoint(
-                /* version_id */ wqe->dag_vertex_id,
-                /* stream_id */ (uint64_t)(_ckpt_stream)
+            retval = handle->checkpoint_sync(
+                /* version_id */ handle->latest_version,
+                /* stream_id */ 0
             );
             if(unlikely(POS_SUCCESS != retval)){
                 POS_WARN_C("failed to checkpoint handle");
@@ -285,109 +184,107 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
             wqe->nb_ckpt_handles += 1;
             wqe->ckpt_size += handle->state_size;
         }
-
-    exit:
-        return retval; 
-    }
-
-    pos_retval_t checkpoint_join() override {
-        cudaStreamSynchronize(_ckpt_stream);
-    }
-
-    /*!
-     *  \brief  generate overlap ckpt scheme
-     *  \note   this function will be invoked by level-2 ckpt
-     *  \param  wqe             the checkpoint op
-     *  \param  nb_pending_op   number of pending ops following the ckpt op
-     *  \param  ckpt_scheme     pointer to the generated checkpoint overlap scheme
-     *  \return POS_SUCCESS for successfully generation
-     */
-    pos_retval_t generate_overlap_ckpt_scheme(
-        POSAPIContext_QE_ptr wqe,
-        uint64_t nb_pending_op,
-        pos_ckpt_overlap_scheme_t* ckpt_scheme
-    ) override {
-        uint64_t i;
-        pos_retval_t retval = POS_SUCCESS;
-        std::vector<POSHandleView_t>* handle_views;
-        POSHandle_ptr handle;
-        POSClient_CUDA* client;
-        std::vector<POSHandle_ptr> remain_handles;
-        cudaError_t cuda_rt_retval;
-
-        std::vector<uint64_t> handle_modified_position;
-        uint64_t deadline_position, relative_deadline_position;
-
-        POS_CHECK_POINTER(wqe.get());
-        POS_CHECK_POINTER(ckpt_scheme);
-        POS_CHECK_POINTER(client = wqe->client);
-
-        ckpt_scheme->refresh(nb_pending_op);
-
-        // extract all modified handles
-        for(auto& stateful_handle_id : this->_ws->stateful_handle_type_idx){
-            // we only checkpoint those handles that been modified since last checkpointing
-            if(likely(wqe->handle_view_map.count(stateful_handle_id) == 0)){
-                continue;
-            }
-            POS_CHECK_POINTER(handle_views = wqe->handle_view_map[stateful_handle_id]);
-
-            for(i=0; i<handle_views->size(); i++){
-                handle = (*handle_views)[i].handle;
-                POS_CHECK_POINTER(handle.get());
-                remain_handles.push_back(handle);
-            }
-        }
-
-        // distribute the checkpoint of these modified handles to each following ops
-        for(auto& remain_handle : remain_handles){
-            // first we query where the handle will be modified in the next following ops
-            retval != client->dag.get_handle_modified_position(
-                /* handle_id */ remain_handle->dag_vertex_id, 
-                /* start_op_id */ wqe->dag_vertex_id + 1,
-                /* end_op_id */ wqe->dag_vertex_id + nb_pending_op,
-                /* positions */ &handle_modified_position
-            );
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_C_DETAIL(
-                    "failed to obtain modified position of handle: type_id(%u), client_addr(%p), server_addr(%p)",
-                    remain_handle->resource_type_id,
-                    remain_handle->client_addr,
-                    remain_handle->server_addr
-                );
-                goto exit;
-            }
-
-            /*!
-             *  \note   obtain the checkpoint deadline
-             *          (i.e., the final position we can checkpoint this handle in overlap manner)
-             */
-            if(unlikely(handle_modified_position.size() == 0)){
-                deadline_position = wqe->dag_vertex_id + (nb_pending_op-1);
-            } else {
-                POS_ASSERT(handle_modified_position[0] > wqe->dag_vertex_id); // must be...
-                deadline_position = handle_modified_position[0] - 1;                
-            }
-            relative_deadline_position = deadline_position - wqe->dag_vertex_id;
-
-            ckpt_scheme->add_new_handle_for_distribute(relative_deadline_position, remain_handle);
-        }
-
-        ckpt_scheme->schedule();
         
-        // make sure the previous ops are done
-        // TODO:    how to synchronize only current client's previous ops?
-        //          cudaDeviceSynchronize will sync all clients' previous ops...
-        // TODO:    we should move this logic to other function 
+        // make sure the checkpoint is finished
         cuda_rt_retval = cudaStreamSynchronize(0);
         if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C_DETAIL("failed to synchronize");
+            POS_WARN_C("failed to synchronize after checkpointing");
             retval = POS_FAILED;
             goto exit;
         }
 
     exit:
         return retval;
+    }
+
+    /*!
+     *  \brief  checkpoint procedure, should be implemented by each platform
+     *  \param  wqe     the checkpoint op
+     *  \return POS_SUCCESS for successfully checkpointing
+     */
+    pos_retval_t checkpoint_sync(POSAPIContext_QE* wqe) override {
+        return __checkpoint_sync_naive(wqe); // singularity
+        // return __checkpoint_sync_selective(wqe);
+    }
+
+    /*!
+     *  \brief  overlapped checkpoint procedure, should be implemented by each platform
+     *  \note   this thread will be raised by level-2 ckpt
+     *  \param  cxt     the context of this checkpointing
+     */
+    void checkpoint_async_thread(checkpoint_async_cxt_t* cxt) override {
+        uint64_t i;
+        pos_vertex_id_t checkpoint_version;
+        cudaError_t cuda_rt_retval;
+        pos_retval_t retval = POS_SUCCESS;
+        POSAPIContext_QE *wqe;
+        POSHandle *handle;
+
+        typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
+        typename std::set<POSHandle*>::iterator set_iter;
+
+        POS_CHECK_POINTER(cxt);
+
+        if(unlikely(_ckpt_stream == nullptr)){
+            POS_ASSERT(cudaSuccess == cudaStreamCreate(&_ckpt_stream));
+        }
+
+        POS_CHECK_POINTER(wqe = cxt->wqe);
+
+        wqe->nb_ckpt_handles = 0;
+        wqe->ckpt_size = 0;
+        wqe->nb_abandon_handles = 0;
+        wqe->abandon_ckpt_size = 0;
+        wqe->ckpt_memory_consumption = 0;
+        
+        for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+            POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
+
+            if(unlikely(cxt->checkpoint_version_map.count(handle) == 0)){
+                POS_WARN_C("failed to checkpoint handle, no checkpoint version provided: client_addr(%p)", handle->client_addr);
+                continue;
+            }
+
+            checkpoint_version = cxt->checkpoint_version_map[handle];
+
+            retval = handle->checkpoint_async(
+                /* version_id */ checkpoint_version,
+                /* stream_id */ (uint64_t)(_ckpt_stream)
+            );
+            POS_ASSERT(retval == POS_SUCCESS);
+        
+            /*!
+             *  \note   we wait until the checkpoint of this handle to be completed here, so then we can judge whether
+             *          we should invalidate this checkpoint
+             */
+            cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_C("failed to synchronize after start checkpointing handle: client_addr(%p)", handle->client_addr);
+                retval = POS_FAILED;
+                goto exit;
+            }
+            
+            if(unlikely(
+                std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
+            )){
+                retval = handle->ckpt_bag->invalidate_by_version(/* version */ checkpoint_version);
+                POS_ASSERT(retval == POS_SUCCESS);
+                wqe->nb_abandon_handles += 1;
+                wqe->abandon_ckpt_size += handle->state_size;
+            } else {
+                wqe->nb_ckpt_handles += 1;
+                wqe->ckpt_size += handle->state_size;
+            }
+        }
+    
+        POS_LOG(
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+        );
+
+    exit:
+        cxt->is_active = false;
     }
 
  private:
@@ -454,5 +351,3 @@ class POSWorker_CUDA : public POSWorker<T_POSTransport, POSClient_CUDA> {
         return POS_SUCCESS;
     }
 };
-
-#include "pos/cuda_impl/worker/base.h"

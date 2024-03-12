@@ -1,5 +1,3 @@
-#pragma once
-
 #include <iostream>
 
 #include "pos/include/common.h"
@@ -7,7 +5,7 @@
 #include "pos/include/dag.h"
 
 #include "pos/cuda_impl/handle.h"
-#include "pos/cuda_impl/runtime.h"
+#include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_context.h"
 #include "pos/cuda_impl/utils/fatbin.h"
@@ -23,18 +21,15 @@ namespace cuda_malloc {
     // parser function
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
-        T_POSTransport *transport;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandleManager<POSHandle_CUDA_Device>* hm_device;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandleManager_CUDA_Device *hm_device;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
 
-        transport = (T_POSTransport*)(wqe->transport);
         client = (POSClient_CUDA*)(wqe->client);
-        POS_CHECK_POINTER(transport);
         POS_CHECK_POINTER(client);
 
     #if POS_ENABLE_DEBUG_CHECK
@@ -49,17 +44,23 @@ namespace cuda_malloc {
         }
     #endif
 
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
-        POS_CHECK_POINTER(hm_device); POS_CHECK_POINTER(hm_device->latest_used_handle);
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
+        POS_CHECK_POINTER(hm_device);
+        POS_CHECK_POINTER(hm_device->latest_used_handle);
+
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // operate on handler manager
         retval = hm_memory->allocate_mocked_resource(
             /* handle */ &memory_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>({{ 
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Device, 
-                /* handles */ std::vector<POSHandle_ptr>({hm_device->latest_used_handle}) 
+                /* handles */ std::vector<POSHandle*>({hm_device->latest_used_handle}) 
             }}),
             /* size */ pos_api_param_value(wqe, 0, size_t),
             /* expected_addr */ 0,
@@ -72,9 +73,12 @@ namespace cuda_malloc {
         }
         
         // record the related handle to QE
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Memory, POSHandleView_t(memory_handle, kPOS_Edge_Direction_Create));
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ memory_handle
+        });
 
         // allocate the memory handle in the dag
+
         retval = client->dag.allocate_handle(memory_handle);
         if(unlikely(retval != POS_SUCCESS)){
             goto exit;
@@ -99,8 +103,8 @@ namespace cuda_free {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -120,7 +124,9 @@ namespace cuda_free {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // operate on handler manager
@@ -138,9 +144,9 @@ namespace cuda_free {
 
         memory_handle->mark_status(kPOS_HandleStatus_Delete_Pending);
 
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Memory, POSHandleView_t(memory_handle, kPOS_Edge_Direction_Delete)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Delete>({
+            /* handle */ memory_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
@@ -160,23 +166,89 @@ namespace cuda_launch_kernel {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Function_ptr function_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        uint64_t i, param_index;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_CUDA_Memory *memory_handle;
+
+        uint64_t i, j, param_index;
         void *args, *arg_addr, *arg_value;
-        POSHandleManager<POSHandle_CUDA_Function>* hm_function;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+
+        uint8_t *struct_base_ptr;
+        uint64_t arg_size, struct_offset;
+
+        POSHandleManager_CUDA_Function *hm_function;
+        POSHandleManager_CUDA_Stream *hm_stream;
+        POSHandleManager_CUDA_Memory *hm_memory;
         
-        uint64_t s_tick, e_tick;
+        uint64_t all_tick, s_tick, e_tick;
+
+        /*!
+         *  \brief  obtain a potential pointer from a struct by given offset within the struct
+         *  \param  base    base address of the struct
+         *  \param  offset  offset within the struct
+         *  \return potential pointer
+         */
+        auto __try_get_potential_addr_from_struct_with_offset = [](uint8_t* base, uint64_t offset) -> void* {
+            uint8_t *bias_base = base + offset;
+            POS_CHECK_POINTER(bias_base);
+
+        #define __ADDR_UNIT(index)   ((uint64_t)(*(bias_base+index) & 0xff) << (index*8))
+            return (void*)(
+                __ADDR_UNIT(0) | __ADDR_UNIT(1) | __ADDR_UNIT(2) | __ADDR_UNIT(3) | __ADDR_UNIT(4) | __ADDR_UNIT(5)
+            );
+        #undef __ADDR_UNIT
+        };
+
+        /*!
+         *  \brief  printing the kernels direction after first parsing
+         *  \param  function_handle handler of the function to be printed
+         */
+        auto __print_kernel_directions = [](POSHandle_CUDA_Function *function_handle){
+            POS_CHECK_POINTER(function_handle);
+            POS_LOG("obtained direction of kernel %s:", function_handle->signature.c_str());
+
+            // for printing input / output
+            auto __unit_print_input_output = [](std::vector<uint32_t>& vec, const char* dir_string){
+                uint64_t i, param_index;
+                char param_idx[512] = {0};
+                for(i=0; i<vec.size(); i++){
+                    param_index = vec[i];
+                    if(likely(i!=0)){
+                        sprintf(param_idx, "%s, %lu", param_idx, param_index); 
+                    } else {
+                        sprintf(param_idx, "%lu", param_index);
+                    }
+                }
+                POS_LOG("    %s params: %s", dir_string, param_idx);
+            };
+
+            // for printing inout
+            auto __unit_print_inout = [](std::vector<std::pair<uint32_t, uint64_t>>& vec, const char* dir_string){
+                uint64_t i, struct_offset, param_index;
+                char param_idx[512] = {0};
+                for(i=0; i<vec.size(); i++){
+                    param_index = vec[i].first;
+                    struct_offset = vec[i].second;
+                    if(likely(i != 0)){
+                        sprintf(param_idx, "%s, %lu(ofs: %lu)", param_idx, param_index, struct_offset); 
+                    } else {
+                        sprintf(param_idx, "%lu(ofs: %lu)", param_index, struct_offset);
+                    }
+                };
+                POS_LOG("    %s params: %s", dir_string, param_idx);
+            };
+
+            __unit_print_input_output(function_handle->input_pointer_params, "input");
+            __unit_print_input_output(function_handle->output_pointer_params, "output");
+            __unit_print_inout(function_handle->confirmed_suspicious_params, "inout");
+        };
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
 
         client = (POSClient_CUDA*)(wqe->client);
         POS_CHECK_POINTER(client);
-
+        
         // check whether given parameter is valid
     #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(wqe->api_cxt->params.size() != 6)){
@@ -190,11 +262,19 @@ namespace cuda_launch_kernel {
     #endif
 
         // obtain handle managers of function, stream and memory
-        hm_function = client->handle_managers[kPOS_ResourceTypeId_CUDA_Function];
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
         POS_CHECK_POINTER(hm_function);
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // find out the involved function
@@ -209,7 +289,9 @@ namespace cuda_launch_kernel {
             );
             goto exit;
         }
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Function, POSHandleView_t(function_handle, kPOS_Edge_Direction_In));
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ function_handle
+        });
 
         // find out the involved stream
         retval = hm_stream->get_handle_by_client_addr(
@@ -223,7 +305,9 @@ namespace cuda_launch_kernel {
             );
             goto exit;
         }
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In));
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ stream_handle
+        });
 
         // the 3rd parameter of the API call contains parameter to launch the kernel
         args = pos_api_param_addr(wqe, 3);
@@ -231,22 +315,55 @@ namespace cuda_launch_kernel {
 
         // [Cricket Adapt] skip the metadata used by cricket
         args += (sizeof(size_t) + sizeof(uint16_t) * function_handle->nb_params);
-        
-        /*!
-         *  \note   check suspicious parameters that might contains pointer
-         */
-        if(unlikely(function_handle->has_verified_params == false)){
-            // TODO:
-            // 1. how to check?
-            // 2. only check once?
-            function_handle->has_verified_params = true;
-        }
 
+        all_tick = 0;
+        
         /*!
          *  \note   record all input memory areas
          */
         for(i=0; i<function_handle->input_pointer_params.size(); i++){
             param_index = function_handle->input_pointer_params[i];
+ 
+            arg_addr = args + function_handle->param_offsets[param_index];
+            POS_CHECK_POINTER(arg_addr);
+            arg_value = *((void**)arg_addr);
+            
+            /*!
+             *  \note   sometimes one would launch kernel with some pointer params are nullptr (at least pytorch did),
+             *          this is probably normal, so we just ignore this situation
+             */
+            if(unlikely(arg_value == nullptr)){
+                continue;
+            }
+
+            tmp_retval = hm_memory->get_handle_by_client_addr(
+                /* client_addr */ arg_value,
+                /* handle */ &memory_handle
+            );
+
+            if(unlikely(tmp_retval != POS_SUCCESS)){
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
+                continue;
+            }
+
+            // s_tick = POSUtilTimestamp::get_tsc();
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ memory_handle,
+                /* param_index */ param_index
+            });
+            // e_tick = POSUtilTimestamp::get_tsc();
+            // all_tick += (e_tick - s_tick);
+        }
+        
+        /*!
+         *  \note   record all inout memory areas
+         */
+        for(i=0; i<function_handle->inout_pointer_params.size(); i++){
+            param_index = function_handle->inout_pointer_params[i];
 
             arg_addr = args + function_handle->param_offsets[param_index];
             POS_CHECK_POINTER(arg_addr);
@@ -264,25 +381,24 @@ namespace cuda_launch_kernel {
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
+
             if(unlikely(tmp_retval != POS_SUCCESS)){
-                POS_WARN(
-                    "%lu(th) parameter of kernel %s is marked as input during kernel parsing phrase, "
-                    "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->name.get(), arg_value
-                );
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as inout during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
                 continue;
             }
 
-            wqe->record_handle(
-                /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-                /* handle_view */ POSHandleView_t(
-                    /* handle_ */ memory_handle,
-                    /* dir_ */ kPOS_Edge_Direction_In,
-                    /* param_index_ */ param_index
-                )
-            );
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                /* handle */ memory_handle,
+                /* param_index */ param_index
+            });
+
+            hm_memory->record_modified_handle(memory_handle);
         }
-        
+
         /*!
          *  \note   record all output memory areas
          */
@@ -305,48 +421,151 @@ namespace cuda_launch_kernel {
                 /* client_addr */ arg_value,
                 /* handle */ &memory_handle
             );
+
             if(unlikely(tmp_retval != POS_SUCCESS)){
-                POS_WARN(
-                    "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
-                    "yet it contains non-exist memory address during launching: given client addr(%p)",
-                    param_index, function_handle->name.get(), arg_value
-                );
+                // POS_WARN(
+                //     "%lu(th) parameter of kernel %s is marked as output during kernel parsing phrase, "
+                //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                //     param_index, function_handle->signature.c_str(), arg_value
+                // );
                 continue;
             }
 
-            wqe->record_handle(
-                /* id */ kPOS_ResourceTypeId_CUDA_Memory,
-                /* handle_view */ POSHandleView_t(
-                    /* handle_ */ memory_handle,
-                    /* dir_ */ kPOS_Edge_Direction_Out,
-                    /* param_index_ */ param_index
-                )
-            );
+            // s_tick = POSUtilTimestamp::get_tsc();
+            wqe->record_handle<kPOS_Edge_Direction_Out>({
+                /* handle */ memory_handle,
+                /* param_index */ param_index
+            });
+            // e_tick = POSUtilTimestamp::get_tsc();
+            // all_tick += (e_tick - s_tick);
+
             hm_memory->record_modified_handle(memory_handle);
         }
 
-        // s_tick = POSUtilTimestamp::get_tsc();
+        /*!
+         *  \note   check suspicious parameters that might contains pointer
+         *  \warn   only check once?
+         */
+        if(unlikely(function_handle->has_verified_params == false)){          
+            for(i=0; i<function_handle->suspicious_params.size(); i++){
+                param_index = function_handle->suspicious_params[i];
+
+                // we can skip those already be identified as input / output
+                if(std::find(
+                    function_handle->input_pointer_params.begin(),
+                    function_handle->input_pointer_params.end(),
+                    param_index
+                ) != function_handle->input_pointer_params.end()){
+                    continue;
+                }
+                if(std::find(
+                    function_handle->output_pointer_params.begin(),
+                    function_handle->output_pointer_params.end(),
+                    param_index
+                ) != function_handle->output_pointer_params.end()){
+                    continue;
+                }
+
+                arg_addr = args + function_handle->param_offsets[param_index];
+                POS_CHECK_POINTER(arg_addr);
+
+                struct_base_ptr = (uint8_t*)arg_addr;
+
+                arg_size = function_handle->param_sizes[param_index];
+                POS_ASSERT(arg_size >= 6);
+
+                // iterate across the struct using a 8-bytes window
+                for(j=0; j<arg_size-6; j++){
+                    arg_value = __try_get_potential_addr_from_struct_with_offset(struct_base_ptr, j);
+
+                    tmp_retval = hm_memory->get_handle_by_client_addr(
+                        /* client_addr */ arg_value,
+                        /* handle */ &memory_handle
+                    );
+                    if(unlikely(tmp_retval == POS_SUCCESS)){
+                        // we treat such memory areas as output memory
+                        function_handle->confirmed_suspicious_params.push_back({
+                            /* parameter index */ param_index,
+                            /* offset */ j  
+                        });
+
+                        wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                            /* handle */ memory_handle,
+                            /* param_index */ param_index
+                        });
+
+                        hm_memory->record_modified_handle(memory_handle);
+                    }
+                } // foreach arg_size
+            } // foreach suspicious_params
+
+            function_handle->has_verified_params = true;
+            
+            __print_kernel_directions(function_handle);
+        } else {
+            for(i=0; i<function_handle->confirmed_suspicious_params.size(); i++){
+                param_index = function_handle->confirmed_suspicious_params[i].first;
+                struct_offset = function_handle->confirmed_suspicious_params[i].second;
+
+                arg_addr = args + function_handle->param_offsets[param_index];
+                POS_CHECK_POINTER(arg_addr);
+                arg_value = *((void**)(arg_addr+struct_offset));
+
+                /*!
+                 *  \note   sometimes one would launch kernel with some pointer params are nullptr (at least pytorch did),
+                 *          this is probably normal, so we just ignore this situation
+                 */
+                if(unlikely(arg_value == nullptr)){
+                    continue;
+                }
+
+                tmp_retval = hm_memory->get_handle_by_client_addr(
+                    /* client_addr */ arg_value,
+                    /* handle */ &memory_handle
+                );
+
+                if(unlikely(tmp_retval != POS_SUCCESS)){
+                    // POS_WARN(
+                    //     "%lu(th) parameter of kernel %s is marked as suspicious output during kernel parsing phrase, "
+                    //     "yet it contains non-exist memory address during launching: given client addr(%p)",
+                    //     param_index, function_handle->signature.c_str(), arg_value
+                    // );
+                    continue;
+                }
+
+                 // s_tick = POSUtilTimestamp::get_tsc();
+                wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                    /* handle */ memory_handle,
+                    /* param_index */ param_index
+                });
+                // e_tick = POSUtilTimestamp::get_tsc();
+                // all_tick += (e_tick - s_tick);
+
+                hm_memory->record_modified_handle(memory_handle);
+            }
+        }
+
+        // POS_LOG("record handle duration: %lf us", POS_TSC_TO_USEC(all_tick));
 
         // launch the op to the dag
+        // s_tick = POSUtilTimestamp::get_tsc();
         retval = client->dag.launch_op(wqe);
-
         // e_tick = POSUtilTimestamp::get_tsc();
 
-        // POS_LOG("launch op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+        // POS_LOG("launch_op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(
-            "parse(cuda_launch_kernel): function(%s), stream(%p), grid_dim(%u,%u,%u), block_dim(%u,%u,%u), SM_size(%lu), #buffer(%lu)",
-            function_handle->name.get(), stream_handle->server_addr,
+            "parse(cuda_launch_kernel): function(%s), stream(%p), grid_dim(%u,%u,%u), block_dim(%u,%u,%u), SM_size(%lu)",
+            function_handle->name.c_str(), stream_handle->server_addr,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->x,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->y,
             ((__dim3_t*)pos_api_param_addr(wqe, 1))->z,
             ((__dim3_t*)pos_api_param_addr(wqe, 2))->x,
             ((__dim3_t*)pos_api_param_addr(wqe, 2))->y,
             ((__dim3_t*)pos_api_param_addr(wqe, 2))->z,
-            pos_api_param_value(wqe, 4, size_t),
-            wqe->handle_view_map[kPOS_ResourceTypeId_CUDA_Memory]->size()
+            pos_api_param_value(wqe, 4, size_t)
         );
     #endif
 
@@ -369,8 +588,8 @@ namespace cuda_memcpy_h2d {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -390,7 +609,9 @@ namespace cuda_memcpy_h2d {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // try obtain the destination memory handle
@@ -405,15 +626,27 @@ namespace cuda_memcpy_h2d {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory, 
-                POSHandleView_t(memory_handle, kPOS_Edge_Direction_Out, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                /* handle */ memory_handle
+            });
             hm_memory->record_modified_handle(memory_handle);
         }
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cuda_memcpy_h2d): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(memory_handle->ckpt_bag);
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
 
     exit:
         return retval;
@@ -433,8 +666,8 @@ namespace cuda_memcpy_d2h {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -454,7 +687,9 @@ namespace cuda_memcpy_d2h {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // try obtain the source memory handle
@@ -469,10 +704,9 @@ namespace cuda_memcpy_d2h {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory, 
-                POSHandleView_t(memory_handle, kPOS_Edge_Direction_In, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ memory_handle
+            });
         }
 
         // launch the op to the dag
@@ -496,8 +730,8 @@ namespace cuda_memcpy_d2d {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr dst_memory_handle, src_memory_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
+        POSHandle_CUDA_Memory *dst_memory_handle, *src_memory_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -517,7 +751,9 @@ namespace cuda_memcpy_d2d {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
 
         // try obtain the destination memory handle
@@ -532,10 +768,9 @@ namespace cuda_memcpy_d2d {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory, 
-                POSHandleView_t(dst_memory_handle, kPOS_Edge_Direction_Out, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_Out>({
+                /* handle */ dst_memory_handle
+            });
             hm_memory->record_modified_handle(dst_memory_handle);
         }
 
@@ -551,10 +786,9 @@ namespace cuda_memcpy_d2d {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory,
-                POSHandleView_t(src_memory_handle, kPOS_Edge_Direction_In, 1)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ src_memory_handle
+            });
         }
 
         // launch the op to the dag
@@ -579,10 +813,10 @@ namespace cuda_memcpy_h2d_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -602,9 +836,14 @@ namespace cuda_memcpy_h2d_async {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // try obtain the destination memory handle
@@ -619,10 +858,9 @@ namespace cuda_memcpy_h2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory,
-                POSHandleView_t(memory_handle, kPOS_Edge_Direction_Out, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_InOut>({
+                /* handle */ memory_handle
+            });
             hm_memory->record_modified_handle(memory_handle);
         }
 
@@ -638,11 +876,26 @@ namespace cuda_memcpy_h2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle(kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In));
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ stream_handle
+            });
         }
-
+        
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cuda_memcpy_h2d_async): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(memory_handle->ckpt_bag);
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
 
     exit:
         return retval;
@@ -663,10 +916,10 @@ namespace cuda_memcpy_d2h_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -686,9 +939,14 @@ namespace cuda_memcpy_d2h_async {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // try obtain the source memory handle
@@ -702,10 +960,9 @@ namespace cuda_memcpy_d2h_async {
                 (void*)pos_api_param_value(wqe, 0, uint64_t)
             );
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory,
-                POSHandleView_t(memory_handle, kPOS_Edge_Direction_In, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ memory_handle
+            });
         }
 
         // try obtain the stream handle
@@ -719,7 +976,9 @@ namespace cuda_memcpy_d2h_async {
                 (void*)pos_api_param_value(wqe, 2, uint64_t)
             );
         } else {
-            wqe->record_handle(kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In));
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ stream_handle
+            });
         }
 
         // launch the op to the dag
@@ -744,10 +1003,10 @@ namespace cuda_memcpy_d2d_async {
         pos_retval_t retval = POS_SUCCESS, tmp_retval;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Memory_ptr dst_memory_handle, src_memory_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Memory>* hm_memory;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Memory *dst_memory_handle, *src_memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -767,9 +1026,14 @@ namespace cuda_memcpy_d2d_async {
         }
     #endif
 
-        hm_memory = client->handle_managers[kPOS_ResourceTypeId_CUDA_Memory];
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
         POS_CHECK_POINTER(hm_memory);
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // try obtain the destination memory handle
@@ -784,10 +1048,9 @@ namespace cuda_memcpy_d2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory,
-                POSHandleView_t(dst_memory_handle, kPOS_Edge_Direction_Out)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_Out>({
+                /* handle */ dst_memory_handle
+            });
             hm_memory->record_modified_handle(dst_memory_handle);
         }
 
@@ -803,10 +1066,9 @@ namespace cuda_memcpy_d2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Memory,
-                POSHandleView_t(src_memory_handle, kPOS_Edge_Direction_In)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ src_memory_handle
+            });
         }
 
         // try obtain the stream handle
@@ -821,7 +1083,9 @@ namespace cuda_memcpy_d2d_async {
             );
             goto exit;
         } else {
-            wqe->record_handle(kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In));
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ stream_handle
+            });
         }
 
         // launch the op to the dag
@@ -845,8 +1109,8 @@ namespace cuda_set_device {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
 
-        POSHandleManager_CUDA_Device* hm_device;
-        POSHandle_CUDA_Device_ptr device_handle;
+        POSHandleManager_CUDA_Device *hm_device;
+        POSHandle_CUDA_Device *device_handle;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -867,7 +1131,9 @@ namespace cuda_set_device {
     #endif
 
         // obtain handle managers of device
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
         POS_CHECK_POINTER(hm_device);
 
         // find out the involved device
@@ -882,7 +1148,10 @@ namespace cuda_set_device {
             );
             goto exit;
         }
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Device, POSHandleView_t(device_handle, kPOS_Edge_Direction_In));
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ device_handle
+        });
+
         hm_device->latest_used_handle = device_handle;
 
         // launch the op to the dag
@@ -957,7 +1226,7 @@ namespace cuda_get_device_count {
         uint64_t nb_handles;
         int nb_handles_int;
 
-        POSHandleManager_CUDA_Device* hm_device;
+        POSHandleManager_CUDA_Device *hm_device;
         
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -966,7 +1235,9 @@ namespace cuda_get_device_count {
         POS_CHECK_POINTER(client);
 
         // obtain handle managers of device
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
         POS_CHECK_POINTER(hm_device);
 
         nb_handles = hm_device->get_nb_handles();
@@ -997,8 +1268,8 @@ namespace cuda_get_device_properties {
         pos_retval_t retval = POS_SUCCESS;
 
         POSClient_CUDA *client;
-        POSHandle_CUDA_Device_ptr device_handle;
-        POSHandleManager<POSHandle_CUDA_Device>* hm_device;
+        POSHandle_CUDA_Device *device_handle;
+        POSHandleManager_CUDA_Device *hm_device;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1018,7 +1289,9 @@ namespace cuda_get_device_properties {
         }
     #endif
 
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
         POS_CHECK_POINTER(hm_device);
 
         // find out the involved device
@@ -1033,7 +1306,9 @@ namespace cuda_get_device_properties {
             );
             goto exit;
         }
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Device, POSHandleView_t(device_handle, kPOS_Edge_Direction_In));
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ device_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
@@ -1057,7 +1332,7 @@ namespace cuda_get_device {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
 
-        POSHandleManager_CUDA_Device* hm_device;
+        POSHandleManager_CUDA_Device *hm_device;
         
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1066,7 +1341,9 @@ namespace cuda_get_device {
         POS_CHECK_POINTER(client);
 
         // obtain handle managers of device
-        hm_device = client->handle_managers[kPOS_ResourceTypeId_CUDA_Device];
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
         POS_CHECK_POINTER(hm_device);
 
         POS_CHECK_POINTER(wqe->api_cxt->ret_data);
@@ -1093,8 +1370,8 @@ namespace cuda_stream_synchronize {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1114,7 +1391,9 @@ namespace cuda_stream_synchronize {
         }
     #endif
 
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // try obtain the source memory handle
@@ -1128,10 +1407,9 @@ namespace cuda_stream_synchronize {
                 (void*)pos_api_param_value(wqe, 0, uint64_t)
             );
         } else {
-            wqe->record_handle(
-                kPOS_ResourceTypeId_CUDA_Stream, 
-                POSHandleView_t(stream_handle, kPOS_Edge_Direction_In, 0)
-            );
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ stream_handle
+            });
         }
 
         // launch the op to the dag
@@ -1155,8 +1433,8 @@ namespace cuda_stream_is_capturing {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         cudaStreamCaptureStatus capture_status;
 
@@ -1178,7 +1456,9 @@ namespace cuda_stream_is_capturing {
         }
     #endif
 
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // try obtain the stream handle
@@ -1200,11 +1480,9 @@ namespace cuda_stream_is_capturing {
             capture_status = cudaStreamCaptureStatusActive;
         }
         memcpy(wqe->api_cxt->ret_data, &capture_status, sizeof(cudaStreamCaptureStatus));
-
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Stream, 
-            POSHandleView_t(stream_handle, kPOS_Edge_Direction_In, 0)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ stream_handle
+        });
         
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -1230,8 +1508,8 @@ namespace cuda_event_create_with_flags {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
-        POSHandleManager<POSHandle_CUDA_Event>* hm_event;
+        POSHandle_CUDA_Event *event_handle;
+        POSHandleManager_CUDA_Event *hm_event;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1251,24 +1529,29 @@ namespace cuda_event_create_with_flags {
         }
     #endif
 
-        hm_event = client->handle_managers[kPOS_ResourceTypeId_CUDA_Event];
+        hm_event = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Event, POSHandleManager_CUDA_Event
+        );
         POS_CHECK_POINTER(hm_event);
 
         // operate on handler manager
         retval = hm_event->allocate_mocked_resource(
             /* handle */ &event_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle_ptr>>()
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>()
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_event_create_with_flags): failed to allocate mocked resource within the CUDA event handler manager");
             memset(wqe->api_cxt->ret_data, 0, sizeof(cudaEvent_t));
             goto exit;
         } else {
+            event_handle->flags = pos_api_param_value(wqe, 0, int);
             memcpy(wqe->api_cxt->ret_data, &(event_handle->client_addr), sizeof(cudaEvent_t));
         }
         
         // record the related handle to QE
-        wqe->record_handle(kPOS_ResourceTypeId_CUDA_Event, POSHandleView_t(event_handle, kPOS_Edge_Direction_Create));
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ event_handle
+        });
 
         // allocate the event handle in the dag
         retval = client->dag.allocate_handle(event_handle);
@@ -1300,8 +1583,8 @@ namespace cuda_event_destory {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
-        POSHandleManager<POSHandle_CUDA_Event>* hm_event;
+        POSHandle_CUDA_Event *event_handle;
+        POSHandleManager_CUDA_Event *hm_event;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1321,7 +1604,9 @@ namespace cuda_event_destory {
         }
     #endif
 
-        hm_event = client->handle_managers[kPOS_ResourceTypeId_CUDA_Event];
+        hm_event = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Event, POSHandleManager_CUDA_Event
+        );
         POS_CHECK_POINTER(hm_event);
 
         // operate on handler manager
@@ -1339,9 +1624,9 @@ namespace cuda_event_destory {
         
         event_handle->mark_status(kPOS_HandleStatus_Delete_Pending);
     
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Event, POSHandleView_t(event_handle, kPOS_Edge_Direction_Delete)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Delete>({
+            /* handle */ event_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
@@ -1364,10 +1649,10 @@ namespace cuda_event_record {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-        POSHandle_CUDA_Event_ptr event_handle;
-        POSHandle_CUDA_Stream_ptr stream_handle;
-        POSHandleManager<POSHandle_CUDA_Event>* hm_event;
-        POSHandleManager<POSHandle_CUDA_Stream>* hm_stream;
+        POSHandle_CUDA_Event *event_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Event *hm_event;
+        POSHandleManager_CUDA_Stream *hm_stream;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1387,9 +1672,14 @@ namespace cuda_event_record {
         }
     #endif
 
-        hm_event = client->handle_managers[kPOS_ResourceTypeId_CUDA_Event];
+        hm_event = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Event, POSHandleManager_CUDA_Event
+        );
         POS_CHECK_POINTER(hm_event);
-        hm_stream = client->handle_managers[kPOS_ResourceTypeId_CUDA_Stream];
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
         POS_CHECK_POINTER(hm_stream);
 
         // operate on handler manager
@@ -1404,9 +1694,10 @@ namespace cuda_event_record {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Event, POSHandleView_t(event_handle, kPOS_Edge_Direction_Out)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_Out>({
+            /* handle */ event_handle
+        });
+
         hm_event->record_modified_handle(event_handle);
 
         retval = hm_stream->get_handle_by_client_addr(
@@ -1420,9 +1711,9 @@ namespace cuda_event_record {
             );
             goto exit;
         }
-        wqe->record_handle(
-            kPOS_ResourceTypeId_CUDA_Stream, POSHandleView_t(stream_handle, kPOS_Edge_Direction_In)
-        );
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ stream_handle
+        });
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);

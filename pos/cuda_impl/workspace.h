@@ -5,18 +5,18 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/workspace.h"
-#include "pos/include/runtime.h"
+#include "pos/include/parser.h"
 
 #include "pos/cuda_impl/client.h"
-#include "pos/cuda_impl/runtime.h"
+#include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/worker.h"
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/api_context.h"
 
-template<class T_POSTransport>
-class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
+
+class POSWorkspace_CUDA : public POSWorkspace{
  public:
-    POSWorkspace_CUDA(){
+    POSWorkspace_CUDA(int argc, char *argv[]) : POSWorkspace(argc, argv){
         this->checkpoint_api_id = 6666;
     }
 
@@ -28,14 +28,14 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
      */
     pos_retval_t init() override {
         // create runtime
-        this->_runtime = new POSRuntime_CUDA<T_POSTransport>(/* ws */ this);
-        POS_CHECK_POINTER(this->_runtime);
-        this->_runtime->init();
+        this->runtime = new POSParser_CUDA(/* ws */ this);
+        POS_CHECK_POINTER(this->runtime);
+        this->runtime->init();
 
         // create worker
-        this->_worker = new POSWorker_CUDA<T_POSTransport>( /* ws */ this );
-        POS_CHECK_POINTER(this->_worker);
-        this->_worker->init();
+        this->worker = new POSWorker_CUDA( /* ws */ this );
+        POS_CHECK_POINTER(this->worker);
+        this->worker->init();
 
         // create the api manager
         this->api_mgnr = new POSApiManager_CUDA();
@@ -47,6 +47,29 @@ class POSWorkspace_CUDA : public POSWorkspace<T_POSTransport, POSClient_CUDA>{
             kPOS_ResourceTypeId_CUDA_Memory
         });
 
+        return POS_SUCCESS;
+    }
+
+    /*!
+     *  \brief  create and add a new client to the workspace
+     *  \param  clnt    pointer to the POSClient to be added
+     *  \param  uuid    the result uuid of the added client
+     *  \return POS_SUCCESS for successfully added
+     */
+    pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid) override {
+        pos_client_cxt_CUDA_t client_cxt;
+        client_cxt.cxt_base = this->_template_client_cxt;
+        client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
+        client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
+
+        POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* id */ _current_max_uuid, /* cxt */ client_cxt));
+        (*clnt)->init();
+        
+        *uuid = _current_max_uuid;
+        _current_max_uuid += 1;
+        _client_map[*uuid] = (*clnt);
+
+        POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), *uuid);
         return POS_SUCCESS;
     }
 };
