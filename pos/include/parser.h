@@ -46,12 +46,7 @@ class POSParser {
         _daemon_thread = new std::thread(&POSParser::daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
 
-        POS_LOG_C(
-            "runtime started: ckpt_interval(%lu ms, %lu ticks), ckpt_opt_level(%d)",
-            POS_CKPT_INTERVAL,
-            this->checkpoint_interval_tick,
-            POS_CKPT_OPT_LEVAL
-        );
+        POS_LOG_C("parser started");
     };
 
     /*!
@@ -218,6 +213,7 @@ class POSParser {
 
     /*!
      *  \brief  insert checkpoint op to the DAG based on certain conditions
+     *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */

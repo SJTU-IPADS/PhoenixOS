@@ -29,8 +29,10 @@ find_library(CUDA_NVTX_LIBRARY
 # >>> vector addition
 add_executable(memcpy_performance_test main.cu)
 
+add_executable(memcpy_performance_d2d_test d2d.cu)
+
 # >>> global configuration
-set(PROFILING_TARGETS memcpy_performance_test)
+set(PROFILING_TARGETS memcpy_performance_test memcpy_performance_d2d_test)
 foreach( profiling_target ${PROFILING_TARGETS} )
   target_link_libraries(${profiling_target} nvToolsExt -lcublas -lcurand)
   target_compile_features(${profiling_target} PUBLIC cxx_std_11)

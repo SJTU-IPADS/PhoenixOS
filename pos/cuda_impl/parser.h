@@ -149,7 +149,7 @@ class POSParser_CUDA : public POSParser {
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_o1_o2(POSAPIContext_QE* wqe) {
+    pos_retval_t __checkpoint_insertion_incremental(POSAPIContext_QE* wqe) {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandleManager<POSHandle>* hm;
@@ -183,18 +183,23 @@ class POSParser_CUDA : public POSParser {
         
     exit:
         return retval;
-    }   
+    }
 
     /*!
      *  \brief  insert checkpoint op to the DAG based on certain conditions
+     *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
      *  \param  wqe the exact WQ element before inserting checkpoint op
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {
-        #if POS_CKPT_OPT_LEVAL == 1 || POS_CKPT_OPT_LEVAL == 2
-            // return __checkpoint_insertion_naive(wqe);
-            return __checkpoint_insertion_o1_o2(wqe);
-        #else // POS_CKPT_OPT_LEVAL == 0
+        #if POS_CKPT_OPT_LEVAL > 0
+            #if POS_CKPT_ENABLE_INCREMENTAL == 1
+                return __checkpoint_insertion_incremental(wqe);
+            #else
+                return __checkpoint_insertion_naive(wqe);
+            #endif
+        #else
+            // insert no checkpoint op, so we won't trigger any checkpoint
             return POS_SUCCESS;
         #endif
     }

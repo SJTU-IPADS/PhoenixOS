@@ -17,6 +17,15 @@
 // checkpoint optimization level
 #define POS_CKPT_OPT_LEVAL              @pos_ckpt_opt_level@
 
+// enable increamental checkpoint
+#define POS_CKPT_ENABLE_INCREMENTAL     @pos_enable_ckpt_increamental@
+
+// enable pipelined checkpoint
+#define POS_CKPT_ENABLE_PIPELINE        @pos_enable_ckpt_pipeline@
+
+// enable checkpoint orchestration
+#define POS_CKPT_ENABLE_ORCHESTRATION   @pos_enable_ckpt_orchestration@
+
 // checkpoint interval (unit in ms)
 #define POS_CKPT_INTERVAL               @pos_ckpt_interval_ms@ // ms
 

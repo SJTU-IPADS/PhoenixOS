@@ -4,7 +4,7 @@ import pandas as pd
 
 device_name = "V100 (Gen3, x16)"
 
-file_path = "/root/memcpy_performance/profile.txt"
+file_path = "/root/microbench/memcpy_performance/build/profile.txt"
 file = open(file_path, 'r')
 lines = file.readlines()
 
@@ -31,7 +31,7 @@ for size in byte_sizes:
 
 # draw
 plt.figure(figsize=(9, 8), dpi=200)
-plt.title(f"CUDA Device to Host Memcpy Performance\n{device_name}")
+plt.title(f"CUDA Device to Device Memcpy Performance\n{device_name}")
 plt.xlabel("Copy Size / Bytes", fontsize=10)
 plt.xticks(size=6)
 plt.xticks(rotation=30)
@@ -75,13 +75,13 @@ ax2.set_zorder(ax1.get_zorder() - 1)
 ax1.patch.set_visible(False)
 
 # plot 3: pcie
-ax3 = ax1.twiny()
-sns.lineplot(data=fig_dataframe, x='sizes', y='pcie_bws', marker='o', color = 'g', ax=ax3, label='PCIe Bandwidth Bound')
-ax3.set(xscale='log')
+# ax3 = ax1.twiny()
+# sns.lineplot(data=fig_dataframe, x='sizes', y='pcie_bws', marker='o', color = 'g', ax=ax3, label='PCIe Bandwidth Bound')
+# ax3.set(xscale='log')
 
 
-lines = ax1.get_lines() + ax3.get_lines()
-labels = [line.get_label() for line in lines]
-ax3.legend(lines, labels, loc='upper left')
+# lines = ax1.get_lines() + ax3.get_lines()
+# labels = [line.get_label() for line in lines]
+# ax3.legend(lines, labels, loc='upper left')
 
-plt.savefig("/root/memcpy_performance/profile.png")
+plt.savefig("/root/microbench/memcpy_performance/build/profile.png")

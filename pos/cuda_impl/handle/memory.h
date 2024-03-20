@@ -57,6 +57,10 @@ class POSHandle_CUDA_Memory : public POSHandle {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
+    /*!
+     *  \brief  allocator of the host-side checkpoint memory
+     *  \param  state_size  size of the area to store checkpoint
+     */
     static void* __checkpoint_allocator(uint64_t state_size) {
         cudaError_t cuda_rt_retval;
         void *ptr;
@@ -75,12 +79,52 @@ class POSHandle_CUDA_Memory : public POSHandle {
         return ptr;
     }
 
+    /*!
+     *  \brief  deallocator of the host-side checkpoint memory
+     *  \param  data    pointer of the buffer to be deallocated
+     */
     static void __checkpoint_deallocator(void* data){
         cudaError_t cuda_rt_retval;
         if(likely(data != nullptr)){
             cuda_rt_retval = cudaFreeHost(data);
             if(unlikely(cuda_rt_retval != cudaSuccess)){
                 POS_WARN_DETAIL("failed cudaFreeHost, error: %d", cuda_rt_retval);
+            }
+        }
+    }
+
+    /*!
+     *  \brief  allocator of the device-side checkpoint memory
+     *  \param  state_size  size of the area to store checkpoint
+     */
+    static void* __checkpoint_dev_allocator(uint64_t state_size) {
+        cudaError_t cuda_rt_retval;
+        void *ptr;
+
+        if(unlikely(state_size == 0)){
+            POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
+            return nullptr;
+        }
+
+        cuda_rt_retval = cudaMalloc(&ptr, state_size);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed cudaMalloc, error: %d", cuda_rt_retval);
+            return nullptr;
+        }
+
+        return ptr;
+    }
+
+    /*!
+     *  \brief  deallocator of the host-side checkpoint memory
+     *  \param  data    pointer of the buffer to be deallocated
+     */
+    static void __checkpoint_dev_deallocator(void* data){
+        cudaError_t cuda_rt_retval;
+        if(likely(data != nullptr)){
+            cuda_rt_retval = cudaFree(data);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_DETAIL("failed cudaFree, error: %d", cuda_rt_retval);
             }
         }
     }
@@ -103,7 +147,8 @@ class POSHandle_CUDA_Memory : public POSHandle {
         
         // apply new checkpoint slot
         if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot(/* version */ version_id, /* ptr */ &ckpt_slot)
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */false>
+                                        (/* version */ version_id, /* ptr */ &ckpt_slot, /* force_overwrite */ false)
         )){
             POS_WARN_C("failed to apply checkpoint slot");
             retval = POS_FAILED;
@@ -147,11 +192,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
         uint64_t s_tick = 0, e_tick = 0;
         double duration_us = 0;
         
-        // apply new checkpoint slot
+        // apply new host-side checkpoint slot
         if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot(/* version */ version_id, /* ptr */ &ckpt_slot)
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ false>
+                                        (/* version */ version_id, /* ptr */ &ckpt_slot, /* force_overwrite */ false)
         )){
-            POS_WARN_C("failed to apply checkpoint slot");
+            POS_WARN_C("failed to apply host-side checkpoint slot");
             retval = POS_FAILED;
             goto exit;
         }
@@ -194,6 +240,130 @@ class POSHandle_CUDA_Memory : public POSHandle {
             goto exit;
         }
     
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const override { 
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        POSCheckpointSlot* ckpt_slot;
+
+        // apply new on-device checkpoint slot
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ true>
+                                        (/* version */ version_id, /* ptr */ &ckpt_slot, /* force_overwrite */ true)
+        )){
+            POS_WARN_C("failed to apply checkpoint slot");
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        cuda_rt_retval = cudaMemcpyAsync(
+            /* dst */ ckpt_slot->expose_pointer(), 
+            /* src */ this->server_addr,
+            /* size */ this->state_size,
+            /* kind */ cudaMemcpyDeviceToDevice,
+            /* stream */ (cudaStream_t)(stream_id)
+        );
+
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C(
+                "failed to checkpoint memory handle on device: server_addr(%p), retval(%d)",
+                this->server_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  commit the on-device memory to host-side checkpoint area (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of the checkpoint to be commit
+     *  \param  stream_id   index of the stream to do this commit
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const override { 
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        POSCheckpointSlot *host_ckpt_slot, *dev_ckpt_slot;
+        uint64_t ckpt_size;
+        uint64_t s_tick, e_tick;
+
+        // step 1: get device-side checkpoint slot
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */ true>
+                                (/* ckpt_slot */ &dev_ckpt_slot, /* size */ ckpt_size, /* version */ version_id)
+        )){
+            POS_WARN_C(
+                "failed to commit checkpoint due to unexist device-side checkpoint: client_addr(%p), verion(%lu)",
+                this->client_addr, version_id
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // step 2: apply new host-side checkpoint slot
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ false>
+                                        (/* version */ version_id, /* ptr */ &host_ckpt_slot, /* force_overwrite */ true)
+        )){
+            POS_WARN_C("failed to apply host-side checkpoint slot");
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // step 3: memcpy from device to host
+        cuda_rt_retval = cudaMemcpyAsync(
+            /* dst */ host_ckpt_slot->expose_pointer(), 
+            /* src */ dev_ckpt_slot->expose_pointer(),
+            /* size */ this->state_size,
+            /* kind */ cudaMemcpyDeviceToHost,
+            /* stream */ (cudaStream_t)(stream_id)
+        );
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C(
+                "failed to commit device-side checkpoint: client_addr(%p), retval(%d)",
+                this->client_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+
+            // invalidate the applied host-side checkpoint area
+            if(unlikely(
+                POS_SUCCESS != this->ckpt_bag->invalidate_by_version</* on_device */ false>(/* version */ version_id)
+            )){
+                POS_WARN_C(
+                    "failed to invalidate host-side checkpoint: client_addr(%p), version(%lu)",
+                    this->client_addr, version_id
+                );
+            }
+
+            goto exit;
+        }
+
+        // step 4: invalidate device-side checkpoint
+        if(unlikely(
+            POS_SUCCESS != this->ckpt_bag->invalidate_by_version</* on_device */ true>(/* version */ version_id)
+        )){
+            POS_WARN_C(
+                "failed to invalidate device-side checkpoint: client_addr(%p), version(%lu)",
+                this->client_addr, version_id
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
     exit:
         return retval;
     }
@@ -332,7 +502,9 @@ class POSHandle_CUDA_Memory : public POSHandle {
         this->ckpt_bag = new POSCheckpointBag(
             this->state_size,
             this->__checkpoint_allocator,
-            this->__checkpoint_deallocator
+            this->__checkpoint_deallocator,
+            this->__checkpoint_dev_allocator,
+            this->__checkpoint_dev_deallocator
         );
         POS_CHECK_POINTER(this->ckpt_bag);
         return POS_SUCCESS;

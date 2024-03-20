@@ -483,7 +483,7 @@ namespace cuda_launch_kernel {
                         /* handle */ &memory_handle
                     );
                     if(unlikely(tmp_retval == POS_SUCCESS)){
-                        // we treat such memory areas as output memory
+                        // we treat such memory areas as inout memory
                         function_handle->confirmed_suspicious_params.push_back({
                             /* parameter index */ param_index,
                             /* offset */ j  

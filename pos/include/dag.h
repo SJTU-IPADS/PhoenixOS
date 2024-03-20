@@ -322,6 +322,38 @@ class POSDag {
         ;
     }
 
+    /*!
+     *  \brief  obtain the upstream api context that modified (inout / output) the specified handle, by given deadline version
+     *  \param  handle_vid  dag vertex index of the handle to be checked
+     *  \param  ddl_vid     deadline version index
+     *  \return pointer to the founed api context wqe or nullptr
+     */
+    POSAPIContext_QE_t* get_handle_upstream_api_cxt_by_ddl(pos_vertex_id_t handle_vid, pos_vertex_id_t ddl_vid){
+        POSAPIContext_QE_t *retval = nullptr;
+        uint64_t i;
+        POSNeighborList_t *neighbor_list;
+        POS_CHECK_POINTER(neighbor_list = this->_graph.get_neighbor_list(handle_vid));
+        
+        // no api context operate on this handle
+        if(unlikely(neighbor_list->size() == 0)){
+            goto exit;
+        }
+
+        // traverse the neighbor list in reverse order
+        for(i=neighbor_list->size()-1; i>=0; i--){
+            POSBgEdge_t &edge = (*neighbor_list)[i];
+
+            if(edge.dir == kPOS_Edge_Direction_Out || edge.dir == kPOS_Edge_Direction_InOut){
+                if(edge.d_vid <= ddl_vid){
+                    POS_CHECK_POINTER(retval = this->get_api_cxt_by_dag_id(edge.d_vid));
+                    break;
+                }
+            }
+        }
+
+    exit:
+        return retval;
+    }
 
     /*!
      *  \brief  obtain serialize size of current dag topo

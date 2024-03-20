@@ -51,9 +51,9 @@ enum pos_handle_status_t : uint8_t {
     /*!
      *  \brief  the resource behind this handle are going
      *          to be deleted
-     *  \note   this status is marked under runtime function
+     *  \note   this status is marked under parser function
      *  \note   once the handle is marked as this status in
-     *          the runtime function, subsequent runtime
+     *          the parser function, subsequent parser
      *          function won't obtain this handle under
      *          get_handle_by_client_addr
      *  \note   it's ok for collect_broken_handles to skip
@@ -157,9 +157,6 @@ class POSHandle {
         POS_CHECK_POINTER(parent);
         parent_handles.push_back(parent);
     }
-
-
-    struct _pos_broken_handle_list_iter;
 
 
     /*!
@@ -309,6 +306,29 @@ class POSHandle {
         return POS_FAILED_NOT_IMPLEMENTED; 
     }
 
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const { 
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+
+    /*!
+     *  \brief  commit the on-device memory to host-side checkpoint area (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of the checkpoint to be commit
+     *  \param  stream_id   index of the stream to do this commit
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  restore the current handle when it becomes broken status

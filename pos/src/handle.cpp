@@ -271,7 +271,7 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
 
         for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
             ckpt_version = *set_iter;
-            retval =  this->ckpt_bag->get_checkpoint_slot(&ckpt_slot, ckpt_size, ckpt_version);
+            retval =  this->ckpt_bag->get_checkpoint_slot</* on_device */ false>(&ckpt_slot, ckpt_size, ckpt_version);
             if(unlikely(retval != POS_SUCCESS)){
                 POS_ERROR_C(
                     "failed to obtain checkpoint by version within the version set, this's a bug: client_addr(%p), version(%lu)",

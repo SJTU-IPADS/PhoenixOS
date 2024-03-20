@@ -221,19 +221,27 @@ void POSClient::init_restore_generate_recompute_scheme(){
     version_handle_pair_t target_vp;
     pos_vertex_id_t vt;
     POSHandle *ht;
-    POSAPIContext_QE_t *wqe_upstream;
+    POSAPIContext_QE_t *wqe_upstream, *wqe_upstream_of_inbuf;
     std::set<uint64_t> ckpt_version_set;
+    pos_vertex_id_t vi;
 
     auto __is_vh_map_contains = [](version_handle_map_t& vh_map, pos_vertex_id_t version, POSHandle* handle) -> bool {
         bool retval = false;
         auto nums = vh_map.count(version);
         auto iter = vh_map.find(version);
+
+        if(nums == 0){ goto exit; }
+
+        POS_CHECK_POINTER(handle);
+
         while(nums--){
             if(iter->second == handle){
                 retval = true;
                 break;
             }
+            iter++;
         }
+        
     exit:
         return retval;
     };
@@ -309,48 +317,89 @@ void POSClient::init_restore_generate_recompute_scheme(){
          * \note    version of the handle is exactly the dag id of its upstream api context
          */
         POS_CHECK_POINTER(wqe_upstream = this->dag.get_api_cxt_by_dag_id(vt));
-        for(POSHandleView_t &hv : wqe_upstream->input_handle_views){
-            POS_CHECK_POINTER(hv.handle);
 
-            /*!
-             *  \note   we only care about stateful handles
-             */
-            if(std::find(
-                this->_cxt.stateful_handle_type_idx.begin(), this->_cxt.stateful_handle_type_idx.end(), hv.resource_type_id
-            ) == this->_cxt.stateful_handle_type_idx.end()){
-                continue;
-            }
+        auto __process_in_handles = [&](std::vector<POSHandleView_t> &hv_vec){
+            for(POSHandleView_t &hv : hv_vec){
+                POS_CHECK_POINTER(hv.handle);
 
-            /*!
-             *  \note   we will skip this upstream handle, if it's been or going to be traced
-             */
-            if( __is_vh_map_contains(missing_vh_map, vt-1, hv.handle) || __is_vh_map_contains(tracing_vh_map, vt-1, hv.handle)){
-                continue;
-            }
+                /*!
+                *  \note   we only care about stateful handles
+                */
+                if(std::find(
+                    this->_cxt.stateful_handle_type_idx.begin(), this->_cxt.stateful_handle_type_idx.end(), hv.resource_type_id
+                ) == this->_cxt.stateful_handle_type_idx.end()){
+                    continue;
+                }
 
-            /*!
-             *  \note   we will continue to trace upstream of this upstream handle, if it's not yet checkpointed
-             */
-            POS_CHECK_POINTER(hv.handle->ckpt_bag);
-            ckpt_version_set = hv.handle->ckpt_bag->get_checkpoint_version_set();
-            if(ckpt_version_set.count(vt-1) == 0){
-                missing_vh_map.insert(version_handle_pair_t(vt-1, hv.handle));
-                tracing_vh_map.insert(version_handle_pair_t(vt-1, hv.handle));
-            }
-        }
-        for(POSHandleView_t &hv : wqe_upstream->inout_handle_views){
-            POS_CHECK_POINTER(hv.handle);
-            if( __is_vh_map_contains(missing_vh_map, vt-1, hv.handle) || __is_vh_map_contains(tracing_vh_map, vt-1, hv.handle)){
-                continue;
-            }
+                /*!
+                *  \brief  obtain the upstream api context that modified this input buffer, we need its version
+                *  \note   we set the deadline version as vt-1, just the one before current upstream api context
+                *          (i.e., wqe_upstream)
+                */
+                if(likely(vt > 0)){
+                    wqe_upstream_of_inbuf = this->dag.get_handle_upstream_api_cxt_by_ddl(hv.handle_dag_id, vt-1);
+                    if(wqe_upstream_of_inbuf == nullptr){
+                        vi = 0;
+                    } else {
+                        vi = wqe_upstream_of_inbuf->dag_vertex_id;
+                    }
+                    POS_ASSERT(vi < vt);
+                } else {
+                    vi = 0;
+                } 
 
-            POS_CHECK_POINTER(hv.handle->ckpt_bag);
-            ckpt_version_set = hv.handle->ckpt_bag->get_checkpoint_version_set();
-            if(ckpt_version_set.count(vt-1) == 0){
-                missing_vh_map.insert(version_handle_pair_t(vt-1, hv.handle));
-                tracing_vh_map.insert(version_handle_pair_t(vt-1, hv.handle));
+                POS_LOG(
+                    "    ==> upstream input buffer: client_addr(%p), vt(%lu), vi(%lu) | "
+                    "missing_vh_map has vt(%d), vi(%d) | "
+                    "tracing_vh_map has vt(%d), vi(%d) | "
+                    "missing_vh_map len: %lu | "
+                    "tracing_vh_map len: %lu ",
+                    hv.handle->client_addr, vt, vi,
+                    __is_vh_map_contains(missing_vh_map, vt, hv.handle),
+                    __is_vh_map_contains(missing_vh_map, vi, hv.handle),
+                    __is_vh_map_contains(tracing_vh_map, vt, hv.handle),
+                    __is_vh_map_contains(tracing_vh_map, vi, hv.handle),
+                    missing_vh_map.size(),
+                    tracing_vh_map.size()
+                );
+                
+                
+                /*!
+                 *  \note   if vi is 0, then we reach the initial state of this handle, there's no need to restore it via recompute
+                 */
+                if(unlikely(vi == 0)){
+                    POS_LOG("trace till begining: client_addr(%p)", hv.handle->client_addr);
+                    tracing_vh_map.insert(version_handle_pair_t(vi, hv.handle));
+                    continue;
+                }
+
+                /*!
+                *  \note   if this upstream handle has been or is going to be traced, we will skip it
+                */
+                if(__is_vh_map_contains(tracing_vh_map, vi, hv.handle) == true){
+                    continue;
+                } else if(__is_vh_map_contains(missing_vh_map, vi, hv.handle) == true){
+                    continue;
+                } else {
+                    /*!
+                     *  \note   we will continue to trace further upstream of this upstream input handle, if it's not yet checkpointed
+                     */
+                    POS_CHECK_POINTER(hv.handle->ckpt_bag);
+                    ckpt_version_set = hv.handle->ckpt_bag->get_checkpoint_version_set();
+                    if(ckpt_version_set.count(vi) == 0){
+                        POS_LOG("    => insert: client_addr(%p), vi(%lu)", hv.handle->client_addr, vi);
+                        missing_vh_map.insert(version_handle_pair_t(vi, hv.handle));
+                        tracing_vh_map.insert(version_handle_pair_t(vi, hv.handle));
+                    }
+                }
             }
-        }
+        };
+        
+        POS_LOG("  ==> input: %lu", wqe_upstream->input_handle_views.size());
+        __process_in_handles(wqe_upstream->input_handle_views);
+
+        POS_LOG("  ==> outin: %lu", wqe_upstream->inout_handle_views.size());
+        __process_in_handles(wqe_upstream->inout_handle_views);
 
         tracing_vh_map.insert(version_handle_pair_t(vt, ht));
         apicxt_sequence_map.insert(version_apicxt_pair_t(vt, wqe_upstream));

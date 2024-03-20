@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <thread>
 
 #include <cuda_runtime_api.h>
 
@@ -58,7 +59,7 @@ namespace wk_functions {
  */
 class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws), _ckpt_stream(nullptr) {}
+    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws), _ckpt_stream(nullptr), _ckpt_commit_stream(nullptr) {}
     ~POSWorker_CUDA(){};
 
  protected:
@@ -148,7 +149,7 @@ class POSWorker_CUDA : public POSWorker {
      *          since last checkpointing
      * \param   wqe WQ element of the checkpoint op
      */
-    pos_retval_t __checkpoint_sync_selective(POSAPIContext_QE* wqe) {
+    pos_retval_t __checkpoint_sync_incremental(POSAPIContext_QE* wqe) {
         uint64_t i;
         std::vector<POSHandleView_t>* handle_views;
         uint64_t nb_handles;
@@ -203,13 +204,18 @@ class POSWorker_CUDA : public POSWorker {
      *  \return POS_SUCCESS for successfully checkpointing
      */
     pos_retval_t checkpoint_sync(POSAPIContext_QE* wqe) override {
-        return __checkpoint_sync_naive(wqe); // singularity
-        // return __checkpoint_sync_selective(wqe);
+        #if POS_CKPT_ENABLE_INCREMENTAL == 1
+            return __checkpoint_sync_incremental(wqe);
+        #else
+            return __checkpoint_sync_naive(wqe);
+        #endif
     }
 
     /*!
      *  \brief  overlapped checkpoint procedure, should be implemented by each platform
      *  \note   this thread will be raised by level-2 ckpt
+     *  \note   aware of the macro POS_CKPT_ENABLE_PIPELINE
+     *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
      *  \param  cxt     the context of this checkpointing
      */
     void checkpoint_async_thread(checkpoint_async_cxt_t* cxt) override {
@@ -219,6 +225,12 @@ class POSWorker_CUDA : public POSWorker {
         pos_retval_t retval = POS_SUCCESS;
         POSAPIContext_QE *wqe;
         POSHandle *handle;
+        uint64_t s_tick = 0, e_tick = 0;
+
+    #if POS_CKPT_ENABLE_PIPELINE == 1
+        // std::vector<std::thread*> _commit_threads;
+        // std::thread *_new_commit_thread;
+    #endif
 
         typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
         typename std::set<POSHandle*>::iterator set_iter;
@@ -228,6 +240,12 @@ class POSWorker_CUDA : public POSWorker {
         if(unlikely(_ckpt_stream == nullptr)){
             POS_ASSERT(cudaSuccess == cudaStreamCreate(&_ckpt_stream));
         }
+
+    #if POS_CKPT_ENABLE_PIPELINE == 1
+        if(unlikely(_ckpt_commit_stream == nullptr)){
+            POS_ASSERT(cudaSuccess == cudaStreamCreate(&_ckpt_commit_stream));
+        }
+    #endif
 
         POS_CHECK_POINTER(wqe = cxt->wqe);
 
@@ -248,12 +266,12 @@ class POSWorker_CUDA : public POSWorker {
 
             checkpoint_version = cxt->checkpoint_version_map[handle];
 
-            retval = handle->checkpoint_async(
+        #if POS_CKPT_ENABLE_PIPELINE == 1
+            retval = handle->checkpoint_pipeline_add_async(
                 /* version_id */ checkpoint_version,
                 /* stream_id */ (uint64_t)(_ckpt_stream)
             );
             POS_ASSERT(retval == POS_SUCCESS);
-        
             /*!
              *  \note   we wait until the checkpoint of this handle to be completed here, so then we can judge whether
              *          we should invalidate this checkpoint
@@ -264,20 +282,61 @@ class POSWorker_CUDA : public POSWorker {
                 retval = POS_FAILED;
                 goto exit;
             }
-            
-            if(unlikely(
-                std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle)
-            )){
-                retval = handle->ckpt_bag->invalidate_by_version(/* version */ checkpoint_version);
+        #else
+            retval = handle->checkpoint_async(
+                /* version_id */ checkpoint_version,
+                /* stream_id */ (uint64_t)(_ckpt_stream)
+            );
+            POS_ASSERT(retval == POS_SUCCESS);
+            /*!
+             *  \note   we wait until the checkpoint of this handle to be completed here, so then we can judge whether
+             *          we should invalidate this checkpoint
+             */
+            cuda_rt_retval = cudaStreamSynchronize(_ckpt_stream);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_C("failed to synchronize after start checkpointing handle: client_addr(%p)", handle->client_addr);
+                retval = POS_FAILED;
+                goto exit;
+            }
+        #endif
+        
+            if(unlikely(std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle))){
+                #if POS_CKPT_ENABLE_PIPELINE == 1
+                    retval = handle->ckpt_bag->invalidate_by_version</* on_deivce */ true>(/* version */ checkpoint_version);
+                #else
+                    retval = handle->ckpt_bag->invalidate_by_version</* on_deivce */ false>(/* version */ checkpoint_version);
+                #endif
                 POS_ASSERT(retval == POS_SUCCESS);
                 wqe->nb_abandon_handles += 1;
                 wqe->abandon_ckpt_size += handle->state_size;
             } else {
+                #if POS_CKPT_ENABLE_PIPELINE == 1
+                    /*!
+                     *  \note   if no invalidation happened, we can commit this checkpoint from device to host
+                     */
+                    retval = handle->checkpoint_pipeline_commit_async(
+                        /* version_id */ checkpoint_version,
+                        /* stream_id */ (uint64_t)(_ckpt_commit_stream)
+                    );
+                    POS_ASSERT(retval == POS_SUCCESS);
+                #endif
                 wqe->nb_ckpt_handles += 1;
                 wqe->ckpt_size += handle->state_size;
             }
         }
-    
+
+        #if POS_CKPT_ENABLE_PIPELINE == 1
+            /*!
+             *  \note   we need to wait all commits to be finished
+             */
+            cuda_rt_retval = cudaStreamSynchronize(_ckpt_commit_stream);
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_C("failed to synchronize the commit stream: nb_ckpt_handles(%lu), nb_abandon_handles(%lu)", wqe->nb_ckpt_handles, wqe->nb_abandon_handles);
+                retval = POS_FAILED;
+                goto exit;
+            }
+        #endif
+
         POS_LOG(
             "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
             wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
@@ -288,8 +347,16 @@ class POSWorker_CUDA : public POSWorker {
     }
 
  private:
-    cudaStream_t _ckpt_stream;
+    /*!
+     *  \brief  stream for overlapped memcpy while computing happens
+     */
+    cudaStream_t _ckpt_stream;  
 
+    /*!
+     *  \brief  stream for commiting checkpoint from device
+     */
+    cudaStream_t _ckpt_commit_stream;
+    
     /*!
      *  \brief      initialization of the worker daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread

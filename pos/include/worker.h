@@ -169,6 +169,8 @@ class POSWorker {
     /*!
      *  \brief  overlapped checkpoint procedure, should be implemented by each platform
      *  \note   this thread will be raised by level-2 ckpt
+     *  \note   aware of the macro POS_CKPT_ENABLE_PIPELINE
+     *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
      *  \param  cxt     the context of this checkpointing
      */
     virtual void checkpoint_async_thread(checkpoint_async_cxt_t* cxt){
@@ -182,16 +184,16 @@ class POSWorker {
      *  \brief  processing daemon of the worker
      */
     void daemon(){
-        #if POS_CKPT_OPT_LEVAL == 1
-            this->__daemon_o0_o1();
+        #if POS_CKPT_OPT_LEVAL <= 1
+            this->__daemon_ckpt_sync();
         #elif POS_CKPT_OPT_LEVAL == 2
-            this->__daemon_o2();
-        #else // POS_CKPT_OPT_LEVAL == 0
-            this->__daemon_o0_o1();
+            this->__daemon_ckpt_async();
+        #else
+            static_assert(false, "error checkpoint level");
         #endif
     }
 
-    void __daemon_o2(){
+    void __daemon_ckpt_async(){
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;
@@ -323,7 +325,7 @@ class POSWorker {
      *  \note   under this worker, checkpoint ops are executed using the same stream (thread) with other
      *          normal operators
      */
-    void __daemon_o0_o1(){
+    void __daemon_ckpt_sync(){
         uint64_t i, j, k, w, api_id;
         pos_retval_t launch_retval;
         POSAPIMeta_t api_meta;

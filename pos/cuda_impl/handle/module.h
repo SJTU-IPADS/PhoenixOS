@@ -140,7 +140,9 @@ class POSHandle_CUDA_Module : public POSHandle {
         this->ckpt_bag = new POSCheckpointBag(
             /* 0 */ state_size,
             /* allocator */ nullptr,
-            /* deallocator */ nullptr
+            /* deallocator */ nullptr,
+            /* dev_allocator */ nullptr,
+            /* dev_deallocator */ nullptr
         );
         POS_CHECK_POINTER(this->ckpt_bag);
         return POS_SUCCESS;

@@ -43,6 +43,15 @@ target = 'cuda'
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
 ckpt_opt_level = 2
 
+# config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
+enable_ckpt_increamental = 1
+
+# config:   async checkpoint (level 2) optimization -> flag to control checkpoint pipeline
+enable_ckpt_pipeline = 1
+
+# config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
+enable_ckpt_orchestration = 0
+
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
@@ -81,17 +90,29 @@ subdir('pos/include')
 
 # print configurations
 message('>>> Build configurations:')
-message('>>>>>> [Config] target:                        ' + target)
-message('>>>>>> [Config] TSC register frequency:        ' + tsc_reg_freq.to_string())
-message('>>>>>> [Config] checkpoint optimization level: ' + ckpt_opt_level.to_string())
-message('>>>>>> [Config] checkpoint interval (ms):      ' + ckpt_interval_ms.to_string())
-message('>>>>>> [Config] log file output path:          ' + log_file_path)
-message('>>>>>> [Switch] enable_runtime_debug_check:    ' + enable_runtime_debug_check.to_string())
-message('>>>>>> [Switch] enable_hijack_api_check:       ' + enable_hijack_api_check.to_string())
-message('>>>>>> [Switch] enable_print_error:            ' + enable_print_error.to_string())
-message('>>>>>> [Switch] enable_print_warn:             ' + enable_print_warn.to_string())
-message('>>>>>> [Switch] enable_print_log:              ' + enable_print_log.to_string())
-message('>>>>>> [Switch] enable_print_debug:            ' + enable_print_debug.to_string())
+message('>>>>>> [Config] target:                                ' + target)
+message('>>>>>> [Config] TSC register frequency:                ' + tsc_reg_freq.to_string())
+message('>>>>>> [Config] checkpoint optimization level:         ' + ckpt_opt_level.to_string())
+if ckpt_opt_level >= 1
+    message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())
+else
+    message('       >>>>>> [Config] enable_ckpt_increamental:       N/A')
+endif
+if ckpt_opt_level >= 2
+    message('       >>>>>> [Config] enable_ckpt_pipeline:           ' + enable_ckpt_pipeline.to_string())
+    message('       >>>>>> [Config] enable_ckpt_orchestration:      ' + enable_ckpt_orchestration.to_string())
+else
+    message('       >>>>>> [Config] enable_ckpt_pipeline:           N/A')
+    message('       >>>>>> [Config] enable_ckpt_orchestration:      N/A')
+endif
+message('>>>>>> [Config] checkpoint interval (ms):              ' + ckpt_interval_ms.to_string())
+message('>>>>>> [Config] log file output path:                  ' + log_file_path)
+message('>>>>>> [Switch] enable_runtime_debug_check:            ' + enable_runtime_debug_check.to_string())
+message('>>>>>> [Switch] enable_hijack_api_check:               ' + enable_hijack_api_check.to_string())
+message('>>>>>> [Switch] enable_print_error:                    ' + enable_print_error.to_string())
+message('>>>>>> [Switch] enable_print_warn:                     ' + enable_print_warn.to_string())
+message('>>>>>> [Switch] enable_print_log:                      ' + enable_print_log.to_string())
+message('>>>>>> [Switch] enable_print_debug:                    ' + enable_print_debug.to_string())
 message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>

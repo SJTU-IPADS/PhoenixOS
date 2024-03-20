@@ -77,11 +77,49 @@ class POSCheckpointBag {
     POSCheckpointBag(
         uint64_t state_size,
         pos_custom_ckpt_allocate_func_t allocator,
-        pos_custom_ckpt_deallocate_func_t deallocator
+        pos_custom_ckpt_deallocate_func_t deallocator,
+        pos_custom_ckpt_allocate_func_t dev_allocator,
+        pos_custom_ckpt_deallocate_func_t dev_deallocator
     )
-        : _state_size(state_size), _allocate_func(allocator), _deallocate_func(deallocator)
+        : _state_size(state_size),
+        _allocate_func(allocator), _deallocate_func(deallocator),
+        _dev_allocate_func(dev_allocator), _dev_deallocate_func(dev_deallocator)
     {
-        // TODO: prefill
+        pos_retval_t tmp_retval;
+        uint64_t i=0;
+        POSCheckpointSlot *tmp_ptr;
+
+        /*!
+         *  \brief  prefill checkpoint area to avoid long allocation time
+         *  \todo   this might slow down the creation of handle, and also
+         *          the deletion of the handle, how to fix? maybe use a
+         *          buffer pool?
+         */
+        if(allocator != nullptr && deallocator != nullptr){
+        #define __CKPT_PREFILL_SIZE 48
+            for(i=0; i<__CKPT_PREFILL_SIZE; i++){
+                tmp_retval = apply_checkpoint_slot</* on_device */false>(i, &tmp_ptr, /* force_overwrite */ false);
+                POS_ASSERT(tmp_retval == POS_SUCCESS);
+            }
+            for(i=0; i<__CKPT_PREFILL_SIZE; i++){
+                tmp_retval = invalidate_by_version</* on_deivce */ false>(i);
+                POS_ASSERT(tmp_retval == POS_SUCCESS);
+            }
+        #undef __CKPT_PREFILL_SIZE
+        }
+
+        if(dev_allocator != nullptr && dev_deallocator != nullptr){
+        #define __DEV_CKPT_PREFILL_SIZE 4
+            for(i=0; i<__DEV_CKPT_PREFILL_SIZE; i++){
+                tmp_retval = apply_checkpoint_slot</* on_device */true>(i, &tmp_ptr, /* force_overwrite */ false);
+                POS_ASSERT(tmp_retval == POS_SUCCESS);
+            }
+            for(i=0; i<__DEV_CKPT_PREFILL_SIZE; i++){
+                tmp_retval = invalidate_by_version</* on_deivce */ true>(i);
+                POS_ASSERT(tmp_retval == POS_SUCCESS);
+            }
+        #undef __DEV_CKPT_PREFILL_SIZE
+        }
     }
 
     ~POSCheckpointBag() = default;
@@ -93,22 +131,27 @@ class POSCheckpointBag {
 
     /*!
      *  \brief  allocate a new checkpoint slot inside this bag
-     *  \param  version     version (i.e., dag index) of this checkpoint
-     *  \param  ptr         pointer to the checkpoint slot
+     *  \tparam on_device           whether to apply the slot on the device
+     *  \param  version             version (i.e., dag index) of this checkpoint
+     *  \param  ptr                 pointer to the checkpoint slot
+     *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
+     *                              (if no available slot exit)
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr);
+    template<bool on_device>
+    pos_retval_t apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite);
 
     /*!
      *  \brief  obtain checkpointed data by given checkpoint version
+     *  \tparam on_device   whether to apply the slot on the device
      *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
      *  \param  size        size of the checkpoin data
      *  \param  version     the specified version
      *  \return POS_SUCCESS for successfully obtained
      *          POS_FAILED_NOT_EXIST for no checkpoint is found
      */
+    template<bool on_device>
     pos_retval_t get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version);
-
 
     /*!
      *  \brief  obtain the checkpoint version list
@@ -121,10 +164,12 @@ class POSCheckpointBag {
 
     /*!
      *  \brief  invalidate the checkpoint from this bag
+     *  \tparam on_device   whether to apply the slot on the device
      *  \param  version version of the checkpoint to be removed
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
+    template<bool on_device>
     pos_retval_t invalidate_by_version(uint64_t version);
 
 
@@ -181,6 +226,20 @@ class POSCheckpointBag {
     std::unordered_map<uint64_t, POSCheckpointSlot*> _invalidate_ckpt_map;
 
     /*!
+     *  \brief  on-device checkpoint version map
+     *  \note   key: version
+     *  \note   value: checkpoint slot  
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _dev_ckpt_map;
+
+    /*!
+     *  \brief  device-side checkpoint version that has been invalidated
+     *  \note   we store thost invalidated version so that we can reuse their memory
+     *          space in the next time we apply for a new checkpoint slot
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _invalidate_dev_ckpt_map;
+
+    /*!
      *  \brief  list of host-side checkpoint
      */
     std::unordered_map<uint64_t, pos_host_ckpt_t> _host_ckpt_map;
@@ -188,10 +247,17 @@ class POSCheckpointBag {
     // all versions that this bag stored
     std::set<uint64_t> _ckpt_version_set;
 
+    // all on-device versions that this bag stored
+    std::set<uint64_t> _dev_ckpt_version_set;
+
     // state size of each checkpoint
     uint64_t _state_size;
 
     // allocator and deallocator of checkpoint memory
     pos_custom_ckpt_allocate_func_t _allocate_func;
     pos_custom_ckpt_deallocate_func_t _deallocate_func;
+
+    // allocator and deallocator of on-device checkpoint memory
+    pos_custom_ckpt_allocate_func_t _dev_allocate_func;
+    pos_custom_ckpt_deallocate_func_t _dev_deallocate_func;
 };

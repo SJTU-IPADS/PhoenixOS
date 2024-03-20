@@ -49,6 +49,21 @@ class POSWorkspace {
         // create out-of-band server
         _oob_server = new POSOobServer( /* ws */ this );
         POS_CHECK_POINTER(_oob_server);
+
+        POS_LOG(
+            "workspace created:                     \n"
+            "   =>  ckpt_opt_level(%d, %s)          \n"
+            "   =>  ckpt_interval(%lu ms)           \n"
+            "   =>  enable_ckpt_increamental(%s)    \n"
+            "   =>  enable_ckpt_pipeline(%s)        \n"
+            "   =>  enable_ckpt_orchestration(%s)   \n",
+            POS_CKPT_OPT_LEVAL,
+            POS_CKPT_OPT_LEVAL == 0 ? "no ckpt" : POS_CKPT_OPT_LEVAL == 1 ? "sync ckpt" : "async ckpt",
+            POS_CKPT_INTERVAL,
+            POS_CKPT_OPT_LEVAL == 0 ? "N/A" : POS_CKPT_ENABLE_INCREMENTAL == 1 ? "true" : "false",
+            POS_CKPT_OPT_LEVAL <= 1 ? "N/A" : POS_CKPT_ENABLE_PIPELINE == 1 ? "true" : "false",
+            POS_CKPT_OPT_LEVAL <= 1 ? "N/A" : POS_CKPT_ENABLE_ORCHESTRATION == 1 ? "true" : "false"
+        );
     }
     
     /*!
