@@ -232,3 +232,63 @@ pos_retval_t test_cuda_event_destory(test_cxt* cxt){
 exit:
     return retval;
 }
+
+pos_retval_t test_cuda_func_get_attributes(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaError cuda_result;
+    cudaFuncAttributes attr;
+
+    uint64_t s_tick, e_tick;
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cuda_result = cudaFuncGetAttributes(&attr, kernel_1);
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    if(unlikely(cuda_result != cudaSuccess)){
+        POS_WARN_DETAIL("failed: %d", cuda_result);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cxt->duration_ticks = e_tick - s_tick;
+
+exit:
+    return retval;
+}
+
+pos_retval_t test_cuda_occupancy_max_active_bpm_with_flags(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaError cuda_result;
+    int numBlocks = 0;
+    int blockSize = 256;
+    size_t dynamicSMemSize = 0;
+    int flags = cudaOccupancyDefault;
+    uint64_t s_tick, e_tick;
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cuda_result = cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
+        &numBlocks,
+        kernel_1,
+        blockSize,
+        dynamicSMemSize,
+        flags
+    );
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    cxt->duration_ticks = e_tick - s_tick;
+
+    if(unlikely(cuda_result != cudaSuccess)){
+        POS_WARN_DETAIL("failed: %d", cuda_result);
+        retval = POS_FAILED;
+        goto exit;
+    }
+    
+    if(unlikely(numBlocks == 0)){
+        POS_WARN_DETAIL("wrong result: %d", numBlocks);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+exit:
+    return retval;
+}

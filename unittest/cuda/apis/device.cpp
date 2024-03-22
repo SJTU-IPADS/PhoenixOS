@@ -114,6 +114,39 @@ exit:
     return retval;
 }
 
+pos_retval_t test_cuda_device_get_attribute(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaDeviceAttr attr = cudaDevAttrMaxThreadsPerBlock;
+    cudaError cuda_result;
+    int result;
+    int device_count = 0, i;
+    uint64_t s_tick, e_tick;
+    
+    cuda_result = cudaGetDeviceCount(&device_count);
+    if(unlikely(cuda_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cxt->duration_ticks = 0;
+
+    for(i=0; i<device_count; i++){
+        s_tick = POSUtilTimestamp::get_tsc();
+        cuda_result =  cudaDeviceGetAttribute(&result, attr, i);
+        e_tick = POSUtilTimestamp::get_tsc();
+    
+        cxt->duration_ticks = ((double)(e_tick-s_tick) + (double)(cxt->duration_ticks)) / (double)(i+1);
+
+        if(unlikely(cuda_result != cudaSuccess)){
+            retval = POS_FAILED;
+            goto exit;
+        }
+    }
+
+exit:
+    return retval;
+}
+
 pos_retval_t test_cuda_get_device(test_cxt* cxt){
     pos_retval_t retval = POS_SUCCESS;
     cudaError cuda_result;

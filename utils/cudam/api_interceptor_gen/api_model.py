@@ -8,10 +8,11 @@ def sort_func_arg(arg:func_arg):
     return arg.order
 
 class api:
-    def __init__(self, api_name:str):
+    def __init__(self, api_name:str, redefined_api_name:str=""):
         self.name = api_name
         self.nb_args = 0
         self.arg_list = list()
+        self.redefined_api_name = redefined_api_name
 
     def add_arg(self, decl_type:str, name:str, order:int):
         arg = func_arg(decl_type=decl_type, name=name, order=order)
@@ -20,4 +21,3 @@ class api:
 
     def add_retval(self, decl_type:str):
         self.retval_decl_type = decl_type
-

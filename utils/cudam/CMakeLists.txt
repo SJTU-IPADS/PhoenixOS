@@ -31,7 +31,7 @@ set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-11.3)
 # target_link_libraries(cudam_buf_analyzer -lpthread)
 
 # 2: general cudam intercept logic
-file(GLOB_RECURSE COMMON_SRC_FILES "src/utils.cpp")
+file(GLOB_RECURSE COMMON_SRC_FILES "src/utils.cpp" "src/dl_intercept.cpp")
 file(GLOB_RECURSE API_COUNTER_SRC_FILES "src/api_counter/*.cpp")
 file(GLOB_RECURSE INTERCEPTOR_SRC_FILES "api_interceptor_gen/outputs/*.cpp")
 
@@ -41,6 +41,7 @@ target_compile_options(
   cudam PUBLIC
   $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=sm_70,code=sm_70>
 )
+set_property(TARGET cudam PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(cudam PUBLIC "src")
 target_include_directories(cudam PUBLIC "src/api_counter")
 target_include_directories(cudam PUBLIC ${CUDA_TOOLKIT_ROOT_DIR}/include)

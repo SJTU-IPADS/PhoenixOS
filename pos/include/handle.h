@@ -8,6 +8,8 @@
 #include <set>
 #include <unordered_map>
 #include <type_traits>
+#include <thread>
+#include <future>
 
 #include <stdint.h>
 #include <assert.h>
@@ -320,15 +322,18 @@ class POSHandle {
 
 
     /*!
-     *  \brief  commit the on-device memory to host-side checkpoint area (async)
-     *  \note   only handle of stateful resource should implement this method
+     *  \brief  start a new thread to commit the on-device memory to host-side 
+     *          checkpoint area (async)
      *  \param  version_id  version of the checkpoint to be commit
      *  \param  stream_id   index of the stream to do this commit
-     *  \return POS_SUCCESS for successfully checkpointed
+     *  \return future handle to obtain thread return value
      */
-    virtual pos_retval_t checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
-        return POS_FAILED_NOT_IMPLEMENTED;
+    std::shared_future<pos_retval_t> spawn_checkpoint_pipeline_commit_thread(uint64_t version_id, uint64_t stream_id=0) const { 
+        return std::async([this, version_id, stream_id]{
+            return this->__checkpoint_pipeline_commit_async(version_id, stream_id);
+        });
     }
+
 
     /*!
      *  \brief  restore the current handle when it becomes broken status
@@ -443,6 +448,16 @@ class POSHandle {
      */
     void *_hm;
 
+    /*!
+     *  \brief  commit the on-device memory to host-side checkpoint area (async)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of the checkpoint to be commit
+     *  \param  stream_id   index of the stream to do this commit
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t __checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  obtain the serilization size of basic fields of POSHandle

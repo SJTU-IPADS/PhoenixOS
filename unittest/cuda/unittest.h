@@ -38,10 +38,13 @@ class POSUnitTest {
             {   CUDA_GET_DEVICE_COUNT, test_cuda_get_device_count },
             {   CUDA_GET_DEVICE_PROPERTIES, test_cuda_get_device_properties },
             {   CUDA_GET_DEVICE, test_cuda_get_device },
+            {   CUDA_DEVICE_GET_ATTRIBUTE, test_cuda_device_get_attribute },
 
             /* context related apis */
+            {   rpc_cuCtxGetCurrent, test_cu_ctx_get_current },
             {   CUDA_GET_LAST_ERROR, test_cuda_get_last_error },
             {   CUDA_GET_ERROR_STRING, test_cuda_get_error_string },
+            {   CUDA_PEEK_AT_LAST_ERROR, test_cuda_peek_at_last_error },
 
             /* kernel related apis */
             {   CUDA_LAUNCH_KERNEL, test_cuda_launch_kernel },
@@ -50,11 +53,14 @@ class POSUnitTest {
             {   CUDA_EVENT_CREATE_WITH_FLAGS, test_cuda_event_create_with_flags },
             {   CUDA_EVENT_RECORD, test_cuda_event_record },
             {   CUDA_EVENT_DESTROY, test_cuda_event_destory },
+            {   CUDA_FUNC_GET_ATTRIBUTES, test_cuda_func_get_attributes},
+            {   CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS, test_cuda_occupancy_max_active_bpm_with_flags},
             
             /* cublas apis */
             {   rpc_cublasCreate, test_cublas_create },
             {   rpc_cublasSetStream, test_cublas_set_stream },
             {   rpc_cublasSetMathMode, test_cublas_set_mathmode },
+            // {   rpc_cublasSgemmStridedBatched, test_cublas_sgemm_stride_batched },
         });
     }
 

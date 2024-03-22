@@ -13,14 +13,14 @@
 
 
 
-namespace rt_functions {
+namespace ps_functions {
 
 
 /*!
  *  \related    cuModuleLoadData
  *  \brief      load CUmodule down to the driver, which contains PTX/SASS binary
  */
-namespace cu_module_load_data {
+namespace cu_module_load {
     // parser function
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
@@ -42,7 +42,7 @@ namespace cu_module_load_data {
     #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
-                "parse(cu_module_load_data): failed to parse, given %lu params, %lu expected",
+                "parse(cu_module_load): failed to parse, given %lu params, %lu expected",
                 wqe->api_cxt->params.size(), 2
             );
             retval = POS_FAILED_INVALID_INPUT;
@@ -77,11 +77,11 @@ namespace cu_module_load_data {
             /* expected_addr */ pos_api_param_value(wqe, 0, uint64_t)
         );
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("parse(cu_module_load_data): failed to allocate mocked module within the CUDA module handler manager");
+            POS_WARN("parse(cu_module_load): failed to allocate mocked module within the CUDA module handler manager");
             goto exit;
         } else {
             POS_DEBUG(
-                "parse(cu_module_load_data): allocate mocked module within the CUDA module handler manager: addr(%p), size(%lu), context_server_addr(%p)",
+                "parse(cu_module_load): allocate mocked module within the CUDA module handler manager: addr(%p), size(%lu), context_server_addr(%p)",
                 module_handle->client_addr, module_handle->size,
                 hm_context->latest_used_handle->server_addr
             )
@@ -98,6 +98,150 @@ namespace cu_module_load_data {
         // analyse the fatbin and stores the function attributes in the handle
         retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
             /* fatbin */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+            /* deps */ &(module_handle->function_desps),
+            /* cached_desp_map */ hm_module->cached_function_desps
+        );
+        POS_DEBUG(
+            "parse(cu_module_load): found %lu functions in the fatbin",
+            module_handle->function_desps.size()
+        );
+
+        #if POS_PRINT_DEBUG
+            for(auto desp : module_handle->function_desps){
+                char *offsets_info = (char*)malloc(1024); POS_CHECK_POINTER(offsets_info);
+                char *sizes_info = (char*)malloc(1024); POS_CHECK_POINTER(sizes_info);
+                memset(offsets_info, 0, 1024);
+                memset(sizes_info, 0, 1024);
+
+                for(auto offset : desp->param_offsets){ sprintf(offsets_info, "%s, %u", offsets_info, offset); }
+                for(auto size : desp->param_sizes){ sprintf(sizes_info, "%s, %u", sizes_info, size); }
+
+                POS_DEBUG(
+                    "function_name(%s), offsets(%s), param_sizes(%s)",
+                    desp->name.c_str(), offsets_info, sizes_info
+                );
+
+                free(offsets_info);
+                free(sizes_info);
+            }
+        #endif
+
+        // allocate the module handle in the dag
+        retval = client->dag.allocate_handle(module_handle);
+        if(unlikely(retval != POS_SUCCESS)){
+            goto exit;
+        }
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cu_module_load): failed to launch op");
+            goto exit;
+        }
+
+    #if POS_CKPT_OPT_LEVAL > 0
+        /*!
+         *  \brief  set host checkpoint record
+         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         */
+        POS_CHECK_POINTER(module_handle->ckpt_bag);
+        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+    #endif
+
+        // mark this sync call can be returned after parsing
+        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+
+    exit:
+        return retval;
+    }
+
+} // cu_module_load
+
+
+
+/*!
+ *  \related    cuModuleLoadData
+ *  \brief      load CUmodule down to the driver, which contains PTX/SASS binary
+ */
+namespace cu_module_load_data {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandleManager_CUDA_Context *hm_context;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Function *hm_function;
+
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+    
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 1)){
+            POS_WARN(
+                "parse(cu_module_load_data): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 1
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
+        POS_CHECK_POINTER(hm_context);
+        POS_CHECK_POINTER(hm_context->latest_used_handle);
+
+        hm_module = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module
+        );
+        POS_CHECK_POINTER(hm_module);
+
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
+        POS_CHECK_POINTER(hm_function);
+
+        // operate on handler manager
+        retval = hm_module->allocate_mocked_resource(
+            /* handle */ &module_handle,
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
+                /* id */ kPOS_ResourceTypeId_CUDA_Context, 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
+            }})
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("parse(cu_module_load_data): failed to allocate mocked module within the CUDA module handler manager");
+            goto exit;
+        } else {
+            POS_DEBUG(
+                "parse(cu_module_load_data): allocate mocked module within the CUDA module handler manager: addr(%p), size(%lu), context_server_addr(%p)",
+                module_handle->client_addr, module_handle->size,
+                hm_context->latest_used_handle->server_addr
+            );
+            POS_CHECK_POINTER(wqe->api_cxt->ret_data);
+            memcpy(wqe->api_cxt->ret_data, &(module_handle->client_addr), sizeof(void*));
+        }
+
+        // set current handle as the latest used handle
+        // hm_module->latest_used_handle = module_handle;
+
+        // record the related handle to QE
+        wqe->record_handle<kPOS_Edge_Direction_Create>({
+            /* handle */ module_handle
+        });
+
+        // analyse the fatbin and stores the function attributes in the handle
+        // TODO: we need to auto detect cubin / fatbin format inside this function!
+        retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
+            /* fatbin */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
             /* deps */ &(module_handle->function_desps),
             /* cached_desp_map */ hm_module->cached_function_desps
         );
@@ -145,7 +289,7 @@ namespace cu_module_load_data {
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(module_handle->ckpt_bag);
-        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 0});
     #endif
 
         // mark this sync call can be returned after parsing
@@ -488,5 +632,44 @@ namespace cu_device_primary_ctx_get_state {
 
 
 
+/*!
+ *  \related    cuCtxGetCurrent
+ *  \brief      obtain the current context
+ */
+namespace cu_ctx_get_current {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        POSClient_CUDA *client;
+        POSHandleManager_CUDA_Context *hm_context;
 
-} // namespace rt_functions
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
+        POS_CHECK_POINTER(hm_context);
+        POS_CHECK_POINTER(hm_context->latest_used_handle);
+
+        POS_CHECK_POINTER(wqe->api_cxt->ret_data);
+        memcpy(wqe->api_cxt->ret_data, &(hm_context->latest_used_handle->client_addr), sizeof(CUcontext));
+
+        // launch the op to the dag
+        // retval = client->dag.launch_op(wqe);
+
+        // mark this sync call can be returned after parsing
+        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        
+    exit:
+        return retval;
+    }
+
+} // namespace cu_ctx_get_current
+
+
+} // namespace ps_functions

@@ -39,10 +39,12 @@ start_client() {
     ip_addr=10.66.20.$container_id
 
     if [ $mount = false ] ; then
-        sudo docker run --gpus all -dit --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name $used_image
         cd $script_dir && cd .. && cd ..
-        sudo docker cp . $container_name:/root
+        sudo docker run --gpus all -dit -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged --network=pos_net \
+                        --ip $ip_addr --ipc=host --name $container_name $used_image
+        
+        # note: we copy files except the samples and utils folder, which we mount to the container
+        while read line; do sudo docker cp $line $container_name:/root; done < <(find . -mindepth 1 -maxdepth 1 | grep -v "samples$" | grep -v  "utils$")
         sudo docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..

@@ -11,41 +11,48 @@
 
 #include "pos/cuda_impl/api_index.h"
 
-namespace rt_functions {
+namespace ps_functions {
     /* CUDA runtime functions */
-    POS_RT_DECLARE_FUNCTIONS(cuda_malloc);
-    POS_RT_DECLARE_FUNCTIONS(cuda_free);
-    POS_RT_DECLARE_FUNCTIONS(cuda_launch_kernel);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_h2d);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_d2h);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_d2d);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_h2d_async);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_d2h_async);
-    POS_RT_DECLARE_FUNCTIONS(cuda_memcpy_d2d_async);
-    POS_RT_DECLARE_FUNCTIONS(cuda_set_device);
-    POS_RT_DECLARE_FUNCTIONS(cuda_get_last_error);
-    POS_RT_DECLARE_FUNCTIONS(cuda_get_error_string);
-    POS_RT_DECLARE_FUNCTIONS(cuda_get_device_count);
-    POS_RT_DECLARE_FUNCTIONS(cuda_get_device_properties);
-    POS_RT_DECLARE_FUNCTIONS(cuda_get_device);
-    POS_RT_DECLARE_FUNCTIONS(cuda_stream_synchronize);
-    POS_RT_DECLARE_FUNCTIONS(cuda_stream_is_capturing);
-    POS_RT_DECLARE_FUNCTIONS(cuda_event_create_with_flags);
-    POS_RT_DECLARE_FUNCTIONS(cuda_event_destory);
-    POS_RT_DECLARE_FUNCTIONS(cuda_event_record);
+    POS_PS_DECLARE_FUNCTIONS(cuda_malloc);
+    POS_PS_DECLARE_FUNCTIONS(cuda_free);
+    POS_PS_DECLARE_FUNCTIONS(cuda_launch_kernel);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_h2d);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2h);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2d);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_h2d_async);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2h_async);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2d_async);
+    POS_PS_DECLARE_FUNCTIONS(cuda_set_device);
+    POS_PS_DECLARE_FUNCTIONS(cuda_get_last_error);
+    POS_PS_DECLARE_FUNCTIONS(cuda_get_error_string);
+    POS_PS_DECLARE_FUNCTIONS(cuda_peek_at_last_error);
+    POS_PS_DECLARE_FUNCTIONS(cuda_get_device_count);
+    POS_PS_DECLARE_FUNCTIONS(cuda_get_device_properties);
+    POS_PS_DECLARE_FUNCTIONS(cuda_device_get_attribute);
+    POS_PS_DECLARE_FUNCTIONS(cuda_get_device);
+    POS_PS_DECLARE_FUNCTIONS(cuda_func_get_attributes);
+    POS_PS_DECLARE_FUNCTIONS(cuda_occupancy_max_active_bpm_with_flags);
+    POS_PS_DECLARE_FUNCTIONS(cuda_stream_synchronize);
+    POS_PS_DECLARE_FUNCTIONS(cuda_stream_is_capturing);
+    POS_PS_DECLARE_FUNCTIONS(cuda_event_create_with_flags);
+    POS_PS_DECLARE_FUNCTIONS(cuda_event_destory);
+    POS_PS_DECLARE_FUNCTIONS(cuda_event_record);
     
     /* CUDA driver functions */
-    POS_RT_DECLARE_FUNCTIONS(cu_module_load_data);
-    POS_RT_DECLARE_FUNCTIONS(cu_module_get_function);
-    POS_RT_DECLARE_FUNCTIONS(cu_module_get_global);
-    POS_RT_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);    
+    POS_PS_DECLARE_FUNCTIONS(cu_module_load); 
+    POS_PS_DECLARE_FUNCTIONS(cu_module_load_data);    
+    POS_PS_DECLARE_FUNCTIONS(cu_module_get_function);
+    POS_PS_DECLARE_FUNCTIONS(cu_module_get_global);
+    POS_PS_DECLARE_FUNCTIONS(cu_ctx_get_current);
+    POS_PS_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);    
 
     /* cuBLAS functions */
-    POS_RT_DECLARE_FUNCTIONS(cublas_create);
-    POS_RT_DECLARE_FUNCTIONS(cublas_set_stream);
-    POS_RT_DECLARE_FUNCTIONS(cublas_set_math_mode);
-    POS_RT_DECLARE_FUNCTIONS(cublas_sgemm);
-} // namespace rt_functions
+    POS_PS_DECLARE_FUNCTIONS(cublas_create);
+    POS_PS_DECLARE_FUNCTIONS(cublas_set_stream);
+    POS_PS_DECLARE_FUNCTIONS(cublas_set_math_mode);
+    POS_PS_DECLARE_FUNCTIONS(cublas_sgemm);
+    POS_PS_DECLARE_FUNCTIONS(cublas_sgemm_strided_batched);
+} // namespace ps_functions
 
 /*!
  *  \brief  POS Runtime (CUDA Implementation)
@@ -80,39 +87,49 @@ class POSParser_CUDA : public POSParser {
      *  \brief  insertion of parse and dag functions
      *  \return POS_SUCCESS for succefully insertion
      */
-    pos_retval_t init_rt_functions() override {
+    pos_retval_t init_ps_functions() override {
         this->_parser_functions.insert({
             /* CUDA runtime functions */
-            {   CUDA_MALLOC,                    rt_functions::cuda_malloc::parse                        },
-            {   CUDA_FREE,                      rt_functions::cuda_free::parse                          },
-            {   CUDA_LAUNCH_KERNEL,             rt_functions::cuda_launch_kernel::parse                 },
-            {   CUDA_MEMCPY_HTOD,               rt_functions::cuda_memcpy_h2d::parse                    },
-            {   CUDA_MEMCPY_DTOH,               rt_functions::cuda_memcpy_d2h::parse                    },
-            {   CUDA_MEMCPY_DTOD,               rt_functions::cuda_memcpy_d2d::parse                    },
-            {   CUDA_MEMCPY_HTOD_ASYNC,         rt_functions::cuda_memcpy_h2d_async::parse              },
-            {   CUDA_MEMCPY_DTOH_ASYNC,         rt_functions::cuda_memcpy_d2h_async::parse              },
-            {   CUDA_MEMCPY_DTOD_ASYNC,         rt_functions::cuda_memcpy_d2d_async::parse              },
-            {   CUDA_SET_DEVICE,                rt_functions::cuda_set_device::parse                    },
-            {   CUDA_GET_LAST_ERROR,            rt_functions::cuda_get_last_error::parse                },
-            {   CUDA_GET_ERROR_STRING,          rt_functions::cuda_get_error_string::parse              },
-            {   CUDA_GET_DEVICE_COUNT,          rt_functions::cuda_get_device_count::parse              },
-            {   CUDA_GET_DEVICE_PROPERTIES,     rt_functions::cuda_get_device_properties::parse         },
-            {   CUDA_GET_DEVICE,                rt_functions::cuda_get_device::parse                    },
-            {   CUDA_STREAM_SYNCHRONIZE,        rt_functions::cuda_stream_synchronize::parse            },
-            {   CUDA_STREAM_IS_CAPTURING,       rt_functions::cuda_stream_is_capturing::parse           },
-            {   CUDA_EVENT_CREATE_WITH_FLAGS,   rt_functions::cuda_event_create_with_flags::parse       },
-            {   CUDA_EVENT_DESTROY,             rt_functions::cuda_event_destory::parse                 },
-            {   CUDA_EVENT_RECORD,              rt_functions::cuda_event_record::parse                  },
+            {   CUDA_MALLOC,                    ps_functions::cuda_malloc::parse                        },
+            {   CUDA_FREE,                      ps_functions::cuda_free::parse                          },
+            {   CUDA_LAUNCH_KERNEL,             ps_functions::cuda_launch_kernel::parse                 },
+            {   CUDA_MEMCPY_HTOD,               ps_functions::cuda_memcpy_h2d::parse                    },
+            {   CUDA_MEMCPY_DTOH,               ps_functions::cuda_memcpy_d2h::parse                    },
+            {   CUDA_MEMCPY_DTOD,               ps_functions::cuda_memcpy_d2d::parse                    },
+            {   CUDA_MEMCPY_HTOD_ASYNC,         ps_functions::cuda_memcpy_h2d_async::parse              },
+            {   CUDA_MEMCPY_DTOH_ASYNC,         ps_functions::cuda_memcpy_d2h_async::parse              },
+            {   CUDA_MEMCPY_DTOD_ASYNC,         ps_functions::cuda_memcpy_d2d_async::parse              },
+            {   CUDA_SET_DEVICE,                ps_functions::cuda_set_device::parse                    },
+            {   CUDA_GET_LAST_ERROR,            ps_functions::cuda_get_last_error::parse                },
+            {   CUDA_GET_ERROR_STRING,          ps_functions::cuda_get_error_string::parse              },
+            {   CUDA_PEEK_AT_LAST_ERROR,        ps_functions::cuda_peek_at_last_error::parse            },
+            {   CUDA_GET_DEVICE_COUNT,          ps_functions::cuda_get_device_count::parse              },
+            {   CUDA_GET_DEVICE_PROPERTIES,     ps_functions::cuda_get_device_properties::parse         },
+            {   CUDA_DEVICE_GET_ATTRIBUTE,      ps_functions::cuda_device_get_attribute::parse          },
+            {   CUDA_GET_DEVICE,                ps_functions::cuda_get_device::parse                    },
+            {   CUDA_FUNC_GET_ATTRIBUTES,       ps_functions::cuda_func_get_attributes::parse           },
+            {   CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS,   
+                                        ps_functions::cuda_occupancy_max_active_bpm_with_flags::parse   },
+            {   CUDA_STREAM_SYNCHRONIZE,        ps_functions::cuda_stream_synchronize::parse            },
+            {   CUDA_STREAM_IS_CAPTURING,       ps_functions::cuda_stream_is_capturing::parse           },
+            {   CUDA_EVENT_CREATE_WITH_FLAGS,   ps_functions::cuda_event_create_with_flags::parse       },
+            {   CUDA_EVENT_DESTROY,             ps_functions::cuda_event_destory::parse                 },
+            {   CUDA_EVENT_RECORD,              ps_functions::cuda_event_record::parse                  },
             /* CUDA driver functions */
-            {   rpc_cuModuleLoad,               rt_functions::cu_module_load_data::parse                },
-            {   rpc_cuModuleGetFunction,        rt_functions::cu_module_get_function::parse             },
-            {   rpc_register_var,               rt_functions::cu_module_get_global::parse               },
-            {   rpc_cuDevicePrimaryCtxGetState, rt_functions::cu_device_primary_ctx_get_state::parse    },
+            {   rpc_cuModuleLoad,               ps_functions::cu_module_load::parse                     },
+            {   rpc_cuModuleLoadData,           ps_functions::cu_module_load_data::parse                },
+            {   rpc_cuModuleGetFunction,        ps_functions::cu_module_get_function::parse             },
+            {   rpc_register_var,               ps_functions::cu_module_get_global::parse               },
+            {   rpc_cuCtxGetCurrent,            ps_functions::cu_ctx_get_current::parse                 },
+            {   rpc_cuDevicePrimaryCtxGetState, ps_functions::cu_device_primary_ctx_get_state::parse    },
+            {   rpc_cuLaunchKernel,             ps_functions::cuda_launch_kernel::parse                 },
+            
             /* cuBLAS functions */
-            {   rpc_cublasCreate,               rt_functions::cublas_create::parse                      },
-            {   rpc_cublasSetStream,            rt_functions::cublas_set_stream::parse                  },
-            {   rpc_cublasSetMathMode,          rt_functions::cublas_set_math_mode::parse               },
-            {   rpc_cublasSgemm,                rt_functions::cublas_sgemm::parse                       }
+            {   rpc_cublasCreate,               ps_functions::cublas_create::parse                      },
+            {   rpc_cublasSetStream,            ps_functions::cublas_set_stream::parse                  },
+            {   rpc_cublasSetMathMode,          ps_functions::cublas_set_math_mode::parse               },
+            {   rpc_cublasSgemm,                ps_functions::cublas_sgemm::parse                       },
+            {   rpc_cublasSgemmStridedBatched,  ps_functions::cublas_sgemm_strided_batched::parse       },
         });
         POS_DEBUG_C("insert %lu runtime parse functions", this->_parser_functions.size());
 

@@ -184,4 +184,61 @@ namespace cublas_sgemm {
 } // namespace cublas_sgemm
 
 
+/*!
+ *  \related    cublasSgemmStridedBatched
+ *  \brief      todo
+ */
+namespace cublas_sgemm_strided_batched {
+    // parser function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *cublas_context_handle;
+        POSHandle *memory_handle_A, *memory_handle_B, *memory_handle_C;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        cublas_context_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(cublas_context_handle);
+
+        memory_handle_A = pos_api_input_handle(wqe, 1);
+        POS_CHECK_POINTER(memory_handle_A);
+        memory_handle_B = pos_api_input_handle(wqe, 2);
+        POS_CHECK_POINTER(memory_handle_B);
+        memory_handle_C = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle_C);
+
+        wqe->api_cxt->return_code = cublasSgemmStridedBatched(
+            /* handle */ (cublasHandle_t)(cublas_context_handle->server_addr),
+            /* transa */ pos_api_param_value(wqe, 1, cublasOperation_t),
+            /* transb */ pos_api_param_value(wqe, 2, cublasOperation_t),
+            /* m */ pos_api_param_value(wqe, 3, int),
+            /* n */ pos_api_param_value(wqe, 4, int),
+            /* k */ pos_api_param_value(wqe, 5, int),
+            /* alpha */ (float*)pos_api_param_addr(wqe, 6),
+            /* A */ (float*)(memory_handle_A->server_addr),
+            /* lda */ pos_api_param_value(wqe, 8, int),
+            /* sA */ pos_api_param_value(wqe, 9, long long int),
+            /* B */ (float*)(memory_handle_B->server_addr),
+            /* ldb */ pos_api_param_value(wqe, 11, int),
+            /* sB */ pos_api_param_value(wqe, 12, long long int),
+            /* beta */ (float*)pos_api_param_addr(wqe, 13),
+            /* C */ (float*)(memory_handle_C->server_addr),
+            /* ldc */ pos_api_param_value(wqe, 15, int),
+            /* sC */ pos_api_param_value(wqe, 16, long long int),
+            /* batchCount */ pos_api_param_value(wqe, 17, int)
+        );
+
+        if(unlikely(CUBLAS_STATUS_SUCCESS != wqe->api_cxt->return_code)){
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+    exit:
+        return retval;
+    }
+} // namespace cublas_sgemm_strided_batched
+
+
 } // namespace wk_functions

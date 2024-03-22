@@ -142,9 +142,18 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cudaGetErrorString"
                 }
             },
-            { 
-                /* api_id */ CUDA_GET_DEVICE_COUNT, 
+            {
+                /* api_id */ CUDA_PEEK_AT_LAST_ERROR, 
                 { 
+                    /* is_sync */       false, 
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaPeekAtLastError"
+                }
+            },
+            {
+                /* api_id */ CUDA_GET_DEVICE_COUNT, 
+                {
                     /* is_sync */       true,
                     /* api_type */      kPOS_API_Type_Get_Resource,
                     /* library_id */    kPOS_CUDA_Library_Id_Runtime,
@@ -161,12 +170,39 @@ class POSApiManager_CUDA : public POSApiManager {
                 }
             },
             { 
+                /* api_id */ CUDA_DEVICE_GET_ATTRIBUTE, 
+                {
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaDeviceGetAttribute"
+                }
+            },
+            { 
                 /* api_id */ CUDA_GET_DEVICE, 
                 {
                     /* is_sync */       true,
                     /* api_type */      kPOS_API_Type_Get_Resource,
                     /* library_id */    kPOS_CUDA_Library_Id_Runtime,
                     /* api_name */      "cudaGetDevice"
+                }
+            },
+            { 
+                /* api_id */ CUDA_FUNC_GET_ATTRIBUTES, 
+                {
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaFuncGetAttributes"
+                }
+            },
+            { 
+                /* api_id */ CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS, 
+                {
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags"
                 }
             },
             {
@@ -226,6 +262,15 @@ class POSApiManager_CUDA : public POSApiManager {
                 }
             },
             { 
+                /* api_id */ rpc_cuModuleLoadData, 
+                { 
+                    /* is_sync */       true, 
+                    /* api_type */      kPOS_API_Type_Create_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Driver,
+                    /* api_name */      "cuModuleLoadData"
+                }
+            },
+            { 
                 /* api_id */ rpc_cuModuleGetFunction, 
                 { 
                     /* is_sync */       true,
@@ -244,6 +289,15 @@ class POSApiManager_CUDA : public POSApiManager {
                 }
             },
             { 
+                /* api_id */ rpc_cuCtxGetCurrent, 
+                { 
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Create_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Driver,
+                    /* api_name */      "cuCtxGetCurrent"
+                }
+            },
+            { 
                 /* api_id */ rpc_cuDevicePrimaryCtxGetState, 
                 { 
                     /* is_sync */       true,
@@ -252,6 +306,16 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cuDevicePrimaryCtxGetState"
                 }
             },
+            { 
+                /* api_id */ rpc_cuLaunchKernel, 
+                { 
+                    /* is_sync */       false,
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Driver,
+                    /* api_name */      "cuLaunchKernel"
+                }
+            },
+
 
             /* ========== cuBLAS functions ========== */
             { 
@@ -288,6 +352,15 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_type */      kPOS_API_Type_Set_Resource,
                     /* library_id */    kPOS_CUDA_Library_Id_cuBLAS,
                     /* api_name */      "cublasSgemm"
+                }
+            },
+            { 
+                /* api_id */ rpc_cublasSgemmStridedBatched, 
+                { 
+                    /* is_sync */       false,
+                    /* api_type */      kPOS_API_Type_Set_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_cuBLAS,
+                    /* api_name */      "cublasSgemmStridedBatched"
                 }
             },
         });

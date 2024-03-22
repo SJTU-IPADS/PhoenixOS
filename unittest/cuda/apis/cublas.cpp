@@ -260,3 +260,161 @@ pos_retval_t test_cublas_sgemm(test_cxt* cxt){
 exit:
     return retval;
 }
+
+
+// TODO: this test has issue
+pos_retval_t test_cublas_sgemm_stride_batched(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cublasStatus_t cublas_result;
+    cudaError_t cuda_rt_result;
+    cublasHandle_t handle;
+    uint64_t s_tick, e_tick;
+
+    int const M = 5;
+    int const K = 6;
+    int const N = 7;
+
+    float *h_A, *h_B, *h_C, *true_h_C;
+    float *d_A, *d_B, *d_C;
+    float a=1.0f, b=0.0f;
+    long long int stride = 1;
+
+    h_A = (float*)malloc(sizeof(float)*M*K);
+    h_B = (float*)malloc(sizeof(float)*K*N);
+    h_C = (float*)malloc(sizeof(float)*M*N);
+    true_h_C = (float*)malloc(sizeof(float)*M*N);
+    
+    for (int i=0; i<M*K; i++) {
+        h_A[i] = (float)(rand()%10+1);
+    }
+    
+    for(int i=0;i<K*N; i++) {
+        h_B[i] = (float)(rand()%10+1);
+    }
+
+    // calculate the correct result
+    auto __calculate_correct_result = [](
+        bool transB, bool transA,
+        int CCols, int CRows, int AColsBRows,
+        const float* alpha,
+        float* B, int ColsB, int SizeB,
+        float* A, int ColsA, int SizeA,
+        const float* beta,
+        float* C, int ColsC, int SizeC,
+        int batchCount
+    ){
+        for (int b = batchCount; b--;){
+            for (int m = CCols; m--;)
+                for (int n = CRows; n--;)
+                {
+                    float sum = 0;
+                    for (int k = AColsBRows; k--;)
+                        sum += (transA ? A[k * ColsA + n] : A[n * ColsA + k]) * (transB ? B[m * ColsB + k] : B[k * ColsB + m]);
+                    C[n * ColsC + m] = *alpha * sum + *beta * C[n * ColsC + m];
+                }
+            A += SizeA;
+            B += SizeB;
+            C += SizeC;
+        }
+    };  
+    __calculate_correct_result(false, false, N, M, K, &a, h_B, N, N * K, h_A, M, M * K, &b, true_h_C, N, N * M, 1);
+
+    cuda_rt_result = cudaMalloc((void**)&d_A, sizeof(float)*M*K);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_rt_result = cudaMalloc((void**)&d_B, sizeof(float)*K*N);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_rt_result = cudaMalloc((void**)&d_C, sizeof(float)*M*N);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cublas_result = cublasCreate(&handle);
+    if(unlikely(cublas_result != CUBLAS_STATUS_SUCCESS)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_rt_result = cudaMemcpy(d_A, h_A, sizeof(float)*M*K, cudaMemcpyHostToDevice);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_rt_result = cudaMemcpy(d_B, h_B, sizeof(float)*K*N, cudaMemcpyHostToDevice);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+    
+    cublas_result = cublasSetStream(handle, 0);
+    if(unlikely(cublas_result != CUBLAS_STATUS_SUCCESS)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cublas_result = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+    if(unlikely(cublas_result != CUBLAS_STATUS_SUCCESS)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cublas_result = cublasSgemmStridedBatched(
+        handle, 
+        CUBLAS_OP_N, CUBLAS_OP_N, 
+        N, M, K, 
+        &a,
+        d_B, N, N * M, 
+        d_A, K, K * M,
+        &b, 
+        d_C, N, N * M,
+        1
+    );
+
+    e_tick = POSUtilTimestamp::get_tsc();
+    
+    cxt->duration_ticks = e_tick - s_tick;
+    
+    if(unlikely(cublas_result != CUBLAS_STATUS_SUCCESS)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_rt_result = cudaMemcpy(h_C, d_C, sizeof(float)*M*N, cudaMemcpyDeviceToHost);
+    if(unlikely(cuda_rt_result != cudaSuccess)){
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // print h_C
+    POS_DEBUG("h_C:");
+    for (int m=0; m<M; m++) {
+        for(int n=0; n<N; n++) {
+            printf("%f ", h_C[m+n*M]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+    // verify result
+    for (int m=0; m<M; m++) {
+        for(int n=0; n<N; n++) {
+            if(h_C[m+n*M] != true_h_C[m*N+n]){
+                retval = POS_FAILED;
+                goto exit;
+            }
+        }
+    }
+
+exit:
+    return retval;
+}

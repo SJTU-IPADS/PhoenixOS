@@ -28,9 +28,9 @@ using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIConte
 #define POS_RT_FUNC_PARSER()                                    \
     pos_retval_t parse(POSWorkspace* ws, POSAPIContext_QE* wqe)
 
-namespace rt_functions {
-#define POS_RT_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
-};  // namespace rt_functions
+namespace ps_functions {
+#define POS_PS_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
+};  // namespace ps_functions
 
 /*!
  *  \brief  POS Parser
@@ -61,7 +61,7 @@ class POSParser {
      *  \return POS_SUCCESS for successfully insertion
      */
     pos_retval_t init(){
-        if(unlikely(POS_SUCCESS != init_rt_functions())){
+        if(unlikely(POS_SUCCESS != init_ps_functions())){
             POS_ERROR_C_DETAIL("failed to insert functions");
         }
     }
@@ -203,7 +203,7 @@ class POSParser {
      *  \brief  insertion of parse and dag functions
      *  \return POS_SUCCESS for succefully insertion
      */
-    virtual pos_retval_t init_rt_functions(){ return POS_FAILED_NOT_IMPLEMENTED; }
+    virtual pos_retval_t init_ps_functions(){ return POS_FAILED_NOT_IMPLEMENTED; }
 
     /*!
      *  \brief      initialization of the runtime daemon thread

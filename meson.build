@@ -41,7 +41,7 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no checkpoint)
-ckpt_opt_level = 2
+ckpt_opt_level = 0
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
 enable_ckpt_increamental = 1
@@ -67,7 +67,7 @@ enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 0
+enable_hijack_api_check = 1
 
 # switch:   whether to print all fatal messages
 enable_print_error = 1

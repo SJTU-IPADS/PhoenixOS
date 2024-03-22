@@ -26,9 +26,13 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     CUDA_SET_DEVICE,
     CUDA_GET_LAST_ERROR,
     CUDA_GET_ERROR_STRING,
+    CUDA_PEEK_AT_LAST_ERROR,
     CUDA_GET_DEVICE_COUNT,
     CUDA_GET_DEVICE_PROPERTIES,
+    CUDA_DEVICE_GET_ATTRIBUTE,
     CUDA_GET_DEVICE,
+    CUDA_FUNC_GET_ATTRIBUTES,
+    CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS,
     CUDA_STREAM_SYNCHRONIZE,
     CUDA_STREAM_IS_CAPTURING,
     CUDA_EVENT_CREATE_WITH_FLAGS,
@@ -37,15 +41,19 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
 
     /* CUDA Driver */
     rpc_cuModuleLoad,
+    rpc_cuModuleLoadData,
     rpc_cuModuleGetFunction,
     rpc_register_var,
     rpc_cuDevicePrimaryCtxGetState,
+    rpc_cuCtxGetCurrent,
+    rpc_cuLaunchKernel,
     
     /* cuBLAS */
     rpc_cublasCreate,
     rpc_cublasSetStream,
     rpc_cublasSetMathMode,
     rpc_cublasSgemm,
+    rpc_cublasSgemmStridedBatched,
 
     /* no need to hijack */
     rpc_printmessage,

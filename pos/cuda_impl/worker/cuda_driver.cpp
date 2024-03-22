@@ -14,7 +14,7 @@ namespace wk_functions {
  *  \related    cuModuleLoadData
  *  \brief      load CUmodule down to the driver, which contains PTX/SASS binary
  */
-namespace cu_module_load_data {
+namespace cu_module_load {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
@@ -48,8 +48,49 @@ namespace cu_module_load_data {
     exit:
         return retval;
     }
-} // namespace cu_module_load_data
+} // namespace cu_module_load
 
+
+
+/*!
+ *  \related    cuModuleLoadData
+ *  \brief      load CUmodule down to the driver, which contains PTX/SASS binary
+ */
+namespace cu_module_load_data {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *module_handle;
+        CUresult res;
+        CUmodule module = NULL;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        module_handle = pos_api_create_handle(wqe, 0);
+        POS_CHECK_POINTER(module_handle);
+
+        wqe->api_cxt->return_code = cuModuleLoadData(
+            /* module */ &module,
+            /* image */  pos_api_param_addr(wqe, 0)
+        );
+
+        // record server address
+        if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
+            module_handle->set_server_addr((void*)module);
+            module_handle->mark_status(kPOS_HandleStatus_Active);
+        }
+
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+    exit:
+        return retval;
+    }
+} // namespace cu_module_load_data
 
 
 
@@ -182,6 +223,19 @@ namespace cu_device_primary_ctx_get_state {
         return retval;
     }
 } // namespace cu_device_primary_ctx_get_state
+
+
+/*!
+ *  \related    cuCtxGetCurrent
+ *  \brief      obtain the state of the current context
+ */
+namespace cu_ctx_get_current {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        POS_ERROR_DETAIL("shouldn't be called");
+        return POS_SUCCESS;
+    }
+} // namespace cu_ctx_get_current
 
 
 } // namespace wk_functions 

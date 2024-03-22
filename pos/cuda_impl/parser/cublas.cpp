@@ -12,7 +12,7 @@
 #include "pos/cuda_impl/api_context.h"
 #include "pos/cuda_impl/utils/fatbin.h"
 
-namespace rt_functions {
+namespace ps_functions {
 
 
 /*!
@@ -358,4 +358,127 @@ namespace cublas_sgemm {
 } // namespace cublas_sgemm
 
 
-} // namespace rt_functions
+
+
+/*!
+ *  \related    cublasSgemmStridedBatched
+ *  \brief      todo
+ */
+namespace cublas_sgemm_strided_batched {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSClient_CUDA *client;
+        POSHandle_cuBLAS_Context *cublas_context_handle;
+        POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
+        POSHandleManager_cuBLAS_Context *hm_cublas_context;
+        POSHandleManager_CUDA_Memory *hm_memory;
+
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 18)){
+            POS_WARN(
+                "parse(cublas_sgemm): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 18
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        hm_cublas_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
+        );
+        POS_CHECK_POINTER(hm_cublas_context);
+
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
+        POS_CHECK_POINTER(hm_memory);
+
+        // operate on handler manager
+        retval = hm_cublas_context->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
+            /* handle */ &cublas_context_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cublas_sgemm): no cuBLAS context was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 0, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ cublas_context_handle
+        });
+
+        // operate on memory manager
+        retval = hm_memory->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 7, uint64_t),
+            /* handle */ &memory_handle_A
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cublas_sgemm): no memory handle A was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 7, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ memory_handle_A,
+            /* param_index */ 7
+        });
+
+        retval = hm_memory->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 10, uint64_t),
+            /* handle */ &memory_handle_B
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cublas_sgemm): no memory handle B was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 10, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ memory_handle_B,
+            /* param_index */ 10
+        });
+
+        retval = hm_memory->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 14, uint64_t),
+            /* handle */ &memory_handle_C
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cublas_sgemm): no memory handle C was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 14, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_Out>({
+            /* handle */ memory_handle_C,
+            /* param_index */ 14
+        });
+
+        hm_memory->record_modified_handle(memory_handle_C);
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+
+} // namespace cublas_sgemm_strided_batched
+
+
+
+
+} // namespace ps_functions

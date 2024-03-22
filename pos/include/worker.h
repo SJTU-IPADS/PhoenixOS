@@ -26,7 +26,7 @@ using pos_worker_launch_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContex
 
 namespace wk_functions {
 #define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); }
-};  // namespace rt_functions
+};  // namespace ps_functions
 
 
 typedef struct checkpoint_async_cxt {
@@ -230,8 +230,16 @@ class POSWorker {
                             goto ckpt_finished;
                         }
 
+                        /*!
+                         *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
+                         *          to avoid waiting overhead here
+                         *  \note   so the actual checkpoint interval might not be accurate
+                         */
+                        if(ckpt_cxt.is_active == true){
+                            goto ckpt_finished;
+                        }
                         // we need to wait until last checkpoint finished
-                        while(ckpt_cxt.is_active == true){}
+                        // while(ckpt_cxt.is_active == true){}
                         
                         // start new checkpoint thread
                         ckpt_cxt.wqe = wqe;

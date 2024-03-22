@@ -132,6 +132,7 @@
 #define rpc_cuDeviceGetProperties 1023
 #define rpc_cuDeviceComputeCapability 1024
 #define rpc_cuDeviceGetP2PAttribute 1025
+#define rpc_cuModuleLoadData 1026
 #define rpc_cusolverDnCreate 2001
 #define rpc_cusolverDnSetStream 2002
 #define rpc_cusolverDnDgetrf_bufferSize 2003
@@ -148,6 +149,7 @@
 #define rpc_cublasSetStream 3008
 #define rpc_cublasSetWorkspace 3009
 #define rpc_cublasSetMathMode 3010
+#define rpc_cublasSgemmStridedBatched 3011
 #define rpc_nvmlDeviceGetCount_v2 4000
 #define rpc_nvmlInitWithFlags 4001
 #define rpc_nvmlInit_v2 4002

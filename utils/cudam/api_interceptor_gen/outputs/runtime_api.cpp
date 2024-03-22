@@ -8,10 +8,11 @@
 #include "api_counter.h"
 
 
+#undef cudaDeviceReset
 cudaError_t cudaDeviceReset(){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceReset) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaDeviceReset");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceReset", kApiTypeRuntime);
 
@@ -21,12 +22,14 @@ cudaError_t cudaDeviceReset(){
 
     return lretval;
 }
+#define cudaDeviceReset cudaDeviceReset
 
 
+#undef cudaDeviceSynchronize
 cudaError_t cudaDeviceSynchronize(){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceSynchronize) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaDeviceSynchronize");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceSynchronize", kApiTypeRuntime);
 
@@ -36,12 +39,14 @@ cudaError_t cudaDeviceSynchronize(){
 
     return lretval;
 }
+#define cudaDeviceSynchronize cudaDeviceSynchronize
 
 
+#undef cudaDeviceSetLimit
 cudaError_t cudaDeviceSetLimit(cudaLimit limit, size_t value){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceSetLimit) (cudaLimit, size_t) = (cudaError_t (*)(cudaLimit, size_t))dlsym(RTLD_NEXT, "cudaDeviceSetLimit");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceSetLimit", kApiTypeRuntime);
 
@@ -51,12 +56,14 @@ cudaError_t cudaDeviceSetLimit(cudaLimit limit, size_t value){
 
     return lretval;
 }
+#define cudaDeviceSetLimit cudaDeviceSetLimit
 
 
+#undef cudaDeviceGetLimit
 cudaError_t cudaDeviceGetLimit(size_t * pValue, cudaLimit limit){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetLimit) (size_t *, cudaLimit) = (cudaError_t (*)(size_t *, cudaLimit))dlsym(RTLD_NEXT, "cudaDeviceGetLimit");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetLimit", kApiTypeRuntime);
 
@@ -66,12 +73,14 @@ cudaError_t cudaDeviceGetLimit(size_t * pValue, cudaLimit limit){
 
     return lretval;
 }
+#define cudaDeviceGetLimit cudaDeviceGetLimit
 
 
+#undef cudaDeviceGetTexture1DLinearMaxWidth
 cudaError_t cudaDeviceGetTexture1DLinearMaxWidth(size_t * maxWidthInElements, cudaChannelFormatDesc const * fmtDesc, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetTexture1DLinearMaxWidth) (size_t *, cudaChannelFormatDesc const *, int) = (cudaError_t (*)(size_t *, cudaChannelFormatDesc const *, int))dlsym(RTLD_NEXT, "cudaDeviceGetTexture1DLinearMaxWidth");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetTexture1DLinearMaxWidth", kApiTypeRuntime);
 
@@ -81,12 +90,14 @@ cudaError_t cudaDeviceGetTexture1DLinearMaxWidth(size_t * maxWidthInElements, cu
 
     return lretval;
 }
+#define cudaDeviceGetTexture1DLinearMaxWidth cudaDeviceGetTexture1DLinearMaxWidth
 
 
+#undef cudaDeviceGetCacheConfig
 cudaError_t cudaDeviceGetCacheConfig(cudaFuncCache * pCacheConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetCacheConfig) (cudaFuncCache *) = (cudaError_t (*)(cudaFuncCache *))dlsym(RTLD_NEXT, "cudaDeviceGetCacheConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetCacheConfig", kApiTypeRuntime);
 
@@ -96,12 +107,14 @@ cudaError_t cudaDeviceGetCacheConfig(cudaFuncCache * pCacheConfig){
 
     return lretval;
 }
+#define cudaDeviceGetCacheConfig cudaDeviceGetCacheConfig
 
 
+#undef cudaDeviceGetStreamPriorityRange
 cudaError_t cudaDeviceGetStreamPriorityRange(int * leastPriority, int * greatestPriority){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetStreamPriorityRange) (int *, int *) = (cudaError_t (*)(int *, int *))dlsym(RTLD_NEXT, "cudaDeviceGetStreamPriorityRange");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetStreamPriorityRange", kApiTypeRuntime);
 
@@ -111,12 +124,14 @@ cudaError_t cudaDeviceGetStreamPriorityRange(int * leastPriority, int * greatest
 
     return lretval;
 }
+#define cudaDeviceGetStreamPriorityRange cudaDeviceGetStreamPriorityRange
 
 
+#undef cudaDeviceSetCacheConfig
 cudaError_t cudaDeviceSetCacheConfig(cudaFuncCache cacheConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceSetCacheConfig) (cudaFuncCache) = (cudaError_t (*)(cudaFuncCache))dlsym(RTLD_NEXT, "cudaDeviceSetCacheConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceSetCacheConfig", kApiTypeRuntime);
 
@@ -126,12 +141,14 @@ cudaError_t cudaDeviceSetCacheConfig(cudaFuncCache cacheConfig){
 
     return lretval;
 }
+#define cudaDeviceSetCacheConfig cudaDeviceSetCacheConfig
 
 
+#undef cudaDeviceGetSharedMemConfig
 cudaError_t cudaDeviceGetSharedMemConfig(cudaSharedMemConfig * pConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetSharedMemConfig) (cudaSharedMemConfig *) = (cudaError_t (*)(cudaSharedMemConfig *))dlsym(RTLD_NEXT, "cudaDeviceGetSharedMemConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetSharedMemConfig", kApiTypeRuntime);
 
@@ -141,12 +158,14 @@ cudaError_t cudaDeviceGetSharedMemConfig(cudaSharedMemConfig * pConfig){
 
     return lretval;
 }
+#define cudaDeviceGetSharedMemConfig cudaDeviceGetSharedMemConfig
 
 
+#undef cudaDeviceSetSharedMemConfig
 cudaError_t cudaDeviceSetSharedMemConfig(cudaSharedMemConfig config){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceSetSharedMemConfig) (cudaSharedMemConfig) = (cudaError_t (*)(cudaSharedMemConfig))dlsym(RTLD_NEXT, "cudaDeviceSetSharedMemConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceSetSharedMemConfig", kApiTypeRuntime);
 
@@ -156,12 +175,14 @@ cudaError_t cudaDeviceSetSharedMemConfig(cudaSharedMemConfig config){
 
     return lretval;
 }
+#define cudaDeviceSetSharedMemConfig cudaDeviceSetSharedMemConfig
 
 
+#undef cudaDeviceGetByPCIBusId
 cudaError_t cudaDeviceGetByPCIBusId(int * device, char const * pciBusId){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetByPCIBusId) (int *, char const *) = (cudaError_t (*)(int *, char const *))dlsym(RTLD_NEXT, "cudaDeviceGetByPCIBusId");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetByPCIBusId", kApiTypeRuntime);
 
@@ -171,12 +192,14 @@ cudaError_t cudaDeviceGetByPCIBusId(int * device, char const * pciBusId){
 
     return lretval;
 }
+#define cudaDeviceGetByPCIBusId cudaDeviceGetByPCIBusId
 
 
+#undef cudaDeviceGetPCIBusId
 cudaError_t cudaDeviceGetPCIBusId(char * pciBusId, int len, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetPCIBusId) (char *, int, int) = (cudaError_t (*)(char *, int, int))dlsym(RTLD_NEXT, "cudaDeviceGetPCIBusId");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetPCIBusId", kApiTypeRuntime);
 
@@ -186,12 +209,14 @@ cudaError_t cudaDeviceGetPCIBusId(char * pciBusId, int len, int device){
 
     return lretval;
 }
+#define cudaDeviceGetPCIBusId cudaDeviceGetPCIBusId
 
 
+#undef cudaIpcGetEventHandle
 cudaError_t cudaIpcGetEventHandle(cudaIpcEventHandle_t * handle, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaIpcGetEventHandle) (cudaIpcEventHandle_t *, cudaEvent_t) = (cudaError_t (*)(cudaIpcEventHandle_t *, cudaEvent_t))dlsym(RTLD_NEXT, "cudaIpcGetEventHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaIpcGetEventHandle", kApiTypeRuntime);
 
@@ -201,12 +226,14 @@ cudaError_t cudaIpcGetEventHandle(cudaIpcEventHandle_t * handle, cudaEvent_t eve
 
     return lretval;
 }
+#define cudaIpcGetEventHandle cudaIpcGetEventHandle
 
 
+#undef cudaIpcOpenEventHandle
 cudaError_t cudaIpcOpenEventHandle(cudaEvent_t * event, cudaIpcEventHandle_t handle){
     cudaError_t lretval;
     cudaError_t (*lcudaIpcOpenEventHandle) (cudaEvent_t *, cudaIpcEventHandle_t) = (cudaError_t (*)(cudaEvent_t *, cudaIpcEventHandle_t))dlsym(RTLD_NEXT, "cudaIpcOpenEventHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaIpcOpenEventHandle", kApiTypeRuntime);
 
@@ -216,12 +243,14 @@ cudaError_t cudaIpcOpenEventHandle(cudaEvent_t * event, cudaIpcEventHandle_t han
 
     return lretval;
 }
+#define cudaIpcOpenEventHandle cudaIpcOpenEventHandle
 
 
+#undef cudaIpcGetMemHandle
 cudaError_t cudaIpcGetMemHandle(cudaIpcMemHandle_t * handle, void * devPtr){
     cudaError_t lretval;
     cudaError_t (*lcudaIpcGetMemHandle) (cudaIpcMemHandle_t *, void *) = (cudaError_t (*)(cudaIpcMemHandle_t *, void *))dlsym(RTLD_NEXT, "cudaIpcGetMemHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaIpcGetMemHandle", kApiTypeRuntime);
 
@@ -231,12 +260,14 @@ cudaError_t cudaIpcGetMemHandle(cudaIpcMemHandle_t * handle, void * devPtr){
 
     return lretval;
 }
+#define cudaIpcGetMemHandle cudaIpcGetMemHandle
 
 
+#undef cudaIpcOpenMemHandle
 cudaError_t cudaIpcOpenMemHandle(void * * devPtr, cudaIpcMemHandle_t handle, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaIpcOpenMemHandle) (void * *, cudaIpcMemHandle_t, unsigned int) = (cudaError_t (*)(void * *, cudaIpcMemHandle_t, unsigned int))dlsym(RTLD_NEXT, "cudaIpcOpenMemHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaIpcOpenMemHandle", kApiTypeRuntime);
 
@@ -246,12 +277,14 @@ cudaError_t cudaIpcOpenMemHandle(void * * devPtr, cudaIpcMemHandle_t handle, uns
 
     return lretval;
 }
+#define cudaIpcOpenMemHandle cudaIpcOpenMemHandle
 
 
+#undef cudaIpcCloseMemHandle
 cudaError_t cudaIpcCloseMemHandle(void * devPtr){
     cudaError_t lretval;
     cudaError_t (*lcudaIpcCloseMemHandle) (void *) = (cudaError_t (*)(void *))dlsym(RTLD_NEXT, "cudaIpcCloseMemHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaIpcCloseMemHandle", kApiTypeRuntime);
 
@@ -261,12 +294,14 @@ cudaError_t cudaIpcCloseMemHandle(void * devPtr){
 
     return lretval;
 }
+#define cudaIpcCloseMemHandle cudaIpcCloseMemHandle
 
 
+#undef cudaDeviceFlushGPUDirectRDMAWrites
 cudaError_t cudaDeviceFlushGPUDirectRDMAWrites(cudaFlushGPUDirectRDMAWritesTarget target, cudaFlushGPUDirectRDMAWritesScope scope){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceFlushGPUDirectRDMAWrites) (cudaFlushGPUDirectRDMAWritesTarget, cudaFlushGPUDirectRDMAWritesScope) = (cudaError_t (*)(cudaFlushGPUDirectRDMAWritesTarget, cudaFlushGPUDirectRDMAWritesScope))dlsym(RTLD_NEXT, "cudaDeviceFlushGPUDirectRDMAWrites");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceFlushGPUDirectRDMAWrites", kApiTypeRuntime);
 
@@ -276,12 +311,14 @@ cudaError_t cudaDeviceFlushGPUDirectRDMAWrites(cudaFlushGPUDirectRDMAWritesTarge
 
     return lretval;
 }
+#define cudaDeviceFlushGPUDirectRDMAWrites cudaDeviceFlushGPUDirectRDMAWrites
 
 
+#undef cudaThreadExit
 cudaError_t cudaThreadExit(){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadExit) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaThreadExit");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadExit", kApiTypeRuntime);
 
@@ -291,12 +328,14 @@ cudaError_t cudaThreadExit(){
 
     return lretval;
 }
+#define cudaThreadExit cudaThreadExit
 
 
+#undef cudaThreadSynchronize
 cudaError_t cudaThreadSynchronize(){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadSynchronize) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaThreadSynchronize");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadSynchronize", kApiTypeRuntime);
 
@@ -306,12 +345,14 @@ cudaError_t cudaThreadSynchronize(){
 
     return lretval;
 }
+#define cudaThreadSynchronize cudaThreadSynchronize
 
 
+#undef cudaThreadSetLimit
 cudaError_t cudaThreadSetLimit(cudaLimit limit, size_t value){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadSetLimit) (cudaLimit, size_t) = (cudaError_t (*)(cudaLimit, size_t))dlsym(RTLD_NEXT, "cudaThreadSetLimit");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadSetLimit", kApiTypeRuntime);
 
@@ -321,12 +362,14 @@ cudaError_t cudaThreadSetLimit(cudaLimit limit, size_t value){
 
     return lretval;
 }
+#define cudaThreadSetLimit cudaThreadSetLimit
 
 
+#undef cudaThreadGetLimit
 cudaError_t cudaThreadGetLimit(size_t * pValue, cudaLimit limit){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadGetLimit) (size_t *, cudaLimit) = (cudaError_t (*)(size_t *, cudaLimit))dlsym(RTLD_NEXT, "cudaThreadGetLimit");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadGetLimit", kApiTypeRuntime);
 
@@ -336,12 +379,14 @@ cudaError_t cudaThreadGetLimit(size_t * pValue, cudaLimit limit){
 
     return lretval;
 }
+#define cudaThreadGetLimit cudaThreadGetLimit
 
 
+#undef cudaThreadGetCacheConfig
 cudaError_t cudaThreadGetCacheConfig(cudaFuncCache * pCacheConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadGetCacheConfig) (cudaFuncCache *) = (cudaError_t (*)(cudaFuncCache *))dlsym(RTLD_NEXT, "cudaThreadGetCacheConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadGetCacheConfig", kApiTypeRuntime);
 
@@ -351,12 +396,14 @@ cudaError_t cudaThreadGetCacheConfig(cudaFuncCache * pCacheConfig){
 
     return lretval;
 }
+#define cudaThreadGetCacheConfig cudaThreadGetCacheConfig
 
 
+#undef cudaThreadSetCacheConfig
 cudaError_t cudaThreadSetCacheConfig(cudaFuncCache cacheConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadSetCacheConfig) (cudaFuncCache) = (cudaError_t (*)(cudaFuncCache))dlsym(RTLD_NEXT, "cudaThreadSetCacheConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadSetCacheConfig", kApiTypeRuntime);
 
@@ -366,12 +413,14 @@ cudaError_t cudaThreadSetCacheConfig(cudaFuncCache cacheConfig){
 
     return lretval;
 }
+#define cudaThreadSetCacheConfig cudaThreadSetCacheConfig
 
 
+#undef cudaGetLastError
 cudaError_t cudaGetLastError(){
     cudaError_t lretval;
     cudaError_t (*lcudaGetLastError) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaGetLastError");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetLastError", kApiTypeRuntime);
 
@@ -381,12 +430,14 @@ cudaError_t cudaGetLastError(){
 
     return lretval;
 }
+#define cudaGetLastError cudaGetLastError
 
 
+#undef cudaPeekAtLastError
 cudaError_t cudaPeekAtLastError(){
     cudaError_t lretval;
     cudaError_t (*lcudaPeekAtLastError) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaPeekAtLastError");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaPeekAtLastError", kApiTypeRuntime);
 
@@ -396,12 +447,14 @@ cudaError_t cudaPeekAtLastError(){
 
     return lretval;
 }
+#define cudaPeekAtLastError cudaPeekAtLastError
 
 
+#undef cudaGetErrorName
 char const * cudaGetErrorName(cudaError_t error){
     char const * lretval;
     char const * (*lcudaGetErrorName) (cudaError_t) = (char const * (*)(cudaError_t))dlsym(RTLD_NEXT, "cudaGetErrorName");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetErrorName", kApiTypeRuntime);
 
@@ -411,12 +464,14 @@ char const * cudaGetErrorName(cudaError_t error){
 
     return lretval;
 }
+#define cudaGetErrorName cudaGetErrorName
 
 
+#undef cudaGetErrorString
 char const * cudaGetErrorString(cudaError_t error){
     char const * lretval;
     char const * (*lcudaGetErrorString) (cudaError_t) = (char const * (*)(cudaError_t))dlsym(RTLD_NEXT, "cudaGetErrorString");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetErrorString", kApiTypeRuntime);
 
@@ -426,12 +481,14 @@ char const * cudaGetErrorString(cudaError_t error){
 
     return lretval;
 }
+#define cudaGetErrorString cudaGetErrorString
 
 
+#undef cudaGetDeviceCount
 cudaError_t cudaGetDeviceCount(int * count){
     cudaError_t lretval;
     cudaError_t (*lcudaGetDeviceCount) (int *) = (cudaError_t (*)(int *))dlsym(RTLD_NEXT, "cudaGetDeviceCount");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetDeviceCount", kApiTypeRuntime);
 
@@ -441,12 +498,14 @@ cudaError_t cudaGetDeviceCount(int * count){
 
     return lretval;
 }
+#define cudaGetDeviceCount cudaGetDeviceCount
 
 
+#undef cudaGetDeviceProperties
 cudaError_t cudaGetDeviceProperties(cudaDeviceProp * prop, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaGetDeviceProperties) (cudaDeviceProp *, int) = (cudaError_t (*)(cudaDeviceProp *, int))dlsym(RTLD_NEXT, "cudaGetDeviceProperties");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetDeviceProperties", kApiTypeRuntime);
 
@@ -456,12 +515,14 @@ cudaError_t cudaGetDeviceProperties(cudaDeviceProp * prop, int device){
 
     return lretval;
 }
+#define cudaGetDeviceProperties cudaGetDeviceProperties
 
 
+#undef cudaDeviceGetAttribute
 cudaError_t cudaDeviceGetAttribute(int * value, cudaDeviceAttr attr, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetAttribute) (int *, cudaDeviceAttr, int) = (cudaError_t (*)(int *, cudaDeviceAttr, int))dlsym(RTLD_NEXT, "cudaDeviceGetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetAttribute", kApiTypeRuntime);
 
@@ -471,12 +532,14 @@ cudaError_t cudaDeviceGetAttribute(int * value, cudaDeviceAttr attr, int device)
 
     return lretval;
 }
+#define cudaDeviceGetAttribute cudaDeviceGetAttribute
 
 
+#undef cudaDeviceGetDefaultMemPool
 cudaError_t cudaDeviceGetDefaultMemPool(cudaMemPool_t * memPool, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetDefaultMemPool) (cudaMemPool_t *, int) = (cudaError_t (*)(cudaMemPool_t *, int))dlsym(RTLD_NEXT, "cudaDeviceGetDefaultMemPool");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetDefaultMemPool", kApiTypeRuntime);
 
@@ -486,12 +549,14 @@ cudaError_t cudaDeviceGetDefaultMemPool(cudaMemPool_t * memPool, int device){
 
     return lretval;
 }
+#define cudaDeviceGetDefaultMemPool cudaDeviceGetDefaultMemPool
 
 
+#undef cudaDeviceSetMemPool
 cudaError_t cudaDeviceSetMemPool(int device, cudaMemPool_t memPool){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceSetMemPool) (int, cudaMemPool_t) = (cudaError_t (*)(int, cudaMemPool_t))dlsym(RTLD_NEXT, "cudaDeviceSetMemPool");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceSetMemPool", kApiTypeRuntime);
 
@@ -501,12 +566,14 @@ cudaError_t cudaDeviceSetMemPool(int device, cudaMemPool_t memPool){
 
     return lretval;
 }
+#define cudaDeviceSetMemPool cudaDeviceSetMemPool
 
 
+#undef cudaDeviceGetMemPool
 cudaError_t cudaDeviceGetMemPool(cudaMemPool_t * memPool, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetMemPool) (cudaMemPool_t *, int) = (cudaError_t (*)(cudaMemPool_t *, int))dlsym(RTLD_NEXT, "cudaDeviceGetMemPool");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetMemPool", kApiTypeRuntime);
 
@@ -516,12 +583,14 @@ cudaError_t cudaDeviceGetMemPool(cudaMemPool_t * memPool, int device){
 
     return lretval;
 }
+#define cudaDeviceGetMemPool cudaDeviceGetMemPool
 
 
+#undef cudaDeviceGetNvSciSyncAttributes
 cudaError_t cudaDeviceGetNvSciSyncAttributes(void * nvSciSyncAttrList, int device, int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetNvSciSyncAttributes) (void *, int, int) = (cudaError_t (*)(void *, int, int))dlsym(RTLD_NEXT, "cudaDeviceGetNvSciSyncAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetNvSciSyncAttributes", kApiTypeRuntime);
 
@@ -531,12 +600,14 @@ cudaError_t cudaDeviceGetNvSciSyncAttributes(void * nvSciSyncAttrList, int devic
 
     return lretval;
 }
+#define cudaDeviceGetNvSciSyncAttributes cudaDeviceGetNvSciSyncAttributes
 
 
+#undef cudaDeviceGetP2PAttribute
 cudaError_t cudaDeviceGetP2PAttribute(int * value, cudaDeviceP2PAttr attr, int srcDevice, int dstDevice){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceGetP2PAttribute) (int *, cudaDeviceP2PAttr, int, int) = (cudaError_t (*)(int *, cudaDeviceP2PAttr, int, int))dlsym(RTLD_NEXT, "cudaDeviceGetP2PAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceGetP2PAttribute", kApiTypeRuntime);
 
@@ -546,12 +617,14 @@ cudaError_t cudaDeviceGetP2PAttribute(int * value, cudaDeviceP2PAttr attr, int s
 
     return lretval;
 }
+#define cudaDeviceGetP2PAttribute cudaDeviceGetP2PAttribute
 
 
+#undef cudaChooseDevice
 cudaError_t cudaChooseDevice(int * device, cudaDeviceProp const * prop){
     cudaError_t lretval;
     cudaError_t (*lcudaChooseDevice) (int *, cudaDeviceProp const *) = (cudaError_t (*)(int *, cudaDeviceProp const *))dlsym(RTLD_NEXT, "cudaChooseDevice");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaChooseDevice", kApiTypeRuntime);
 
@@ -561,12 +634,14 @@ cudaError_t cudaChooseDevice(int * device, cudaDeviceProp const * prop){
 
     return lretval;
 }
+#define cudaChooseDevice cudaChooseDevice
 
 
+#undef cudaSetDevice
 cudaError_t cudaSetDevice(int device){
     cudaError_t lretval;
     cudaError_t (*lcudaSetDevice) (int) = (cudaError_t (*)(int))dlsym(RTLD_NEXT, "cudaSetDevice");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSetDevice", kApiTypeRuntime);
 
@@ -576,12 +651,14 @@ cudaError_t cudaSetDevice(int device){
 
     return lretval;
 }
+#define cudaSetDevice cudaSetDevice
 
 
+#undef cudaGetDevice
 cudaError_t cudaGetDevice(int * device){
     cudaError_t lretval;
     cudaError_t (*lcudaGetDevice) (int *) = (cudaError_t (*)(int *))dlsym(RTLD_NEXT, "cudaGetDevice");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetDevice", kApiTypeRuntime);
 
@@ -591,12 +668,14 @@ cudaError_t cudaGetDevice(int * device){
 
     return lretval;
 }
+#define cudaGetDevice cudaGetDevice
 
 
+#undef cudaSetValidDevices
 cudaError_t cudaSetValidDevices(int * device_arr, int len){
     cudaError_t lretval;
     cudaError_t (*lcudaSetValidDevices) (int *, int) = (cudaError_t (*)(int *, int))dlsym(RTLD_NEXT, "cudaSetValidDevices");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSetValidDevices", kApiTypeRuntime);
 
@@ -606,12 +685,14 @@ cudaError_t cudaSetValidDevices(int * device_arr, int len){
 
     return lretval;
 }
+#define cudaSetValidDevices cudaSetValidDevices
 
 
+#undef cudaSetDeviceFlags
 cudaError_t cudaSetDeviceFlags(unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaSetDeviceFlags) (unsigned int) = (cudaError_t (*)(unsigned int))dlsym(RTLD_NEXT, "cudaSetDeviceFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSetDeviceFlags", kApiTypeRuntime);
 
@@ -621,12 +702,14 @@ cudaError_t cudaSetDeviceFlags(unsigned int flags){
 
     return lretval;
 }
+#define cudaSetDeviceFlags cudaSetDeviceFlags
 
 
+#undef cudaGetDeviceFlags
 cudaError_t cudaGetDeviceFlags(unsigned int * flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGetDeviceFlags) (unsigned int *) = (cudaError_t (*)(unsigned int *))dlsym(RTLD_NEXT, "cudaGetDeviceFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetDeviceFlags", kApiTypeRuntime);
 
@@ -636,12 +719,14 @@ cudaError_t cudaGetDeviceFlags(unsigned int * flags){
 
     return lretval;
 }
+#define cudaGetDeviceFlags cudaGetDeviceFlags
 
 
+#undef cudaStreamCreate
 cudaError_t cudaStreamCreate(cudaStream_t * pStream){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamCreate) (cudaStream_t *) = (cudaError_t (*)(cudaStream_t *))dlsym(RTLD_NEXT, "cudaStreamCreate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamCreate", kApiTypeRuntime);
 
@@ -651,12 +736,14 @@ cudaError_t cudaStreamCreate(cudaStream_t * pStream){
 
     return lretval;
 }
+#define cudaStreamCreate cudaStreamCreate
 
 
+#undef cudaStreamCreateWithFlags
 cudaError_t cudaStreamCreateWithFlags(cudaStream_t * pStream, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamCreateWithFlags) (cudaStream_t *, unsigned int) = (cudaError_t (*)(cudaStream_t *, unsigned int))dlsym(RTLD_NEXT, "cudaStreamCreateWithFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamCreateWithFlags", kApiTypeRuntime);
 
@@ -666,12 +753,14 @@ cudaError_t cudaStreamCreateWithFlags(cudaStream_t * pStream, unsigned int flags
 
     return lretval;
 }
+#define cudaStreamCreateWithFlags cudaStreamCreateWithFlags
 
 
+#undef cudaStreamCreateWithPriority
 cudaError_t cudaStreamCreateWithPriority(cudaStream_t * pStream, unsigned int flags, int priority){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamCreateWithPriority) (cudaStream_t *, unsigned int, int) = (cudaError_t (*)(cudaStream_t *, unsigned int, int))dlsym(RTLD_NEXT, "cudaStreamCreateWithPriority");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamCreateWithPriority", kApiTypeRuntime);
 
@@ -681,12 +770,14 @@ cudaError_t cudaStreamCreateWithPriority(cudaStream_t * pStream, unsigned int fl
 
     return lretval;
 }
+#define cudaStreamCreateWithPriority cudaStreamCreateWithPriority
 
 
+#undef cudaStreamGetPriority
 cudaError_t cudaStreamGetPriority(cudaStream_t hStream, int * priority){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamGetPriority) (cudaStream_t, int *) = (cudaError_t (*)(cudaStream_t, int *))dlsym(RTLD_NEXT, "cudaStreamGetPriority");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamGetPriority", kApiTypeRuntime);
 
@@ -696,12 +787,14 @@ cudaError_t cudaStreamGetPriority(cudaStream_t hStream, int * priority){
 
     return lretval;
 }
+#define cudaStreamGetPriority cudaStreamGetPriority
 
 
+#undef cudaStreamGetFlags
 cudaError_t cudaStreamGetFlags(cudaStream_t hStream, unsigned int * flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamGetFlags) (cudaStream_t, unsigned int *) = (cudaError_t (*)(cudaStream_t, unsigned int *))dlsym(RTLD_NEXT, "cudaStreamGetFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamGetFlags", kApiTypeRuntime);
 
@@ -711,12 +804,14 @@ cudaError_t cudaStreamGetFlags(cudaStream_t hStream, unsigned int * flags){
 
     return lretval;
 }
+#define cudaStreamGetFlags cudaStreamGetFlags
 
 
+#undef cudaCtxResetPersistingL2Cache
 cudaError_t cudaCtxResetPersistingL2Cache(){
     cudaError_t lretval;
     cudaError_t (*lcudaCtxResetPersistingL2Cache) () = (cudaError_t (*)())dlsym(RTLD_NEXT, "cudaCtxResetPersistingL2Cache");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaCtxResetPersistingL2Cache", kApiTypeRuntime);
 
@@ -726,12 +821,14 @@ cudaError_t cudaCtxResetPersistingL2Cache(){
 
     return lretval;
 }
+#define cudaCtxResetPersistingL2Cache cudaCtxResetPersistingL2Cache
 
 
+#undef cudaStreamCopyAttributes
 cudaError_t cudaStreamCopyAttributes(cudaStream_t dst, cudaStream_t src){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamCopyAttributes) (cudaStream_t, cudaStream_t) = (cudaError_t (*)(cudaStream_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaStreamCopyAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamCopyAttributes", kApiTypeRuntime);
 
@@ -741,12 +838,14 @@ cudaError_t cudaStreamCopyAttributes(cudaStream_t dst, cudaStream_t src){
 
     return lretval;
 }
+#define cudaStreamCopyAttributes cudaStreamCopyAttributes
 
 
+#undef cudaStreamGetAttribute
 cudaError_t cudaStreamGetAttribute(cudaStream_t hStream, cudaStreamAttrID attr, cudaStreamAttrValue * value_out){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamGetAttribute) (cudaStream_t, cudaStreamAttrID, cudaStreamAttrValue *) = (cudaError_t (*)(cudaStream_t, cudaStreamAttrID, cudaStreamAttrValue *))dlsym(RTLD_NEXT, "cudaStreamGetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamGetAttribute", kApiTypeRuntime);
 
@@ -756,12 +855,14 @@ cudaError_t cudaStreamGetAttribute(cudaStream_t hStream, cudaStreamAttrID attr, 
 
     return lretval;
 }
+#define cudaStreamGetAttribute cudaStreamGetAttribute
 
 
+#undef cudaStreamSetAttribute
 cudaError_t cudaStreamSetAttribute(cudaStream_t hStream, cudaStreamAttrID attr, cudaStreamAttrValue const * value){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamSetAttribute) (cudaStream_t, cudaStreamAttrID, cudaStreamAttrValue const *) = (cudaError_t (*)(cudaStream_t, cudaStreamAttrID, cudaStreamAttrValue const *))dlsym(RTLD_NEXT, "cudaStreamSetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamSetAttribute", kApiTypeRuntime);
 
@@ -771,12 +872,14 @@ cudaError_t cudaStreamSetAttribute(cudaStream_t hStream, cudaStreamAttrID attr, 
 
     return lretval;
 }
+#define cudaStreamSetAttribute cudaStreamSetAttribute
 
 
+#undef cudaStreamDestroy
 cudaError_t cudaStreamDestroy(cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamDestroy) (cudaStream_t) = (cudaError_t (*)(cudaStream_t))dlsym(RTLD_NEXT, "cudaStreamDestroy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamDestroy", kApiTypeRuntime);
 
@@ -786,12 +889,14 @@ cudaError_t cudaStreamDestroy(cudaStream_t stream){
 
     return lretval;
 }
+#define cudaStreamDestroy cudaStreamDestroy
 
 
+#undef cudaStreamWaitEvent
 cudaError_t cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamWaitEvent) (cudaStream_t, cudaEvent_t, unsigned int) = (cudaError_t (*)(cudaStream_t, cudaEvent_t, unsigned int))dlsym(RTLD_NEXT, "cudaStreamWaitEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamWaitEvent", kApiTypeRuntime);
 
@@ -801,12 +906,14 @@ cudaError_t cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned
 
     return lretval;
 }
+#define cudaStreamWaitEvent cudaStreamWaitEvent
 
 
+#undef cudaStreamAddCallback
 cudaError_t cudaStreamAddCallback(cudaStream_t stream, cudaStreamCallback_t callback, void * userData, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamAddCallback) (cudaStream_t, cudaStreamCallback_t, void *, unsigned int) = (cudaError_t (*)(cudaStream_t, cudaStreamCallback_t, void *, unsigned int))dlsym(RTLD_NEXT, "cudaStreamAddCallback");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamAddCallback", kApiTypeRuntime);
 
@@ -816,12 +923,14 @@ cudaError_t cudaStreamAddCallback(cudaStream_t stream, cudaStreamCallback_t call
 
     return lretval;
 }
+#define cudaStreamAddCallback cudaStreamAddCallback
 
 
+#undef cudaStreamSynchronize
 cudaError_t cudaStreamSynchronize(cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamSynchronize) (cudaStream_t) = (cudaError_t (*)(cudaStream_t))dlsym(RTLD_NEXT, "cudaStreamSynchronize");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamSynchronize", kApiTypeRuntime);
 
@@ -831,12 +940,14 @@ cudaError_t cudaStreamSynchronize(cudaStream_t stream){
 
     return lretval;
 }
+#define cudaStreamSynchronize cudaStreamSynchronize
 
 
+#undef cudaStreamQuery
 cudaError_t cudaStreamQuery(cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamQuery) (cudaStream_t) = (cudaError_t (*)(cudaStream_t))dlsym(RTLD_NEXT, "cudaStreamQuery");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamQuery", kApiTypeRuntime);
 
@@ -846,12 +957,14 @@ cudaError_t cudaStreamQuery(cudaStream_t stream){
 
     return lretval;
 }
+#define cudaStreamQuery cudaStreamQuery
 
 
+#undef cudaStreamAttachMemAsync
 cudaError_t cudaStreamAttachMemAsync(cudaStream_t stream, void * devPtr, size_t length, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamAttachMemAsync) (cudaStream_t, void *, size_t, unsigned int) = (cudaError_t (*)(cudaStream_t, void *, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaStreamAttachMemAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamAttachMemAsync", kApiTypeRuntime);
 
@@ -861,12 +974,14 @@ cudaError_t cudaStreamAttachMemAsync(cudaStream_t stream, void * devPtr, size_t 
 
     return lretval;
 }
+#define cudaStreamAttachMemAsync cudaStreamAttachMemAsync
 
 
+#undef cudaStreamBeginCapture
 cudaError_t cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCaptureMode mode){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamBeginCapture) (cudaStream_t, cudaStreamCaptureMode) = (cudaError_t (*)(cudaStream_t, cudaStreamCaptureMode))dlsym(RTLD_NEXT, "cudaStreamBeginCapture");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamBeginCapture", kApiTypeRuntime);
 
@@ -876,12 +991,14 @@ cudaError_t cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCaptureMode mo
 
     return lretval;
 }
+#define cudaStreamBeginCapture cudaStreamBeginCapture
 
 
+#undef cudaThreadExchangeStreamCaptureMode
 cudaError_t cudaThreadExchangeStreamCaptureMode(cudaStreamCaptureMode * mode){
     cudaError_t lretval;
     cudaError_t (*lcudaThreadExchangeStreamCaptureMode) (cudaStreamCaptureMode *) = (cudaError_t (*)(cudaStreamCaptureMode *))dlsym(RTLD_NEXT, "cudaThreadExchangeStreamCaptureMode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaThreadExchangeStreamCaptureMode", kApiTypeRuntime);
 
@@ -891,12 +1008,14 @@ cudaError_t cudaThreadExchangeStreamCaptureMode(cudaStreamCaptureMode * mode){
 
     return lretval;
 }
+#define cudaThreadExchangeStreamCaptureMode cudaThreadExchangeStreamCaptureMode
 
 
+#undef cudaStreamEndCapture
 cudaError_t cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t * pGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamEndCapture) (cudaStream_t, cudaGraph_t *) = (cudaError_t (*)(cudaStream_t, cudaGraph_t *))dlsym(RTLD_NEXT, "cudaStreamEndCapture");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamEndCapture", kApiTypeRuntime);
 
@@ -906,12 +1025,14 @@ cudaError_t cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t * pGraph){
 
     return lretval;
 }
+#define cudaStreamEndCapture cudaStreamEndCapture
 
 
+#undef cudaStreamIsCapturing
 cudaError_t cudaStreamIsCapturing(cudaStream_t stream, cudaStreamCaptureStatus * pCaptureStatus){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamIsCapturing) (cudaStream_t, cudaStreamCaptureStatus *) = (cudaError_t (*)(cudaStream_t, cudaStreamCaptureStatus *))dlsym(RTLD_NEXT, "cudaStreamIsCapturing");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamIsCapturing", kApiTypeRuntime);
 
@@ -921,12 +1042,14 @@ cudaError_t cudaStreamIsCapturing(cudaStream_t stream, cudaStreamCaptureStatus *
 
     return lretval;
 }
+#define cudaStreamIsCapturing cudaStreamIsCapturing
 
 
+#undef cudaStreamGetCaptureInfo
 cudaError_t cudaStreamGetCaptureInfo(cudaStream_t stream, cudaStreamCaptureStatus * pCaptureStatus, long long unsigned int * pId){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamGetCaptureInfo) (cudaStream_t, cudaStreamCaptureStatus *, long long unsigned int *) = (cudaError_t (*)(cudaStream_t, cudaStreamCaptureStatus *, long long unsigned int *))dlsym(RTLD_NEXT, "cudaStreamGetCaptureInfo");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamGetCaptureInfo", kApiTypeRuntime);
 
@@ -936,12 +1059,14 @@ cudaError_t cudaStreamGetCaptureInfo(cudaStream_t stream, cudaStreamCaptureStatu
 
     return lretval;
 }
+#define cudaStreamGetCaptureInfo cudaStreamGetCaptureInfo
 
 
+#undef cudaStreamGetCaptureInfo_v2
 cudaError_t cudaStreamGetCaptureInfo_v2(cudaStream_t stream, cudaStreamCaptureStatus * captureStatus_out, long long unsigned int * id_out, cudaGraph_t * graph_out, cudaGraphNode_t const * * dependencies_out, size_t * numDependencies_out){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamGetCaptureInfo_v2) (cudaStream_t, cudaStreamCaptureStatus *, long long unsigned int *, cudaGraph_t *, cudaGraphNode_t const * *, size_t *) = (cudaError_t (*)(cudaStream_t, cudaStreamCaptureStatus *, long long unsigned int *, cudaGraph_t *, cudaGraphNode_t const * *, size_t *))dlsym(RTLD_NEXT, "cudaStreamGetCaptureInfo_v2");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamGetCaptureInfo_v2", kApiTypeRuntime);
 
@@ -951,12 +1076,14 @@ cudaError_t cudaStreamGetCaptureInfo_v2(cudaStream_t stream, cudaStreamCaptureSt
 
     return lretval;
 }
+#define cudaStreamGetCaptureInfo_v2 cudaStreamGetCaptureInfo_v2
 
 
+#undef cudaStreamUpdateCaptureDependencies
 cudaError_t cudaStreamUpdateCaptureDependencies(cudaStream_t stream, cudaGraphNode_t * dependencies, size_t numDependencies, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaStreamUpdateCaptureDependencies) (cudaStream_t, cudaGraphNode_t *, size_t, unsigned int) = (cudaError_t (*)(cudaStream_t, cudaGraphNode_t *, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaStreamUpdateCaptureDependencies");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaStreamUpdateCaptureDependencies", kApiTypeRuntime);
 
@@ -966,12 +1093,14 @@ cudaError_t cudaStreamUpdateCaptureDependencies(cudaStream_t stream, cudaGraphNo
 
     return lretval;
 }
+#define cudaStreamUpdateCaptureDependencies cudaStreamUpdateCaptureDependencies
 
 
+#undef cudaEventCreate
 cudaError_t cudaEventCreate(cudaEvent_t * event){
     cudaError_t lretval;
     cudaError_t (*lcudaEventCreate) (cudaEvent_t *) = (cudaError_t (*)(cudaEvent_t *))dlsym(RTLD_NEXT, "cudaEventCreate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventCreate", kApiTypeRuntime);
 
@@ -981,12 +1110,14 @@ cudaError_t cudaEventCreate(cudaEvent_t * event){
 
     return lretval;
 }
+#define cudaEventCreate cudaEventCreate
 
 
+#undef cudaEventCreateWithFlags
 cudaError_t cudaEventCreateWithFlags(cudaEvent_t * event, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaEventCreateWithFlags) (cudaEvent_t *, unsigned int) = (cudaError_t (*)(cudaEvent_t *, unsigned int))dlsym(RTLD_NEXT, "cudaEventCreateWithFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventCreateWithFlags", kApiTypeRuntime);
 
@@ -996,12 +1127,14 @@ cudaError_t cudaEventCreateWithFlags(cudaEvent_t * event, unsigned int flags){
 
     return lretval;
 }
+#define cudaEventCreateWithFlags cudaEventCreateWithFlags
 
 
+#undef cudaEventRecord
 cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaEventRecord) (cudaEvent_t, cudaStream_t) = (cudaError_t (*)(cudaEvent_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaEventRecord");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventRecord", kApiTypeRuntime);
 
@@ -1011,12 +1144,14 @@ cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream){
 
     return lretval;
 }
+#define cudaEventRecord cudaEventRecord
 
 
+#undef cudaEventRecordWithFlags
 cudaError_t cudaEventRecordWithFlags(cudaEvent_t event, cudaStream_t stream, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaEventRecordWithFlags) (cudaEvent_t, cudaStream_t, unsigned int) = (cudaError_t (*)(cudaEvent_t, cudaStream_t, unsigned int))dlsym(RTLD_NEXT, "cudaEventRecordWithFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventRecordWithFlags", kApiTypeRuntime);
 
@@ -1026,12 +1161,14 @@ cudaError_t cudaEventRecordWithFlags(cudaEvent_t event, cudaStream_t stream, uns
 
     return lretval;
 }
+#define cudaEventRecordWithFlags cudaEventRecordWithFlags
 
 
+#undef cudaEventQuery
 cudaError_t cudaEventQuery(cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaEventQuery) (cudaEvent_t) = (cudaError_t (*)(cudaEvent_t))dlsym(RTLD_NEXT, "cudaEventQuery");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventQuery", kApiTypeRuntime);
 
@@ -1041,12 +1178,14 @@ cudaError_t cudaEventQuery(cudaEvent_t event){
 
     return lretval;
 }
+#define cudaEventQuery cudaEventQuery
 
 
+#undef cudaEventSynchronize
 cudaError_t cudaEventSynchronize(cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaEventSynchronize) (cudaEvent_t) = (cudaError_t (*)(cudaEvent_t))dlsym(RTLD_NEXT, "cudaEventSynchronize");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventSynchronize", kApiTypeRuntime);
 
@@ -1056,12 +1195,14 @@ cudaError_t cudaEventSynchronize(cudaEvent_t event){
 
     return lretval;
 }
+#define cudaEventSynchronize cudaEventSynchronize
 
 
+#undef cudaEventDestroy
 cudaError_t cudaEventDestroy(cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaEventDestroy) (cudaEvent_t) = (cudaError_t (*)(cudaEvent_t))dlsym(RTLD_NEXT, "cudaEventDestroy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventDestroy", kApiTypeRuntime);
 
@@ -1071,12 +1212,14 @@ cudaError_t cudaEventDestroy(cudaEvent_t event){
 
     return lretval;
 }
+#define cudaEventDestroy cudaEventDestroy
 
 
+#undef cudaEventElapsedTime
 cudaError_t cudaEventElapsedTime(float * ms, cudaEvent_t start, cudaEvent_t end){
     cudaError_t lretval;
     cudaError_t (*lcudaEventElapsedTime) (float *, cudaEvent_t, cudaEvent_t) = (cudaError_t (*)(float *, cudaEvent_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaEventElapsedTime");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaEventElapsedTime", kApiTypeRuntime);
 
@@ -1086,12 +1229,14 @@ cudaError_t cudaEventElapsedTime(float * ms, cudaEvent_t start, cudaEvent_t end)
 
     return lretval;
 }
+#define cudaEventElapsedTime cudaEventElapsedTime
 
 
+#undef cudaImportExternalMemory
 cudaError_t cudaImportExternalMemory(cudaExternalMemory_t * extMem_out, cudaExternalMemoryHandleDesc const * memHandleDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaImportExternalMemory) (cudaExternalMemory_t *, cudaExternalMemoryHandleDesc const *) = (cudaError_t (*)(cudaExternalMemory_t *, cudaExternalMemoryHandleDesc const *))dlsym(RTLD_NEXT, "cudaImportExternalMemory");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaImportExternalMemory", kApiTypeRuntime);
 
@@ -1101,12 +1246,14 @@ cudaError_t cudaImportExternalMemory(cudaExternalMemory_t * extMem_out, cudaExte
 
     return lretval;
 }
+#define cudaImportExternalMemory cudaImportExternalMemory
 
 
+#undef cudaExternalMemoryGetMappedBuffer
 cudaError_t cudaExternalMemoryGetMappedBuffer(void * * devPtr, cudaExternalMemory_t extMem, cudaExternalMemoryBufferDesc const * bufferDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaExternalMemoryGetMappedBuffer) (void * *, cudaExternalMemory_t, cudaExternalMemoryBufferDesc const *) = (cudaError_t (*)(void * *, cudaExternalMemory_t, cudaExternalMemoryBufferDesc const *))dlsym(RTLD_NEXT, "cudaExternalMemoryGetMappedBuffer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaExternalMemoryGetMappedBuffer", kApiTypeRuntime);
 
@@ -1116,12 +1263,14 @@ cudaError_t cudaExternalMemoryGetMappedBuffer(void * * devPtr, cudaExternalMemor
 
     return lretval;
 }
+#define cudaExternalMemoryGetMappedBuffer cudaExternalMemoryGetMappedBuffer
 
 
+#undef cudaExternalMemoryGetMappedMipmappedArray
 cudaError_t cudaExternalMemoryGetMappedMipmappedArray(cudaMipmappedArray_t * mipmap, cudaExternalMemory_t extMem, cudaExternalMemoryMipmappedArrayDesc const * mipmapDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaExternalMemoryGetMappedMipmappedArray) (cudaMipmappedArray_t *, cudaExternalMemory_t, cudaExternalMemoryMipmappedArrayDesc const *) = (cudaError_t (*)(cudaMipmappedArray_t *, cudaExternalMemory_t, cudaExternalMemoryMipmappedArrayDesc const *))dlsym(RTLD_NEXT, "cudaExternalMemoryGetMappedMipmappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaExternalMemoryGetMappedMipmappedArray", kApiTypeRuntime);
 
@@ -1131,12 +1280,14 @@ cudaError_t cudaExternalMemoryGetMappedMipmappedArray(cudaMipmappedArray_t * mip
 
     return lretval;
 }
+#define cudaExternalMemoryGetMappedMipmappedArray cudaExternalMemoryGetMappedMipmappedArray
 
 
+#undef cudaDestroyExternalMemory
 cudaError_t cudaDestroyExternalMemory(cudaExternalMemory_t extMem){
     cudaError_t lretval;
     cudaError_t (*lcudaDestroyExternalMemory) (cudaExternalMemory_t) = (cudaError_t (*)(cudaExternalMemory_t))dlsym(RTLD_NEXT, "cudaDestroyExternalMemory");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDestroyExternalMemory", kApiTypeRuntime);
 
@@ -1146,12 +1297,14 @@ cudaError_t cudaDestroyExternalMemory(cudaExternalMemory_t extMem){
 
     return lretval;
 }
+#define cudaDestroyExternalMemory cudaDestroyExternalMemory
 
 
+#undef cudaImportExternalSemaphore
 cudaError_t cudaImportExternalSemaphore(cudaExternalSemaphore_t * extSem_out, cudaExternalSemaphoreHandleDesc const * semHandleDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaImportExternalSemaphore) (cudaExternalSemaphore_t *, cudaExternalSemaphoreHandleDesc const *) = (cudaError_t (*)(cudaExternalSemaphore_t *, cudaExternalSemaphoreHandleDesc const *))dlsym(RTLD_NEXT, "cudaImportExternalSemaphore");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaImportExternalSemaphore", kApiTypeRuntime);
 
@@ -1161,12 +1314,14 @@ cudaError_t cudaImportExternalSemaphore(cudaExternalSemaphore_t * extSem_out, cu
 
     return lretval;
 }
+#define cudaImportExternalSemaphore cudaImportExternalSemaphore
 
 
+#undef cudaSignalExternalSemaphoresAsync_v2
 cudaError_t cudaSignalExternalSemaphoresAsync_v2(cudaExternalSemaphore_t const * extSemArray, cudaExternalSemaphoreSignalParams const * paramsArray, unsigned int numExtSems, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaSignalExternalSemaphoresAsync_v2) (cudaExternalSemaphore_t const *, cudaExternalSemaphoreSignalParams const *, unsigned int, cudaStream_t) = (cudaError_t (*)(cudaExternalSemaphore_t const *, cudaExternalSemaphoreSignalParams const *, unsigned int, cudaStream_t))dlsym(RTLD_NEXT, "cudaSignalExternalSemaphoresAsync_v2");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSignalExternalSemaphoresAsync_v2", kApiTypeRuntime);
 
@@ -1176,12 +1331,14 @@ cudaError_t cudaSignalExternalSemaphoresAsync_v2(cudaExternalSemaphore_t const *
 
     return lretval;
 }
+#define cudaSignalExternalSemaphoresAsync_v2 cudaSignalExternalSemaphoresAsync_v2
 
 
+#undef cudaWaitExternalSemaphoresAsync_v2
 cudaError_t cudaWaitExternalSemaphoresAsync_v2(cudaExternalSemaphore_t const * extSemArray, cudaExternalSemaphoreWaitParams const * paramsArray, unsigned int numExtSems, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaWaitExternalSemaphoresAsync_v2) (cudaExternalSemaphore_t const *, cudaExternalSemaphoreWaitParams const *, unsigned int, cudaStream_t) = (cudaError_t (*)(cudaExternalSemaphore_t const *, cudaExternalSemaphoreWaitParams const *, unsigned int, cudaStream_t))dlsym(RTLD_NEXT, "cudaWaitExternalSemaphoresAsync_v2");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaWaitExternalSemaphoresAsync_v2", kApiTypeRuntime);
 
@@ -1191,12 +1348,14 @@ cudaError_t cudaWaitExternalSemaphoresAsync_v2(cudaExternalSemaphore_t const * e
 
     return lretval;
 }
+#define cudaWaitExternalSemaphoresAsync_v2 cudaWaitExternalSemaphoresAsync_v2
 
 
+#undef cudaDestroyExternalSemaphore
 cudaError_t cudaDestroyExternalSemaphore(cudaExternalSemaphore_t extSem){
     cudaError_t lretval;
     cudaError_t (*lcudaDestroyExternalSemaphore) (cudaExternalSemaphore_t) = (cudaError_t (*)(cudaExternalSemaphore_t))dlsym(RTLD_NEXT, "cudaDestroyExternalSemaphore");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDestroyExternalSemaphore", kApiTypeRuntime);
 
@@ -1206,12 +1365,14 @@ cudaError_t cudaDestroyExternalSemaphore(cudaExternalSemaphore_t extSem){
 
     return lretval;
 }
+#define cudaDestroyExternalSemaphore cudaDestroyExternalSemaphore
 
 
+#undef cudaLaunchKernel
 cudaError_t cudaLaunchKernel(void const * func, dim3 gridDim, dim3 blockDim, void * * args, size_t sharedMem, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaLaunchKernel) (void const *, dim3, dim3, void * *, size_t, cudaStream_t) = (cudaError_t (*)(void const *, dim3, dim3, void * *, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaLaunchKernel");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaLaunchKernel", kApiTypeRuntime);
 
@@ -1221,12 +1382,14 @@ cudaError_t cudaLaunchKernel(void const * func, dim3 gridDim, dim3 blockDim, voi
 
     return lretval;
 }
+#define cudaLaunchKernel cudaLaunchKernel
 
 
+#undef cudaLaunchCooperativeKernel
 cudaError_t cudaLaunchCooperativeKernel(void const * func, dim3 gridDim, dim3 blockDim, void * * args, size_t sharedMem, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaLaunchCooperativeKernel) (void const *, dim3, dim3, void * *, size_t, cudaStream_t) = (cudaError_t (*)(void const *, dim3, dim3, void * *, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaLaunchCooperativeKernel");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaLaunchCooperativeKernel", kApiTypeRuntime);
 
@@ -1236,12 +1399,14 @@ cudaError_t cudaLaunchCooperativeKernel(void const * func, dim3 gridDim, dim3 bl
 
     return lretval;
 }
+#define cudaLaunchCooperativeKernel cudaLaunchCooperativeKernel
 
 
+#undef cudaLaunchCooperativeKernelMultiDevice
 cudaError_t cudaLaunchCooperativeKernelMultiDevice(cudaLaunchParams * launchParamsList, unsigned int numDevices, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaLaunchCooperativeKernelMultiDevice) (cudaLaunchParams *, unsigned int, unsigned int) = (cudaError_t (*)(cudaLaunchParams *, unsigned int, unsigned int))dlsym(RTLD_NEXT, "cudaLaunchCooperativeKernelMultiDevice");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaLaunchCooperativeKernelMultiDevice", kApiTypeRuntime);
 
@@ -1251,12 +1416,14 @@ cudaError_t cudaLaunchCooperativeKernelMultiDevice(cudaLaunchParams * launchPara
 
     return lretval;
 }
+#define cudaLaunchCooperativeKernelMultiDevice cudaLaunchCooperativeKernelMultiDevice
 
 
+#undef cudaFuncSetCacheConfig
 cudaError_t cudaFuncSetCacheConfig(void const * func, cudaFuncCache cacheConfig){
     cudaError_t lretval;
     cudaError_t (*lcudaFuncSetCacheConfig) (void const *, cudaFuncCache) = (cudaError_t (*)(void const *, cudaFuncCache))dlsym(RTLD_NEXT, "cudaFuncSetCacheConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFuncSetCacheConfig", kApiTypeRuntime);
 
@@ -1266,12 +1433,14 @@ cudaError_t cudaFuncSetCacheConfig(void const * func, cudaFuncCache cacheConfig)
 
     return lretval;
 }
+#define cudaFuncSetCacheConfig cudaFuncSetCacheConfig
 
 
+#undef cudaFuncSetSharedMemConfig
 cudaError_t cudaFuncSetSharedMemConfig(void const * func, cudaSharedMemConfig config){
     cudaError_t lretval;
     cudaError_t (*lcudaFuncSetSharedMemConfig) (void const *, cudaSharedMemConfig) = (cudaError_t (*)(void const *, cudaSharedMemConfig))dlsym(RTLD_NEXT, "cudaFuncSetSharedMemConfig");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFuncSetSharedMemConfig", kApiTypeRuntime);
 
@@ -1281,12 +1450,14 @@ cudaError_t cudaFuncSetSharedMemConfig(void const * func, cudaSharedMemConfig co
 
     return lretval;
 }
+#define cudaFuncSetSharedMemConfig cudaFuncSetSharedMemConfig
 
 
+#undef cudaFuncGetAttributes
 cudaError_t cudaFuncGetAttributes(cudaFuncAttributes * attr, void const * func){
     cudaError_t lretval;
     cudaError_t (*lcudaFuncGetAttributes) (cudaFuncAttributes *, void const *) = (cudaError_t (*)(cudaFuncAttributes *, void const *))dlsym(RTLD_NEXT, "cudaFuncGetAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFuncGetAttributes", kApiTypeRuntime);
 
@@ -1296,12 +1467,14 @@ cudaError_t cudaFuncGetAttributes(cudaFuncAttributes * attr, void const * func){
 
     return lretval;
 }
+#define cudaFuncGetAttributes cudaFuncGetAttributes
 
 
+#undef cudaFuncSetAttribute
 cudaError_t cudaFuncSetAttribute(void const * func, cudaFuncAttribute attr, int value){
     cudaError_t lretval;
     cudaError_t (*lcudaFuncSetAttribute) (void const *, cudaFuncAttribute, int) = (cudaError_t (*)(void const *, cudaFuncAttribute, int))dlsym(RTLD_NEXT, "cudaFuncSetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFuncSetAttribute", kApiTypeRuntime);
 
@@ -1311,12 +1484,14 @@ cudaError_t cudaFuncSetAttribute(void const * func, cudaFuncAttribute attr, int 
 
     return lretval;
 }
+#define cudaFuncSetAttribute cudaFuncSetAttribute
 
 
+#undef cudaSetDoubleForDevice
 cudaError_t cudaSetDoubleForDevice(double * d){
     cudaError_t lretval;
     cudaError_t (*lcudaSetDoubleForDevice) (double *) = (cudaError_t (*)(double *))dlsym(RTLD_NEXT, "cudaSetDoubleForDevice");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSetDoubleForDevice", kApiTypeRuntime);
 
@@ -1326,12 +1501,14 @@ cudaError_t cudaSetDoubleForDevice(double * d){
 
     return lretval;
 }
+#define cudaSetDoubleForDevice cudaSetDoubleForDevice
 
 
+#undef cudaSetDoubleForHost
 cudaError_t cudaSetDoubleForHost(double * d){
     cudaError_t lretval;
     cudaError_t (*lcudaSetDoubleForHost) (double *) = (cudaError_t (*)(double *))dlsym(RTLD_NEXT, "cudaSetDoubleForHost");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaSetDoubleForHost", kApiTypeRuntime);
 
@@ -1341,12 +1518,14 @@ cudaError_t cudaSetDoubleForHost(double * d){
 
     return lretval;
 }
+#define cudaSetDoubleForHost cudaSetDoubleForHost
 
 
+#undef cudaLaunchHostFunc
 cudaError_t cudaLaunchHostFunc(cudaStream_t stream, cudaHostFn_t fn, void * userData){
     cudaError_t lretval;
     cudaError_t (*lcudaLaunchHostFunc) (cudaStream_t, cudaHostFn_t, void *) = (cudaError_t (*)(cudaStream_t, cudaHostFn_t, void *))dlsym(RTLD_NEXT, "cudaLaunchHostFunc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaLaunchHostFunc", kApiTypeRuntime);
 
@@ -1356,12 +1535,14 @@ cudaError_t cudaLaunchHostFunc(cudaStream_t stream, cudaHostFn_t fn, void * user
 
     return lretval;
 }
+#define cudaLaunchHostFunc cudaLaunchHostFunc
 
 
+#undef cudaOccupancyMaxActiveBlocksPerMultiprocessor
 cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessor(int * numBlocks, void const * func, int blockSize, size_t dynamicSMemSize){
     cudaError_t lretval;
     cudaError_t (*lcudaOccupancyMaxActiveBlocksPerMultiprocessor) (int *, void const *, int, size_t) = (cudaError_t (*)(int *, void const *, int, size_t))dlsym(RTLD_NEXT, "cudaOccupancyMaxActiveBlocksPerMultiprocessor");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaOccupancyMaxActiveBlocksPerMultiprocessor", kApiTypeRuntime);
 
@@ -1371,12 +1552,14 @@ cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessor(int * numBlocks, void 
 
     return lretval;
 }
+#define cudaOccupancyMaxActiveBlocksPerMultiprocessor cudaOccupancyMaxActiveBlocksPerMultiprocessor
 
 
+#undef cudaOccupancyAvailableDynamicSMemPerBlock
 cudaError_t cudaOccupancyAvailableDynamicSMemPerBlock(size_t * dynamicSmemSize, void const * func, int numBlocks, int blockSize){
     cudaError_t lretval;
     cudaError_t (*lcudaOccupancyAvailableDynamicSMemPerBlock) (size_t *, void const *, int, int) = (cudaError_t (*)(size_t *, void const *, int, int))dlsym(RTLD_NEXT, "cudaOccupancyAvailableDynamicSMemPerBlock");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaOccupancyAvailableDynamicSMemPerBlock", kApiTypeRuntime);
 
@@ -1386,12 +1569,14 @@ cudaError_t cudaOccupancyAvailableDynamicSMemPerBlock(size_t * dynamicSmemSize, 
 
     return lretval;
 }
+#define cudaOccupancyAvailableDynamicSMemPerBlock cudaOccupancyAvailableDynamicSMemPerBlock
 
 
+#undef cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags
 cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(int * numBlocks, void const * func, int blockSize, size_t dynamicSMemSize, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags) (int *, void const *, int, size_t, unsigned int) = (cudaError_t (*)(int *, void const *, int, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags", kApiTypeRuntime);
 
@@ -1401,12 +1586,14 @@ cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(int * numBloc
 
     return lretval;
 }
+#define cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags
 
 
+#undef cudaMallocManaged
 cudaError_t cudaMallocManaged(void * * devPtr, size_t size, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocManaged) (void * *, size_t, unsigned int) = (cudaError_t (*)(void * *, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaMallocManaged");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocManaged", kApiTypeRuntime);
 
@@ -1416,12 +1603,14 @@ cudaError_t cudaMallocManaged(void * * devPtr, size_t size, unsigned int flags){
 
     return lretval;
 }
+#define cudaMallocManaged cudaMallocManaged
 
 
+#undef cudaMalloc
 cudaError_t cudaMalloc(void * * devPtr, size_t size){
     cudaError_t lretval;
     cudaError_t (*lcudaMalloc) (void * *, size_t) = (cudaError_t (*)(void * *, size_t))dlsym(RTLD_NEXT, "cudaMalloc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMalloc", kApiTypeRuntime);
 
@@ -1431,12 +1620,14 @@ cudaError_t cudaMalloc(void * * devPtr, size_t size){
 
     return lretval;
 }
+#define cudaMalloc cudaMalloc
 
 
+#undef cudaMallocHost
 cudaError_t cudaMallocHost(void * * ptr, size_t size){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocHost) (void * *, size_t) = (cudaError_t (*)(void * *, size_t))dlsym(RTLD_NEXT, "cudaMallocHost");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocHost", kApiTypeRuntime);
 
@@ -1446,12 +1637,14 @@ cudaError_t cudaMallocHost(void * * ptr, size_t size){
 
     return lretval;
 }
+#define cudaMallocHost cudaMallocHost
 
 
+#undef cudaMallocPitch
 cudaError_t cudaMallocPitch(void * * devPtr, size_t * pitch, size_t width, size_t height){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocPitch) (void * *, size_t *, size_t, size_t) = (cudaError_t (*)(void * *, size_t *, size_t, size_t))dlsym(RTLD_NEXT, "cudaMallocPitch");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocPitch", kApiTypeRuntime);
 
@@ -1461,12 +1654,14 @@ cudaError_t cudaMallocPitch(void * * devPtr, size_t * pitch, size_t width, size_
 
     return lretval;
 }
+#define cudaMallocPitch cudaMallocPitch
 
 
+#undef cudaMallocArray
 cudaError_t cudaMallocArray(cudaArray_t * array, cudaChannelFormatDesc const * desc, size_t width, size_t height, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocArray) (cudaArray_t *, cudaChannelFormatDesc const *, size_t, size_t, unsigned int) = (cudaError_t (*)(cudaArray_t *, cudaChannelFormatDesc const *, size_t, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaMallocArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocArray", kApiTypeRuntime);
 
@@ -1476,12 +1671,14 @@ cudaError_t cudaMallocArray(cudaArray_t * array, cudaChannelFormatDesc const * d
 
     return lretval;
 }
+#define cudaMallocArray cudaMallocArray
 
 
+#undef cudaFree
 cudaError_t cudaFree(void * devPtr){
     cudaError_t lretval;
     cudaError_t (*lcudaFree) (void *) = (cudaError_t (*)(void *))dlsym(RTLD_NEXT, "cudaFree");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFree", kApiTypeRuntime);
 
@@ -1491,12 +1688,14 @@ cudaError_t cudaFree(void * devPtr){
 
     return lretval;
 }
+#define cudaFree cudaFree
 
 
+#undef cudaFreeHost
 cudaError_t cudaFreeHost(void * ptr){
     cudaError_t lretval;
     cudaError_t (*lcudaFreeHost) (void *) = (cudaError_t (*)(void *))dlsym(RTLD_NEXT, "cudaFreeHost");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFreeHost", kApiTypeRuntime);
 
@@ -1506,12 +1705,14 @@ cudaError_t cudaFreeHost(void * ptr){
 
     return lretval;
 }
+#define cudaFreeHost cudaFreeHost
 
 
+#undef cudaFreeArray
 cudaError_t cudaFreeArray(cudaArray_t array){
     cudaError_t lretval;
     cudaError_t (*lcudaFreeArray) (cudaArray_t) = (cudaError_t (*)(cudaArray_t))dlsym(RTLD_NEXT, "cudaFreeArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFreeArray", kApiTypeRuntime);
 
@@ -1521,12 +1722,14 @@ cudaError_t cudaFreeArray(cudaArray_t array){
 
     return lretval;
 }
+#define cudaFreeArray cudaFreeArray
 
 
+#undef cudaFreeMipmappedArray
 cudaError_t cudaFreeMipmappedArray(cudaMipmappedArray_t mipmappedArray){
     cudaError_t lretval;
     cudaError_t (*lcudaFreeMipmappedArray) (cudaMipmappedArray_t) = (cudaError_t (*)(cudaMipmappedArray_t))dlsym(RTLD_NEXT, "cudaFreeMipmappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFreeMipmappedArray", kApiTypeRuntime);
 
@@ -1536,12 +1739,14 @@ cudaError_t cudaFreeMipmappedArray(cudaMipmappedArray_t mipmappedArray){
 
     return lretval;
 }
+#define cudaFreeMipmappedArray cudaFreeMipmappedArray
 
 
+#undef cudaHostAlloc
 cudaError_t cudaHostAlloc(void * * pHost, size_t size, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaHostAlloc) (void * *, size_t, unsigned int) = (cudaError_t (*)(void * *, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaHostAlloc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaHostAlloc", kApiTypeRuntime);
 
@@ -1551,12 +1756,14 @@ cudaError_t cudaHostAlloc(void * * pHost, size_t size, unsigned int flags){
 
     return lretval;
 }
+#define cudaHostAlloc cudaHostAlloc
 
 
+#undef cudaHostRegister
 cudaError_t cudaHostRegister(void * ptr, size_t size, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaHostRegister) (void *, size_t, unsigned int) = (cudaError_t (*)(void *, size_t, unsigned int))dlsym(RTLD_NEXT, "cudaHostRegister");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaHostRegister", kApiTypeRuntime);
 
@@ -1566,12 +1773,14 @@ cudaError_t cudaHostRegister(void * ptr, size_t size, unsigned int flags){
 
     return lretval;
 }
+#define cudaHostRegister cudaHostRegister
 
 
+#undef cudaHostUnregister
 cudaError_t cudaHostUnregister(void * ptr){
     cudaError_t lretval;
     cudaError_t (*lcudaHostUnregister) (void *) = (cudaError_t (*)(void *))dlsym(RTLD_NEXT, "cudaHostUnregister");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaHostUnregister", kApiTypeRuntime);
 
@@ -1581,12 +1790,14 @@ cudaError_t cudaHostUnregister(void * ptr){
 
     return lretval;
 }
+#define cudaHostUnregister cudaHostUnregister
 
 
+#undef cudaHostGetDevicePointer
 cudaError_t cudaHostGetDevicePointer(void * * pDevice, void * pHost, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaHostGetDevicePointer) (void * *, void *, unsigned int) = (cudaError_t (*)(void * *, void *, unsigned int))dlsym(RTLD_NEXT, "cudaHostGetDevicePointer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaHostGetDevicePointer", kApiTypeRuntime);
 
@@ -1596,12 +1807,14 @@ cudaError_t cudaHostGetDevicePointer(void * * pDevice, void * pHost, unsigned in
 
     return lretval;
 }
+#define cudaHostGetDevicePointer cudaHostGetDevicePointer
 
 
+#undef cudaHostGetFlags
 cudaError_t cudaHostGetFlags(unsigned int * pFlags, void * pHost){
     cudaError_t lretval;
     cudaError_t (*lcudaHostGetFlags) (unsigned int *, void *) = (cudaError_t (*)(unsigned int *, void *))dlsym(RTLD_NEXT, "cudaHostGetFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaHostGetFlags", kApiTypeRuntime);
 
@@ -1611,12 +1824,14 @@ cudaError_t cudaHostGetFlags(unsigned int * pFlags, void * pHost){
 
     return lretval;
 }
+#define cudaHostGetFlags cudaHostGetFlags
 
 
+#undef cudaMalloc3D
 cudaError_t cudaMalloc3D(cudaPitchedPtr * pitchedDevPtr, cudaExtent extent){
     cudaError_t lretval;
     cudaError_t (*lcudaMalloc3D) (cudaPitchedPtr *, cudaExtent) = (cudaError_t (*)(cudaPitchedPtr *, cudaExtent))dlsym(RTLD_NEXT, "cudaMalloc3D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMalloc3D", kApiTypeRuntime);
 
@@ -1626,12 +1841,14 @@ cudaError_t cudaMalloc3D(cudaPitchedPtr * pitchedDevPtr, cudaExtent extent){
 
     return lretval;
 }
+#define cudaMalloc3D cudaMalloc3D
 
 
+#undef cudaMalloc3DArray
 cudaError_t cudaMalloc3DArray(cudaArray_t * array, cudaChannelFormatDesc const * desc, cudaExtent extent, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMalloc3DArray) (cudaArray_t *, cudaChannelFormatDesc const *, cudaExtent, unsigned int) = (cudaError_t (*)(cudaArray_t *, cudaChannelFormatDesc const *, cudaExtent, unsigned int))dlsym(RTLD_NEXT, "cudaMalloc3DArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMalloc3DArray", kApiTypeRuntime);
 
@@ -1641,12 +1858,14 @@ cudaError_t cudaMalloc3DArray(cudaArray_t * array, cudaChannelFormatDesc const *
 
     return lretval;
 }
+#define cudaMalloc3DArray cudaMalloc3DArray
 
 
+#undef cudaMallocMipmappedArray
 cudaError_t cudaMallocMipmappedArray(cudaMipmappedArray_t * mipmappedArray, cudaChannelFormatDesc const * desc, cudaExtent extent, unsigned int numLevels, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocMipmappedArray) (cudaMipmappedArray_t *, cudaChannelFormatDesc const *, cudaExtent, unsigned int, unsigned int) = (cudaError_t (*)(cudaMipmappedArray_t *, cudaChannelFormatDesc const *, cudaExtent, unsigned int, unsigned int))dlsym(RTLD_NEXT, "cudaMallocMipmappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocMipmappedArray", kApiTypeRuntime);
 
@@ -1656,12 +1875,14 @@ cudaError_t cudaMallocMipmappedArray(cudaMipmappedArray_t * mipmappedArray, cuda
 
     return lretval;
 }
+#define cudaMallocMipmappedArray cudaMallocMipmappedArray
 
 
+#undef cudaGetMipmappedArrayLevel
 cudaError_t cudaGetMipmappedArrayLevel(cudaArray_t * levelArray, cudaMipmappedArray_const_t mipmappedArray, unsigned int level){
     cudaError_t lretval;
     cudaError_t (*lcudaGetMipmappedArrayLevel) (cudaArray_t *, cudaMipmappedArray_const_t, unsigned int) = (cudaError_t (*)(cudaArray_t *, cudaMipmappedArray_const_t, unsigned int))dlsym(RTLD_NEXT, "cudaGetMipmappedArrayLevel");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetMipmappedArrayLevel", kApiTypeRuntime);
 
@@ -1671,12 +1892,14 @@ cudaError_t cudaGetMipmappedArrayLevel(cudaArray_t * levelArray, cudaMipmappedAr
 
     return lretval;
 }
+#define cudaGetMipmappedArrayLevel cudaGetMipmappedArrayLevel
 
 
+#undef cudaMemcpy3D
 cudaError_t cudaMemcpy3D(cudaMemcpy3DParms const * p){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy3D) (cudaMemcpy3DParms const *) = (cudaError_t (*)(cudaMemcpy3DParms const *))dlsym(RTLD_NEXT, "cudaMemcpy3D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy3D", kApiTypeRuntime);
 
@@ -1686,12 +1909,14 @@ cudaError_t cudaMemcpy3D(cudaMemcpy3DParms const * p){
 
     return lretval;
 }
+#define cudaMemcpy3D cudaMemcpy3D
 
 
+#undef cudaMemcpy3DPeer
 cudaError_t cudaMemcpy3DPeer(cudaMemcpy3DPeerParms const * p){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy3DPeer) (cudaMemcpy3DPeerParms const *) = (cudaError_t (*)(cudaMemcpy3DPeerParms const *))dlsym(RTLD_NEXT, "cudaMemcpy3DPeer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy3DPeer", kApiTypeRuntime);
 
@@ -1701,12 +1926,14 @@ cudaError_t cudaMemcpy3DPeer(cudaMemcpy3DPeerParms const * p){
 
     return lretval;
 }
+#define cudaMemcpy3DPeer cudaMemcpy3DPeer
 
 
+#undef cudaMemcpy3DAsync
 cudaError_t cudaMemcpy3DAsync(cudaMemcpy3DParms const * p, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy3DAsync) (cudaMemcpy3DParms const *, cudaStream_t) = (cudaError_t (*)(cudaMemcpy3DParms const *, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpy3DAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy3DAsync", kApiTypeRuntime);
 
@@ -1716,12 +1943,14 @@ cudaError_t cudaMemcpy3DAsync(cudaMemcpy3DParms const * p, cudaStream_t stream){
 
     return lretval;
 }
+#define cudaMemcpy3DAsync cudaMemcpy3DAsync
 
 
+#undef cudaMemcpy3DPeerAsync
 cudaError_t cudaMemcpy3DPeerAsync(cudaMemcpy3DPeerParms const * p, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy3DPeerAsync) (cudaMemcpy3DPeerParms const *, cudaStream_t) = (cudaError_t (*)(cudaMemcpy3DPeerParms const *, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpy3DPeerAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy3DPeerAsync", kApiTypeRuntime);
 
@@ -1731,12 +1960,14 @@ cudaError_t cudaMemcpy3DPeerAsync(cudaMemcpy3DPeerParms const * p, cudaStream_t 
 
     return lretval;
 }
+#define cudaMemcpy3DPeerAsync cudaMemcpy3DPeerAsync
 
 
+#undef cudaMemGetInfo
 cudaError_t cudaMemGetInfo(size_t * free, size_t * total){
     cudaError_t lretval;
     cudaError_t (*lcudaMemGetInfo) (size_t *, size_t *) = (cudaError_t (*)(size_t *, size_t *))dlsym(RTLD_NEXT, "cudaMemGetInfo");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemGetInfo", kApiTypeRuntime);
 
@@ -1746,12 +1977,14 @@ cudaError_t cudaMemGetInfo(size_t * free, size_t * total){
 
     return lretval;
 }
+#define cudaMemGetInfo cudaMemGetInfo
 
 
+#undef cudaArrayGetInfo
 cudaError_t cudaArrayGetInfo(cudaChannelFormatDesc * desc, cudaExtent * extent, unsigned int * flags, cudaArray_t array){
     cudaError_t lretval;
     cudaError_t (*lcudaArrayGetInfo) (cudaChannelFormatDesc *, cudaExtent *, unsigned int *, cudaArray_t) = (cudaError_t (*)(cudaChannelFormatDesc *, cudaExtent *, unsigned int *, cudaArray_t))dlsym(RTLD_NEXT, "cudaArrayGetInfo");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaArrayGetInfo", kApiTypeRuntime);
 
@@ -1761,12 +1994,14 @@ cudaError_t cudaArrayGetInfo(cudaChannelFormatDesc * desc, cudaExtent * extent, 
 
     return lretval;
 }
+#define cudaArrayGetInfo cudaArrayGetInfo
 
 
+#undef cudaArrayGetPlane
 cudaError_t cudaArrayGetPlane(cudaArray_t * pPlaneArray, cudaArray_t hArray, unsigned int planeIdx){
     cudaError_t lretval;
     cudaError_t (*lcudaArrayGetPlane) (cudaArray_t *, cudaArray_t, unsigned int) = (cudaError_t (*)(cudaArray_t *, cudaArray_t, unsigned int))dlsym(RTLD_NEXT, "cudaArrayGetPlane");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaArrayGetPlane", kApiTypeRuntime);
 
@@ -1776,12 +2011,14 @@ cudaError_t cudaArrayGetPlane(cudaArray_t * pPlaneArray, cudaArray_t hArray, uns
 
     return lretval;
 }
+#define cudaArrayGetPlane cudaArrayGetPlane
 
 
+#undef cudaArrayGetSparseProperties
 cudaError_t cudaArrayGetSparseProperties(cudaArraySparseProperties * sparseProperties, cudaArray_t array){
     cudaError_t lretval;
     cudaError_t (*lcudaArrayGetSparseProperties) (cudaArraySparseProperties *, cudaArray_t) = (cudaError_t (*)(cudaArraySparseProperties *, cudaArray_t))dlsym(RTLD_NEXT, "cudaArrayGetSparseProperties");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaArrayGetSparseProperties", kApiTypeRuntime);
 
@@ -1791,12 +2028,14 @@ cudaError_t cudaArrayGetSparseProperties(cudaArraySparseProperties * sparsePrope
 
     return lretval;
 }
+#define cudaArrayGetSparseProperties cudaArrayGetSparseProperties
 
 
+#undef cudaMipmappedArrayGetSparseProperties
 cudaError_t cudaMipmappedArrayGetSparseProperties(cudaArraySparseProperties * sparseProperties, cudaMipmappedArray_t mipmap){
     cudaError_t lretval;
     cudaError_t (*lcudaMipmappedArrayGetSparseProperties) (cudaArraySparseProperties *, cudaMipmappedArray_t) = (cudaError_t (*)(cudaArraySparseProperties *, cudaMipmappedArray_t))dlsym(RTLD_NEXT, "cudaMipmappedArrayGetSparseProperties");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMipmappedArrayGetSparseProperties", kApiTypeRuntime);
 
@@ -1806,12 +2045,14 @@ cudaError_t cudaMipmappedArrayGetSparseProperties(cudaArraySparseProperties * sp
 
     return lretval;
 }
+#define cudaMipmappedArrayGetSparseProperties cudaMipmappedArrayGetSparseProperties
 
 
+#undef cudaMemcpy
 cudaError_t cudaMemcpy(void * dst, void const * src, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy) (void *, void const *, size_t, cudaMemcpyKind) = (cudaError_t (*)(void *, void const *, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy", kApiTypeRuntime);
 
@@ -1821,12 +2062,14 @@ cudaError_t cudaMemcpy(void * dst, void const * src, size_t count, cudaMemcpyKin
 
     return lretval;
 }
+#define cudaMemcpy cudaMemcpy
 
 
+#undef cudaMemcpyPeer
 cudaError_t cudaMemcpyPeer(void * dst, int dstDevice, void const * src, int srcDevice, size_t count){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyPeer) (void *, int, void const *, int, size_t) = (cudaError_t (*)(void *, int, void const *, int, size_t))dlsym(RTLD_NEXT, "cudaMemcpyPeer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyPeer", kApiTypeRuntime);
 
@@ -1836,12 +2079,14 @@ cudaError_t cudaMemcpyPeer(void * dst, int dstDevice, void const * src, int srcD
 
     return lretval;
 }
+#define cudaMemcpyPeer cudaMemcpyPeer
 
 
+#undef cudaMemcpy2D
 cudaError_t cudaMemcpy2D(void * dst, size_t dpitch, void const * src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2D) (void *, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(void *, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpy2D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2D", kApiTypeRuntime);
 
@@ -1851,12 +2096,14 @@ cudaError_t cudaMemcpy2D(void * dst, size_t dpitch, void const * src, size_t spi
 
     return lretval;
 }
+#define cudaMemcpy2D cudaMemcpy2D
 
 
+#undef cudaMemcpy2DToArray
 cudaError_t cudaMemcpy2DToArray(cudaArray_t dst, size_t wOffset, size_t hOffset, void const * src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DToArray) (cudaArray_t, size_t, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaArray_t, size_t, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpy2DToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DToArray", kApiTypeRuntime);
 
@@ -1866,12 +2113,14 @@ cudaError_t cudaMemcpy2DToArray(cudaArray_t dst, size_t wOffset, size_t hOffset,
 
     return lretval;
 }
+#define cudaMemcpy2DToArray cudaMemcpy2DToArray
 
 
+#undef cudaMemcpy2DFromArray
 cudaError_t cudaMemcpy2DFromArray(void * dst, size_t dpitch, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t width, size_t height, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DFromArray) (void *, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(void *, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpy2DFromArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DFromArray", kApiTypeRuntime);
 
@@ -1881,12 +2130,14 @@ cudaError_t cudaMemcpy2DFromArray(void * dst, size_t dpitch, cudaArray_const_t s
 
     return lretval;
 }
+#define cudaMemcpy2DFromArray cudaMemcpy2DFromArray
 
 
+#undef cudaMemcpy2DArrayToArray
 cudaError_t cudaMemcpy2DArrayToArray(cudaArray_t dst, size_t wOffsetDst, size_t hOffsetDst, cudaArray_const_t src, size_t wOffsetSrc, size_t hOffsetSrc, size_t width, size_t height, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DArrayToArray) (cudaArray_t, size_t, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaArray_t, size_t, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpy2DArrayToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DArrayToArray", kApiTypeRuntime);
 
@@ -1896,12 +2147,14 @@ cudaError_t cudaMemcpy2DArrayToArray(cudaArray_t dst, size_t wOffsetDst, size_t 
 
     return lretval;
 }
+#define cudaMemcpy2DArrayToArray cudaMemcpy2DArrayToArray
 
 
+#undef cudaMemcpyToSymbol
 cudaError_t cudaMemcpyToSymbol(void const * symbol, void const * src, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyToSymbol) (void const *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(void const *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpyToSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyToSymbol", kApiTypeRuntime);
 
@@ -1911,12 +2164,14 @@ cudaError_t cudaMemcpyToSymbol(void const * symbol, void const * src, size_t cou
 
     return lretval;
 }
+#define cudaMemcpyToSymbol cudaMemcpyToSymbol
 
 
+#undef cudaMemcpyFromSymbol
 cudaError_t cudaMemcpyFromSymbol(void * dst, void const * symbol, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyFromSymbol) (void *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(void *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpyFromSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyFromSymbol", kApiTypeRuntime);
 
@@ -1926,12 +2181,14 @@ cudaError_t cudaMemcpyFromSymbol(void * dst, void const * symbol, size_t count, 
 
     return lretval;
 }
+#define cudaMemcpyFromSymbol cudaMemcpyFromSymbol
 
 
+#undef cudaMemcpyAsync
 cudaError_t cudaMemcpyAsync(void * dst, void const * src, size_t count, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyAsync) (void *, void const *, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void *, void const *, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyAsync", kApiTypeRuntime);
 
@@ -1941,12 +2198,14 @@ cudaError_t cudaMemcpyAsync(void * dst, void const * src, size_t count, cudaMemc
 
     return lretval;
 }
+#define cudaMemcpyAsync cudaMemcpyAsync
 
 
+#undef cudaMemcpyPeerAsync
 cudaError_t cudaMemcpyPeerAsync(void * dst, int dstDevice, void const * src, int srcDevice, size_t count, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyPeerAsync) (void *, int, void const *, int, size_t, cudaStream_t) = (cudaError_t (*)(void *, int, void const *, int, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyPeerAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyPeerAsync", kApiTypeRuntime);
 
@@ -1956,12 +2215,14 @@ cudaError_t cudaMemcpyPeerAsync(void * dst, int dstDevice, void const * src, int
 
     return lretval;
 }
+#define cudaMemcpyPeerAsync cudaMemcpyPeerAsync
 
 
+#undef cudaMemcpy2DAsync
 cudaError_t cudaMemcpy2DAsync(void * dst, size_t dpitch, void const * src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DAsync) (void *, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void *, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpy2DAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DAsync", kApiTypeRuntime);
 
@@ -1971,12 +2232,14 @@ cudaError_t cudaMemcpy2DAsync(void * dst, size_t dpitch, void const * src, size_
 
     return lretval;
 }
+#define cudaMemcpy2DAsync cudaMemcpy2DAsync
 
 
+#undef cudaMemcpy2DToArrayAsync
 cudaError_t cudaMemcpy2DToArrayAsync(cudaArray_t dst, size_t wOffset, size_t hOffset, void const * src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DToArrayAsync) (cudaArray_t, size_t, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(cudaArray_t, size_t, size_t, void const *, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpy2DToArrayAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DToArrayAsync", kApiTypeRuntime);
 
@@ -1986,12 +2249,14 @@ cudaError_t cudaMemcpy2DToArrayAsync(cudaArray_t dst, size_t wOffset, size_t hOf
 
     return lretval;
 }
+#define cudaMemcpy2DToArrayAsync cudaMemcpy2DToArrayAsync
 
 
+#undef cudaMemcpy2DFromArrayAsync
 cudaError_t cudaMemcpy2DFromArrayAsync(void * dst, size_t dpitch, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpy2DFromArrayAsync) (void *, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void *, size_t, cudaArray_const_t, size_t, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpy2DFromArrayAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpy2DFromArrayAsync", kApiTypeRuntime);
 
@@ -2001,12 +2266,14 @@ cudaError_t cudaMemcpy2DFromArrayAsync(void * dst, size_t dpitch, cudaArray_cons
 
     return lretval;
 }
+#define cudaMemcpy2DFromArrayAsync cudaMemcpy2DFromArrayAsync
 
 
+#undef cudaMemcpyToSymbolAsync
 cudaError_t cudaMemcpyToSymbolAsync(void const * symbol, void const * src, size_t count, size_t offset, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyToSymbolAsync) (void const *, void const *, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void const *, void const *, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyToSymbolAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyToSymbolAsync", kApiTypeRuntime);
 
@@ -2016,12 +2283,14 @@ cudaError_t cudaMemcpyToSymbolAsync(void const * symbol, void const * src, size_
 
     return lretval;
 }
+#define cudaMemcpyToSymbolAsync cudaMemcpyToSymbolAsync
 
 
+#undef cudaMemcpyFromSymbolAsync
 cudaError_t cudaMemcpyFromSymbolAsync(void * dst, void const * symbol, size_t count, size_t offset, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyFromSymbolAsync) (void *, void const *, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void *, void const *, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyFromSymbolAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyFromSymbolAsync", kApiTypeRuntime);
 
@@ -2031,12 +2300,14 @@ cudaError_t cudaMemcpyFromSymbolAsync(void * dst, void const * symbol, size_t co
 
     return lretval;
 }
+#define cudaMemcpyFromSymbolAsync cudaMemcpyFromSymbolAsync
 
 
+#undef cudaMemset
 cudaError_t cudaMemset(void * devPtr, int value, size_t count){
     cudaError_t lretval;
     cudaError_t (*lcudaMemset) (void *, int, size_t) = (cudaError_t (*)(void *, int, size_t))dlsym(RTLD_NEXT, "cudaMemset");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemset", kApiTypeRuntime);
 
@@ -2046,12 +2317,14 @@ cudaError_t cudaMemset(void * devPtr, int value, size_t count){
 
     return lretval;
 }
+#define cudaMemset cudaMemset
 
 
+#undef cudaMemset2D
 cudaError_t cudaMemset2D(void * devPtr, size_t pitch, int value, size_t width, size_t height){
     cudaError_t lretval;
     cudaError_t (*lcudaMemset2D) (void *, size_t, int, size_t, size_t) = (cudaError_t (*)(void *, size_t, int, size_t, size_t))dlsym(RTLD_NEXT, "cudaMemset2D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemset2D", kApiTypeRuntime);
 
@@ -2061,12 +2334,14 @@ cudaError_t cudaMemset2D(void * devPtr, size_t pitch, int value, size_t width, s
 
     return lretval;
 }
+#define cudaMemset2D cudaMemset2D
 
 
+#undef cudaMemset3D
 cudaError_t cudaMemset3D(cudaPitchedPtr pitchedDevPtr, int value, cudaExtent extent){
     cudaError_t lretval;
     cudaError_t (*lcudaMemset3D) (cudaPitchedPtr, int, cudaExtent) = (cudaError_t (*)(cudaPitchedPtr, int, cudaExtent))dlsym(RTLD_NEXT, "cudaMemset3D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemset3D", kApiTypeRuntime);
 
@@ -2076,12 +2351,14 @@ cudaError_t cudaMemset3D(cudaPitchedPtr pitchedDevPtr, int value, cudaExtent ext
 
     return lretval;
 }
+#define cudaMemset3D cudaMemset3D
 
 
+#undef cudaMemsetAsync
 cudaError_t cudaMemsetAsync(void * devPtr, int value, size_t count, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemsetAsync) (void *, int, size_t, cudaStream_t) = (cudaError_t (*)(void *, int, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemsetAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemsetAsync", kApiTypeRuntime);
 
@@ -2091,12 +2368,14 @@ cudaError_t cudaMemsetAsync(void * devPtr, int value, size_t count, cudaStream_t
 
     return lretval;
 }
+#define cudaMemsetAsync cudaMemsetAsync
 
 
+#undef cudaMemset2DAsync
 cudaError_t cudaMemset2DAsync(void * devPtr, size_t pitch, int value, size_t width, size_t height, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemset2DAsync) (void *, size_t, int, size_t, size_t, cudaStream_t) = (cudaError_t (*)(void *, size_t, int, size_t, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemset2DAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemset2DAsync", kApiTypeRuntime);
 
@@ -2106,12 +2385,14 @@ cudaError_t cudaMemset2DAsync(void * devPtr, size_t pitch, int value, size_t wid
 
     return lretval;
 }
+#define cudaMemset2DAsync cudaMemset2DAsync
 
 
+#undef cudaMemset3DAsync
 cudaError_t cudaMemset3DAsync(cudaPitchedPtr pitchedDevPtr, int value, cudaExtent extent, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemset3DAsync) (cudaPitchedPtr, int, cudaExtent, cudaStream_t) = (cudaError_t (*)(cudaPitchedPtr, int, cudaExtent, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemset3DAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemset3DAsync", kApiTypeRuntime);
 
@@ -2121,12 +2402,14 @@ cudaError_t cudaMemset3DAsync(cudaPitchedPtr pitchedDevPtr, int value, cudaExten
 
     return lretval;
 }
+#define cudaMemset3DAsync cudaMemset3DAsync
 
 
+#undef cudaGetSymbolAddress
 cudaError_t cudaGetSymbolAddress(void * * devPtr, void const * symbol){
     cudaError_t lretval;
     cudaError_t (*lcudaGetSymbolAddress) (void * *, void const *) = (cudaError_t (*)(void * *, void const *))dlsym(RTLD_NEXT, "cudaGetSymbolAddress");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetSymbolAddress", kApiTypeRuntime);
 
@@ -2136,12 +2419,14 @@ cudaError_t cudaGetSymbolAddress(void * * devPtr, void const * symbol){
 
     return lretval;
 }
+#define cudaGetSymbolAddress cudaGetSymbolAddress
 
 
+#undef cudaGetSymbolSize
 cudaError_t cudaGetSymbolSize(size_t * size, void const * symbol){
     cudaError_t lretval;
     cudaError_t (*lcudaGetSymbolSize) (size_t *, void const *) = (cudaError_t (*)(size_t *, void const *))dlsym(RTLD_NEXT, "cudaGetSymbolSize");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetSymbolSize", kApiTypeRuntime);
 
@@ -2151,12 +2436,14 @@ cudaError_t cudaGetSymbolSize(size_t * size, void const * symbol){
 
     return lretval;
 }
+#define cudaGetSymbolSize cudaGetSymbolSize
 
 
+#undef cudaMemPrefetchAsync
 cudaError_t cudaMemPrefetchAsync(void const * devPtr, size_t count, int dstDevice, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPrefetchAsync) (void const *, size_t, int, cudaStream_t) = (cudaError_t (*)(void const *, size_t, int, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemPrefetchAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPrefetchAsync", kApiTypeRuntime);
 
@@ -2166,12 +2453,14 @@ cudaError_t cudaMemPrefetchAsync(void const * devPtr, size_t count, int dstDevic
 
     return lretval;
 }
+#define cudaMemPrefetchAsync cudaMemPrefetchAsync
 
 
+#undef cudaMemAdvise
 cudaError_t cudaMemAdvise(void const * devPtr, size_t count, cudaMemoryAdvise advice, int device){
     cudaError_t lretval;
     cudaError_t (*lcudaMemAdvise) (void const *, size_t, cudaMemoryAdvise, int) = (cudaError_t (*)(void const *, size_t, cudaMemoryAdvise, int))dlsym(RTLD_NEXT, "cudaMemAdvise");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemAdvise", kApiTypeRuntime);
 
@@ -2181,12 +2470,14 @@ cudaError_t cudaMemAdvise(void const * devPtr, size_t count, cudaMemoryAdvise ad
 
     return lretval;
 }
+#define cudaMemAdvise cudaMemAdvise
 
 
+#undef cudaMemRangeGetAttribute
 cudaError_t cudaMemRangeGetAttribute(void * data, size_t dataSize, cudaMemRangeAttribute attribute, void const * devPtr, size_t count){
     cudaError_t lretval;
     cudaError_t (*lcudaMemRangeGetAttribute) (void *, size_t, cudaMemRangeAttribute, void const *, size_t) = (cudaError_t (*)(void *, size_t, cudaMemRangeAttribute, void const *, size_t))dlsym(RTLD_NEXT, "cudaMemRangeGetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemRangeGetAttribute", kApiTypeRuntime);
 
@@ -2196,12 +2487,14 @@ cudaError_t cudaMemRangeGetAttribute(void * data, size_t dataSize, cudaMemRangeA
 
     return lretval;
 }
+#define cudaMemRangeGetAttribute cudaMemRangeGetAttribute
 
 
+#undef cudaMemRangeGetAttributes
 cudaError_t cudaMemRangeGetAttributes(void * * data, size_t * dataSizes, cudaMemRangeAttribute * attributes, size_t numAttributes, void const * devPtr, size_t count){
     cudaError_t lretval;
     cudaError_t (*lcudaMemRangeGetAttributes) (void * *, size_t *, cudaMemRangeAttribute *, size_t, void const *, size_t) = (cudaError_t (*)(void * *, size_t *, cudaMemRangeAttribute *, size_t, void const *, size_t))dlsym(RTLD_NEXT, "cudaMemRangeGetAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemRangeGetAttributes", kApiTypeRuntime);
 
@@ -2211,12 +2504,14 @@ cudaError_t cudaMemRangeGetAttributes(void * * data, size_t * dataSizes, cudaMem
 
     return lretval;
 }
+#define cudaMemRangeGetAttributes cudaMemRangeGetAttributes
 
 
+#undef cudaMemcpyToArray
 cudaError_t cudaMemcpyToArray(cudaArray_t dst, size_t wOffset, size_t hOffset, void const * src, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyToArray) (cudaArray_t, size_t, size_t, void const *, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaArray_t, size_t, size_t, void const *, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpyToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyToArray", kApiTypeRuntime);
 
@@ -2226,12 +2521,14 @@ cudaError_t cudaMemcpyToArray(cudaArray_t dst, size_t wOffset, size_t hOffset, v
 
     return lretval;
 }
+#define cudaMemcpyToArray cudaMemcpyToArray
 
 
+#undef cudaMemcpyFromArray
 cudaError_t cudaMemcpyFromArray(void * dst, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyFromArray) (void *, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(void *, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpyFromArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyFromArray", kApiTypeRuntime);
 
@@ -2241,12 +2538,14 @@ cudaError_t cudaMemcpyFromArray(void * dst, cudaArray_const_t src, size_t wOffse
 
     return lretval;
 }
+#define cudaMemcpyFromArray cudaMemcpyFromArray
 
 
+#undef cudaMemcpyArrayToArray
 cudaError_t cudaMemcpyArrayToArray(cudaArray_t dst, size_t wOffsetDst, size_t hOffsetDst, cudaArray_const_t src, size_t wOffsetSrc, size_t hOffsetSrc, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyArrayToArray) (cudaArray_t, size_t, size_t, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaArray_t, size_t, size_t, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaMemcpyArrayToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyArrayToArray", kApiTypeRuntime);
 
@@ -2256,12 +2555,14 @@ cudaError_t cudaMemcpyArrayToArray(cudaArray_t dst, size_t wOffsetDst, size_t hO
 
     return lretval;
 }
+#define cudaMemcpyArrayToArray cudaMemcpyArrayToArray
 
 
+#undef cudaMemcpyToArrayAsync
 cudaError_t cudaMemcpyToArrayAsync(cudaArray_t dst, size_t wOffset, size_t hOffset, void const * src, size_t count, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyToArrayAsync) (cudaArray_t, size_t, size_t, void const *, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(cudaArray_t, size_t, size_t, void const *, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyToArrayAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyToArrayAsync", kApiTypeRuntime);
 
@@ -2271,12 +2572,14 @@ cudaError_t cudaMemcpyToArrayAsync(cudaArray_t dst, size_t wOffset, size_t hOffs
 
     return lretval;
 }
+#define cudaMemcpyToArrayAsync cudaMemcpyToArrayAsync
 
 
+#undef cudaMemcpyFromArrayAsync
 cudaError_t cudaMemcpyFromArrayAsync(void * dst, cudaArray_const_t src, size_t wOffset, size_t hOffset, size_t count, cudaMemcpyKind kind, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMemcpyFromArrayAsync) (void *, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t) = (cudaError_t (*)(void *, cudaArray_const_t, size_t, size_t, size_t, cudaMemcpyKind, cudaStream_t))dlsym(RTLD_NEXT, "cudaMemcpyFromArrayAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemcpyFromArrayAsync", kApiTypeRuntime);
 
@@ -2286,12 +2589,14 @@ cudaError_t cudaMemcpyFromArrayAsync(void * dst, cudaArray_const_t src, size_t w
 
     return lretval;
 }
+#define cudaMemcpyFromArrayAsync cudaMemcpyFromArrayAsync
 
 
+#undef cudaMallocAsync
 cudaError_t cudaMallocAsync(void * * devPtr, size_t size, cudaStream_t hStream){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocAsync) (void * *, size_t, cudaStream_t) = (cudaError_t (*)(void * *, size_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaMallocAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocAsync", kApiTypeRuntime);
 
@@ -2301,12 +2606,14 @@ cudaError_t cudaMallocAsync(void * * devPtr, size_t size, cudaStream_t hStream){
 
     return lretval;
 }
+#define cudaMallocAsync cudaMallocAsync
 
 
+#undef cudaFreeAsync
 cudaError_t cudaFreeAsync(void * devPtr, cudaStream_t hStream){
     cudaError_t lretval;
     cudaError_t (*lcudaFreeAsync) (void *, cudaStream_t) = (cudaError_t (*)(void *, cudaStream_t))dlsym(RTLD_NEXT, "cudaFreeAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaFreeAsync", kApiTypeRuntime);
 
@@ -2316,12 +2623,14 @@ cudaError_t cudaFreeAsync(void * devPtr, cudaStream_t hStream){
 
     return lretval;
 }
+#define cudaFreeAsync cudaFreeAsync
 
 
+#undef cudaMemPoolTrimTo
 cudaError_t cudaMemPoolTrimTo(cudaMemPool_t memPool, size_t minBytesToKeep){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolTrimTo) (cudaMemPool_t, size_t) = (cudaError_t (*)(cudaMemPool_t, size_t))dlsym(RTLD_NEXT, "cudaMemPoolTrimTo");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolTrimTo", kApiTypeRuntime);
 
@@ -2331,12 +2640,14 @@ cudaError_t cudaMemPoolTrimTo(cudaMemPool_t memPool, size_t minBytesToKeep){
 
     return lretval;
 }
+#define cudaMemPoolTrimTo cudaMemPoolTrimTo
 
 
+#undef cudaMemPoolSetAttribute
 cudaError_t cudaMemPoolSetAttribute(cudaMemPool_t memPool, cudaMemPoolAttr attr, void * value){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolSetAttribute) (cudaMemPool_t, cudaMemPoolAttr, void *) = (cudaError_t (*)(cudaMemPool_t, cudaMemPoolAttr, void *))dlsym(RTLD_NEXT, "cudaMemPoolSetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolSetAttribute", kApiTypeRuntime);
 
@@ -2346,12 +2657,14 @@ cudaError_t cudaMemPoolSetAttribute(cudaMemPool_t memPool, cudaMemPoolAttr attr,
 
     return lretval;
 }
+#define cudaMemPoolSetAttribute cudaMemPoolSetAttribute
 
 
+#undef cudaMemPoolGetAttribute
 cudaError_t cudaMemPoolGetAttribute(cudaMemPool_t memPool, cudaMemPoolAttr attr, void * value){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolGetAttribute) (cudaMemPool_t, cudaMemPoolAttr, void *) = (cudaError_t (*)(cudaMemPool_t, cudaMemPoolAttr, void *))dlsym(RTLD_NEXT, "cudaMemPoolGetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolGetAttribute", kApiTypeRuntime);
 
@@ -2361,12 +2674,14 @@ cudaError_t cudaMemPoolGetAttribute(cudaMemPool_t memPool, cudaMemPoolAttr attr,
 
     return lretval;
 }
+#define cudaMemPoolGetAttribute cudaMemPoolGetAttribute
 
 
+#undef cudaMemPoolSetAccess
 cudaError_t cudaMemPoolSetAccess(cudaMemPool_t memPool, cudaMemAccessDesc const * descList, size_t count){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolSetAccess) (cudaMemPool_t, cudaMemAccessDesc const *, size_t) = (cudaError_t (*)(cudaMemPool_t, cudaMemAccessDesc const *, size_t))dlsym(RTLD_NEXT, "cudaMemPoolSetAccess");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolSetAccess", kApiTypeRuntime);
 
@@ -2376,12 +2691,14 @@ cudaError_t cudaMemPoolSetAccess(cudaMemPool_t memPool, cudaMemAccessDesc const 
 
     return lretval;
 }
+#define cudaMemPoolSetAccess cudaMemPoolSetAccess
 
 
+#undef cudaMemPoolGetAccess
 cudaError_t cudaMemPoolGetAccess(cudaMemAccessFlags * flags, cudaMemPool_t memPool, cudaMemLocation * location){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolGetAccess) (cudaMemAccessFlags *, cudaMemPool_t, cudaMemLocation *) = (cudaError_t (*)(cudaMemAccessFlags *, cudaMemPool_t, cudaMemLocation *))dlsym(RTLD_NEXT, "cudaMemPoolGetAccess");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolGetAccess", kApiTypeRuntime);
 
@@ -2391,12 +2708,14 @@ cudaError_t cudaMemPoolGetAccess(cudaMemAccessFlags * flags, cudaMemPool_t memPo
 
     return lretval;
 }
+#define cudaMemPoolGetAccess cudaMemPoolGetAccess
 
 
+#undef cudaMemPoolCreate
 cudaError_t cudaMemPoolCreate(cudaMemPool_t * memPool, cudaMemPoolProps const * poolProps){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolCreate) (cudaMemPool_t *, cudaMemPoolProps const *) = (cudaError_t (*)(cudaMemPool_t *, cudaMemPoolProps const *))dlsym(RTLD_NEXT, "cudaMemPoolCreate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolCreate", kApiTypeRuntime);
 
@@ -2406,12 +2725,14 @@ cudaError_t cudaMemPoolCreate(cudaMemPool_t * memPool, cudaMemPoolProps const * 
 
     return lretval;
 }
+#define cudaMemPoolCreate cudaMemPoolCreate
 
 
+#undef cudaMemPoolDestroy
 cudaError_t cudaMemPoolDestroy(cudaMemPool_t memPool){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolDestroy) (cudaMemPool_t) = (cudaError_t (*)(cudaMemPool_t))dlsym(RTLD_NEXT, "cudaMemPoolDestroy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolDestroy", kApiTypeRuntime);
 
@@ -2421,12 +2742,14 @@ cudaError_t cudaMemPoolDestroy(cudaMemPool_t memPool){
 
     return lretval;
 }
+#define cudaMemPoolDestroy cudaMemPoolDestroy
 
 
+#undef cudaMallocFromPoolAsync
 cudaError_t cudaMallocFromPoolAsync(void * * ptr, size_t size, cudaMemPool_t memPool, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaMallocFromPoolAsync) (void * *, size_t, cudaMemPool_t, cudaStream_t) = (cudaError_t (*)(void * *, size_t, cudaMemPool_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaMallocFromPoolAsync");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMallocFromPoolAsync", kApiTypeRuntime);
 
@@ -2436,12 +2759,14 @@ cudaError_t cudaMallocFromPoolAsync(void * * ptr, size_t size, cudaMemPool_t mem
 
     return lretval;
 }
+#define cudaMallocFromPoolAsync cudaMallocFromPoolAsync
 
 
+#undef cudaMemPoolExportToShareableHandle
 cudaError_t cudaMemPoolExportToShareableHandle(void * shareableHandle, cudaMemPool_t memPool, cudaMemAllocationHandleType handleType, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolExportToShareableHandle) (void *, cudaMemPool_t, cudaMemAllocationHandleType, unsigned int) = (cudaError_t (*)(void *, cudaMemPool_t, cudaMemAllocationHandleType, unsigned int))dlsym(RTLD_NEXT, "cudaMemPoolExportToShareableHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolExportToShareableHandle", kApiTypeRuntime);
 
@@ -2451,12 +2776,14 @@ cudaError_t cudaMemPoolExportToShareableHandle(void * shareableHandle, cudaMemPo
 
     return lretval;
 }
+#define cudaMemPoolExportToShareableHandle cudaMemPoolExportToShareableHandle
 
 
+#undef cudaMemPoolImportFromShareableHandle
 cudaError_t cudaMemPoolImportFromShareableHandle(cudaMemPool_t * memPool, void * shareableHandle, cudaMemAllocationHandleType handleType, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolImportFromShareableHandle) (cudaMemPool_t *, void *, cudaMemAllocationHandleType, unsigned int) = (cudaError_t (*)(cudaMemPool_t *, void *, cudaMemAllocationHandleType, unsigned int))dlsym(RTLD_NEXT, "cudaMemPoolImportFromShareableHandle");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolImportFromShareableHandle", kApiTypeRuntime);
 
@@ -2466,12 +2793,14 @@ cudaError_t cudaMemPoolImportFromShareableHandle(cudaMemPool_t * memPool, void *
 
     return lretval;
 }
+#define cudaMemPoolImportFromShareableHandle cudaMemPoolImportFromShareableHandle
 
 
+#undef cudaMemPoolExportPointer
 cudaError_t cudaMemPoolExportPointer(cudaMemPoolPtrExportData * exportData, void * ptr){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolExportPointer) (cudaMemPoolPtrExportData *, void *) = (cudaError_t (*)(cudaMemPoolPtrExportData *, void *))dlsym(RTLD_NEXT, "cudaMemPoolExportPointer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolExportPointer", kApiTypeRuntime);
 
@@ -2481,12 +2810,14 @@ cudaError_t cudaMemPoolExportPointer(cudaMemPoolPtrExportData * exportData, void
 
     return lretval;
 }
+#define cudaMemPoolExportPointer cudaMemPoolExportPointer
 
 
+#undef cudaMemPoolImportPointer
 cudaError_t cudaMemPoolImportPointer(void * * ptr, cudaMemPool_t memPool, cudaMemPoolPtrExportData * exportData){
     cudaError_t lretval;
     cudaError_t (*lcudaMemPoolImportPointer) (void * *, cudaMemPool_t, cudaMemPoolPtrExportData *) = (cudaError_t (*)(void * *, cudaMemPool_t, cudaMemPoolPtrExportData *))dlsym(RTLD_NEXT, "cudaMemPoolImportPointer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaMemPoolImportPointer", kApiTypeRuntime);
 
@@ -2496,12 +2827,14 @@ cudaError_t cudaMemPoolImportPointer(void * * ptr, cudaMemPool_t memPool, cudaMe
 
     return lretval;
 }
+#define cudaMemPoolImportPointer cudaMemPoolImportPointer
 
 
+#undef cudaPointerGetAttributes
 cudaError_t cudaPointerGetAttributes(cudaPointerAttributes * attributes, void const * ptr){
     cudaError_t lretval;
     cudaError_t (*lcudaPointerGetAttributes) (cudaPointerAttributes *, void const *) = (cudaError_t (*)(cudaPointerAttributes *, void const *))dlsym(RTLD_NEXT, "cudaPointerGetAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaPointerGetAttributes", kApiTypeRuntime);
 
@@ -2511,12 +2844,14 @@ cudaError_t cudaPointerGetAttributes(cudaPointerAttributes * attributes, void co
 
     return lretval;
 }
+#define cudaPointerGetAttributes cudaPointerGetAttributes
 
 
+#undef cudaDeviceCanAccessPeer
 cudaError_t cudaDeviceCanAccessPeer(int * canAccessPeer, int device, int peerDevice){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceCanAccessPeer) (int *, int, int) = (cudaError_t (*)(int *, int, int))dlsym(RTLD_NEXT, "cudaDeviceCanAccessPeer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceCanAccessPeer", kApiTypeRuntime);
 
@@ -2526,12 +2861,14 @@ cudaError_t cudaDeviceCanAccessPeer(int * canAccessPeer, int device, int peerDev
 
     return lretval;
 }
+#define cudaDeviceCanAccessPeer cudaDeviceCanAccessPeer
 
 
+#undef cudaDeviceEnablePeerAccess
 cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceEnablePeerAccess) (int, unsigned int) = (cudaError_t (*)(int, unsigned int))dlsym(RTLD_NEXT, "cudaDeviceEnablePeerAccess");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceEnablePeerAccess", kApiTypeRuntime);
 
@@ -2541,12 +2878,14 @@ cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags){
 
     return lretval;
 }
+#define cudaDeviceEnablePeerAccess cudaDeviceEnablePeerAccess
 
 
+#undef cudaDeviceDisablePeerAccess
 cudaError_t cudaDeviceDisablePeerAccess(int peerDevice){
     cudaError_t lretval;
     cudaError_t (*lcudaDeviceDisablePeerAccess) (int) = (cudaError_t (*)(int))dlsym(RTLD_NEXT, "cudaDeviceDisablePeerAccess");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDeviceDisablePeerAccess", kApiTypeRuntime);
 
@@ -2556,12 +2895,14 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice){
 
     return lretval;
 }
+#define cudaDeviceDisablePeerAccess cudaDeviceDisablePeerAccess
 
 
+#undef cudaGraphicsUnregisterResource
 cudaError_t cudaGraphicsUnregisterResource(cudaGraphicsResource_t resource){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsUnregisterResource) (cudaGraphicsResource_t) = (cudaError_t (*)(cudaGraphicsResource_t))dlsym(RTLD_NEXT, "cudaGraphicsUnregisterResource");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsUnregisterResource", kApiTypeRuntime);
 
@@ -2571,12 +2912,14 @@ cudaError_t cudaGraphicsUnregisterResource(cudaGraphicsResource_t resource){
 
     return lretval;
 }
+#define cudaGraphicsUnregisterResource cudaGraphicsUnregisterResource
 
 
+#undef cudaGraphicsResourceSetMapFlags
 cudaError_t cudaGraphicsResourceSetMapFlags(cudaGraphicsResource_t resource, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsResourceSetMapFlags) (cudaGraphicsResource_t, unsigned int) = (cudaError_t (*)(cudaGraphicsResource_t, unsigned int))dlsym(RTLD_NEXT, "cudaGraphicsResourceSetMapFlags");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsResourceSetMapFlags", kApiTypeRuntime);
 
@@ -2586,12 +2929,14 @@ cudaError_t cudaGraphicsResourceSetMapFlags(cudaGraphicsResource_t resource, uns
 
     return lretval;
 }
+#define cudaGraphicsResourceSetMapFlags cudaGraphicsResourceSetMapFlags
 
 
+#undef cudaGraphicsMapResources
 cudaError_t cudaGraphicsMapResources(int count, cudaGraphicsResource_t * resources, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsMapResources) (int, cudaGraphicsResource_t *, cudaStream_t) = (cudaError_t (*)(int, cudaGraphicsResource_t *, cudaStream_t))dlsym(RTLD_NEXT, "cudaGraphicsMapResources");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsMapResources", kApiTypeRuntime);
 
@@ -2601,12 +2946,14 @@ cudaError_t cudaGraphicsMapResources(int count, cudaGraphicsResource_t * resourc
 
     return lretval;
 }
+#define cudaGraphicsMapResources cudaGraphicsMapResources
 
 
+#undef cudaGraphicsUnmapResources
 cudaError_t cudaGraphicsUnmapResources(int count, cudaGraphicsResource_t * resources, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsUnmapResources) (int, cudaGraphicsResource_t *, cudaStream_t) = (cudaError_t (*)(int, cudaGraphicsResource_t *, cudaStream_t))dlsym(RTLD_NEXT, "cudaGraphicsUnmapResources");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsUnmapResources", kApiTypeRuntime);
 
@@ -2616,12 +2963,14 @@ cudaError_t cudaGraphicsUnmapResources(int count, cudaGraphicsResource_t * resou
 
     return lretval;
 }
+#define cudaGraphicsUnmapResources cudaGraphicsUnmapResources
 
 
+#undef cudaGraphicsResourceGetMappedPointer
 cudaError_t cudaGraphicsResourceGetMappedPointer(void * * devPtr, size_t * size, cudaGraphicsResource_t resource){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsResourceGetMappedPointer) (void * *, size_t *, cudaGraphicsResource_t) = (cudaError_t (*)(void * *, size_t *, cudaGraphicsResource_t))dlsym(RTLD_NEXT, "cudaGraphicsResourceGetMappedPointer");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsResourceGetMappedPointer", kApiTypeRuntime);
 
@@ -2631,12 +2980,14 @@ cudaError_t cudaGraphicsResourceGetMappedPointer(void * * devPtr, size_t * size,
 
     return lretval;
 }
+#define cudaGraphicsResourceGetMappedPointer cudaGraphicsResourceGetMappedPointer
 
 
+#undef cudaGraphicsSubResourceGetMappedArray
 cudaError_t cudaGraphicsSubResourceGetMappedArray(cudaArray_t * array, cudaGraphicsResource_t resource, unsigned int arrayIndex, unsigned int mipLevel){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsSubResourceGetMappedArray) (cudaArray_t *, cudaGraphicsResource_t, unsigned int, unsigned int) = (cudaError_t (*)(cudaArray_t *, cudaGraphicsResource_t, unsigned int, unsigned int))dlsym(RTLD_NEXT, "cudaGraphicsSubResourceGetMappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsSubResourceGetMappedArray", kApiTypeRuntime);
 
@@ -2646,12 +2997,14 @@ cudaError_t cudaGraphicsSubResourceGetMappedArray(cudaArray_t * array, cudaGraph
 
     return lretval;
 }
+#define cudaGraphicsSubResourceGetMappedArray cudaGraphicsSubResourceGetMappedArray
 
 
+#undef cudaGraphicsResourceGetMappedMipmappedArray
 cudaError_t cudaGraphicsResourceGetMappedMipmappedArray(cudaMipmappedArray_t * mipmappedArray, cudaGraphicsResource_t resource){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphicsResourceGetMappedMipmappedArray) (cudaMipmappedArray_t *, cudaGraphicsResource_t) = (cudaError_t (*)(cudaMipmappedArray_t *, cudaGraphicsResource_t))dlsym(RTLD_NEXT, "cudaGraphicsResourceGetMappedMipmappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphicsResourceGetMappedMipmappedArray", kApiTypeRuntime);
 
@@ -2661,12 +3014,14 @@ cudaError_t cudaGraphicsResourceGetMappedMipmappedArray(cudaMipmappedArray_t * m
 
     return lretval;
 }
+#define cudaGraphicsResourceGetMappedMipmappedArray cudaGraphicsResourceGetMappedMipmappedArray
 
 
+#undef cudaBindTexture
 cudaError_t cudaBindTexture(size_t * offset, textureReference const * texref, void const * devPtr, cudaChannelFormatDesc const * desc, size_t size){
     cudaError_t lretval;
     cudaError_t (*lcudaBindTexture) (size_t *, textureReference const *, void const *, cudaChannelFormatDesc const *, size_t) = (cudaError_t (*)(size_t *, textureReference const *, void const *, cudaChannelFormatDesc const *, size_t))dlsym(RTLD_NEXT, "cudaBindTexture");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaBindTexture", kApiTypeRuntime);
 
@@ -2676,12 +3031,14 @@ cudaError_t cudaBindTexture(size_t * offset, textureReference const * texref, vo
 
     return lretval;
 }
+#define cudaBindTexture cudaBindTexture
 
 
+#undef cudaBindTexture2D
 cudaError_t cudaBindTexture2D(size_t * offset, textureReference const * texref, void const * devPtr, cudaChannelFormatDesc const * desc, size_t width, size_t height, size_t pitch){
     cudaError_t lretval;
     cudaError_t (*lcudaBindTexture2D) (size_t *, textureReference const *, void const *, cudaChannelFormatDesc const *, size_t, size_t, size_t) = (cudaError_t (*)(size_t *, textureReference const *, void const *, cudaChannelFormatDesc const *, size_t, size_t, size_t))dlsym(RTLD_NEXT, "cudaBindTexture2D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaBindTexture2D", kApiTypeRuntime);
 
@@ -2691,12 +3048,14 @@ cudaError_t cudaBindTexture2D(size_t * offset, textureReference const * texref, 
 
     return lretval;
 }
+#define cudaBindTexture2D cudaBindTexture2D
 
 
+#undef cudaBindTextureToArray
 cudaError_t cudaBindTextureToArray(textureReference const * texref, cudaArray_const_t array, cudaChannelFormatDesc const * desc){
     cudaError_t lretval;
     cudaError_t (*lcudaBindTextureToArray) (textureReference const *, cudaArray_const_t, cudaChannelFormatDesc const *) = (cudaError_t (*)(textureReference const *, cudaArray_const_t, cudaChannelFormatDesc const *))dlsym(RTLD_NEXT, "cudaBindTextureToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaBindTextureToArray", kApiTypeRuntime);
 
@@ -2706,12 +3065,14 @@ cudaError_t cudaBindTextureToArray(textureReference const * texref, cudaArray_co
 
     return lretval;
 }
+#define cudaBindTextureToArray cudaBindTextureToArray
 
 
+#undef cudaBindTextureToMipmappedArray
 cudaError_t cudaBindTextureToMipmappedArray(textureReference const * texref, cudaMipmappedArray_const_t mipmappedArray, cudaChannelFormatDesc const * desc){
     cudaError_t lretval;
     cudaError_t (*lcudaBindTextureToMipmappedArray) (textureReference const *, cudaMipmappedArray_const_t, cudaChannelFormatDesc const *) = (cudaError_t (*)(textureReference const *, cudaMipmappedArray_const_t, cudaChannelFormatDesc const *))dlsym(RTLD_NEXT, "cudaBindTextureToMipmappedArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaBindTextureToMipmappedArray", kApiTypeRuntime);
 
@@ -2721,12 +3082,14 @@ cudaError_t cudaBindTextureToMipmappedArray(textureReference const * texref, cud
 
     return lretval;
 }
+#define cudaBindTextureToMipmappedArray cudaBindTextureToMipmappedArray
 
 
+#undef cudaUnbindTexture
 cudaError_t cudaUnbindTexture(textureReference const * texref){
     cudaError_t lretval;
     cudaError_t (*lcudaUnbindTexture) (textureReference const *) = (cudaError_t (*)(textureReference const *))dlsym(RTLD_NEXT, "cudaUnbindTexture");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaUnbindTexture", kApiTypeRuntime);
 
@@ -2736,12 +3099,14 @@ cudaError_t cudaUnbindTexture(textureReference const * texref){
 
     return lretval;
 }
+#define cudaUnbindTexture cudaUnbindTexture
 
 
+#undef cudaGetTextureAlignmentOffset
 cudaError_t cudaGetTextureAlignmentOffset(size_t * offset, textureReference const * texref){
     cudaError_t lretval;
     cudaError_t (*lcudaGetTextureAlignmentOffset) (size_t *, textureReference const *) = (cudaError_t (*)(size_t *, textureReference const *))dlsym(RTLD_NEXT, "cudaGetTextureAlignmentOffset");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetTextureAlignmentOffset", kApiTypeRuntime);
 
@@ -2751,12 +3116,14 @@ cudaError_t cudaGetTextureAlignmentOffset(size_t * offset, textureReference cons
 
     return lretval;
 }
+#define cudaGetTextureAlignmentOffset cudaGetTextureAlignmentOffset
 
 
+#undef cudaGetTextureReference
 cudaError_t cudaGetTextureReference(textureReference const * * texref, void const * symbol){
     cudaError_t lretval;
     cudaError_t (*lcudaGetTextureReference) (textureReference const * *, void const *) = (cudaError_t (*)(textureReference const * *, void const *))dlsym(RTLD_NEXT, "cudaGetTextureReference");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetTextureReference", kApiTypeRuntime);
 
@@ -2766,12 +3133,14 @@ cudaError_t cudaGetTextureReference(textureReference const * * texref, void cons
 
     return lretval;
 }
+#define cudaGetTextureReference cudaGetTextureReference
 
 
+#undef cudaBindSurfaceToArray
 cudaError_t cudaBindSurfaceToArray(surfaceReference const * surfref, cudaArray_const_t array, cudaChannelFormatDesc const * desc){
     cudaError_t lretval;
     cudaError_t (*lcudaBindSurfaceToArray) (surfaceReference const *, cudaArray_const_t, cudaChannelFormatDesc const *) = (cudaError_t (*)(surfaceReference const *, cudaArray_const_t, cudaChannelFormatDesc const *))dlsym(RTLD_NEXT, "cudaBindSurfaceToArray");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaBindSurfaceToArray", kApiTypeRuntime);
 
@@ -2781,12 +3150,14 @@ cudaError_t cudaBindSurfaceToArray(surfaceReference const * surfref, cudaArray_c
 
     return lretval;
 }
+#define cudaBindSurfaceToArray cudaBindSurfaceToArray
 
 
+#undef cudaGetSurfaceReference
 cudaError_t cudaGetSurfaceReference(surfaceReference const * * surfref, void const * symbol){
     cudaError_t lretval;
     cudaError_t (*lcudaGetSurfaceReference) (surfaceReference const * *, void const *) = (cudaError_t (*)(surfaceReference const * *, void const *))dlsym(RTLD_NEXT, "cudaGetSurfaceReference");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetSurfaceReference", kApiTypeRuntime);
 
@@ -2796,12 +3167,14 @@ cudaError_t cudaGetSurfaceReference(surfaceReference const * * surfref, void con
 
     return lretval;
 }
+#define cudaGetSurfaceReference cudaGetSurfaceReference
 
 
+#undef cudaGetChannelDesc
 cudaError_t cudaGetChannelDesc(cudaChannelFormatDesc * desc, cudaArray_const_t array){
     cudaError_t lretval;
     cudaError_t (*lcudaGetChannelDesc) (cudaChannelFormatDesc *, cudaArray_const_t) = (cudaError_t (*)(cudaChannelFormatDesc *, cudaArray_const_t))dlsym(RTLD_NEXT, "cudaGetChannelDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetChannelDesc", kApiTypeRuntime);
 
@@ -2811,12 +3184,14 @@ cudaError_t cudaGetChannelDesc(cudaChannelFormatDesc * desc, cudaArray_const_t a
 
     return lretval;
 }
+#define cudaGetChannelDesc cudaGetChannelDesc
 
 
+#undef cudaCreateChannelDesc
 cudaChannelFormatDesc cudaCreateChannelDesc(int x, int y, int z, int w, cudaChannelFormatKind f){
     cudaChannelFormatDesc lretval;
     cudaChannelFormatDesc (*lcudaCreateChannelDesc) (int, int, int, int, cudaChannelFormatKind) = (cudaChannelFormatDesc (*)(int, int, int, int, cudaChannelFormatKind))dlsym(RTLD_NEXT, "cudaCreateChannelDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaCreateChannelDesc", kApiTypeRuntime);
 
@@ -2826,12 +3201,14 @@ cudaChannelFormatDesc cudaCreateChannelDesc(int x, int y, int z, int w, cudaChan
 
     return lretval;
 }
+#define cudaCreateChannelDesc cudaCreateChannelDesc
 
 
+#undef cudaCreateTextureObject
 cudaError_t cudaCreateTextureObject(cudaTextureObject_t * pTexObject, cudaResourceDesc const * pResDesc, cudaTextureDesc const * pTexDesc, cudaResourceViewDesc const * pResViewDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaCreateTextureObject) (cudaTextureObject_t *, cudaResourceDesc const *, cudaTextureDesc const *, cudaResourceViewDesc const *) = (cudaError_t (*)(cudaTextureObject_t *, cudaResourceDesc const *, cudaTextureDesc const *, cudaResourceViewDesc const *))dlsym(RTLD_NEXT, "cudaCreateTextureObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaCreateTextureObject", kApiTypeRuntime);
 
@@ -2841,12 +3218,14 @@ cudaError_t cudaCreateTextureObject(cudaTextureObject_t * pTexObject, cudaResour
 
     return lretval;
 }
+#define cudaCreateTextureObject cudaCreateTextureObject
 
 
+#undef cudaDestroyTextureObject
 cudaError_t cudaDestroyTextureObject(cudaTextureObject_t texObject){
     cudaError_t lretval;
     cudaError_t (*lcudaDestroyTextureObject) (cudaTextureObject_t) = (cudaError_t (*)(cudaTextureObject_t))dlsym(RTLD_NEXT, "cudaDestroyTextureObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDestroyTextureObject", kApiTypeRuntime);
 
@@ -2856,12 +3235,14 @@ cudaError_t cudaDestroyTextureObject(cudaTextureObject_t texObject){
 
     return lretval;
 }
+#define cudaDestroyTextureObject cudaDestroyTextureObject
 
 
+#undef cudaGetTextureObjectResourceDesc
 cudaError_t cudaGetTextureObjectResourceDesc(cudaResourceDesc * pResDesc, cudaTextureObject_t texObject){
     cudaError_t lretval;
     cudaError_t (*lcudaGetTextureObjectResourceDesc) (cudaResourceDesc *, cudaTextureObject_t) = (cudaError_t (*)(cudaResourceDesc *, cudaTextureObject_t))dlsym(RTLD_NEXT, "cudaGetTextureObjectResourceDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetTextureObjectResourceDesc", kApiTypeRuntime);
 
@@ -2871,12 +3252,14 @@ cudaError_t cudaGetTextureObjectResourceDesc(cudaResourceDesc * pResDesc, cudaTe
 
     return lretval;
 }
+#define cudaGetTextureObjectResourceDesc cudaGetTextureObjectResourceDesc
 
 
+#undef cudaGetTextureObjectTextureDesc
 cudaError_t cudaGetTextureObjectTextureDesc(cudaTextureDesc * pTexDesc, cudaTextureObject_t texObject){
     cudaError_t lretval;
     cudaError_t (*lcudaGetTextureObjectTextureDesc) (cudaTextureDesc *, cudaTextureObject_t) = (cudaError_t (*)(cudaTextureDesc *, cudaTextureObject_t))dlsym(RTLD_NEXT, "cudaGetTextureObjectTextureDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetTextureObjectTextureDesc", kApiTypeRuntime);
 
@@ -2886,12 +3269,14 @@ cudaError_t cudaGetTextureObjectTextureDesc(cudaTextureDesc * pTexDesc, cudaText
 
     return lretval;
 }
+#define cudaGetTextureObjectTextureDesc cudaGetTextureObjectTextureDesc
 
 
+#undef cudaGetTextureObjectResourceViewDesc
 cudaError_t cudaGetTextureObjectResourceViewDesc(cudaResourceViewDesc * pResViewDesc, cudaTextureObject_t texObject){
     cudaError_t lretval;
     cudaError_t (*lcudaGetTextureObjectResourceViewDesc) (cudaResourceViewDesc *, cudaTextureObject_t) = (cudaError_t (*)(cudaResourceViewDesc *, cudaTextureObject_t))dlsym(RTLD_NEXT, "cudaGetTextureObjectResourceViewDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetTextureObjectResourceViewDesc", kApiTypeRuntime);
 
@@ -2901,12 +3286,14 @@ cudaError_t cudaGetTextureObjectResourceViewDesc(cudaResourceViewDesc * pResView
 
     return lretval;
 }
+#define cudaGetTextureObjectResourceViewDesc cudaGetTextureObjectResourceViewDesc
 
 
+#undef cudaCreateSurfaceObject
 cudaError_t cudaCreateSurfaceObject(cudaSurfaceObject_t * pSurfObject, cudaResourceDesc const * pResDesc){
     cudaError_t lretval;
     cudaError_t (*lcudaCreateSurfaceObject) (cudaSurfaceObject_t *, cudaResourceDesc const *) = (cudaError_t (*)(cudaSurfaceObject_t *, cudaResourceDesc const *))dlsym(RTLD_NEXT, "cudaCreateSurfaceObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaCreateSurfaceObject", kApiTypeRuntime);
 
@@ -2916,12 +3303,14 @@ cudaError_t cudaCreateSurfaceObject(cudaSurfaceObject_t * pSurfObject, cudaResou
 
     return lretval;
 }
+#define cudaCreateSurfaceObject cudaCreateSurfaceObject
 
 
+#undef cudaDestroySurfaceObject
 cudaError_t cudaDestroySurfaceObject(cudaSurfaceObject_t surfObject){
     cudaError_t lretval;
     cudaError_t (*lcudaDestroySurfaceObject) (cudaSurfaceObject_t) = (cudaError_t (*)(cudaSurfaceObject_t))dlsym(RTLD_NEXT, "cudaDestroySurfaceObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDestroySurfaceObject", kApiTypeRuntime);
 
@@ -2931,12 +3320,14 @@ cudaError_t cudaDestroySurfaceObject(cudaSurfaceObject_t surfObject){
 
     return lretval;
 }
+#define cudaDestroySurfaceObject cudaDestroySurfaceObject
 
 
+#undef cudaGetSurfaceObjectResourceDesc
 cudaError_t cudaGetSurfaceObjectResourceDesc(cudaResourceDesc * pResDesc, cudaSurfaceObject_t surfObject){
     cudaError_t lretval;
     cudaError_t (*lcudaGetSurfaceObjectResourceDesc) (cudaResourceDesc *, cudaSurfaceObject_t) = (cudaError_t (*)(cudaResourceDesc *, cudaSurfaceObject_t))dlsym(RTLD_NEXT, "cudaGetSurfaceObjectResourceDesc");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetSurfaceObjectResourceDesc", kApiTypeRuntime);
 
@@ -2946,12 +3337,14 @@ cudaError_t cudaGetSurfaceObjectResourceDesc(cudaResourceDesc * pResDesc, cudaSu
 
     return lretval;
 }
+#define cudaGetSurfaceObjectResourceDesc cudaGetSurfaceObjectResourceDesc
 
 
+#undef cudaDriverGetVersion
 cudaError_t cudaDriverGetVersion(int * driverVersion){
     cudaError_t lretval;
     cudaError_t (*lcudaDriverGetVersion) (int *) = (cudaError_t (*)(int *))dlsym(RTLD_NEXT, "cudaDriverGetVersion");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaDriverGetVersion", kApiTypeRuntime);
 
@@ -2961,12 +3354,14 @@ cudaError_t cudaDriverGetVersion(int * driverVersion){
 
     return lretval;
 }
+#define cudaDriverGetVersion cudaDriverGetVersion
 
 
+#undef cudaRuntimeGetVersion
 cudaError_t cudaRuntimeGetVersion(int * runtimeVersion){
     cudaError_t lretval;
     cudaError_t (*lcudaRuntimeGetVersion) (int *) = (cudaError_t (*)(int *))dlsym(RTLD_NEXT, "cudaRuntimeGetVersion");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaRuntimeGetVersion", kApiTypeRuntime);
 
@@ -2976,12 +3371,14 @@ cudaError_t cudaRuntimeGetVersion(int * runtimeVersion){
 
     return lretval;
 }
+#define cudaRuntimeGetVersion cudaRuntimeGetVersion
 
 
+#undef cudaGraphCreate
 cudaError_t cudaGraphCreate(cudaGraph_t * pGraph, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphCreate) (cudaGraph_t *, unsigned int) = (cudaError_t (*)(cudaGraph_t *, unsigned int))dlsym(RTLD_NEXT, "cudaGraphCreate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphCreate", kApiTypeRuntime);
 
@@ -2991,12 +3388,14 @@ cudaError_t cudaGraphCreate(cudaGraph_t * pGraph, unsigned int flags){
 
     return lretval;
 }
+#define cudaGraphCreate cudaGraphCreate
 
 
+#undef cudaGraphAddKernelNode
 cudaError_t cudaGraphAddKernelNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaKernelNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddKernelNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaKernelNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaKernelNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphAddKernelNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddKernelNode", kApiTypeRuntime);
 
@@ -3006,12 +3405,14 @@ cudaError_t cudaGraphAddKernelNode(cudaGraphNode_t * pGraphNode, cudaGraph_t gra
 
     return lretval;
 }
+#define cudaGraphAddKernelNode cudaGraphAddKernelNode
 
 
+#undef cudaGraphKernelNodeGetParams
 cudaError_t cudaGraphKernelNodeGetParams(cudaGraphNode_t node, cudaKernelNodeParams * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphKernelNodeGetParams) (cudaGraphNode_t, cudaKernelNodeParams *) = (cudaError_t (*)(cudaGraphNode_t, cudaKernelNodeParams *))dlsym(RTLD_NEXT, "cudaGraphKernelNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphKernelNodeGetParams", kApiTypeRuntime);
 
@@ -3021,12 +3422,14 @@ cudaError_t cudaGraphKernelNodeGetParams(cudaGraphNode_t node, cudaKernelNodePar
 
     return lretval;
 }
+#define cudaGraphKernelNodeGetParams cudaGraphKernelNodeGetParams
 
 
+#undef cudaGraphKernelNodeSetParams
 cudaError_t cudaGraphKernelNodeSetParams(cudaGraphNode_t node, cudaKernelNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphKernelNodeSetParams) (cudaGraphNode_t, cudaKernelNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t, cudaKernelNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphKernelNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphKernelNodeSetParams", kApiTypeRuntime);
 
@@ -3036,12 +3439,14 @@ cudaError_t cudaGraphKernelNodeSetParams(cudaGraphNode_t node, cudaKernelNodePar
 
     return lretval;
 }
+#define cudaGraphKernelNodeSetParams cudaGraphKernelNodeSetParams
 
 
+#undef cudaGraphKernelNodeCopyAttributes
 cudaError_t cudaGraphKernelNodeCopyAttributes(cudaGraphNode_t hSrc, cudaGraphNode_t hDst){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphKernelNodeCopyAttributes) (cudaGraphNode_t, cudaGraphNode_t) = (cudaError_t (*)(cudaGraphNode_t, cudaGraphNode_t))dlsym(RTLD_NEXT, "cudaGraphKernelNodeCopyAttributes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphKernelNodeCopyAttributes", kApiTypeRuntime);
 
@@ -3051,12 +3456,14 @@ cudaError_t cudaGraphKernelNodeCopyAttributes(cudaGraphNode_t hSrc, cudaGraphNod
 
     return lretval;
 }
+#define cudaGraphKernelNodeCopyAttributes cudaGraphKernelNodeCopyAttributes
 
 
+#undef cudaGraphKernelNodeGetAttribute
 cudaError_t cudaGraphKernelNodeGetAttribute(cudaGraphNode_t hNode, cudaKernelNodeAttrID attr, cudaKernelNodeAttrValue * value_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphKernelNodeGetAttribute) (cudaGraphNode_t, cudaKernelNodeAttrID, cudaKernelNodeAttrValue *) = (cudaError_t (*)(cudaGraphNode_t, cudaKernelNodeAttrID, cudaKernelNodeAttrValue *))dlsym(RTLD_NEXT, "cudaGraphKernelNodeGetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphKernelNodeGetAttribute", kApiTypeRuntime);
 
@@ -3066,12 +3473,14 @@ cudaError_t cudaGraphKernelNodeGetAttribute(cudaGraphNode_t hNode, cudaKernelNod
 
     return lretval;
 }
+#define cudaGraphKernelNodeGetAttribute cudaGraphKernelNodeGetAttribute
 
 
+#undef cudaGraphKernelNodeSetAttribute
 cudaError_t cudaGraphKernelNodeSetAttribute(cudaGraphNode_t hNode, cudaKernelNodeAttrID attr, cudaKernelNodeAttrValue const * value){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphKernelNodeSetAttribute) (cudaGraphNode_t, cudaKernelNodeAttrID, cudaKernelNodeAttrValue const *) = (cudaError_t (*)(cudaGraphNode_t, cudaKernelNodeAttrID, cudaKernelNodeAttrValue const *))dlsym(RTLD_NEXT, "cudaGraphKernelNodeSetAttribute");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphKernelNodeSetAttribute", kApiTypeRuntime);
 
@@ -3081,12 +3490,14 @@ cudaError_t cudaGraphKernelNodeSetAttribute(cudaGraphNode_t hNode, cudaKernelNod
 
     return lretval;
 }
+#define cudaGraphKernelNodeSetAttribute cudaGraphKernelNodeSetAttribute
 
 
+#undef cudaGraphAddMemcpyNode
 cudaError_t cudaGraphAddMemcpyNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaMemcpy3DParms const * pCopyParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddMemcpyNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaMemcpy3DParms const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaMemcpy3DParms const *))dlsym(RTLD_NEXT, "cudaGraphAddMemcpyNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddMemcpyNode", kApiTypeRuntime);
 
@@ -3096,12 +3507,14 @@ cudaError_t cudaGraphAddMemcpyNode(cudaGraphNode_t * pGraphNode, cudaGraph_t gra
 
     return lretval;
 }
+#define cudaGraphAddMemcpyNode cudaGraphAddMemcpyNode
 
 
+#undef cudaGraphAddMemcpyNodeToSymbol
 cudaError_t cudaGraphAddMemcpyNodeToSymbol(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, void const * symbol, void const * src, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddMemcpyNodeToSymbol) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void const *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void const *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphAddMemcpyNodeToSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddMemcpyNodeToSymbol", kApiTypeRuntime);
 
@@ -3111,12 +3524,14 @@ cudaError_t cudaGraphAddMemcpyNodeToSymbol(cudaGraphNode_t * pGraphNode, cudaGra
 
     return lretval;
 }
+#define cudaGraphAddMemcpyNodeToSymbol cudaGraphAddMemcpyNodeToSymbol
 
 
+#undef cudaGraphAddMemcpyNodeFromSymbol
 cudaError_t cudaGraphAddMemcpyNodeFromSymbol(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, void * dst, void const * symbol, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddMemcpyNodeFromSymbol) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphAddMemcpyNodeFromSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddMemcpyNodeFromSymbol", kApiTypeRuntime);
 
@@ -3126,12 +3541,14 @@ cudaError_t cudaGraphAddMemcpyNodeFromSymbol(cudaGraphNode_t * pGraphNode, cudaG
 
     return lretval;
 }
+#define cudaGraphAddMemcpyNodeFromSymbol cudaGraphAddMemcpyNodeFromSymbol
 
 
+#undef cudaGraphAddMemcpyNode1D
 cudaError_t cudaGraphAddMemcpyNode1D(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, void * dst, void const * src, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddMemcpyNode1D) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void *, void const *, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, void *, void const *, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphAddMemcpyNode1D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddMemcpyNode1D", kApiTypeRuntime);
 
@@ -3141,12 +3558,14 @@ cudaError_t cudaGraphAddMemcpyNode1D(cudaGraphNode_t * pGraphNode, cudaGraph_t g
 
     return lretval;
 }
+#define cudaGraphAddMemcpyNode1D cudaGraphAddMemcpyNode1D
 
 
+#undef cudaGraphMemcpyNodeGetParams
 cudaError_t cudaGraphMemcpyNodeGetParams(cudaGraphNode_t node, cudaMemcpy3DParms * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemcpyNodeGetParams) (cudaGraphNode_t, cudaMemcpy3DParms *) = (cudaError_t (*)(cudaGraphNode_t, cudaMemcpy3DParms *))dlsym(RTLD_NEXT, "cudaGraphMemcpyNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemcpyNodeGetParams", kApiTypeRuntime);
 
@@ -3156,12 +3575,14 @@ cudaError_t cudaGraphMemcpyNodeGetParams(cudaGraphNode_t node, cudaMemcpy3DParms
 
     return lretval;
 }
+#define cudaGraphMemcpyNodeGetParams cudaGraphMemcpyNodeGetParams
 
 
+#undef cudaGraphMemcpyNodeSetParams
 cudaError_t cudaGraphMemcpyNodeSetParams(cudaGraphNode_t node, cudaMemcpy3DParms const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemcpyNodeSetParams) (cudaGraphNode_t, cudaMemcpy3DParms const *) = (cudaError_t (*)(cudaGraphNode_t, cudaMemcpy3DParms const *))dlsym(RTLD_NEXT, "cudaGraphMemcpyNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemcpyNodeSetParams", kApiTypeRuntime);
 
@@ -3171,12 +3592,14 @@ cudaError_t cudaGraphMemcpyNodeSetParams(cudaGraphNode_t node, cudaMemcpy3DParms
 
     return lretval;
 }
+#define cudaGraphMemcpyNodeSetParams cudaGraphMemcpyNodeSetParams
 
 
+#undef cudaGraphMemcpyNodeSetParamsToSymbol
 cudaError_t cudaGraphMemcpyNodeSetParamsToSymbol(cudaGraphNode_t node, void const * symbol, void const * src, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemcpyNodeSetParamsToSymbol) (cudaGraphNode_t, void const *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t, void const *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphMemcpyNodeSetParamsToSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemcpyNodeSetParamsToSymbol", kApiTypeRuntime);
 
@@ -3186,12 +3609,14 @@ cudaError_t cudaGraphMemcpyNodeSetParamsToSymbol(cudaGraphNode_t node, void cons
 
     return lretval;
 }
+#define cudaGraphMemcpyNodeSetParamsToSymbol cudaGraphMemcpyNodeSetParamsToSymbol
 
 
+#undef cudaGraphMemcpyNodeSetParamsFromSymbol
 cudaError_t cudaGraphMemcpyNodeSetParamsFromSymbol(cudaGraphNode_t node, void * dst, void const * symbol, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemcpyNodeSetParamsFromSymbol) (cudaGraphNode_t, void *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t, void *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphMemcpyNodeSetParamsFromSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemcpyNodeSetParamsFromSymbol", kApiTypeRuntime);
 
@@ -3201,12 +3626,14 @@ cudaError_t cudaGraphMemcpyNodeSetParamsFromSymbol(cudaGraphNode_t node, void * 
 
     return lretval;
 }
+#define cudaGraphMemcpyNodeSetParamsFromSymbol cudaGraphMemcpyNodeSetParamsFromSymbol
 
 
+#undef cudaGraphMemcpyNodeSetParams1D
 cudaError_t cudaGraphMemcpyNodeSetParams1D(cudaGraphNode_t node, void * dst, void const * src, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemcpyNodeSetParams1D) (cudaGraphNode_t, void *, void const *, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphNode_t, void *, void const *, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphMemcpyNodeSetParams1D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemcpyNodeSetParams1D", kApiTypeRuntime);
 
@@ -3216,12 +3643,14 @@ cudaError_t cudaGraphMemcpyNodeSetParams1D(cudaGraphNode_t node, void * dst, voi
 
     return lretval;
 }
+#define cudaGraphMemcpyNodeSetParams1D cudaGraphMemcpyNodeSetParams1D
 
 
+#undef cudaGraphAddMemsetNode
 cudaError_t cudaGraphAddMemsetNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaMemsetParams const * pMemsetParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddMemsetNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaMemsetParams const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaMemsetParams const *))dlsym(RTLD_NEXT, "cudaGraphAddMemsetNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddMemsetNode", kApiTypeRuntime);
 
@@ -3231,12 +3660,14 @@ cudaError_t cudaGraphAddMemsetNode(cudaGraphNode_t * pGraphNode, cudaGraph_t gra
 
     return lretval;
 }
+#define cudaGraphAddMemsetNode cudaGraphAddMemsetNode
 
 
+#undef cudaGraphMemsetNodeGetParams
 cudaError_t cudaGraphMemsetNodeGetParams(cudaGraphNode_t node, cudaMemsetParams * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemsetNodeGetParams) (cudaGraphNode_t, cudaMemsetParams *) = (cudaError_t (*)(cudaGraphNode_t, cudaMemsetParams *))dlsym(RTLD_NEXT, "cudaGraphMemsetNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemsetNodeGetParams", kApiTypeRuntime);
 
@@ -3246,12 +3677,14 @@ cudaError_t cudaGraphMemsetNodeGetParams(cudaGraphNode_t node, cudaMemsetParams 
 
     return lretval;
 }
+#define cudaGraphMemsetNodeGetParams cudaGraphMemsetNodeGetParams
 
 
+#undef cudaGraphMemsetNodeSetParams
 cudaError_t cudaGraphMemsetNodeSetParams(cudaGraphNode_t node, cudaMemsetParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphMemsetNodeSetParams) (cudaGraphNode_t, cudaMemsetParams const *) = (cudaError_t (*)(cudaGraphNode_t, cudaMemsetParams const *))dlsym(RTLD_NEXT, "cudaGraphMemsetNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphMemsetNodeSetParams", kApiTypeRuntime);
 
@@ -3261,12 +3694,14 @@ cudaError_t cudaGraphMemsetNodeSetParams(cudaGraphNode_t node, cudaMemsetParams 
 
     return lretval;
 }
+#define cudaGraphMemsetNodeSetParams cudaGraphMemsetNodeSetParams
 
 
+#undef cudaGraphAddHostNode
 cudaError_t cudaGraphAddHostNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaHostNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddHostNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaHostNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaHostNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphAddHostNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddHostNode", kApiTypeRuntime);
 
@@ -3276,12 +3711,14 @@ cudaError_t cudaGraphAddHostNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph
 
     return lretval;
 }
+#define cudaGraphAddHostNode cudaGraphAddHostNode
 
 
+#undef cudaGraphHostNodeGetParams
 cudaError_t cudaGraphHostNodeGetParams(cudaGraphNode_t node, cudaHostNodeParams * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphHostNodeGetParams) (cudaGraphNode_t, cudaHostNodeParams *) = (cudaError_t (*)(cudaGraphNode_t, cudaHostNodeParams *))dlsym(RTLD_NEXT, "cudaGraphHostNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphHostNodeGetParams", kApiTypeRuntime);
 
@@ -3291,12 +3728,14 @@ cudaError_t cudaGraphHostNodeGetParams(cudaGraphNode_t node, cudaHostNodeParams 
 
     return lretval;
 }
+#define cudaGraphHostNodeGetParams cudaGraphHostNodeGetParams
 
 
+#undef cudaGraphHostNodeSetParams
 cudaError_t cudaGraphHostNodeSetParams(cudaGraphNode_t node, cudaHostNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphHostNodeSetParams) (cudaGraphNode_t, cudaHostNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t, cudaHostNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphHostNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphHostNodeSetParams", kApiTypeRuntime);
 
@@ -3306,12 +3745,14 @@ cudaError_t cudaGraphHostNodeSetParams(cudaGraphNode_t node, cudaHostNodeParams 
 
     return lretval;
 }
+#define cudaGraphHostNodeSetParams cudaGraphHostNodeSetParams
 
 
+#undef cudaGraphAddChildGraphNode
 cudaError_t cudaGraphAddChildGraphNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaGraph_t childGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddChildGraphNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaGraph_t) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaGraph_t))dlsym(RTLD_NEXT, "cudaGraphAddChildGraphNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddChildGraphNode", kApiTypeRuntime);
 
@@ -3321,12 +3762,14 @@ cudaError_t cudaGraphAddChildGraphNode(cudaGraphNode_t * pGraphNode, cudaGraph_t
 
     return lretval;
 }
+#define cudaGraphAddChildGraphNode cudaGraphAddChildGraphNode
 
 
+#undef cudaGraphChildGraphNodeGetGraph
 cudaError_t cudaGraphChildGraphNodeGetGraph(cudaGraphNode_t node, cudaGraph_t * pGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphChildGraphNodeGetGraph) (cudaGraphNode_t, cudaGraph_t *) = (cudaError_t (*)(cudaGraphNode_t, cudaGraph_t *))dlsym(RTLD_NEXT, "cudaGraphChildGraphNodeGetGraph");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphChildGraphNodeGetGraph", kApiTypeRuntime);
 
@@ -3336,12 +3779,14 @@ cudaError_t cudaGraphChildGraphNodeGetGraph(cudaGraphNode_t node, cudaGraph_t * 
 
     return lretval;
 }
+#define cudaGraphChildGraphNodeGetGraph cudaGraphChildGraphNodeGetGraph
 
 
+#undef cudaGraphAddEmptyNode
 cudaError_t cudaGraphAddEmptyNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddEmptyNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t))dlsym(RTLD_NEXT, "cudaGraphAddEmptyNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddEmptyNode", kApiTypeRuntime);
 
@@ -3351,12 +3796,14 @@ cudaError_t cudaGraphAddEmptyNode(cudaGraphNode_t * pGraphNode, cudaGraph_t grap
 
     return lretval;
 }
+#define cudaGraphAddEmptyNode cudaGraphAddEmptyNode
 
 
+#undef cudaGraphAddEventRecordNode
 cudaError_t cudaGraphAddEventRecordNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddEventRecordNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphAddEventRecordNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddEventRecordNode", kApiTypeRuntime);
 
@@ -3366,12 +3813,14 @@ cudaError_t cudaGraphAddEventRecordNode(cudaGraphNode_t * pGraphNode, cudaGraph_
 
     return lretval;
 }
+#define cudaGraphAddEventRecordNode cudaGraphAddEventRecordNode
 
 
+#undef cudaGraphEventRecordNodeGetEvent
 cudaError_t cudaGraphEventRecordNodeGetEvent(cudaGraphNode_t node, cudaEvent_t * event_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphEventRecordNodeGetEvent) (cudaGraphNode_t, cudaEvent_t *) = (cudaError_t (*)(cudaGraphNode_t, cudaEvent_t *))dlsym(RTLD_NEXT, "cudaGraphEventRecordNodeGetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphEventRecordNodeGetEvent", kApiTypeRuntime);
 
@@ -3381,12 +3830,14 @@ cudaError_t cudaGraphEventRecordNodeGetEvent(cudaGraphNode_t node, cudaEvent_t *
 
     return lretval;
 }
+#define cudaGraphEventRecordNodeGetEvent cudaGraphEventRecordNodeGetEvent
 
 
+#undef cudaGraphEventRecordNodeSetEvent
 cudaError_t cudaGraphEventRecordNodeSetEvent(cudaGraphNode_t node, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphEventRecordNodeSetEvent) (cudaGraphNode_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphNode_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphEventRecordNodeSetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphEventRecordNodeSetEvent", kApiTypeRuntime);
 
@@ -3396,12 +3847,14 @@ cudaError_t cudaGraphEventRecordNodeSetEvent(cudaGraphNode_t node, cudaEvent_t e
 
     return lretval;
 }
+#define cudaGraphEventRecordNodeSetEvent cudaGraphEventRecordNodeSetEvent
 
 
+#undef cudaGraphAddEventWaitNode
 cudaError_t cudaGraphAddEventWaitNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddEventWaitNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphAddEventWaitNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddEventWaitNode", kApiTypeRuntime);
 
@@ -3411,12 +3864,14 @@ cudaError_t cudaGraphAddEventWaitNode(cudaGraphNode_t * pGraphNode, cudaGraph_t 
 
     return lretval;
 }
+#define cudaGraphAddEventWaitNode cudaGraphAddEventWaitNode
 
 
+#undef cudaGraphEventWaitNodeGetEvent
 cudaError_t cudaGraphEventWaitNodeGetEvent(cudaGraphNode_t node, cudaEvent_t * event_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphEventWaitNodeGetEvent) (cudaGraphNode_t, cudaEvent_t *) = (cudaError_t (*)(cudaGraphNode_t, cudaEvent_t *))dlsym(RTLD_NEXT, "cudaGraphEventWaitNodeGetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphEventWaitNodeGetEvent", kApiTypeRuntime);
 
@@ -3426,12 +3881,14 @@ cudaError_t cudaGraphEventWaitNodeGetEvent(cudaGraphNode_t node, cudaEvent_t * e
 
     return lretval;
 }
+#define cudaGraphEventWaitNodeGetEvent cudaGraphEventWaitNodeGetEvent
 
 
+#undef cudaGraphEventWaitNodeSetEvent
 cudaError_t cudaGraphEventWaitNodeSetEvent(cudaGraphNode_t node, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphEventWaitNodeSetEvent) (cudaGraphNode_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphNode_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphEventWaitNodeSetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphEventWaitNodeSetEvent", kApiTypeRuntime);
 
@@ -3441,12 +3898,14 @@ cudaError_t cudaGraphEventWaitNodeSetEvent(cudaGraphNode_t node, cudaEvent_t eve
 
     return lretval;
 }
+#define cudaGraphEventWaitNodeSetEvent cudaGraphEventWaitNodeSetEvent
 
 
+#undef cudaGraphAddExternalSemaphoresSignalNode
 cudaError_t cudaGraphAddExternalSemaphoresSignalNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaExternalSemaphoreSignalNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddExternalSemaphoresSignalNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaExternalSemaphoreSignalNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaExternalSemaphoreSignalNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphAddExternalSemaphoresSignalNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddExternalSemaphoresSignalNode", kApiTypeRuntime);
 
@@ -3456,12 +3915,14 @@ cudaError_t cudaGraphAddExternalSemaphoresSignalNode(cudaGraphNode_t * pGraphNod
 
     return lretval;
 }
+#define cudaGraphAddExternalSemaphoresSignalNode cudaGraphAddExternalSemaphoresSignalNode
 
 
+#undef cudaGraphExternalSemaphoresSignalNodeGetParams
 cudaError_t cudaGraphExternalSemaphoresSignalNodeGetParams(cudaGraphNode_t hNode, cudaExternalSemaphoreSignalNodeParams * params_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExternalSemaphoresSignalNodeGetParams) (cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams *) = (cudaError_t (*)(cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams *))dlsym(RTLD_NEXT, "cudaGraphExternalSemaphoresSignalNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExternalSemaphoresSignalNodeGetParams", kApiTypeRuntime);
 
@@ -3471,12 +3932,14 @@ cudaError_t cudaGraphExternalSemaphoresSignalNodeGetParams(cudaGraphNode_t hNode
 
     return lretval;
 }
+#define cudaGraphExternalSemaphoresSignalNodeGetParams cudaGraphExternalSemaphoresSignalNodeGetParams
 
 
+#undef cudaGraphExternalSemaphoresSignalNodeSetParams
 cudaError_t cudaGraphExternalSemaphoresSignalNodeSetParams(cudaGraphNode_t hNode, cudaExternalSemaphoreSignalNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExternalSemaphoresSignalNodeSetParams) (cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExternalSemaphoresSignalNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExternalSemaphoresSignalNodeSetParams", kApiTypeRuntime);
 
@@ -3486,12 +3949,14 @@ cudaError_t cudaGraphExternalSemaphoresSignalNodeSetParams(cudaGraphNode_t hNode
 
     return lretval;
 }
+#define cudaGraphExternalSemaphoresSignalNodeSetParams cudaGraphExternalSemaphoresSignalNodeSetParams
 
 
+#undef cudaGraphAddExternalSemaphoresWaitNode
 cudaError_t cudaGraphAddExternalSemaphoresWaitNode(cudaGraphNode_t * pGraphNode, cudaGraph_t graph, cudaGraphNode_t const * pDependencies, size_t numDependencies, cudaExternalSemaphoreWaitNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddExternalSemaphoresWaitNode) (cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaExternalSemaphoreWaitNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraph_t, cudaGraphNode_t const *, size_t, cudaExternalSemaphoreWaitNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphAddExternalSemaphoresWaitNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddExternalSemaphoresWaitNode", kApiTypeRuntime);
 
@@ -3501,12 +3966,14 @@ cudaError_t cudaGraphAddExternalSemaphoresWaitNode(cudaGraphNode_t * pGraphNode,
 
     return lretval;
 }
+#define cudaGraphAddExternalSemaphoresWaitNode cudaGraphAddExternalSemaphoresWaitNode
 
 
+#undef cudaGraphExternalSemaphoresWaitNodeGetParams
 cudaError_t cudaGraphExternalSemaphoresWaitNodeGetParams(cudaGraphNode_t hNode, cudaExternalSemaphoreWaitNodeParams * params_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExternalSemaphoresWaitNodeGetParams) (cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams *) = (cudaError_t (*)(cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams *))dlsym(RTLD_NEXT, "cudaGraphExternalSemaphoresWaitNodeGetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExternalSemaphoresWaitNodeGetParams", kApiTypeRuntime);
 
@@ -3516,12 +3983,14 @@ cudaError_t cudaGraphExternalSemaphoresWaitNodeGetParams(cudaGraphNode_t hNode, 
 
     return lretval;
 }
+#define cudaGraphExternalSemaphoresWaitNodeGetParams cudaGraphExternalSemaphoresWaitNodeGetParams
 
 
+#undef cudaGraphExternalSemaphoresWaitNodeSetParams
 cudaError_t cudaGraphExternalSemaphoresWaitNodeSetParams(cudaGraphNode_t hNode, cudaExternalSemaphoreWaitNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExternalSemaphoresWaitNodeSetParams) (cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams const *) = (cudaError_t (*)(cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExternalSemaphoresWaitNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExternalSemaphoresWaitNodeSetParams", kApiTypeRuntime);
 
@@ -3531,12 +4000,14 @@ cudaError_t cudaGraphExternalSemaphoresWaitNodeSetParams(cudaGraphNode_t hNode, 
 
     return lretval;
 }
+#define cudaGraphExternalSemaphoresWaitNodeSetParams cudaGraphExternalSemaphoresWaitNodeSetParams
 
 
+#undef cudaGraphClone
 cudaError_t cudaGraphClone(cudaGraph_t * pGraphClone, cudaGraph_t originalGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphClone) (cudaGraph_t *, cudaGraph_t) = (cudaError_t (*)(cudaGraph_t *, cudaGraph_t))dlsym(RTLD_NEXT, "cudaGraphClone");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphClone", kApiTypeRuntime);
 
@@ -3546,12 +4017,14 @@ cudaError_t cudaGraphClone(cudaGraph_t * pGraphClone, cudaGraph_t originalGraph)
 
     return lretval;
 }
+#define cudaGraphClone cudaGraphClone
 
 
+#undef cudaGraphNodeFindInClone
 cudaError_t cudaGraphNodeFindInClone(cudaGraphNode_t * pNode, cudaGraphNode_t originalNode, cudaGraph_t clonedGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphNodeFindInClone) (cudaGraphNode_t *, cudaGraphNode_t, cudaGraph_t) = (cudaError_t (*)(cudaGraphNode_t *, cudaGraphNode_t, cudaGraph_t))dlsym(RTLD_NEXT, "cudaGraphNodeFindInClone");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphNodeFindInClone", kApiTypeRuntime);
 
@@ -3561,12 +4034,14 @@ cudaError_t cudaGraphNodeFindInClone(cudaGraphNode_t * pNode, cudaGraphNode_t or
 
     return lretval;
 }
+#define cudaGraphNodeFindInClone cudaGraphNodeFindInClone
 
 
+#undef cudaGraphNodeGetType
 cudaError_t cudaGraphNodeGetType(cudaGraphNode_t node, cudaGraphNodeType * pType){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphNodeGetType) (cudaGraphNode_t, cudaGraphNodeType *) = (cudaError_t (*)(cudaGraphNode_t, cudaGraphNodeType *))dlsym(RTLD_NEXT, "cudaGraphNodeGetType");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphNodeGetType", kApiTypeRuntime);
 
@@ -3576,12 +4051,14 @@ cudaError_t cudaGraphNodeGetType(cudaGraphNode_t node, cudaGraphNodeType * pType
 
     return lretval;
 }
+#define cudaGraphNodeGetType cudaGraphNodeGetType
 
 
+#undef cudaGraphGetNodes
 cudaError_t cudaGraphGetNodes(cudaGraph_t graph, cudaGraphNode_t * nodes, size_t * numNodes){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphGetNodes) (cudaGraph_t, cudaGraphNode_t *, size_t *) = (cudaError_t (*)(cudaGraph_t, cudaGraphNode_t *, size_t *))dlsym(RTLD_NEXT, "cudaGraphGetNodes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphGetNodes", kApiTypeRuntime);
 
@@ -3591,12 +4068,14 @@ cudaError_t cudaGraphGetNodes(cudaGraph_t graph, cudaGraphNode_t * nodes, size_t
 
     return lretval;
 }
+#define cudaGraphGetNodes cudaGraphGetNodes
 
 
+#undef cudaGraphGetRootNodes
 cudaError_t cudaGraphGetRootNodes(cudaGraph_t graph, cudaGraphNode_t * pRootNodes, size_t * pNumRootNodes){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphGetRootNodes) (cudaGraph_t, cudaGraphNode_t *, size_t *) = (cudaError_t (*)(cudaGraph_t, cudaGraphNode_t *, size_t *))dlsym(RTLD_NEXT, "cudaGraphGetRootNodes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphGetRootNodes", kApiTypeRuntime);
 
@@ -3606,12 +4085,14 @@ cudaError_t cudaGraphGetRootNodes(cudaGraph_t graph, cudaGraphNode_t * pRootNode
 
     return lretval;
 }
+#define cudaGraphGetRootNodes cudaGraphGetRootNodes
 
 
+#undef cudaGraphGetEdges
 cudaError_t cudaGraphGetEdges(cudaGraph_t graph, cudaGraphNode_t * from, cudaGraphNode_t * to, size_t * numEdges){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphGetEdges) (cudaGraph_t, cudaGraphNode_t *, cudaGraphNode_t *, size_t *) = (cudaError_t (*)(cudaGraph_t, cudaGraphNode_t *, cudaGraphNode_t *, size_t *))dlsym(RTLD_NEXT, "cudaGraphGetEdges");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphGetEdges", kApiTypeRuntime);
 
@@ -3621,12 +4102,14 @@ cudaError_t cudaGraphGetEdges(cudaGraph_t graph, cudaGraphNode_t * from, cudaGra
 
     return lretval;
 }
+#define cudaGraphGetEdges cudaGraphGetEdges
 
 
+#undef cudaGraphNodeGetDependencies
 cudaError_t cudaGraphNodeGetDependencies(cudaGraphNode_t node, cudaGraphNode_t * pDependencies, size_t * pNumDependencies){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphNodeGetDependencies) (cudaGraphNode_t, cudaGraphNode_t *, size_t *) = (cudaError_t (*)(cudaGraphNode_t, cudaGraphNode_t *, size_t *))dlsym(RTLD_NEXT, "cudaGraphNodeGetDependencies");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphNodeGetDependencies", kApiTypeRuntime);
 
@@ -3636,12 +4119,14 @@ cudaError_t cudaGraphNodeGetDependencies(cudaGraphNode_t node, cudaGraphNode_t *
 
     return lretval;
 }
+#define cudaGraphNodeGetDependencies cudaGraphNodeGetDependencies
 
 
+#undef cudaGraphNodeGetDependentNodes
 cudaError_t cudaGraphNodeGetDependentNodes(cudaGraphNode_t node, cudaGraphNode_t * pDependentNodes, size_t * pNumDependentNodes){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphNodeGetDependentNodes) (cudaGraphNode_t, cudaGraphNode_t *, size_t *) = (cudaError_t (*)(cudaGraphNode_t, cudaGraphNode_t *, size_t *))dlsym(RTLD_NEXT, "cudaGraphNodeGetDependentNodes");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphNodeGetDependentNodes", kApiTypeRuntime);
 
@@ -3651,12 +4136,14 @@ cudaError_t cudaGraphNodeGetDependentNodes(cudaGraphNode_t node, cudaGraphNode_t
 
     return lretval;
 }
+#define cudaGraphNodeGetDependentNodes cudaGraphNodeGetDependentNodes
 
 
+#undef cudaGraphAddDependencies
 cudaError_t cudaGraphAddDependencies(cudaGraph_t graph, cudaGraphNode_t const * from, cudaGraphNode_t const * to, size_t numDependencies){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphAddDependencies) (cudaGraph_t, cudaGraphNode_t const *, cudaGraphNode_t const *, size_t) = (cudaError_t (*)(cudaGraph_t, cudaGraphNode_t const *, cudaGraphNode_t const *, size_t))dlsym(RTLD_NEXT, "cudaGraphAddDependencies");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphAddDependencies", kApiTypeRuntime);
 
@@ -3666,12 +4153,14 @@ cudaError_t cudaGraphAddDependencies(cudaGraph_t graph, cudaGraphNode_t const * 
 
     return lretval;
 }
+#define cudaGraphAddDependencies cudaGraphAddDependencies
 
 
+#undef cudaGraphRemoveDependencies
 cudaError_t cudaGraphRemoveDependencies(cudaGraph_t graph, cudaGraphNode_t const * from, cudaGraphNode_t const * to, size_t numDependencies){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphRemoveDependencies) (cudaGraph_t, cudaGraphNode_t const *, cudaGraphNode_t const *, size_t) = (cudaError_t (*)(cudaGraph_t, cudaGraphNode_t const *, cudaGraphNode_t const *, size_t))dlsym(RTLD_NEXT, "cudaGraphRemoveDependencies");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphRemoveDependencies", kApiTypeRuntime);
 
@@ -3681,12 +4170,14 @@ cudaError_t cudaGraphRemoveDependencies(cudaGraph_t graph, cudaGraphNode_t const
 
     return lretval;
 }
+#define cudaGraphRemoveDependencies cudaGraphRemoveDependencies
 
 
+#undef cudaGraphDestroyNode
 cudaError_t cudaGraphDestroyNode(cudaGraphNode_t node){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphDestroyNode) (cudaGraphNode_t) = (cudaError_t (*)(cudaGraphNode_t))dlsym(RTLD_NEXT, "cudaGraphDestroyNode");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphDestroyNode", kApiTypeRuntime);
 
@@ -3696,12 +4187,14 @@ cudaError_t cudaGraphDestroyNode(cudaGraphNode_t node){
 
     return lretval;
 }
+#define cudaGraphDestroyNode cudaGraphDestroyNode
 
 
+#undef cudaGraphInstantiate
 cudaError_t cudaGraphInstantiate(cudaGraphExec_t * pGraphExec, cudaGraph_t graph, cudaGraphNode_t * pErrorNode, char * pLogBuffer, size_t bufferSize){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphInstantiate) (cudaGraphExec_t *, cudaGraph_t, cudaGraphNode_t *, char *, size_t) = (cudaError_t (*)(cudaGraphExec_t *, cudaGraph_t, cudaGraphNode_t *, char *, size_t))dlsym(RTLD_NEXT, "cudaGraphInstantiate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphInstantiate", kApiTypeRuntime);
 
@@ -3711,12 +4204,14 @@ cudaError_t cudaGraphInstantiate(cudaGraphExec_t * pGraphExec, cudaGraph_t graph
 
     return lretval;
 }
+#define cudaGraphInstantiate cudaGraphInstantiate
 
 
+#undef cudaGraphExecKernelNodeSetParams
 cudaError_t cudaGraphExecKernelNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, cudaKernelNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecKernelNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaKernelNodeParams const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaKernelNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExecKernelNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecKernelNodeSetParams", kApiTypeRuntime);
 
@@ -3726,12 +4221,14 @@ cudaError_t cudaGraphExecKernelNodeSetParams(cudaGraphExec_t hGraphExec, cudaGra
 
     return lretval;
 }
+#define cudaGraphExecKernelNodeSetParams cudaGraphExecKernelNodeSetParams
 
 
+#undef cudaGraphExecMemcpyNodeSetParams
 cudaError_t cudaGraphExecMemcpyNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, cudaMemcpy3DParms const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecMemcpyNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaMemcpy3DParms const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaMemcpy3DParms const *))dlsym(RTLD_NEXT, "cudaGraphExecMemcpyNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecMemcpyNodeSetParams", kApiTypeRuntime);
 
@@ -3741,12 +4238,14 @@ cudaError_t cudaGraphExecMemcpyNodeSetParams(cudaGraphExec_t hGraphExec, cudaGra
 
     return lretval;
 }
+#define cudaGraphExecMemcpyNodeSetParams cudaGraphExecMemcpyNodeSetParams
 
 
+#undef cudaGraphExecMemcpyNodeSetParamsToSymbol
 cudaError_t cudaGraphExecMemcpyNodeSetParamsToSymbol(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, void const * symbol, void const * src, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecMemcpyNodeSetParamsToSymbol) (cudaGraphExec_t, cudaGraphNode_t, void const *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, void const *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphExecMemcpyNodeSetParamsToSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecMemcpyNodeSetParamsToSymbol", kApiTypeRuntime);
 
@@ -3756,12 +4255,14 @@ cudaError_t cudaGraphExecMemcpyNodeSetParamsToSymbol(cudaGraphExec_t hGraphExec,
 
     return lretval;
 }
+#define cudaGraphExecMemcpyNodeSetParamsToSymbol cudaGraphExecMemcpyNodeSetParamsToSymbol
 
 
+#undef cudaGraphExecMemcpyNodeSetParamsFromSymbol
 cudaError_t cudaGraphExecMemcpyNodeSetParamsFromSymbol(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, void * dst, void const * symbol, size_t count, size_t offset, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecMemcpyNodeSetParamsFromSymbol) (cudaGraphExec_t, cudaGraphNode_t, void *, void const *, size_t, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, void *, void const *, size_t, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphExecMemcpyNodeSetParamsFromSymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecMemcpyNodeSetParamsFromSymbol", kApiTypeRuntime);
 
@@ -3771,12 +4272,14 @@ cudaError_t cudaGraphExecMemcpyNodeSetParamsFromSymbol(cudaGraphExec_t hGraphExe
 
     return lretval;
 }
+#define cudaGraphExecMemcpyNodeSetParamsFromSymbol cudaGraphExecMemcpyNodeSetParamsFromSymbol
 
 
+#undef cudaGraphExecMemcpyNodeSetParams1D
 cudaError_t cudaGraphExecMemcpyNodeSetParams1D(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, void * dst, void const * src, size_t count, cudaMemcpyKind kind){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecMemcpyNodeSetParams1D) (cudaGraphExec_t, cudaGraphNode_t, void *, void const *, size_t, cudaMemcpyKind) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, void *, void const *, size_t, cudaMemcpyKind))dlsym(RTLD_NEXT, "cudaGraphExecMemcpyNodeSetParams1D");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecMemcpyNodeSetParams1D", kApiTypeRuntime);
 
@@ -3786,12 +4289,14 @@ cudaError_t cudaGraphExecMemcpyNodeSetParams1D(cudaGraphExec_t hGraphExec, cudaG
 
     return lretval;
 }
+#define cudaGraphExecMemcpyNodeSetParams1D cudaGraphExecMemcpyNodeSetParams1D
 
 
+#undef cudaGraphExecMemsetNodeSetParams
 cudaError_t cudaGraphExecMemsetNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, cudaMemsetParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecMemsetNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaMemsetParams const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaMemsetParams const *))dlsym(RTLD_NEXT, "cudaGraphExecMemsetNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecMemsetNodeSetParams", kApiTypeRuntime);
 
@@ -3801,12 +4306,14 @@ cudaError_t cudaGraphExecMemsetNodeSetParams(cudaGraphExec_t hGraphExec, cudaGra
 
     return lretval;
 }
+#define cudaGraphExecMemsetNodeSetParams cudaGraphExecMemsetNodeSetParams
 
 
+#undef cudaGraphExecHostNodeSetParams
 cudaError_t cudaGraphExecHostNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, cudaHostNodeParams const * pNodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecHostNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaHostNodeParams const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaHostNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExecHostNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecHostNodeSetParams", kApiTypeRuntime);
 
@@ -3816,12 +4323,14 @@ cudaError_t cudaGraphExecHostNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraph
 
     return lretval;
 }
+#define cudaGraphExecHostNodeSetParams cudaGraphExecHostNodeSetParams
 
 
+#undef cudaGraphExecChildGraphNodeSetParams
 cudaError_t cudaGraphExecChildGraphNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t node, cudaGraph_t childGraph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecChildGraphNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaGraph_t) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaGraph_t))dlsym(RTLD_NEXT, "cudaGraphExecChildGraphNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecChildGraphNodeSetParams", kApiTypeRuntime);
 
@@ -3831,12 +4340,14 @@ cudaError_t cudaGraphExecChildGraphNodeSetParams(cudaGraphExec_t hGraphExec, cud
 
     return lretval;
 }
+#define cudaGraphExecChildGraphNodeSetParams cudaGraphExecChildGraphNodeSetParams
 
 
+#undef cudaGraphExecEventRecordNodeSetEvent
 cudaError_t cudaGraphExecEventRecordNodeSetEvent(cudaGraphExec_t hGraphExec, cudaGraphNode_t hNode, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecEventRecordNodeSetEvent) (cudaGraphExec_t, cudaGraphNode_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphExecEventRecordNodeSetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecEventRecordNodeSetEvent", kApiTypeRuntime);
 
@@ -3846,12 +4357,14 @@ cudaError_t cudaGraphExecEventRecordNodeSetEvent(cudaGraphExec_t hGraphExec, cud
 
     return lretval;
 }
+#define cudaGraphExecEventRecordNodeSetEvent cudaGraphExecEventRecordNodeSetEvent
 
 
+#undef cudaGraphExecEventWaitNodeSetEvent
 cudaError_t cudaGraphExecEventWaitNodeSetEvent(cudaGraphExec_t hGraphExec, cudaGraphNode_t hNode, cudaEvent_t event){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecEventWaitNodeSetEvent) (cudaGraphExec_t, cudaGraphNode_t, cudaEvent_t) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaEvent_t))dlsym(RTLD_NEXT, "cudaGraphExecEventWaitNodeSetEvent");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecEventWaitNodeSetEvent", kApiTypeRuntime);
 
@@ -3861,12 +4374,14 @@ cudaError_t cudaGraphExecEventWaitNodeSetEvent(cudaGraphExec_t hGraphExec, cudaG
 
     return lretval;
 }
+#define cudaGraphExecEventWaitNodeSetEvent cudaGraphExecEventWaitNodeSetEvent
 
 
+#undef cudaGraphExecExternalSemaphoresSignalNodeSetParams
 cudaError_t cudaGraphExecExternalSemaphoresSignalNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t hNode, cudaExternalSemaphoreSignalNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecExternalSemaphoresSignalNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaExternalSemaphoreSignalNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExecExternalSemaphoresSignalNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecExternalSemaphoresSignalNodeSetParams", kApiTypeRuntime);
 
@@ -3876,12 +4391,14 @@ cudaError_t cudaGraphExecExternalSemaphoresSignalNodeSetParams(cudaGraphExec_t h
 
     return lretval;
 }
+#define cudaGraphExecExternalSemaphoresSignalNodeSetParams cudaGraphExecExternalSemaphoresSignalNodeSetParams
 
 
+#undef cudaGraphExecExternalSemaphoresWaitNodeSetParams
 cudaError_t cudaGraphExecExternalSemaphoresWaitNodeSetParams(cudaGraphExec_t hGraphExec, cudaGraphNode_t hNode, cudaExternalSemaphoreWaitNodeParams const * nodeParams){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecExternalSemaphoresWaitNodeSetParams) (cudaGraphExec_t, cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams const *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraphNode_t, cudaExternalSemaphoreWaitNodeParams const *))dlsym(RTLD_NEXT, "cudaGraphExecExternalSemaphoresWaitNodeSetParams");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecExternalSemaphoresWaitNodeSetParams", kApiTypeRuntime);
 
@@ -3891,12 +4408,14 @@ cudaError_t cudaGraphExecExternalSemaphoresWaitNodeSetParams(cudaGraphExec_t hGr
 
     return lretval;
 }
+#define cudaGraphExecExternalSemaphoresWaitNodeSetParams cudaGraphExecExternalSemaphoresWaitNodeSetParams
 
 
+#undef cudaGraphExecUpdate
 cudaError_t cudaGraphExecUpdate(cudaGraphExec_t hGraphExec, cudaGraph_t hGraph, cudaGraphNode_t * hErrorNode_out, cudaGraphExecUpdateResult * updateResult_out){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecUpdate) (cudaGraphExec_t, cudaGraph_t, cudaGraphNode_t *, cudaGraphExecUpdateResult *) = (cudaError_t (*)(cudaGraphExec_t, cudaGraph_t, cudaGraphNode_t *, cudaGraphExecUpdateResult *))dlsym(RTLD_NEXT, "cudaGraphExecUpdate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecUpdate", kApiTypeRuntime);
 
@@ -3906,12 +4425,14 @@ cudaError_t cudaGraphExecUpdate(cudaGraphExec_t hGraphExec, cudaGraph_t hGraph, 
 
     return lretval;
 }
+#define cudaGraphExecUpdate cudaGraphExecUpdate
 
 
+#undef cudaGraphUpload
 cudaError_t cudaGraphUpload(cudaGraphExec_t graphExec, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphUpload) (cudaGraphExec_t, cudaStream_t) = (cudaError_t (*)(cudaGraphExec_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaGraphUpload");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphUpload", kApiTypeRuntime);
 
@@ -3921,12 +4442,14 @@ cudaError_t cudaGraphUpload(cudaGraphExec_t graphExec, cudaStream_t stream){
 
     return lretval;
 }
+#define cudaGraphUpload cudaGraphUpload
 
 
+#undef cudaGraphLaunch
 cudaError_t cudaGraphLaunch(cudaGraphExec_t graphExec, cudaStream_t stream){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphLaunch) (cudaGraphExec_t, cudaStream_t) = (cudaError_t (*)(cudaGraphExec_t, cudaStream_t))dlsym(RTLD_NEXT, "cudaGraphLaunch");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphLaunch", kApiTypeRuntime);
 
@@ -3936,12 +4459,14 @@ cudaError_t cudaGraphLaunch(cudaGraphExec_t graphExec, cudaStream_t stream){
 
     return lretval;
 }
+#define cudaGraphLaunch cudaGraphLaunch
 
 
+#undef cudaGraphExecDestroy
 cudaError_t cudaGraphExecDestroy(cudaGraphExec_t graphExec){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphExecDestroy) (cudaGraphExec_t) = (cudaError_t (*)(cudaGraphExec_t))dlsym(RTLD_NEXT, "cudaGraphExecDestroy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphExecDestroy", kApiTypeRuntime);
 
@@ -3951,12 +4476,14 @@ cudaError_t cudaGraphExecDestroy(cudaGraphExec_t graphExec){
 
     return lretval;
 }
+#define cudaGraphExecDestroy cudaGraphExecDestroy
 
 
+#undef cudaGraphDestroy
 cudaError_t cudaGraphDestroy(cudaGraph_t graph){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphDestroy) (cudaGraph_t) = (cudaError_t (*)(cudaGraph_t))dlsym(RTLD_NEXT, "cudaGraphDestroy");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphDestroy", kApiTypeRuntime);
 
@@ -3966,12 +4493,14 @@ cudaError_t cudaGraphDestroy(cudaGraph_t graph){
 
     return lretval;
 }
+#define cudaGraphDestroy cudaGraphDestroy
 
 
+#undef cudaGraphDebugDotPrint
 cudaError_t cudaGraphDebugDotPrint(cudaGraph_t graph, char const * path, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphDebugDotPrint) (cudaGraph_t, char const *, unsigned int) = (cudaError_t (*)(cudaGraph_t, char const *, unsigned int))dlsym(RTLD_NEXT, "cudaGraphDebugDotPrint");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphDebugDotPrint", kApiTypeRuntime);
 
@@ -3981,12 +4510,14 @@ cudaError_t cudaGraphDebugDotPrint(cudaGraph_t graph, char const * path, unsigne
 
     return lretval;
 }
+#define cudaGraphDebugDotPrint cudaGraphDebugDotPrint
 
 
+#undef cudaUserObjectCreate
 cudaError_t cudaUserObjectCreate(cudaUserObject_t * object_out, void * ptr, cudaHostFn_t destroy, unsigned int initialRefcount, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaUserObjectCreate) (cudaUserObject_t *, void *, cudaHostFn_t, unsigned int, unsigned int) = (cudaError_t (*)(cudaUserObject_t *, void *, cudaHostFn_t, unsigned int, unsigned int))dlsym(RTLD_NEXT, "cudaUserObjectCreate");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaUserObjectCreate", kApiTypeRuntime);
 
@@ -3996,12 +4527,14 @@ cudaError_t cudaUserObjectCreate(cudaUserObject_t * object_out, void * ptr, cuda
 
     return lretval;
 }
+#define cudaUserObjectCreate cudaUserObjectCreate
 
 
+#undef cudaUserObjectRetain
 cudaError_t cudaUserObjectRetain(cudaUserObject_t object, unsigned int count){
     cudaError_t lretval;
     cudaError_t (*lcudaUserObjectRetain) (cudaUserObject_t, unsigned int) = (cudaError_t (*)(cudaUserObject_t, unsigned int))dlsym(RTLD_NEXT, "cudaUserObjectRetain");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaUserObjectRetain", kApiTypeRuntime);
 
@@ -4011,12 +4544,14 @@ cudaError_t cudaUserObjectRetain(cudaUserObject_t object, unsigned int count){
 
     return lretval;
 }
+#define cudaUserObjectRetain cudaUserObjectRetain
 
 
+#undef cudaUserObjectRelease
 cudaError_t cudaUserObjectRelease(cudaUserObject_t object, unsigned int count){
     cudaError_t lretval;
     cudaError_t (*lcudaUserObjectRelease) (cudaUserObject_t, unsigned int) = (cudaError_t (*)(cudaUserObject_t, unsigned int))dlsym(RTLD_NEXT, "cudaUserObjectRelease");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaUserObjectRelease", kApiTypeRuntime);
 
@@ -4026,12 +4561,14 @@ cudaError_t cudaUserObjectRelease(cudaUserObject_t object, unsigned int count){
 
     return lretval;
 }
+#define cudaUserObjectRelease cudaUserObjectRelease
 
 
+#undef cudaGraphRetainUserObject
 cudaError_t cudaGraphRetainUserObject(cudaGraph_t graph, cudaUserObject_t object, unsigned int count, unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphRetainUserObject) (cudaGraph_t, cudaUserObject_t, unsigned int, unsigned int) = (cudaError_t (*)(cudaGraph_t, cudaUserObject_t, unsigned int, unsigned int))dlsym(RTLD_NEXT, "cudaGraphRetainUserObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphRetainUserObject", kApiTypeRuntime);
 
@@ -4041,12 +4578,14 @@ cudaError_t cudaGraphRetainUserObject(cudaGraph_t graph, cudaUserObject_t object
 
     return lretval;
 }
+#define cudaGraphRetainUserObject cudaGraphRetainUserObject
 
 
+#undef cudaGraphReleaseUserObject
 cudaError_t cudaGraphReleaseUserObject(cudaGraph_t graph, cudaUserObject_t object, unsigned int count){
     cudaError_t lretval;
     cudaError_t (*lcudaGraphReleaseUserObject) (cudaGraph_t, cudaUserObject_t, unsigned int) = (cudaError_t (*)(cudaGraph_t, cudaUserObject_t, unsigned int))dlsym(RTLD_NEXT, "cudaGraphReleaseUserObject");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGraphReleaseUserObject", kApiTypeRuntime);
 
@@ -4056,12 +4595,14 @@ cudaError_t cudaGraphReleaseUserObject(cudaGraph_t graph, cudaUserObject_t objec
 
     return lretval;
 }
+#define cudaGraphReleaseUserObject cudaGraphReleaseUserObject
 
 
+#undef cudaGetDriverEntryPoint
 cudaError_t cudaGetDriverEntryPoint(char const * symbol, void * * funcPtr, long long unsigned int flags){
     cudaError_t lretval;
     cudaError_t (*lcudaGetDriverEntryPoint) (char const *, void * *, long long unsigned int) = (cudaError_t (*)(char const *, void * *, long long unsigned int))dlsym(RTLD_NEXT, "cudaGetDriverEntryPoint");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetDriverEntryPoint", kApiTypeRuntime);
 
@@ -4071,12 +4612,14 @@ cudaError_t cudaGetDriverEntryPoint(char const * symbol, void * * funcPtr, long 
 
     return lretval;
 }
+#define cudaGetDriverEntryPoint cudaGetDriverEntryPoint
 
 
+#undef cudaGetExportTable
 cudaError_t cudaGetExportTable(void const * * ppExportTable, cudaUUID_t const * pExportTableId){
     cudaError_t lretval;
     cudaError_t (*lcudaGetExportTable) (void const * *, cudaUUID_t const *) = (cudaError_t (*)(void const * *, cudaUUID_t const *))dlsym(RTLD_NEXT, "cudaGetExportTable");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetExportTable", kApiTypeRuntime);
 
@@ -4086,12 +4629,14 @@ cudaError_t cudaGetExportTable(void const * * ppExportTable, cudaUUID_t const * 
 
     return lretval;
 }
+#define cudaGetExportTable cudaGetExportTable
 
 
+#undef cudaGetFuncBySymbol
 cudaError_t cudaGetFuncBySymbol(cudaFunction_t * functionPtr, void const * symbolPtr){
     cudaError_t lretval;
     cudaError_t (*lcudaGetFuncBySymbol) (cudaFunction_t *, void const *) = (cudaError_t (*)(cudaFunction_t *, void const *))dlsym(RTLD_NEXT, "cudaGetFuncBySymbol");
-
+    
     /* pre exeuction logics */
     ac.add_counter("cudaGetFuncBySymbol", kApiTypeRuntime);
 
@@ -4101,4 +4646,5 @@ cudaError_t cudaGetFuncBySymbol(cudaFunction_t * functionPtr, void const * symbo
 
     return lretval;
 }
+#define cudaGetFuncBySymbol cudaGetFuncBySymbol
 

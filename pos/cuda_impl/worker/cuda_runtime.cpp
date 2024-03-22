@@ -498,6 +498,21 @@ namespace cuda_get_error_string {
 
 
 /*!
+ *  \related    cudaPeekAtLastError
+ *  \brief      obtain the latest error within the CUDA context
+ */
+namespace cuda_peek_at_last_error {
+    // parser function
+    POS_WK_FUNC_LAUNCH(){
+        POS_ERROR_DETAIL("shouldn't be called");
+        return POS_SUCCESS;
+    }
+} // namespace cuda_peek_at_last_error
+
+
+
+
+/*!
  *  \related    cudaGetDeviceCount
  *  \brief      obtain the number of devices
  */
@@ -548,6 +563,40 @@ namespace cuda_get_device_properties {
 
 
 
+/*!
+ *  \related    cudaDeviceGetAttribute
+ *  \brief      obtain the properties of specified device
+ */
+namespace cuda_device_get_attribute {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle_CUDA_Device *device_handle;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
+        POS_CHECK_POINTER(device_handle);
+
+        wqe->api_cxt->return_code = cudaDeviceGetAttribute(
+            /* value */ (int*)(wqe->api_cxt->ret_data), 
+            /* attr */ pos_api_param_value(wqe, 0, cudaDeviceAttr),
+            /* device */ device_handle->device_id
+        );
+
+        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+    exit:
+        return retval;
+    }
+} // namespace cuda_device_get_attribute
+
+
 
 /*!
  *  \related    cudaGetDevice
@@ -561,6 +610,97 @@ namespace cuda_get_device {
         return POS_SUCCESS;
     }
 } // namespace cuda_get_device
+
+
+
+/*!
+ *  \related    cudaFuncGetAttributes
+ *  \brief      find out attributes for a given function
+ */
+namespace cuda_func_get_attributes {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle_CUDA_Function *function_handle;
+        struct cudaFuncAttributes *attr = (struct cudaFuncAttributes*)wqe->api_cxt->ret_data;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_input_handle(wqe, 0));
+        POS_CHECK_POINTER(function_handle);
+
+    #define GET_FUNC_ATTR(member, name)					                                    \
+        do {								                                                \
+            int tmp;								                                        \
+            wqe->api_cxt->return_code = cuFuncGetAttribute(                                 \
+                &tmp, CU_FUNC_ATTRIBUTE_##name, (CUfunction)(function_handle->server_addr)  \
+            );                                                                              \
+            if(unlikely(wqe->api_cxt->return_code != CUDA_SUCCESS)){                        \
+                goto exit;                                                                  \
+            }                                                                               \
+            attr->member = tmp;						                                        \
+        } while(0)
+        GET_FUNC_ATTR(maxThreadsPerBlock, MAX_THREADS_PER_BLOCK);
+        GET_FUNC_ATTR(sharedSizeBytes, SHARED_SIZE_BYTES);
+        GET_FUNC_ATTR(constSizeBytes, CONST_SIZE_BYTES);
+        GET_FUNC_ATTR(localSizeBytes, LOCAL_SIZE_BYTES);
+        GET_FUNC_ATTR(numRegs, NUM_REGS);
+        GET_FUNC_ATTR(ptxVersion, PTX_VERSION);
+        GET_FUNC_ATTR(binaryVersion, BINARY_VERSION);
+        GET_FUNC_ATTR(cacheModeCA, CACHE_MODE_CA);
+        GET_FUNC_ATTR(maxDynamicSharedSizeBytes, MAX_DYNAMIC_SHARED_SIZE_BYTES);
+        GET_FUNC_ATTR(preferredShmemCarveout, PREFERRED_SHARED_MEMORY_CARVEOUT);
+    #undef GET_FUNC_ATTR
+
+    exit:
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+        return retval;
+    }
+} // namespace cuda_func_get_attributes
+
+
+
+/*!
+ *  \related    cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags
+ *  \brief      returns occupancy for a device function with the specified flags
+ */
+namespace cuda_occupancy_max_active_bpm_with_flags {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle_CUDA_Function *function_handle;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_input_handle(wqe, 0));
+        POS_CHECK_POINTER(function_handle);
+
+        wqe->api_cxt->return_code = cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
+            /* numBlock */ (int*)(wqe->api_cxt->ret_data),
+            /* func */ (CUfunction)(function_handle->server_addr),
+            /* blockSize */ pos_api_param_value(wqe, 1, int),
+            /* dynamicSMemSize */ pos_api_param_value(wqe, 2, size_t),
+            /* flags */ pos_api_param_value(wqe, 3, int)
+        );
+
+    exit:
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+        return retval;
+    }
+} // namespace cuda_occupancy_max_active_bpm_with_flags
 
 
 

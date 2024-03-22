@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <thread>
+#include <future>
 
 #include <cuda_runtime_api.h>
 
@@ -14,9 +15,11 @@
 #include "pos/include/transport.h"
 #include "pos/include/worker.h"
 #include "pos/include/checkpoint.h"
-#include "pos/cuda_impl/client.h"
 
+#include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_index.h"
+#include "pos/cuda_impl/handle/memory.h"
+
 
 namespace wk_functions {
     /* CUDA runtime functions */
@@ -32,9 +35,13 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cuda_set_device);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_last_error);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_error_string);
+    POS_WK_DECLARE_FUNCTIONS(cuda_peek_at_last_error);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_device_count);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_device_properties);
+    POS_WK_DECLARE_FUNCTIONS(cuda_device_get_attribute);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_device);
+    POS_WK_DECLARE_FUNCTIONS(cuda_func_get_attributes);
+    POS_WK_DECLARE_FUNCTIONS(cuda_occupancy_max_active_bpm_with_flags);
     POS_WK_DECLARE_FUNCTIONS(cuda_stream_synchronize);
     POS_WK_DECLARE_FUNCTIONS(cuda_stream_is_capturing);
     POS_WK_DECLARE_FUNCTIONS(cuda_event_create_with_flags);
@@ -42,9 +49,11 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cuda_event_record);
 
     /* CUDA driver functions */
+    POS_WK_DECLARE_FUNCTIONS(cu_module_load);
     POS_WK_DECLARE_FUNCTIONS(cu_module_load_data);
     POS_WK_DECLARE_FUNCTIONS(cu_module_get_function);
     POS_WK_DECLARE_FUNCTIONS(cu_module_get_global);
+    POS_WK_DECLARE_FUNCTIONS(cu_ctx_get_current);
     POS_WK_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);
 
     /* cuBLAS functions */
@@ -52,7 +61,8 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cublas_set_stream);
     POS_WK_DECLARE_FUNCTIONS(cublas_set_math_mode);
     POS_WK_DECLARE_FUNCTIONS(cublas_sgemm);
-} // namespace rt_functions
+    POS_WK_DECLARE_FUNCTIONS(cublas_sgemm_strided_batched);
+} // namespace ps_functions
 
 /*!
  *  \brief  POS Worker (CUDA Implementation)
@@ -228,8 +238,8 @@ class POSWorker_CUDA : public POSWorker {
         uint64_t s_tick = 0, e_tick = 0;
 
     #if POS_CKPT_ENABLE_PIPELINE == 1
-        // std::vector<std::thread*> _commit_threads;
-        // std::thread *_new_commit_thread;
+        std::vector<std::shared_future<pos_retval_t>> _commit_threads;
+        std::shared_future<pos_retval_t> _new_commit_thread;
     #endif
 
         typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
@@ -314,11 +324,16 @@ class POSWorker_CUDA : public POSWorker {
                     /*!
                      *  \note   if no invalidation happened, we can commit this checkpoint from device to host
                      */
-                    retval = handle->checkpoint_pipeline_commit_async(
-                        /* version_id */ checkpoint_version,
-                        /* stream_id */ (uint64_t)(_ckpt_commit_stream)
+                    _new_commit_thread = handle->spawn_checkpoint_pipeline_commit_thread(
+                            /* version_id */ checkpoint_version,
+                           /* stream_id */ (uint64_t)(_ckpt_commit_stream)
                     );
-                    POS_ASSERT(retval == POS_SUCCESS);
+                    _commit_threads.push_back(_new_commit_thread);
+
+                    // retval = handle->checkpoint_pipeline_commit_async(
+                    //     /* version_id */ checkpoint_version,
+                    //     /* stream_id */ (uint64_t)(_ckpt_commit_stream)
+                    // );
                 #endif
                 wqe->nb_ckpt_handles += 1;
                 wqe->ckpt_size += handle->state_size;
@@ -326,6 +341,12 @@ class POSWorker_CUDA : public POSWorker {
         }
 
         #if POS_CKPT_ENABLE_PIPELINE == 1
+            for(auto &commit_thread : _commit_threads){
+                if(unlikely(POS_SUCCESS != commit_thread.get())){
+                    POS_WARN_C("failure occured within the commit thread");
+                }
+            }
+
             /*!
              *  \note   we need to wait all commits to be finished
              */
@@ -394,24 +415,32 @@ class POSWorker_CUDA : public POSWorker {
             {   CUDA_SET_DEVICE,                wk_functions::cuda_set_device::launch                   },
             {   CUDA_GET_LAST_ERROR,            wk_functions::cuda_get_last_error::launch               },
             {   CUDA_GET_ERROR_STRING,          wk_functions::cuda_get_error_string::launch             },
+            {   CUDA_PEEK_AT_LAST_ERROR,        wk_functions::cuda_peek_at_last_error::launch           },
             {   CUDA_GET_DEVICE_COUNT,          wk_functions::cuda_get_device_count::launch             },
             {   CUDA_GET_DEVICE_PROPERTIES,     wk_functions::cuda_get_device_properties::launch        },
+            {   CUDA_DEVICE_GET_ATTRIBUTE,      wk_functions::cuda_device_get_attribute::launch         },
             {   CUDA_GET_DEVICE,                wk_functions::cuda_get_device::launch                   },
+            {   CUDA_FUNC_GET_ATTRIBUTES,       wk_functions::cuda_func_get_attributes::launch          },
+            {   CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS,   
+                                        wk_functions::cuda_occupancy_max_active_bpm_with_flags::launch  },
             {   CUDA_STREAM_SYNCHRONIZE,        wk_functions::cuda_stream_synchronize::launch           },
             {   CUDA_STREAM_IS_CAPTURING,       wk_functions::cuda_stream_is_capturing::launch          },
             {   CUDA_EVENT_CREATE_WITH_FLAGS,   wk_functions::cuda_event_create_with_flags::launch      },
             {   CUDA_EVENT_DESTROY,             wk_functions::cuda_event_destory::launch                },
             {   CUDA_EVENT_RECORD,              wk_functions::cuda_event_record::launch                 },
             /* CUDA driver functions */
-            {   rpc_cuModuleLoad,               wk_functions::cu_module_load_data::launch               },
+            {   rpc_cuModuleLoad,               wk_functions::cu_module_load::launch                    },
+            {   rpc_cuModuleLoadData,           wk_functions::cu_module_load_data::launch               },
             {   rpc_cuModuleGetFunction,        wk_functions::cu_module_get_function::launch            },
             {   rpc_register_var,               wk_functions::cu_module_get_global::launch              },
             {   rpc_cuDevicePrimaryCtxGetState, wk_functions::cu_device_primary_ctx_get_state::launch   },
+            {   rpc_cuLaunchKernel,             wk_functions::cuda_launch_kernel::launch                },
             /* cuBLAS functions */
             {   rpc_cublasCreate,               wk_functions::cublas_create::launch                     },
             {   rpc_cublasSetStream,            wk_functions::cublas_set_stream::launch                 },
             {   rpc_cublasSetMathMode,          wk_functions::cublas_set_math_mode::launch              },
             {   rpc_cublasSgemm,                wk_functions::cublas_sgemm::launch                      },
+            {   rpc_cublasSgemmStridedBatched,  wk_functions::cublas_sgemm_strided_batched::launch      },
         });
         POS_DEBUG_C("insert %lu worker launch functions", this->_launch_functions.size());
 

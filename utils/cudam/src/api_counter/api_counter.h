@@ -11,7 +11,12 @@
 enum api_type_t {
     kApiTypeRuntime = 0,
     kApiTypeDriver,
-    kApiTypeCublasV2
+    kApiTypeCublasV2,
+    kApiTypeCuDNN,
+    kApiTypeCuSolver,
+    kApiTypeNvml,
+    kApiTypeCuRand,
+    kApiTypeCuFFT
 };
 
 class api_counter {
@@ -34,6 +39,31 @@ class api_counter {
         for(iter = _cublas_v2_count_map.begin(); iter != _cublas_v2_count_map.end(); iter++){
             fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
         }
+
+        fprintf(stdout, ">> cuDNN API Count:\n");
+        for(iter = _cudnn_count_map.begin(); iter != _cudnn_count_map.end(); iter++){
+            fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
+        }
+
+        fprintf(stdout, ">> cuSolver API Count:\n");
+        for(iter = _cusolver_count_map.begin(); iter != _cusolver_count_map.end(); iter++){
+            fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
+        }
+
+        fprintf(stdout, ">> NVML API Count:\n");
+        for(iter = _nvml_count_map.begin(); iter != _nvml_count_map.end(); iter++){
+            fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
+        }
+
+        fprintf(stdout, ">> curand API Count:\n");
+        for(iter = _curand_count_map.begin(); iter != _curand_count_map.end(); iter++){
+            fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
+        }
+
+        fprintf(stdout, ">> cuFFT API Count:\n");
+        for(iter = _cufft_count_map.begin(); iter != _cufft_count_map.end(); iter++){
+            fprintf(stdout, "  %s: %lu\n", iter->first, iter->second);
+        }
     }
 
     inline void add_counter(const char* api_name, api_type_t api_type){
@@ -46,6 +76,16 @@ class api_counter {
                 return this->_driver_count_map;
             case kApiTypeCublasV2:
                 return this->_cublas_v2_count_map;
+            case kApiTypeCuDNN:
+                return this->_cudnn_count_map;
+            case kApiTypeCuSolver:
+                return this->_cusolver_count_map;
+            case kApiTypeNvml:
+                return this->_nvml_count_map;
+            case kApiTypeCuRand:
+                return this->_curand_count_map;
+            case kApiTypeCuFFT:
+                return this->_cufft_count_map;
             default:
                 assert(0);
             }
@@ -64,6 +104,12 @@ class api_counter {
     std::map<const char*, uint64_t> _runtime_count_map;
     std::map<const char*, uint64_t> _driver_count_map;
     std::map<const char*, uint64_t> _cublas_v2_count_map;
+
+    std::map<const char*, uint64_t> _cudnn_count_map;
+    std::map<const char*, uint64_t> _cusolver_count_map;
+    std::map<const char*, uint64_t> _nvml_count_map;
+    std::map<const char*, uint64_t> _curand_count_map;
+    std::map<const char*, uint64_t> _cufft_count_map;
 };
 
 extern api_counter ac;

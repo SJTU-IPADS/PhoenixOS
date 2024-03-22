@@ -10,7 +10,7 @@
 #include "pos/cuda_impl/api_context.h"
 #include "pos/cuda_impl/utils/fatbin.h"
 
-namespace rt_functions {
+namespace ps_functions {
 
 
 /*!
@@ -1212,6 +1212,17 @@ namespace cuda_get_error_string {
 } // namespace cuda_get_error_string
 
 
+/*!
+ *  \related    cudaPeekAtLastError
+ *  \brief      obtain the latest error within the CUDA context
+ */
+namespace cuda_peek_at_last_error {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        return POS_SUCCESS;
+    }
+} // namespace cuda_peek_at_last_error
+
 
 
 /*!
@@ -1321,6 +1332,68 @@ namespace cuda_get_device_properties {
 
 
 
+/*!
+ *  \related    cudaDeviceGetAttribute
+ *  \brief      obtain the properties of specified device
+ */
+namespace cuda_device_get_attribute {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Device *device_handle;
+        POSHandleManager_CUDA_Device *hm_device;
+
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 2)){
+            POS_WARN(
+                "parse(cuda_device_get_attribute): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 2
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        hm_device = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        );
+        POS_CHECK_POINTER(hm_device);
+
+        // find out the involved device
+        retval = hm_device->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 1, int),
+            /* handle */ &device_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_device_get_attribute): no device was founded: client_addr(%d)",
+                (uint64_t)pos_api_param_value(wqe, 1, int)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ device_handle
+        });
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+
+} // namespace cuda_device_get_attribute
+
+
 
 /*!
  *  \related    cudaGetDevice
@@ -1355,9 +1428,129 @@ namespace cuda_get_device {
     exit:
         return retval;
     }
-
 } // namespace cuda_get_device
 
+
+
+/*!
+ *  \related    cudaFuncGetAttributes
+ *  \brief      find out attributes for a given function
+ */
+namespace cuda_func_get_attributes {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandleManager_CUDA_Function *hm_function;
+        
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 1)){
+            POS_WARN(
+                "parse(cuda_func_get_attributes): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 1
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        // obtain handle managers of device
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
+        POS_CHECK_POINTER(hm_function);
+
+        // find out the involved function
+        retval = hm_function->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
+            /* handle */ &function_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_func_get_attributes): no function was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 0, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ function_handle
+        });
+
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+} // namespace cuda_func_get_attributes
+
+
+
+/*!
+ *  \related    cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags
+ *  \brief      returns occupancy for a device function with the specified flags
+ */
+namespace cuda_occupancy_max_active_bpm_with_flags {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Function *function_handle;
+        POSHandleManager_CUDA_Function *hm_function;
+        
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 4)){
+            POS_WARN(
+                "parse(cuda_occupancy_max_active_bpm_with_flags): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 4
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        // obtain handle managers of device
+        hm_function = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function
+        );
+        POS_CHECK_POINTER(hm_function);
+
+        // find out the involved function
+        retval = hm_function->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
+            /* handle */ &function_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_occupancy_max_active_bpm_with_flags): no function was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 0, uint64_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ function_handle
+        });
+
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+} // namespace cuda_occupancy_max_active_bpm_with_flags
 
 
 
@@ -1740,4 +1933,4 @@ namespace template_cuda {
 } // namespace template_cuda
 
 
-} // namespace rt_functions
+} // namespace ps_functions
