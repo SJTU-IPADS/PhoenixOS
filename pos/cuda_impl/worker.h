@@ -108,7 +108,10 @@ class POSWorker_CUDA : public POSWorker {
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle);
 
-                if(unlikely(handle->status == kPOS_HandleStatus_Deleted)){
+                if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                            || handle->status == kPOS_HandleStatus_Create_Pending
+                            || handle->status == kPOS_HandleStatus_Broken
+                )){
                     continue;
                 }
 
@@ -191,6 +194,13 @@ class POSWorker_CUDA : public POSWorker {
         for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
             const POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
+
+            if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                        || handle->status == kPOS_HandleStatus_Create_Pending
+                        || handle->status == kPOS_HandleStatus_Broken
+            )){
+                continue;
+            }
 
             retval = handle->checkpoint_sync(
                 /* version_id */ handle->latest_version,

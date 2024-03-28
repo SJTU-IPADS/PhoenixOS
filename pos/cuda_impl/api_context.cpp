@@ -55,12 +55,14 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     rpc_cublasSgemm,
     rpc_cublasSgemmStridedBatched,
 
+    /* remoting */
+    rpc_deinit,
+
     /* no need to hijack */
     rpc_printmessage,
     rpc_elf_load,
     rpc_register_function,
     rpc_elf_unload,
-    rpc_deinit,
     rpc_checkpoint
 });
 

@@ -16,7 +16,7 @@ torch.backends.cudnn.enabled = False
 print(f"process id: {os.getpid()}")
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-batch_size = 1
+batch_size = 128
 
 train_loader,valid_loader,test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 n_class = 10
@@ -99,7 +99,7 @@ for epoch in tqdm(range(1, n_epochs+1)):
 
         # POS: we only train 15 iteration for test
         # change this number to 15 while enable level-1 continuous checkpoint
-        if nb_iteration == 15:
+        if nb_iteration == 8:
             print(f"reach {nb_iteration}, break")
             break
     

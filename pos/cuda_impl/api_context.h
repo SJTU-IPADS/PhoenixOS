@@ -16,7 +16,8 @@
 enum pos_cuda_library_id_t : uint8_t {
     kPOS_CUDA_Library_Id_Runtime = 0,
     kPOS_CUDA_Library_Id_Driver,
-    kPOS_CUDA_Library_Id_cuBLAS
+    kPOS_CUDA_Library_Id_cuBLAS,
+    kPOS_CUDA_Library_Id_Remoting
 };
 
 /*!
@@ -363,6 +364,17 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cublasSgemmStridedBatched"
                 }
             },
+
+            /* */
+            { 
+                /* api_id */ rpc_deinit, 
+                { 
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Set_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Remoting,
+                    /* api_name */      "rpc_deinit"
+                }
+            },
         });
     }
 
@@ -381,6 +393,8 @@ class POSApiManager_CUDA : public POSApiManager {
                 return CUDA_SUCCESS;
             } else if (library_id == kPOS_CUDA_Library_Id_cuBLAS){
                 return CUBLAS_STATUS_SUCCESS;
+            } else {
+                return 0;
             }
         case POS_FAILED_DRAIN:
             if (library_id == kPOS_CUDA_Library_Id_Runtime){
@@ -389,6 +403,8 @@ class POSApiManager_CUDA : public POSApiManager {
                 return CUDA_ERROR_OUT_OF_MEMORY;
             } else if (library_id == kPOS_CUDA_Library_Id_cuBLAS){
                 return CUBLAS_STATUS_ALLOC_FAILED;
+            } else {
+                return -1;
             }
         default:
             if (library_id == kPOS_CUDA_Library_Id_Runtime){
@@ -397,6 +413,8 @@ class POSApiManager_CUDA : public POSApiManager {
                 return CUDA_ERROR_UNKNOWN;
             } else if (library_id == kPOS_CUDA_Library_Id_cuBLAS){
                 return CUBLAS_STATUS_INTERNAL_ERROR;
+            } else {
+                return -1;
             }
         }
     }

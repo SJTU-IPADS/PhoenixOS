@@ -52,6 +52,9 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(cublas_set_math_mode);
     POS_PS_DECLARE_FUNCTIONS(cublas_sgemm);
     POS_PS_DECLARE_FUNCTIONS(cublas_sgemm_strided_batched);
+
+    /* remoting functions */
+    POS_PS_DECLARE_FUNCTIONS(remoting_deinit);
 } // namespace ps_functions
 
 /*!
@@ -130,6 +133,9 @@ class POSParser_CUDA : public POSParser {
             {   rpc_cublasSetMathMode,          ps_functions::cublas_set_math_mode::parse               },
             {   rpc_cublasSgemm,                ps_functions::cublas_sgemm::parse                       },
             {   rpc_cublasSgemmStridedBatched,  ps_functions::cublas_sgemm_strided_batched::parse       },
+
+            /* remoting functgions */
+            {   rpc_deinit,                     ps_functions::remoting_deinit::parse                    },
         });
         POS_DEBUG_C("insert %lu runtime parse functions", this->_parser_functions.size());
 

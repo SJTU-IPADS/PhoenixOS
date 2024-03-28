@@ -54,13 +54,13 @@ enable_ckpt_orchestration = 0
 
 # config:   enable preempt checkpoint 
 #           (NOTE: must set ckpt_opt_level as 0 while enable this option)
-enable_ckpt_preempt = 0
+enable_ckpt_preempt = 1
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
 # config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 50
+ckpt_interval_ms = 600
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -176,6 +176,7 @@ if target == 'cuda'
         'pos/cuda_impl/parser/cublas.cpp',
         'pos/cuda_impl/parser/cuda_driver.cpp',
         'pos/cuda_impl/parser/cuda_runtime.cpp',
+        'pos/cuda_impl/parser/remoting.cpp',
         'pos/cuda_impl/worker/cublas.cpp',
         'pos/cuda_impl/worker/cuda_driver.cpp',
         'pos/cuda_impl/worker/cuda_runtime.cpp',

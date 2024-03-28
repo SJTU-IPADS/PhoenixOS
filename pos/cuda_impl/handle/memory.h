@@ -158,12 +158,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
             retval = POS_FAILED;
             goto exit;
         }
-        
-        /*!
-         *  \note   it's necessary here to setCtx for worker thread
-         *  \ref    https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DRIVER.html#group__CUDART__DRIVER
-         */
-        cudaSetDevice(((POSHandle_CUDA_Device*)(this->parent_handles[0]))->device_id);
 
         // checkpoint
         cuda_rt_retval = cudaMemcpy(

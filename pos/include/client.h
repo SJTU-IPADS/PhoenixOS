@@ -91,29 +91,8 @@ class POSClient {
     void deinit(){
         pos_retval_t tmp_retval;
         this->deinit_dump_handle_managers();
-        uint64_t s_tick, e_tick;
-
-    #if POS_CKPT_ENABLE_PREEMPT
-        // launch ckpt ops to checkpoint all handles
-        s_tick = POSUtilTimestamp::get_tsc();
-        tmp_retval = this->__preempt_checkpoint_all_resource();
-        if(unlikely(tmp_retval != POS_SUCCESS)){
-            POS_WARN("failed to launch checkpoint ops for preemption");
-            goto exit;
-        }
-
-        // drain out the dag
-        this->dag.drain();
-        e_tick = POSUtilTimestamp::get_tsc();
-        POS_LOG("preempt checkpoint duration: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
-
-        // dump checkpoint to file
-        if(this->_cxt.checkpoint_file_path.size() == 0){
-            this->deinit_dump_checkpoints();
-        }
-    #endif
-
-    #if POS_CKPT_OPT_LEVEL > 0
+        
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         // drain out the dag, and dump checkpoint to file
         this->dag.drain();
         if(this->_cxt.checkpoint_file_path.size() == 0){
