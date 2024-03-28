@@ -158,6 +158,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
             retval = POS_FAILED;
             goto exit;
         }
+        
+        /*!
+         *  \note   it's necessary here to setCtx for worker thread
+         *  \ref    https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DRIVER.html#group__CUDART__DRIVER
+         */
+        cudaSetDevice(((POSHandle_CUDA_Device*)(this->parent_handles[0]))->device_id);
 
         // checkpoint
         cuda_rt_retval = cudaMemcpy(
@@ -412,7 +418,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         std::set<uint64_t> ckpt_version_set;
-        uint64_t s_tick, e_tick;
         uint64_t ckpt_size, ckpt_version;
         POSCheckpointSlot *ckpt_slot = nullptr;
         void *src_data;
@@ -430,14 +435,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
         POS_CHECK_POINTER(ckpt_slot);
         POS_CHECK_POINTER(src_data = ckpt_slot->expose_pointer());
 
-        s_tick = POSUtilTimestamp::get_tsc();
         cuda_rt_retval = cudaMemcpy(
             /* dst */ this->server_addr,
             /* src */ src_data,
             /* size */ this->state_size,
             /* kind */ cudaMemcpyHostToDevice
         );
-        e_tick = POSUtilTimestamp::get_tsc();
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C_DETAIL(
                 "failed to cudaMemcpy checkpoint to GPU: client_addr(%p), retval(%d)",
@@ -445,7 +448,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
             );
             retval = POS_FAILED;
         }
-        POS_LOG("cudaMemcpy duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
         return retval;
     }

@@ -185,9 +185,7 @@ class POSParser {
                  */
                 // TODO: this checkpoint tick should be modified as per-client
                 current_tick = POSUtilTimestamp::get_tsc();
-                if(unlikely(
-                    current_tick - last_ckpt_tick >= this->checkpoint_interval_tick
-                )){
+                if(unlikely(current_tick - last_ckpt_tick >= this->checkpoint_interval_tick)){
                     last_ckpt_tick = current_tick;
                     if(unlikely(POS_SUCCESS != this->checkpoint_insertion(wqe))){
                         POS_WARN_C("failed to insert checkpointing op");

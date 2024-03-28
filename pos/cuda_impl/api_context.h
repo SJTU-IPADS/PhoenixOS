@@ -272,6 +272,15 @@ class POSApiManager_CUDA : public POSApiManager {
                 }
             },
             { 
+                /* api_id */ rpc_register_function, 
+                { 
+                    /* is_sync */       true,
+                    /* api_type */      kPOS_API_Type_Create_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Driver,
+                    /* api_name */      "__cudaRegisterFunction"
+                }
+            },
+            { 
                 /* api_id */ rpc_cuModuleGetFunction, 
                 { 
                     /* is_sync */       true,

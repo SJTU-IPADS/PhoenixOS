@@ -39,6 +39,7 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(cuda_event_record);
     
     /* CUDA driver functions */
+    POS_PS_DECLARE_FUNCTIONS(__register_function);   
     POS_PS_DECLARE_FUNCTIONS(cu_module_load); 
     POS_PS_DECLARE_FUNCTIONS(cu_module_load_data);    
     POS_PS_DECLARE_FUNCTIONS(cu_module_get_function);
@@ -121,6 +122,7 @@ class POSParser_CUDA : public POSParser {
             /* CUDA driver functions */
             {   rpc_cuModuleLoad,               ps_functions::cu_module_load::parse                     },
             {   rpc_cuModuleLoadData,           ps_functions::cu_module_load_data::parse                },
+            {   rpc_register_function,          ps_functions::__register_function::parse                },
             {   rpc_cuModuleGetFunction,        ps_functions::cu_module_get_function::parse             },
             {   rpc_register_var,               ps_functions::cu_module_get_global::parse               },
             {   rpc_cuCtxGetCurrent,            ps_functions::cu_ctx_get_current::parse                 },

@@ -41,6 +41,8 @@ static_assert(
     (POS_CKPT_ENABLE_PREEMPT == 0)
     || (POS_CKPT_ENABLE_PREEMPT == 1 && POS_CKPT_OPT_LEVEL == 0)
 );
+// mock time to trigger preempt checkpoint
+#define POS_CKPT_PREEMPT_TRIGGER_TIME_S   @pos_ckpt_preempt_trigger_time_s@
 
 /*!
  *  \brief  common checkpoint configurations

@@ -443,6 +443,7 @@ void POSClient::init_restore_recreate_handles(
     std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
 ){ 
     uint64_t i, nb_handles;
+    uint64_t s_tick, e_tick;
     std::set<pos_resource_typeid_t> rid_set;
     typename std::set<pos_resource_typeid_t>::iterator rid_set_iter;
     pos_resource_typeid_t rid;
@@ -489,6 +490,7 @@ void POSClient::init_restore_recreate_handles(
     };
 
     // step 1: recreate all handles on XPU driver / device
+    s_tick = POSUtilTimestamp::get_tsc();
     rid_set = this->__get_resource_idx();
     for(rid_set_iter = rid_set.begin(); rid_set_iter != rid_set.end(); rid_set_iter++){
         rid = *rid_set_iter;
@@ -503,8 +505,11 @@ void POSClient::init_restore_recreate_handles(
             __recreate_handle_with_dependency(handle);
         }
     }
+    e_tick = POSUtilTimestamp::get_tsc();
+    POS_LOG("  => recreate handles on XPU driver/device: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
     // step 2: restore state of stateful resource via recomputation
+    s_tick = POSUtilTimestamp::get_tsc();
     for(mh_map_iter=missing_handle_map.begin(); mh_map_iter!=missing_handle_map.end(); mh_map_iter++){
         handle_missing_version = mh_map_iter->first;
         POS_CHECK_POINTER(missing_handle = mh_map_iter->second);
@@ -512,8 +517,12 @@ void POSClient::init_restore_recreate_handles(
         POS_ERROR_C_DETAIL("haven't implement the recompute logic yet");
         recomputed_handles.insert(missing_handle);
     }
+    e_tick = POSUtilTimestamp::get_tsc();
+    POS_LOG("  => restore state of stateful resource via recomputation: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+
 
     // step 3: restore state of stateful resource via reload
+    s_tick = POSUtilTimestamp::get_tsc();
     for(auto &stateful_type_id : this->_cxt.stateful_handle_type_idx){
         POS_CHECK_POINTER(hm = this->__get_handle_manager_by_resource_id(stateful_type_id));
         nb_handles = hm->get_nb_handles();
@@ -530,6 +539,8 @@ void POSClient::init_restore_recreate_handles(
             }
         }
     }
+    e_tick = POSUtilTimestamp::get_tsc();
+    POS_LOG("  => restore state of stateful resource via reload: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 }
 
 

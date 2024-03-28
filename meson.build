@@ -56,6 +56,9 @@ enable_ckpt_orchestration = 0
 #           (NOTE: must set ckpt_opt_level as 0 while enable this option)
 enable_ckpt_preempt = 1
 
+# config:   time to trigger preempt checkpoint
+ckpt_preempt_trigger_time_s = 40
+
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
@@ -71,7 +74,7 @@ enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 1
+enable_hijack_api_check = 0
 
 # switch:   whether to print all fatal messages
 enable_print_error = 1
@@ -99,8 +102,10 @@ message('>>>>>> [Config] TSC register frequency:                    ' + tsc_reg_
 message('>>>>>> [Config] checkpoint optimization level:             ' + ckpt_opt_level.to_string())
 if ckpt_opt_level == 0
     message('       >>>>>> [Config] enable_ckpt_preempt:            ' + enable_ckpt_preempt.to_string())
+    message('       >>>>>> [Config] ckpt_preempt_trigger_time_s:    ' + ckpt_preempt_trigger_time_s.to_string())
 else
     message('       >>>>>> [Config] enable_ckpt_preempt:            N/A')
+    message('       >>>>>> [Config] ckpt_preempt_trigger_time:      N/A')
 endif
 if ckpt_opt_level >= 1
     message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())

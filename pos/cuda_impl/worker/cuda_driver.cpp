@@ -94,6 +94,54 @@ namespace cu_module_load_data {
 
 
 
+
+/*!
+ *  \related    __cudaRegisterFunction 
+ *  \brief      implicitly register cuda function
+ */
+namespace __register_function {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *module_handle;
+        POSHandle_CUDA_Function *function_handle;
+        CUfunction function = NULL;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+    
+        function_handle = (POSHandle_CUDA_Function*)(pos_api_create_handle(wqe, 0));
+        POS_CHECK_POINTER(function_handle);
+
+        POS_ASSERT(function_handle->parent_handles.size() > 0);
+        module_handle = function_handle->parent_handles[0];
+
+        wqe->api_cxt->return_code = cuModuleGetFunction(
+            &function, (CUmodule)(module_handle->server_addr), function_handle->name.c_str()
+        );
+
+        // record server address
+        if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
+            function_handle->set_server_addr((void*)function);
+            function_handle->mark_status(kPOS_HandleStatus_Active);
+        }
+
+        // TODO: skip checking
+        // if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+        //     POSWorker::__restore(ws, wqe);
+        // } else {
+        //     POSWorker::__done(ws, wqe);
+        // }
+        POSWorker::__done(ws, wqe);
+
+    exit:
+        return retval;
+    }
+} // namespace __register_function
+
+
+
+
 /*!
  *  \related    cuModuleGetFunction 
  *  \brief      obtain kernel host pointer by given kernel name from specified CUmodule

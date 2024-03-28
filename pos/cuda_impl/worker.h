@@ -49,6 +49,7 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cuda_event_record);
 
     /* CUDA driver functions */
+    POS_WK_DECLARE_FUNCTIONS(__register_function);
     POS_WK_DECLARE_FUNCTIONS(cu_module_load);
     POS_WK_DECLARE_FUNCTIONS(cu_module_load_data);
     POS_WK_DECLARE_FUNCTIONS(cu_module_get_function);
@@ -90,6 +91,7 @@ class POSWorker_CUDA : public POSWorker {
         POSHandleManager<POSHandle>* hm;
         POSCheckpointSlot *ckpt_slot;
         uint64_t i;
+        uint64_t s_tick, all_tick = 0;
 
         POS_CHECK_POINTER(wqe);
 
@@ -115,6 +117,7 @@ class POSWorker_CUDA : public POSWorker {
                     continue;
                 }
 
+                s_tick = POSUtilTimestamp::get_tsc();
                 retval = handle->checkpoint_sync(
                     /* version_id */ handle->latest_version,
                     /* stream_id */ 0
@@ -125,6 +128,7 @@ class POSWorker_CUDA : public POSWorker {
                     // goto exit;
                     continue;
                 }
+                all_tick += POSUtilTimestamp::get_tsc() - s_tick;
 
                 wqe->nb_ckpt_handles += 1;
                 wqe->ckpt_size += handle->state_size;
@@ -159,8 +163,8 @@ class POSWorker_CUDA : public POSWorker {
         }
 
         POS_LOG(
-            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
-            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes), duration(%lf us)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size, POS_TSC_TO_USEC(all_tick)
         );
 
         return retval;
@@ -452,13 +456,16 @@ class POSWorker_CUDA : public POSWorker {
             {   CUDA_EVENT_CREATE_WITH_FLAGS,   wk_functions::cuda_event_create_with_flags::launch      },
             {   CUDA_EVENT_DESTROY,             wk_functions::cuda_event_destory::launch                },
             {   CUDA_EVENT_RECORD,              wk_functions::cuda_event_record::launch                 },
+            
             /* CUDA driver functions */
             {   rpc_cuModuleLoad,               wk_functions::cu_module_load::launch                    },
             {   rpc_cuModuleLoadData,           wk_functions::cu_module_load_data::launch               },
+            {   rpc_register_function,          wk_functions::__register_function::launch               },
             {   rpc_cuModuleGetFunction,        wk_functions::cu_module_get_function::launch            },
             {   rpc_register_var,               wk_functions::cu_module_get_global::launch              },
             {   rpc_cuDevicePrimaryCtxGetState, wk_functions::cu_device_primary_ctx_get_state::launch   },
             {   rpc_cuLaunchKernel,             wk_functions::cuda_launch_kernel::launch                },
+            
             /* cuBLAS functions */
             {   rpc_cublasCreate,               wk_functions::cublas_create::launch                     },
             {   rpc_cublasSetStream,            wk_functions::cublas_set_stream::launch                 },

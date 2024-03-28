@@ -25,6 +25,7 @@ config_conf.set('pos_ckpt_interval_ms', ckpt_interval_ms)
 
 # for migration
 config_conf.set('pos_enable_ckpt_preempt', enable_ckpt_preempt)
+config_conf.set('pos_ckpt_preempt_trigger_time_s', ckpt_preempt_trigger_time_s)
 
 config_conf.set('pos_log_file_path', log_file_path)
 configure_file(input : 'config.h.in', output : 'config.h', configuration : config_conf)

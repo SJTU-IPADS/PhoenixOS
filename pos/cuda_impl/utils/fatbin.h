@@ -844,13 +844,9 @@ class POSUtil_CUDA_Fatbin {
             if(unlikely(is_duplicated)){ continue; }
 
             // check whether this function is cached
-            if(unlikely(cached_desp_map.size() > 0)){
-                if(likely(cached_desp_map.count(std::string(kernel_str)) > 0)){
-                    function_desp = cached_desp_map[std::string(kernel_str)];
-                    desps->push_back(function_desp);
-                } else {
-                    POS_DEBUG_DETAIL("found uncached kernel, which might cause nsys to crash, so we skip: name(%s)", kernel_str);
-                }
+            if(likely(cached_desp_map.count(std::string(kernel_str)) > 0)){
+                function_desp = cached_desp_map[std::string(kernel_str)];
+                desps->push_back(function_desp);
             } else {
                 function_desp = new POSCudaFunctionDesp_t();
                 POS_CHECK_POINTER(function_desp);

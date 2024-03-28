@@ -38,6 +38,9 @@ namespace remoting_deinit {
         retval = client->dag.launch_op(ckpt_wqe);
     #endif
 
+        // mark this sync call can be returned after parsing
+        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+
     exit:
         return retval;
     }

@@ -51,20 +51,22 @@ class POSWorkspace {
         POS_CHECK_POINTER(_oob_server);
 
         POS_LOG(
-            "workspace created:                     \n"
-            "   =>  ckpt_opt_level(%d, %s)          \n"
-            "   =>  ckpt_interval(%lu ms)           \n"
-            "   =>  enable_ckpt_increamental(%s)    \n"
-            "   =>  enable_ckpt_pipeline(%s)        \n"
-            "   =>  enable_ckpt_orchestration(%s)   \n"
-            "   =>  enable_ckpt_preempt(%s)         \n",
+            "workspace created:                         \n"
+            "   =>  ckpt_opt_level(%d, %s)              \n"
+            "   =>  ckpt_interval(%lu ms)               \n"
+            "   =>  enable_ckpt_increamental(%s)        \n"
+            "   =>  enable_ckpt_pipeline(%s)            \n"
+            "   =>  enable_ckpt_orchestration(%s)       \n"
+            "   =>  enable_ckpt_preempt(%s)             \n"
+            "   =>  ckpt_preempt_trigger_time_s(%lu)    \n",
             POS_CKPT_OPT_LEVEL,
             POS_CKPT_OPT_LEVEL == 0 ? "no ckpt" : POS_CKPT_OPT_LEVEL == 1 ? "sync ckpt" : "async ckpt",
             POS_CKPT_INTERVAL,
             POS_CKPT_OPT_LEVEL == 0 ? "N/A" : POS_CKPT_ENABLE_INCREMENTAL == 1 ? "true" : "false",
             POS_CKPT_OPT_LEVEL <= 1 ? "N/A" : POS_CKPT_ENABLE_PIPELINE == 1 ? "true" : "false",
             POS_CKPT_OPT_LEVEL <= 1 ? "N/A" : POS_CKPT_ENABLE_ORCHESTRATION == 1 ? "true" : "false",
-            POS_CKPT_ENABLE_PREEMPT == 1 ? "true" : "false"
+            POS_CKPT_ENABLE_PREEMPT == 1 ? "true" : "false",
+            POS_CKPT_PREEMPT_TRIGGER_TIME_S
         );
     }
     

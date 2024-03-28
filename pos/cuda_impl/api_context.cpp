@@ -43,6 +43,7 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     rpc_cuModuleLoad,
     rpc_cuModuleLoadData,
     rpc_cuModuleGetFunction,
+    rpc_register_function,
     rpc_register_var,
     rpc_cuDevicePrimaryCtxGetState,
     rpc_cuCtxGetCurrent,

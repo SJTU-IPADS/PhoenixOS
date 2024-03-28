@@ -61,6 +61,17 @@ class POSDag {
     }
 
     /*!
+     *  \brief  block until the end_pc reach the given destination id
+     *  \param  dest_id the given destination api instance id
+     *  \note   this function is used for drain out both parser and worker of 
+     *          current client, the dest_id is recorded inside the client
+     */
+    void drain_by_dest_id(uint64_t dest_id){
+        while(_pc < dest_id){}
+    }
+
+
+    /*!
      *  \brief  add a new handle to the DAG
      *  \param  handle  pointer to the added handle
      *  \note   this function will be called by the runtime thread

@@ -36,6 +36,8 @@ typedef struct pos_client_cxt {
 
     // indices of stateful handle type
     std::vector<uint64_t> stateful_handle_type_idx;
+
+    
 } pos_client_cxt_t;
 
 
@@ -90,15 +92,30 @@ class POSClient {
      */
     void deinit(){
         pos_retval_t tmp_retval;
-        this->deinit_dump_handle_managers();
-        
+        POSAPIContext_QE *ckpt_wqe;
+        uint64_t s_tick, e_tick;
+
     #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
-        // drain out the dag, and dump checkpoint to file
+        // drain out both the parser and worker
+        s_tick = POSUtilTimestamp::get_tsc();
+        // this->dag.drain_by_dest_id(this->_api_inst_pc-1);
+        e_tick = POSUtilTimestamp::get_tsc();
+        POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
+    #endif
+
+    #if POS_CKPT_ENABLE_PREEMPT == 1
+        __preempt_checkpoint_all_resource(&ckpt_wqe);
         this->dag.drain();
+    #endif
+
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+        // dump checkpoint to file
         if(this->_cxt.checkpoint_file_path.size() == 0){
             this->deinit_dump_checkpoints();
         }
     #endif
+
+        this->deinit_dump_handle_managers();
 
     exit:
         ;
@@ -172,7 +189,7 @@ class POSClient {
      *  \return the current pc
      */
     inline uint64_t get_and_move_api_inst_pc(){ _api_inst_pc++; return (_api_inst_pc-1); }
-    
+
  protected:
     // api instance pc
     uint64_t _api_inst_pc;
@@ -216,21 +233,22 @@ class POSClient {
     /*!
      *  \brief  launch checkpoint ops to checkpoint all stateful resources
      *  \note   this function should be invoked during the preemption
+     *  \param  the issued checkpoint wqe
      */
-    pos_retval_t __preempt_checkpoint_all_resource(){
+    pos_retval_t __preempt_checkpoint_all_resource(POSAPIContext_QE **ckpt_wqe){
         pos_retval_t retval = POS_SUCCESS;
         POSHandleManager<POSHandle> *hm;
         uint64_t nb_handles, i;
         POSHandle *handle;
-        POSAPIContext_QE *ckpt_wqe;
 
-        ckpt_wqe = new POSAPIContext_QE_t(
+        POS_CHECK_POINTER(ckpt_wqe);
+        *ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_cxt.checkpoint_api_id,
             /* client */ this
         );
-        POS_CHECK_POINTER(ckpt_wqe);
+        POS_CHECK_POINTER(*ckpt_wqe);
 
-        retval = this->dag.launch_op(ckpt_wqe);
+        retval = this->dag.launch_op(*ckpt_wqe);
 
     exit:
         return retval;

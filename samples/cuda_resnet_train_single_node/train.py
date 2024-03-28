@@ -16,7 +16,7 @@ torch.backends.cudnn.enabled = False
 print(f"process id: {os.getpid()}")
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-batch_size = 128
+batch_size = 512
 
 train_loader,valid_loader,test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 n_class = 10
@@ -43,6 +43,9 @@ accuracy = []
 iter_durations = []
 lr = 0.1
 counter = 0
+
+test_training = False
+
 for epoch in tqdm(range(1, n_epochs+1)):
     # keep track of training and validation loss
     train_loss = 0.0
@@ -74,15 +77,14 @@ for epoch in tqdm(range(1, n_epochs+1)):
         output = model(data).to(device)
         __nvtx_pop(rng_fwd)
 
-        # NOTE: comment out to mock inference
-        # TODO: use nsight system to see whether this part has multi-threads
-        rng_bwd = __nvtx_push(message=f"backward", color="green")
-        optimizer.zero_grad()
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()*data.size(0)
-        __nvtx_pop(rng_bwd)
+        if test_training:
+            rng_bwd = __nvtx_push(message=f"backward", color="green")
+            optimizer.zero_grad()
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()*data.size(0)
+            __nvtx_pop(rng_bwd)
 
         nb_iteration += 1
         
@@ -99,7 +101,7 @@ for epoch in tqdm(range(1, n_epochs+1)):
 
         # POS: we only train 15 iteration for test
         # change this number to 15 while enable level-1 continuous checkpoint
-        if nb_iteration == 8:
+        if nb_iteration == 36:
             print(f"reach {nb_iteration}, break")
             break
     
@@ -113,20 +115,26 @@ for epoch in tqdm(range(1, n_epochs+1)):
 
     print(f"drop wierd duration lower than {lower} or larger than {upper}")
 
-    throughput_list_str = ""
-    time_list_str = ""
+    throughput_list_str = "0, "
+    time_list_str = "0, "
     time_accu = 0 #s
     for i, duration in enumerate(new_np_iter_durations):
         time_accu += duration / 1000
         if i != len(new_np_iter_durations) - 1:
-            throughput_list_str += f"{1000/duration:.2f}, "
+            if test_training:
+                throughput_list_str += f"{1000/duration:.2f}, "
+            else:
+                throughput_list_str += f"{1000/duration*batch_size:.2f}, "
             time_list_str += f"{time_accu:.2f}, "
         else:
-            throughput_list_str += f"{1000/duration:.2f}"
+            if test_training:
+                throughput_list_str += f"{1000/duration:.2f}"
+            else:
+                throughput_list_str += f"{1000/duration*batch_size:.2f}"
             time_list_str += f"{time_accu:.2f}"
+
     print(f"throughput list: {throughput_list_str}")
     print(f"time list: {time_list_str}")
-
     print(f"avg itetration duration: {np.mean(new_np_iter_durations):.2f} ms")
     
     # model.eval()
