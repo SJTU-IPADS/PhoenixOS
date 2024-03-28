@@ -15,8 +15,11 @@
 #define POS_TSC_FREQ                    @pos_tsc_freq@ // Hz
 
 // checkpoint optimization level
-#define POS_CKPT_OPT_LEVAL              @pos_ckpt_opt_level@
+#define POS_CKPT_OPT_LEVEL              @pos_ckpt_opt_level@
 
+/*!
+ *  \brief  configurations for continuous checkpoint
+ */
 // enable increamental checkpoint
 #define POS_CKPT_ENABLE_INCREMENTAL     @pos_enable_ckpt_increamental@
 
@@ -29,6 +32,19 @@
 // checkpoint interval (unit in ms)
 #define POS_CKPT_INTERVAL               @pos_ckpt_interval_ms@ // ms
 
+/*!
+ *  \brief  configurations for preempt checkpoint
+ */
+// enable checkpoint after preempt
+#define POS_CKPT_ENABLE_PREEMPT         @pos_enable_ckpt_preempt@
+static_assert(
+    (POS_CKPT_ENABLE_PREEMPT == 0)
+    || (POS_CKPT_ENABLE_PREEMPT == 1 && POS_CKPT_OPT_LEVEL == 0)
+);
+
+/*!
+ *  \brief  common checkpoint configurations
+ */
 // path to output log file
 #define POS_LOG_FILE_PATH               "@pos_log_file_path@"
 

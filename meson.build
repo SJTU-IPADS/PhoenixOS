@@ -40,23 +40,27 @@ meson_file_dir = meson.source_root()
 # config:   target selection (options: cuda, todos: rocm/ascend)
 target = 'cuda'
 
-# config:   checkpoint optimization level (p.s., 0 is no checkpoint)
+# config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
 ckpt_opt_level = 0
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
-enable_ckpt_increamental = 1
+enable_ckpt_increamental = 0
 
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint pipeline
-enable_ckpt_pipeline = 1
+enable_ckpt_pipeline = 0
 
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
 enable_ckpt_orchestration = 0
+
+# config:   enable preempt checkpoint 
+#           (NOTE: must set ckpt_opt_level as 0 while enable this option)
+enable_ckpt_preempt = 0
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
 # config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 500
+ckpt_interval_ms = 50
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -90,9 +94,14 @@ subdir('pos/include')
 
 # print configurations
 message('>>> Build configurations:')
-message('>>>>>> [Config] target:                                ' + target)
-message('>>>>>> [Config] TSC register frequency:                ' + tsc_reg_freq.to_string())
-message('>>>>>> [Config] checkpoint optimization level:         ' + ckpt_opt_level.to_string())
+message('>>>>>> [Config] target:                                    ' + target)
+message('>>>>>> [Config] TSC register frequency:                    ' + tsc_reg_freq.to_string())
+message('>>>>>> [Config] checkpoint optimization level:             ' + ckpt_opt_level.to_string())
+if ckpt_opt_level == 0
+    message('       >>>>>> [Config] enable_ckpt_preempt:            ' + enable_ckpt_preempt.to_string())
+else
+    message('       >>>>>> [Config] enable_ckpt_preempt:            N/A')
+endif
 if ckpt_opt_level >= 1
     message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())
 else
@@ -105,14 +114,14 @@ else
     message('       >>>>>> [Config] enable_ckpt_pipeline:           N/A')
     message('       >>>>>> [Config] enable_ckpt_orchestration:      N/A')
 endif
-message('>>>>>> [Config] checkpoint interval (ms):              ' + ckpt_interval_ms.to_string())
-message('>>>>>> [Config] log file output path:                  ' + log_file_path)
-message('>>>>>> [Switch] enable_runtime_debug_check:            ' + enable_runtime_debug_check.to_string())
-message('>>>>>> [Switch] enable_hijack_api_check:               ' + enable_hijack_api_check.to_string())
-message('>>>>>> [Switch] enable_print_error:                    ' + enable_print_error.to_string())
-message('>>>>>> [Switch] enable_print_warn:                     ' + enable_print_warn.to_string())
-message('>>>>>> [Switch] enable_print_log:                      ' + enable_print_log.to_string())
-message('>>>>>> [Switch] enable_print_debug:                    ' + enable_print_debug.to_string())
+message('>>>>>> [Config] checkpoint interval (ms):                  ' + ckpt_interval_ms.to_string())
+message('>>>>>> [Config] log file output path:                      ' + log_file_path)
+message('>>>>>> [Switch] enable_runtime_debug_check:                ' + enable_runtime_debug_check.to_string())
+message('>>>>>> [Switch] enable_hijack_api_check:                   ' + enable_hijack_api_check.to_string())
+message('>>>>>> [Switch] enable_print_error:                        ' + enable_print_error.to_string())
+message('>>>>>> [Switch] enable_print_warn:                         ' + enable_print_warn.to_string())
+message('>>>>>> [Switch] enable_print_log:                          ' + enable_print_log.to_string())
+message('>>>>>> [Switch] enable_print_debug:                        ' + enable_print_debug.to_string())
 message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
@@ -152,8 +161,10 @@ message('>>> Detecting CUDA toolkit done\n')
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
 sources += ['pos/src/handle.cpp', 'pos/src/oob.cpp', 'pos/src/api_context.cpp', 'pos/src/client.cpp']
 
-if ckpt_opt_level == 0
+if ckpt_opt_level == 0 and enable_ckpt_preempt == 0
     sources += ['pos/src/checkpoint_o0.cpp']
+elif ckpt_opt_level == 0 and enable_ckpt_preempt == 1
+    sources += ['pos/src/checkpoint_o1_o2.cpp']
 elif ckpt_opt_level == 1 or ckpt_opt_level == 2
     sources += ['pos/src/checkpoint_o1_o2.cpp']
 endif
@@ -167,7 +178,8 @@ if target == 'cuda'
         'pos/cuda_impl/parser/cuda_runtime.cpp',
         'pos/cuda_impl/worker/cublas.cpp',
         'pos/cuda_impl/worker/cuda_driver.cpp',
-        'pos/cuda_impl/worker/cuda_runtime.cpp'
+        'pos/cuda_impl/worker/cuda_runtime.cpp',
+        'pos/cuda_impl/handle/memory.cpp'
     ]
 else
     assert(false, 'target ' + target + ' is currently not supported')

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <map>
 #include <cstdlib>
 
 #include <sys/resource.h>
@@ -14,6 +15,7 @@
 #include "pos/include/utils/serializer.h"
 
 #include "pos/cuda_impl/handle.h"
+#include "pos/cuda_impl/handle/device.h"
 
 
 /*!
@@ -32,7 +34,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         // initialize checkpoint bag
         if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
@@ -156,6 +158,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
             retval = POS_FAILED;
             goto exit;
         }
+        
+        /*!
+         *  \note   it's necessary here to setCtx for worker thread
+         *  \ref    https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DRIVER.html#group__CUDART__DRIVER
+         */
+        cudaSetDevice(((POSHandle_CUDA_Device*)(this->parent_handles[0]))->device_id);
 
         // checkpoint
         cuda_rt_retval = cudaMemcpy(
@@ -167,9 +175,10 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(
-                "failed to checkpoint memory handle: server_addr(%p), retval(%d)",
-                this->server_addr, cuda_rt_retval
+                "failed to checkpoint memory handle: server_addr(%p), state_size(%lu), retval(%d)",
+                this->server_addr, this->state_size, cuda_rt_retval
             );
+            cudaGetLastError();
             retval = POS_FAILED;
             goto exit;
         }
@@ -307,66 +316,77 @@ class POSHandle_CUDA_Memory : public POSHandle {
         CUresult cuda_dv_retval;
         POSHandle_CUDA_Device *device_handle;
         
-        void *rt_ptr;
-
         CUmemAllocationProp prop = {};
         CUmemGenericAllocationHandle hdl;
-        CUmemAccessDesc accessDesc;
-        CUdeviceptr ptr, req_ptr;
-        size_t sz, aligned_sz;
+        CUmemAccessDesc access_desc;
+
+        void *rt_ptr;
 
         POS_ASSERT(this->parent_handles.size() == 1);
         POS_CHECK_POINTER(device_handle = static_cast<POSHandle_CUDA_Device*>(this->parent_handles[0]));
 
-        if(likely(this->client_addr != 0)){
+        if(likely(this->server_addr != 0)){
+            /*!
+             *  \note   case:   restore memory handle at the specified memory address
+             */
             POS_ASSERT(this->client_addr == this->server_addr);
-        
-            // obtain round up allocation size
+
             prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
             prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
             prop.location.id = device_handle->device_id;
-            cuda_dv_retval = cuMemGetAllocationGranularity(&aligned_sz, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM);
-            if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+
+            cuda_dv_retval = cuMemCreate(
+                /* handle */ &hdl,
+                /* size */ this->state_size,
+                /* prop */ &prop,
+                /* flags */ 0
+            );
+            if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+                POS_WARN_DETAIL(
+                    "failed to execute cuMemCreate while restoring: client_addr(%p), state_size(%lu), retval(%d)",
+                    this->client_addr, this->state_size, cuda_dv_retval
+                );
                 retval = POS_FAILED;
-                POS_WARN_C_DETAIL("failed to restore CUDA memory, cuMemGetAllocationGranularity failed: %d", cuda_dv_retval);
                 goto exit;
             }
 
-        #define ROUND_UP(size, aligned_size)    ((size + aligned_size - 1) / aligned_size) * aligned_size;
-            sz = ROUND_UP(this->state_size, aligned_sz);
-        #undef ROUND_UP
-
-            // allocate
-            req_ptr = (CUdeviceptr)(this->client_addr);
-            cuda_dv_retval = cuMemAddressReserve(&ptr, sz, 0ULL, req_ptr, 0ULL);
-            if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+            cuda_dv_retval = cuMemMap(
+                /* ptr */ (CUdeviceptr)(this->server_addr),
+                /* size */ this->state_size,
+                /* offset */ 0ULL,
+                /* handle */ hdl,
+                /* flags */ 0ULL
+            );
+            if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+                POS_WARN_DETAIL(
+                    "failed to execute cuMemMap while restoring: client_addr(%p), state_size(%lu), retval(%d)",
+                    this->client_addr, this->state_size, cuda_dv_retval
+                );
                 retval = POS_FAILED;
-                POS_WARN_C_DETAIL("failed to restore CUDA memory, cuMemAddressReserve failed: %d", cuda_dv_retval);
-                goto exit;
-            }
-            cuda_dv_retval = cuMemCreate(&hdl, sz, &prop, 0);
-            if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
-                retval = POS_FAILED;
-                POS_WARN_C_DETAIL("failed to restore CUDA memory, cuMemCreate failed: %d", cuda_dv_retval);
-                goto exit;
-            }
-            cuda_dv_retval = cuMemMap(ptr, sz, 0ULL, hdl, 0ULL);
-            if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
-                retval = POS_FAILED;
-                POS_WARN_C_DETAIL("failed to restore CUDA memory, cuMemMap failed: %d", cuda_dv_retval);
-                goto exit;
-            }
-            accessDesc.location = prop.location;
-            accessDesc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-            cuda_dv_retval = cuMemSetAccess(ptr, sz, &accessDesc, 1ULL);
-            if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
-                retval = POS_FAILED;
-                POS_WARN_C_DETAIL("failed to restore CUDA memory, cuMemSetAccess failed: %d", cuda_dv_retval);
                 goto exit;
             }
 
-            POS_ASSERT((uint64_t)(ptr) == (uint64_t)(req_ptr));
+            // set access attribute of this memory
+            access_desc.location = prop.location;
+            access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+            cuda_dv_retval = cuMemSetAccess(
+                /* ptr */ (CUdeviceptr)(this->server_addr),
+                /* size */ this->state_size,
+                /* desc */ &access_desc,
+                /* count */ 1ULL
+            );
+            if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+                POS_WARN_DETAIL(
+                    "failed to execute cuMemSetAccess while restoring: client_addr(%p), state_size(%lu), retval(%d)",
+                    this->client_addr, this->state_size, cuda_dv_retval
+                );
+                retval = POS_FAILED;
+                goto exit;  
+            }
         } else {
+            /*!
+             *  \note   case:   no specified address to restore, randomly assign one
+             */
             cuda_rt_retval = cudaMalloc(&rt_ptr, this->state_size);
             if(unlikely(cuda_rt_retval != cudaSuccess)){
                 retval = POS_FAILED;
@@ -384,6 +404,55 @@ class POSHandle_CUDA_Memory : public POSHandle {
         this->mark_status(kPOS_HandleStatus_Active);
 
     exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  reload checkpoint data to device
+     *  \param  version     version of the checkpoint to be reloaded
+     *  \param  load_latest whether to load the latest checkpoint to the GPU
+     *                      (if this option is enabled, version param will be invalidated)
+     *  \return POS_SUCCESS for successfully reloading
+     */
+    pos_retval_t reload_state_to_device(pos_vertex_id_t version, bool load_latest=false) override {
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        std::set<uint64_t> ckpt_version_set;
+        uint64_t s_tick, e_tick;
+        uint64_t ckpt_size, ckpt_version;
+        POSCheckpointSlot *ckpt_slot = nullptr;
+        void *src_data;
+
+        POS_ASSERT(this->status == kPOS_HandleStatus_Active);
+        POS_CHECK_POINTER(this->ckpt_bag);
+
+        if(load_latest){
+            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
+            version = *(ckpt_version_set.rbegin());
+        }
+
+        retval = this->ckpt_bag->get_checkpoint_slot</* on_device */false>(&ckpt_slot, ckpt_size, version);
+        POS_ASSERT(retval == POS_SUCCESS);
+        POS_CHECK_POINTER(ckpt_slot);
+        POS_CHECK_POINTER(src_data = ckpt_slot->expose_pointer());
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        cuda_rt_retval = cudaMemcpy(
+            /* dst */ this->server_addr,
+            /* src */ src_data,
+            /* size */ this->state_size,
+            /* kind */ cudaMemcpyHostToDevice
+        );
+        e_tick = POSUtilTimestamp::get_tsc();
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C_DETAIL(
+                "failed to cudaMemcpy checkpoint to GPU: client_addr(%p), retval(%d)",
+                this->client_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+        }
+        POS_LOG("cudaMemcpy duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+
         return retval;
     }
 
@@ -522,11 +591,130 @@ class POSHandle_CUDA_Memory : public POSHandle {
 class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memory> {
  public:
     /*!
+     *  \brief  base virtual memory address reserved on each device
+     */
+    static const uint64_t reserved_vm_base;
+
+    /*!
+     *  \brief  allocation pointers on each device
+     *  \note   map of device index to allocation pointer
+     */
+    static std::map<int, CUdeviceptr> alloc_ptrs;
+
+    /*!
+     *  \brief  allocation granularity of each device
+     *  \note   map of device index to allocation granularity
+     */
+    static std::map<int, uint64_t> alloc_granularities;
+
+    /*!
+     *  \brief  identify whether previous cuda memroy hm has finsihed reserved virtual memory space
+     *          so that current hm doesn't need to reserve again
+     */
+    static bool has_finshed_reserved;
+
+    /*!
      *  \brief  constructor
      *  \note   the memory manager is a passthrough manager, which means that the client-side
      *          and server-side handle address are equal
      */
-    POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true, /* is_stateful */ true) {}
+    POSHandleManager_CUDA_Memory(POSHandle_CUDA_Device* device_handle, bool is_restoring) : POSHandleManager(/* passthrough */ true, /* is_stateful */ true) {
+        int num_device, i;
+        
+        /*!
+         *  \brief  reserve a large portion of virtual memory space on a specified device
+         *  \param  device_id   index of the device
+         */
+        auto __reserve_device_vm_space = [](int device_id){
+            uint64_t free_portion, free, total;
+            uint64_t reserved_size, alloc_granularity;
+            CUmemAllocationProp prop = {};
+            CUmemGenericAllocationHandle hdl;
+            CUmemAccessDesc accessDesc;
+            CUdeviceptr ptr;
+
+            cudaError_t rt_retval;
+
+            POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 0);
+            POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 0);
+
+            // switch to target device
+            if(unlikely(cudaSuccess != cudaSetDevice(device_id))){
+                POS_ERROR_DETAIL("failed to call cudaSetDevice");
+            }
+            cudaDeviceSynchronize();
+
+            // obtain avaliable device memory space
+            rt_retval = cudaMemGetInfo(&free, &total);
+            if(unlikely(rt_retval == cudaErrorMemoryAllocation || free < 16*1024*1024)){
+                POS_LOG("no available memory space on device to reserve, skip: device_id(%d)", device_id);
+                POSHandleManager_CUDA_Memory::alloc_granularities[device_id] = 0;
+                POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] = (CUdeviceptr)(nullptr);
+                goto exit;
+            }
+            if(unlikely(cudaSuccess != rt_retval)){
+                POS_ERROR_DETAIL("failed to call cudaMemGetInfo: retval(%d)", rt_retval);
+            }
+
+            // obtain granularity of allocation
+            prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+            prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+            prop.location.id = device_id;
+            if(unlikely(
+                CUDA_SUCCESS != cuMemGetAllocationGranularity(&alloc_granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM)
+            )){
+                POS_ERROR_DETAIL("failed to call cuMemGetAllocationGranularity");
+            }
+            POSHandleManager_CUDA_Memory::alloc_granularities[device_id] = alloc_granularity;
+
+            /*!
+             *  \note   we only reserved 80% of free memory, and round up the size according to allocation granularity
+             */
+        #define ROUND_UP(size, aligned_size) ((size + aligned_size - 1) / aligned_size) * aligned_size
+            free_portion = 0.8*free;
+            reserved_size = ROUND_UP(free_portion, alloc_granularity);
+        #undef ROUND_UP
+
+            if(unlikely(
+                CUDA_SUCCESS != cuMemAddressReserve(&ptr, reserved_size, 0, POSHandleManager_CUDA_Memory::reserved_vm_base, 0ULL)
+            )){
+                POS_ERROR_DETAIL("failed to call cuMemAddressReserve");
+            }
+            POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] = ptr;
+            POS_LOG("reserved virtual memory space: device_id(%d), base(%p), size(%lu)", device_id, ptr, reserved_size);
+        
+        exit:
+            ;
+        };
+
+        // no need to conduct reserving if previous hm has already done
+        if(has_finshed_reserved == true){
+            goto exit;
+        }
+    
+        // obtain the number of devices
+        if(unlikely(cudaSuccess != cudaGetDeviceCount(&num_device))){
+            POS_ERROR_C_DETAIL("failed to call cudaGetDeviceCount");
+        }
+
+        // we reserve virtual memory spave on each device
+        for(i=0; i<num_device; i++){
+            __reserve_device_vm_space(i);
+        }
+
+        if(is_restoring == false){
+            POS_CHECK_POINTER(device_handle);
+            // switch back to origin default device
+            if(unlikely(cudaSuccess != cudaSetDevice(device_handle->device_id))){
+                POS_ERROR_DETAIL("failed to call cudaSetDevice");
+            }
+        }    
+
+        has_finshed_reserved = true;
+
+    exit:
+        ;
+    }
 
     /*!
      *  \brief  allocate new mocked CUDA memory within the manager
@@ -547,7 +735,9 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         uint64_t state_size = 0
     ) override {
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle *device_handle;
+        POSHandle_CUDA_Device *device_handle;
+        CUdeviceptr alloc_ptr;
+        uint64_t aligned_alloc_size;
 
         POS_CHECK_POINTER(handle);
 
@@ -560,15 +750,34 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         }
     #endif
     
-        device_handle = related_handles[kPOS_ResourceTypeId_CUDA_Device][0];
+        device_handle = (POSHandle_CUDA_Device*)(related_handles[kPOS_ResourceTypeId_CUDA_Device][0]);
+        POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_handle->device_id) == 1);
+        POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_handle->device_id) == 1);
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        // obtain the desired address based on reserved virtual memory space pointer
+        alloc_ptr = POSHandleManager_CUDA_Memory::alloc_ptrs[device_handle->device_id];
+        
+        // no avaialble memory space on device
+        if(unlikely((void*)(alloc_ptr) == nullptr)){
+            retval = POS_FAILED_DRAIN;
+            goto exit;
+        }
+
+        // forward the allocation pointer
+    #define ROUND_UP(size, alloc_granularity) ((size + alloc_granularity - 1) / alloc_granularity) * alloc_granularity
+        aligned_alloc_size = ROUND_UP(state_size, POSHandleManager_CUDA_Memory::alloc_granularities[device_handle->device_id]);
+        POSHandleManager_CUDA_Memory::alloc_ptrs[device_handle->device_id] += aligned_alloc_size;
+    #undef ROUND_UP
+        
+        retval = this->__allocate_mocked_resource(handle, size, expected_addr, aligned_alloc_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA memory in the manager");
             goto exit;
         }
-
         (*handle)->record_parent_handle(device_handle);
+
+        // we directly setup the passthrough address here
+        (*handle)->set_passthrough_addr((void*)(alloc_ptr), (*handle));
 
     exit:
         return retval;

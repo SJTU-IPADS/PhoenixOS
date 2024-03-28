@@ -74,7 +74,8 @@ namespace cu_module_load {
                 /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
-            /* expected_addr */ pos_api_param_value(wqe, 0, uint64_t)
+            /* expected_addr */ pos_api_param_value(wqe, 0, uint64_t),
+            /* state_size */ pos_api_param_size(wqe, 1)
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load): failed to allocate mocked module within the CUDA module handler manager");
@@ -96,8 +97,9 @@ namespace cu_module_load {
         });
 
         // analyse the fatbin and stores the function attributes in the handle
-        retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
-            /* fatbin */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+        retval = POSUtil_CUDA_Fatbin::obtain_functions_from_cuda_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+            /* binary_size */ pos_api_param_size(wqe, 1),
             /* deps */ &(module_handle->function_desps),
             /* cached_desp_map */ hm_module->cached_function_desps
         );
@@ -139,7 +141,7 @@ namespace cu_module_load {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVAL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -174,6 +176,12 @@ namespace cu_module_load_data {
         POSHandleManager_CUDA_Context *hm_context;
         POSHandleManager_CUDA_Module *hm_module;
         POSHandleManager_CUDA_Function *hm_function;
+
+        // for debug
+        std::ofstream gpt2_elf_stream;
+        gpt2_elf_stream.open("/root/samples/gpt2.elf", std::ofstream::binary);
+        gpt2_elf_stream.write((const char*)(pos_api_param_addr(wqe, 0)), pos_api_param_size(wqe, 0));
+        gpt2_elf_stream.close();
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -215,7 +223,10 @@ namespace cu_module_load_data {
             /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
                 /* id */ kPOS_ResourceTypeId_CUDA_Context, 
                 /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
-            }})
+            }}),
+            /* size */ kPOS_HandleDefaultSize,
+            /* expected_addr */ 0,
+            /* state_size */ pos_api_param_size(wqe, 0)
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load_data): failed to allocate mocked module within the CUDA module handler manager");
@@ -231,7 +242,7 @@ namespace cu_module_load_data {
         }
 
         // set current handle as the latest used handle
-        // hm_module->latest_used_handle = module_handle;
+        hm_module->latest_used_handle = module_handle;
 
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
@@ -239,16 +250,26 @@ namespace cu_module_load_data {
         });
 
         // analyse the fatbin and stores the function attributes in the handle
-        // TODO: we need to auto detect cubin / fatbin format inside this function!
-        retval = POSUtil_CUDA_Fatbin::obtain_functions_from_fatbin(
-            /* fatbin */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
+        POS_WARN("image length: %lu bytes, ready to parse", pos_api_param_size(wqe, 0));
+        for(i=0; i<20; i++){
+            printf("%x ", ((uint8_t*)(pos_api_param_addr(wqe, 0)))[i]);
+        }
+        retval = POSUtil_CUDA_Fatbin::obtain_functions_from_cuda_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
+            /* binary_size */ pos_api_param_size(wqe, 0),
             /* deps */ &(module_handle->function_desps),
             /* cached_desp_map */ hm_module->cached_function_desps
         );
-        POS_DEBUG(
-            "parse(cu_module_load_data): found %lu functions in the fatbin",
-            module_handle->function_desps.size()
-        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cu_module_load_data): failed to parse fatbin/cubin"
+            );
+        } else {
+            POS_LOG(
+                "parse(cu_module_load_data): found %lu functions in the fatbin",
+                module_handle->function_desps.size()
+            );
+        }
 
         #if POS_PRINT_DEBUG
             for(auto desp : module_handle->function_desps){
@@ -283,7 +304,7 @@ namespace cu_module_load_data {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVAL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -387,7 +408,7 @@ namespace cu_module_get_function {
         if(unlikely(found_function_desp == false)){
             POS_WARN(
                 "parse(cu_module_get_function): failed to find function within the module: module_clnt_addr(%p), device_name(%s)",
-                pos_api_param_value(wqe, 0, uint64_t), pos_api_param_addr(wqe, 3)
+                pos_api_param_value(wqe, 0, uint64_t), pos_api_param_addr(wqe, 1)
             );
             retval = POS_FAILED_NOT_EXIST;
             goto exit;

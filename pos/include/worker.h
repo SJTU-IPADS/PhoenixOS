@@ -184,9 +184,9 @@ class POSWorker {
      *  \brief  processing daemon of the worker
      */
     void daemon(){
-        #if POS_CKPT_OPT_LEVAL <= 1
+        #if POS_CKPT_OPT_LEVEL <= 1
             this->__daemon_ckpt_sync();
-        #elif POS_CKPT_OPT_LEVAL == 2
+        #elif POS_CKPT_OPT_LEVEL == 2
             this->__daemon_ckpt_async();
         #else
             static_assert(false, "error checkpoint level");

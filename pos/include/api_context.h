@@ -533,6 +533,14 @@ typedef struct POSAPIContext_QE {
     }
 
     /*!
+     *  \brief  record all handles that need to be checkpointed within this checkpoint op
+     *  \param  handle  the handle to be recorded
+     */
+    inline void record_checkpoint_handles(POSHandle *handle){
+        checkpoint_handles.insert(handle);
+    }
+
+    /*!
      *  \brief  obtain involved handles with specified direction
      *  \param  dir     expected direction
      *  \param  handles pointer to a list that stores the results

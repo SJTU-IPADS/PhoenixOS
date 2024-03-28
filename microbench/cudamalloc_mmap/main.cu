@@ -38,7 +38,7 @@ int main(){
     CUmemAccessDesc accessDesc;
     CUdeviceptr ptr, req_ptr;
     int dev = 0;
-    uint64_t size = 8192;
+    uint64_t size = 64 * 2097152;
 
     // init runtime
     CHECK_RT(cudaSetDevice(dev));
@@ -53,15 +53,15 @@ int main(){
     sz = ROUND_UP(size, aligned_sz);
 
     // give a hint (48-bit GPU memory address)
-    req_ptr = 0x555500000000;
-    CHECK_DRV(cuMemAddressReserve(&ptr, sz, 0ULL, req_ptr, 0ULL));
+    req_ptr = 0x555000000000;
+    CHECK_DRV(cuMemAddressReserve(&ptr, sz, 4*1024*1024, req_ptr, 0ULL));
+        
+    printf("cuda vm: %p, aligned_sz: %lu\n", ptr, aligned_sz);
+
     CHECK_DRV(cuMemCreate(&hdl, sz, &prop, 0));
-    CHECK_DRV(cuMemMap(ptr, sz, 0ULL, hdl, 0ULL));
-    CHECK_DRV(cuMemSetAccess(ptr, sz, &accessDesc, 1ULL));
-
-    printf("cuda vm: %p\n", ptr);
-
-    CHECK_DRV(cuMemUnmap(ptr, sz));
-    CHECK_DRV(cuMemAddressFree(ptr, sz));
+    CHECK_DRV(cuMemMap(ptr+32*2097152, sz, 0ULL, hdl, 0ULL));
+    CHECK_DRV(cuMemSetAccess(ptr+32*2097152, sz, &accessDesc, 1ULL));
+    CHECK_DRV(cuMemUnmap(ptr+32*2097152, sz));
+     CHECK_DRV(cuMemAddressFree(ptr+32*2097152, sz));
     CHECK_DRV(cuMemRelease(hdl));
 }

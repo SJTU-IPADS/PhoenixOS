@@ -12,6 +12,7 @@
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
 #include "pos/include/checkpoint.h"
+#include "pos/include/api_context.h"
 #include "pos/include/utils/serializer.h"
 
 #include "pos/cuda_impl/handle.h"
@@ -36,7 +37,7 @@ class POSHandle_CUDA_Module : public POSHandle {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
 
         // initialize checkpoint bag
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
         }

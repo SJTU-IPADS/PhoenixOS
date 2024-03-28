@@ -346,7 +346,6 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
         POSUtil_Deserializer::read_field(&nb_ckpt_version, &ptr, sizeof(uint64_t));
         for(i=0; i<nb_ckpt_version; i++){
             POSUtil_Deserializer::read_field(&ckpt_version, &ptr, sizeof(uint64_t));
-            
             tmp_retval = this->ckpt_bag->load(ckpt_version, ptr);
             if(unlikely(tmp_retval != POS_SUCCESS)){
                 POS_ERROR_C(

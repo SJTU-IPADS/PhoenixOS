@@ -68,7 +68,30 @@ class POSHandle_CUDA_Var : public POSHandle {
      */
     pos_retval_t restore() override {
         pos_retval_t retval = POS_SUCCESS;
-        
+        CUresult cuda_dv_retval;
+        CUdeviceptr dptr = 0;
+        size_t d_size = 0;
+        POSHandle *module_handle;
+
+        POS_ASSERT(this->parent_handles.size() == 1);
+        POS_CHECK_POINTER(module_handle = this->parent_handles[0]);
+        POS_ASSERT(module_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Module);
+
+        POS_ASSERT(this->name.size() > 0);
+
+        cuda_dv_retval = cuModuleGetGlobal(
+            &dptr, &d_size, (CUmodule)(module_handle->server_addr), this->name.c_str()
+        );
+
+         if(likely(CUDA_SUCCESS == cuda_dv_retval)){
+            this->set_server_addr((void*)dptr);
+            this->mark_status(kPOS_HandleStatus_Active);
+        } else {
+            retval = POS_FAILED;
+            POS_WARN_C_DETAIL("failed to restore CUDA var: %d", cuda_dv_retval);
+        }
+
+        return retval;
     }
 
  protected:

@@ -143,7 +143,7 @@ class POSCheckpointBag {
 
     /*!
      *  \brief  obtain checkpointed data by given checkpoint version
-     *  \tparam on_device   whether to apply the slot on the device
+     *  \tparam on_device   whether the slot to be applied is on the device
      *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
      *  \param  size        size of the checkpoin data
      *  \param  version     the specified version

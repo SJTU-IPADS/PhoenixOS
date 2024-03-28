@@ -16,7 +16,7 @@ torch.backends.cudnn.enabled = False
 print(f"process id: {os.getpid()}")
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-batch_size = 128
+batch_size = 1
 
 train_loader,valid_loader,test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 n_class = 10
@@ -40,6 +40,7 @@ def __nvtx_pop(handle):
 n_epochs = 1
 valid_loss_min = np.Inf # track change in validation loss
 accuracy = []
+iter_durations = []
 lr = 0.1
 counter = 0
 for epoch in tqdm(range(1, n_epochs+1)):
@@ -94,12 +95,40 @@ for epoch in tqdm(range(1, n_epochs+1)):
         end_t = time.time()
 
         print(f"itetration {nb_iteration} duration: {int(round((end_t-start_t) * 1000))} ms")
+        iter_durations.append(int(round((end_t-start_t) * 1000)))
 
         # POS: we only train 15 iteration for test
+        # change this number to 15 while enable level-1 continuous checkpoint
         if nb_iteration == 15:
             print(f"reach {nb_iteration}, break")
             break
-        
+    
+    np_iter_durations = np.array(iter_durations)
+    mean = np.mean(np_iter_durations)
+    std = np.std(np_iter_durations)
+
+    cut_off = std * 3
+    lower, upper = mean - cut_off, mean + cut_off
+    new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
+
+    print(f"drop wierd duration lower than {lower} or larger than {upper}")
+
+    throughput_list_str = ""
+    time_list_str = ""
+    time_accu = 0 #s
+    for i, duration in enumerate(new_np_iter_durations):
+        time_accu += duration / 1000
+        if i != len(new_np_iter_durations) - 1:
+            throughput_list_str += f"{1000/duration:.2f}, "
+            time_list_str += f"{time_accu:.2f}, "
+        else:
+            throughput_list_str += f"{1000/duration:.2f}"
+            time_list_str += f"{time_accu:.2f}"
+    print(f"throughput list: {throughput_list_str}")
+    print(f"time list: {time_list_str}")
+
+    print(f"avg itetration duration: {np.mean(new_np_iter_durations):.2f} ms")
+    
     # model.eval()
     # for data, target in valid_loader:
     #     data = data.to(device)
@@ -114,19 +143,19 @@ for epoch in tqdm(range(1, n_epochs+1)):
     #         if i:
     #             right_sample += 1
 
-    print("Accuracy:",100*right_sample/total_sample,"%")
-    accuracy.append(right_sample/total_sample)
+    # print("Accuracy:",100*right_sample/total_sample,"%")
+    # accuracy.append(right_sample/total_sample)
  
-    train_loss = train_loss/len(train_loader.sampler)
-    valid_loss = valid_loss/len(valid_loader.sampler)
+    # train_loss = train_loss/len(train_loader.sampler)
+    # valid_loss = valid_loss/len(valid_loader.sampler)
         
-    print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(
-        epoch, train_loss, valid_loss))
+    # print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(
+    #     epoch, train_loss, valid_loss))
     
-    if valid_loss <= valid_loss_min:
-        print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(valid_loss_min,valid_loss))
-        # torch.save(model.state_dict(), 'checkpoint/resnet18_cifar10.pt')
-        valid_loss_min = valid_loss
-        counter = 0
-    else:
-        counter += 1
+    # if valid_loss <= valid_loss_min:
+    #     print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(valid_loss_min,valid_loss))
+    #     # torch.save(model.state_dict(), 'checkpoint/resnet18_cifar10.pt')
+    #     valid_loss_min = valid_loss
+    #     counter = 0
+    # else:
+    #     counter += 1

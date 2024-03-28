@@ -16,42 +16,91 @@ namespace wk_functions {
 namespace cuda_malloc {
     // launch function
     POS_WK_FUNC_LAUNCH(){
+        CUmemAllocationProp prop = {};
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *memory_handle;
+        POSHandle_CUDA_Device *device_handle;
         size_t allocate_size;
         void *ptr;
+        CUmemGenericAllocationHandle hdl;
+        CUmemAccessDesc access_desc;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
-        
-        // execute the actual cuda_malloc
-        allocate_size = pos_api_param_value(wqe, 0, size_t);
-        wqe->api_cxt->return_code = cudaMalloc(&ptr, allocate_size);
 
-        // record server address
-        if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            memory_handle = pos_api_create_handle(wqe, 0);
-            POS_CHECK_POINTER(memory_handle);
-            
-            retval = memory_handle->set_passthrough_addr(ptr, memory_handle);
-            if(unlikely(POS_SUCCESS != retval)){ 
-                POS_WARN_DETAIL("failed to set passthrough address for the memory handle: %p", ptr);
-                goto exit;
-            }
+        device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
+        POS_CHECK_POINTER(device_handle);
 
-            memory_handle->mark_status(kPOS_HandleStatus_Active);
-            memcpy(wqe->api_cxt->ret_data, &(memory_handle->client_addr), sizeof(uint64_t));
-        } else {
-            memset(wqe->api_cxt->ret_data, 0, sizeof(uint64_t));
+        memory_handle = pos_api_create_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
+
+        prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+        prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+        prop.location.id = device_handle->device_id;
+
+        // create physical memory on the device
+        wqe->api_cxt->return_code = cuMemCreate(
+            /* handle */ &hdl,
+            /* size */ memory_handle->state_size,
+            /* prop */ &prop,
+            /* flags */ 0
+        );
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemCreate: client_addr(%p), state_size(%lu), retval(%d)",
+                memory_handle->client_addr, memory_handle->state_size,
+                wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
         }
 
-        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+        // map the virtual memory space to the physical memory
+        wqe->api_cxt->return_code = cuMemMap(
+            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
+            /* size */ memory_handle->state_size,
+            /* offset */ 0ULL,
+            /* handle */ hdl,
+            /* flags */ 0ULL
+        );
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemMap: client_addr(%p), state_size(%lu), retval(%d)",
+                memory_handle->client_addr, memory_handle->state_size,
+                wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // set access attribute of this memory
+        access_desc.location = prop.location;
+        access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+        wqe->api_cxt->return_code = cuMemSetAccess(
+            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
+            /* size */ memory_handle->state_size,
+            /* desc */ &access_desc,
+            /* count */ 1ULL
+        );
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemSetAccess: client_addr(%p), state_size(%lu), retval(%d)",
+                memory_handle->client_addr, memory_handle->state_size,
+                wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        memory_handle->mark_status(kPOS_HandleStatus_Active);
+
+    exit:
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
         } else {
             POSWorker::__done(ws, wqe);
         }
 
-    exit:
         return retval;
     }
 } // namespace cuda_malloc
@@ -66,6 +115,7 @@ namespace cuda_free {
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *memory_handle;
+        CUmemGenericAllocationHandle hdl;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -73,21 +123,37 @@ namespace cuda_free {
         memory_handle = pos_api_delete_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
-        wqe->api_cxt->return_code = cudaFree(
-            /* devPtr */ memory_handle->server_addr
-        );
-
-        if(likely(cudaSuccess == wqe->api_cxt->return_code)){
-            memory_handle->mark_status(kPOS_HandleStatus_Deleted);
+        // obtain the physical memory handle
+        wqe->api_cxt->return_code = cuMemRetainAllocationHandle(&hdl, memory_handle->server_addr);
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemRetainAllocationHandle: client_addr(%p), retval(%d)",
+                memory_handle->client_addr, wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
         }
 
-        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+        // release the physical memory
+        wqe->api_cxt->return_code = cuMemRelease(hdl);
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemRelease: client_addr(%p), retval(%d)",
+                memory_handle->client_addr, wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        memory_handle->mark_status(kPOS_HandleStatus_Deleted);
+        
+    exit:
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
         } else {
             POSWorker::__done(ws, wqe);
         }
 
-    exit:
         return retval;
     }
 } // namespace cuda_free

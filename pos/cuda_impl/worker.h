@@ -108,14 +108,19 @@ class POSWorker_CUDA : public POSWorker {
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle);
 
+                if(unlikely(handle->status == kPOS_HandleStatus_Deleted)){
+                    continue;
+                }
+
                 retval = handle->checkpoint_sync(
                     /* version_id */ handle->latest_version,
                     /* stream_id */ 0
                 );
                 if(unlikely(POS_SUCCESS != retval)){
                     POS_WARN_C("failed to checkpoint handle");
-                    retval = POS_FAILED;
-                    goto exit;
+                    // retval = POS_FAILED;
+                    // goto exit;
+                    continue;
                 }
 
                 wqe->nb_ckpt_handles += 1;
@@ -141,6 +146,11 @@ class POSWorker_CUDA : public POSWorker {
             for(i=0; i<nb_handles; i++){
                 handle = hm->get_handle_by_id(i);
                 POS_CHECK_POINTER(handle);
+
+                if(unlikely(handle->status == kPOS_HandleStatus_Deleted)){
+                    continue;
+                }
+
                 wqe->ckpt_memory_consumption += handle->ckpt_bag->get_memory_consumption();
             }
         }
@@ -214,10 +224,14 @@ class POSWorker_CUDA : public POSWorker {
      *  \return POS_SUCCESS for successfully checkpointing
      */
     pos_retval_t checkpoint_sync(POSAPIContext_QE* wqe) override {
-        #if POS_CKPT_ENABLE_INCREMENTAL == 1
-            return __checkpoint_sync_incremental(wqe);
-        #else
+        #if POS_CKPT_ENABLE_PREEMPT == 1
             return __checkpoint_sync_naive(wqe);
+        #else
+            #if POS_CKPT_ENABLE_INCREMENTAL == 1
+                return __checkpoint_sync_incremental(wqe);
+            #else
+                return __checkpoint_sync_naive(wqe);
+            #endif
         #endif
     }
 

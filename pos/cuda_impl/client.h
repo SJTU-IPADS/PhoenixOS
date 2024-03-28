@@ -41,17 +41,20 @@ class POSClient_CUDA : public POSClient {
         pos_retval_t retval;
         POSHandleManager_CUDA_Context *ctx_mgr;
         POSHandleManager_CUDA_Module *module_mgr;
+        POSHandleManager_CUDA_Device *device_mgr;
 
         bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
 
         POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context(is_restoring));
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] 
+            = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle, is_restoring);
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
+        device_mgr = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle, is_restoring);
+        POS_CHECK_POINTER(device_mgr);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = device_mgr;
 
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = new POSHandleManager_CUDA_Module();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Module]);
@@ -73,7 +76,8 @@ class POSClient_CUDA : public POSClient {
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Var] = new POSHandleManager_CUDA_Var();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Var]);
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] = new POSHandleManager_CUDA_Memory();
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] 
+            = new POSHandleManager_CUDA_Memory(device_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory]);
 
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Event] = new POSHandleManager_CUDA_Event();

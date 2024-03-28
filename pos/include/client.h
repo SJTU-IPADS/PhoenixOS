@@ -12,7 +12,10 @@ class POSClient;
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
 #include "pos/include/dag.h"
+#include "pos/include/utils/timestamp.h"
 
+#define pos_get_client_typed_hm(client, resource_id, hm_type)  \
+    (hm_type*)(client->handle_managers[resource_id])
 
 /*!
  *  \brief  context of the client
@@ -67,12 +70,16 @@ class POSClient {
      *          that implemented by derived class
      */
     void init(){
+        std::map<pos_vertex_id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
+        std::multimap<pos_vertex_id_t, POSHandle*> missing_handle_map;
+
         this->init_handle_managers();
         this->init_dag();
 
         if(this->_cxt.checkpoint_file_path.size() > 0){
             this->init_restore_load_resources();
-            this->init_restore_generate_recompute_scheme();
+            this->init_restore_generate_recompute_scheme(apicxt_sequence_map, missing_handle_map);
+            this->init_restore_recreate_handles(apicxt_sequence_map, missing_handle_map);
         }
     }
 
@@ -82,16 +89,40 @@ class POSClient {
      *          that implemented by derived class
      */
     void deinit(){
+        pos_retval_t tmp_retval;
         this->deinit_dump_handle_managers();
+        uint64_t s_tick, e_tick;
 
-    #if POS_CKPT_OPT_LEVAL > 0
-        // drain out the dag, and dump checkpoint to file
+    #if POS_CKPT_ENABLE_PREEMPT
+        // launch ckpt ops to checkpoint all handles
+        s_tick = POSUtilTimestamp::get_tsc();
+        tmp_retval = this->__preempt_checkpoint_all_resource();
+        if(unlikely(tmp_retval != POS_SUCCESS)){
+            POS_WARN("failed to launch checkpoint ops for preemption");
+            goto exit;
+        }
+
+        // drain out the dag
         this->dag.drain();
+        e_tick = POSUtilTimestamp::get_tsc();
+        POS_LOG("preempt checkpoint duration: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
 
+        // dump checkpoint to file
         if(this->_cxt.checkpoint_file_path.size() == 0){
             this->deinit_dump_checkpoints();
         }
     #endif
+
+    #if POS_CKPT_OPT_LEVEL > 0
+        // drain out the dag, and dump checkpoint to file
+        this->dag.drain();
+        if(this->_cxt.checkpoint_file_path.size() == 0){
+            this->deinit_dump_checkpoints();
+        }
+    #endif
+
+    exit:
+        ;
     }
     
     /*!
@@ -114,8 +145,24 @@ class POSClient {
 
     /*!
      *  \brief  generate recompute wqe sequence
+     *  \param  apicxt_sequence_map     the generated recompute sequence
+     *  \param  missing_handle_map      the generated all missing handles
+     *  \todo   this algorithm need to be reconsidered
      */
-    void init_restore_generate_recompute_scheme();
+    void init_restore_generate_recompute_scheme(
+        std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
+        std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
+    );
+
+    /*!
+     *  \brief  recreate handles and their state via reloading / recompute
+     *  \param  apicxt_sequence_map     recompute sequence
+     *  \param  missing_handle_map      all missing handles that need to be restored
+     */
+    void init_restore_recreate_handles(
+        std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
+        std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
+    );
 
     /*!
      *  \brief      deinit handle manager for all used resources
@@ -146,7 +193,7 @@ class POSClient {
      *  \return the current pc
      */
     inline uint64_t get_and_move_api_inst_pc(){ _api_inst_pc++; return (_api_inst_pc-1); }
-
+    
  protected:
     // api instance pc
     uint64_t _api_inst_pc;
@@ -185,7 +232,28 @@ class POSClient {
         }
         return static_cast<POSHandleManager<POSHandle>*>(this->handle_managers[rid]);
     }
-};
 
-#define pos_get_client_typed_hm(client, resource_id, hm_type)  \
-    (hm_type*)(client->handle_managers[resource_id])
+ private:
+    /*!
+     *  \brief  launch checkpoint ops to checkpoint all stateful resources
+     *  \note   this function should be invoked during the preemption
+     */
+    pos_retval_t __preempt_checkpoint_all_resource(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandleManager<POSHandle> *hm;
+        uint64_t nb_handles, i;
+        POSHandle *handle;
+        POSAPIContext_QE *ckpt_wqe;
+
+        ckpt_wqe = new POSAPIContext_QE_t(
+            /* api_id*/ this->_cxt.checkpoint_api_id,
+            /* client */ this
+        );
+        POS_CHECK_POINTER(ckpt_wqe);
+
+        retval = this->dag.launch_op(ckpt_wqe);
+
+    exit:
+        return retval;
+    }
+};

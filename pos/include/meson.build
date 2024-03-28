@@ -14,10 +14,17 @@ log_conf.set('pos_print_with_color', enable_print_with_color)
 configure_file(input : 'log.h.in', output : 'log.h', configuration : log_conf)
 
 config_conf.set('pos_tsc_freq', tsc_reg_freq)
+
 config_conf.set('pos_ckpt_opt_level', ckpt_opt_level)
+
+# for continuous checkpoint
 config_conf.set('pos_enable_ckpt_increamental', enable_ckpt_increamental)
 config_conf.set('pos_enable_ckpt_pipeline', enable_ckpt_pipeline)
 config_conf.set('pos_enable_ckpt_orchestration', enable_ckpt_orchestration)
 config_conf.set('pos_ckpt_interval_ms', ckpt_interval_ms)
+
+# for migration
+config_conf.set('pos_enable_ckpt_preempt', enable_ckpt_preempt)
+
 config_conf.set('pos_log_file_path', log_file_path)
 configure_file(input : 'config.h.in', output : 'config.h', configuration : config_conf)

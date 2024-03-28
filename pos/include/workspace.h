@@ -56,13 +56,15 @@ class POSWorkspace {
             "   =>  ckpt_interval(%lu ms)           \n"
             "   =>  enable_ckpt_increamental(%s)    \n"
             "   =>  enable_ckpt_pipeline(%s)        \n"
-            "   =>  enable_ckpt_orchestration(%s)   \n",
-            POS_CKPT_OPT_LEVAL,
-            POS_CKPT_OPT_LEVAL == 0 ? "no ckpt" : POS_CKPT_OPT_LEVAL == 1 ? "sync ckpt" : "async ckpt",
+            "   =>  enable_ckpt_orchestration(%s)   \n"
+            "   =>  enable_ckpt_preempt(%s)         \n",
+            POS_CKPT_OPT_LEVEL,
+            POS_CKPT_OPT_LEVEL == 0 ? "no ckpt" : POS_CKPT_OPT_LEVEL == 1 ? "sync ckpt" : "async ckpt",
             POS_CKPT_INTERVAL,
-            POS_CKPT_OPT_LEVAL == 0 ? "N/A" : POS_CKPT_ENABLE_INCREMENTAL == 1 ? "true" : "false",
-            POS_CKPT_OPT_LEVAL <= 1 ? "N/A" : POS_CKPT_ENABLE_PIPELINE == 1 ? "true" : "false",
-            POS_CKPT_OPT_LEVAL <= 1 ? "N/A" : POS_CKPT_ENABLE_ORCHESTRATION == 1 ? "true" : "false"
+            POS_CKPT_OPT_LEVEL == 0 ? "N/A" : POS_CKPT_ENABLE_INCREMENTAL == 1 ? "true" : "false",
+            POS_CKPT_OPT_LEVEL <= 1 ? "N/A" : POS_CKPT_ENABLE_PIPELINE == 1 ? "true" : "false",
+            POS_CKPT_OPT_LEVEL <= 1 ? "N/A" : POS_CKPT_ENABLE_ORCHESTRATION == 1 ? "true" : "false",
+            POS_CKPT_ENABLE_PREEMPT == 1 ? "true" : "false"
         );
     }
     

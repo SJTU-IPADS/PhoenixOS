@@ -174,14 +174,17 @@ class POSUtil_CUDA_Fatbin {
  public:
     /*!
      *  \brief  obtain metadata of CUDA functions from given fatbin
-     *  \param  fatbin      pointer to the memory area that stores the fatbin
+     *  \param  binary_ptr  pointer to the memory area that stores the fatbin
      *                      (note: the content should start from the fatbin ELF header)
+     *  \param  binary_size size of the given binary
      *  \param  desps       vector to store the extracted function metadata
      *  \param  cached_deps cached function metadata
      *  \return POS_SUCCESS for successfully extraction
      */
-    static pos_retval_t obtain_functions_from_fatbin(
-        uint8_t* fatbin, std::vector<POSCudaFunctionDesp*>* desps,
+    static pos_retval_t obtain_functions_from_cuda_binary(
+        uint8_t* binary_ptr,
+        uint64_t binary_size,
+        std::vector<POSCudaFunctionDesp*>* desps,
         std::map<std::string, POSCudaFunctionDesp*>& cached_desp_map
     ){
         pos_retval_t retval = POS_SUCCESS;
@@ -196,83 +199,93 @@ class POSUtil_CUDA_Fatbin {
         fat_text_header_t *fatbin_text_hdr;
 
         POS_CHECK_POINTER(desps);
+        POS_CHECK_POINTER(input_pos = binary_ptr);
+        POS_ASSERT(binary_size > 0);
 
-        input_pos = fatbin;   
-
-        // verify fatbin ELF header
         fatbin_elf_hdr = (fat_elf_header_t*)input_pos;
         retval = POSUtil_CUDA_Fatbin::__verify_fatbin_elf_header(fatbin_elf_hdr);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin;
-        }
-        input_pos += fatbin_elf_hdr->header_size;
-        fatbin_total_size = fatbin_elf_hdr->header_size + fatbin_elf_hdr->size;
+        if(retval == POS_SUCCESS){
+            /*!
+             *  \note   case: this is a fatbin that contains multiple cubin
+             */
+            input_pos += fatbin_elf_hdr->header_size;
+            fatbin_total_size = fatbin_elf_hdr->header_size + fatbin_elf_hdr->size;
 
-        do {
-            // verify fatbin text header
-            fatbin_text_hdr = (fat_text_header_t*)input_pos;
-            retval = POSUtil_CUDA_Fatbin::__verify_fatbin_text_header(fatbin_text_hdr);
-            if(unlikely(retval != POS_SUCCESS)){
-                goto exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin;
-            }
-            input_pos += fatbin_text_hdr->header_size;
+            do {
+                // verify fatbin text header
+                fatbin_text_hdr = (fat_text_header_t*)input_pos;
+                retval = POSUtil_CUDA_Fatbin::__verify_fatbin_text_header(fatbin_text_hdr);
+                if(unlikely(retval != POS_SUCCESS)){
+                    goto exit;
+                }
+                input_pos += fatbin_text_hdr->header_size;
 
-            POS_DEBUG(
-                "parsing %u(th) text section: arch(%u), major(%u), minor(%u)",
-                nb_text_section, fatbin_text_hdr->arch, fatbin_text_hdr->major, fatbin_text_hdr->minor
-            );
-
-            // section does not cotain device code (e.g. only PTX)
-            if (fatbin_text_hdr->kind != 2) { 
-                input_pos += fatbin_text_hdr->size;
-                continue;
-            }
-
-            // this section contains debug info
-            if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
-                POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
-            }
-
-            if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
-                // the payload of this section is compressed, need to be decompressed
-                ssize_t input_read;
                 POS_DEBUG(
-                    "%u(th) fatbin text section contains compressed device code, decompressing...",
-                    nb_text_section
+                    "parsing %u(th) text section: arch(%u), major(%u), minor(%u)",
+                    nb_text_section, fatbin_text_hdr->arch, fatbin_text_hdr->major, fatbin_text_hdr->minor
                 );
 
-                input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
-                    input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
-                );
-                if(unlikely(input_read < 0)){
-                    POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
-                    retval = POS_FAILED;
-                    goto exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin;
+                // section does not cotain device code (e.g. only PTX)
+                if (fatbin_text_hdr->kind != 2) { 
+                    input_pos += fatbin_text_hdr->size;
+                    continue;
                 }
 
-                input_pos += input_read;
-            } else {
-                text_data = (uint8_t*)input_pos;
-                text_data_size = fatbin_text_hdr->size;
-                input_pos += fatbin_text_hdr->size;
-            }
+                // this section contains debug info
+                if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
+                    POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
+                }
 
-            retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
+                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
+                    // the payload of this section is compressed, need to be decompressed
+                    ssize_t input_read;
+                    POS_DEBUG(
+                        "%u(th) fatbin text section contains compressed device code, decompressing...",
+                        nb_text_section
+                    );
+
+                    input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
+                        input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
+                    );
+                    if(unlikely(input_read < 0)){
+                        POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
+                        retval = POS_FAILED;
+                        goto exit;
+                    }
+
+                    input_pos += input_read;
+                } else {
+                    text_data = (uint8_t*)input_pos;
+                    text_data_size = fatbin_text_hdr->size;
+                    input_pos += fatbin_text_hdr->size;
+                }
+
+                retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
+                if(unlikely(retval != POS_SUCCESS)){
+                    goto exit;
+                }
+
+                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
+                    free(text_data);
+                }
+
+                nb_text_section += 1;
+
+            } while(input_pos < (uint8_t*)fatbin_elf_hdr + fatbin_elf_hdr->header_size + fatbin_elf_hdr->size);
+        } else {
+            /*!
+             *  \note   case: this is a single ELF cubin
+             */
+            retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(binary_ptr, binary_size, desps, cached_desp_map);
             if(unlikely(retval != POS_SUCCESS)){
-                goto exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin;
+                goto exit;
             }
+        }
 
-            if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
-                free(text_data);
-            }
-
-            nb_text_section += 1;
-
-        } while(input_pos < (uint8_t*)fatbin_elf_hdr + fatbin_elf_hdr->header_size + fatbin_elf_hdr->size);
-
-    exit_POSUtil_CUDA_Fatbin_obtain_functions_from_fatbin:
+    exit:
         return retval;
     }
+
 
  private:
     /*!
@@ -343,12 +356,12 @@ class POSUtil_CUDA_Fatbin {
         POS_CHECK_POINTER(fatbin_elf_hdr);
 
         if(unlikely(fatbin_elf_hdr->magic != FATBIN_TEXT_MAGIC)){
-            POS_WARN(
+            POS_DEBUG(
                 "invalid magic within the fatbin ELF header: given(%x), expected(%x)",
                 fatbin_elf_hdr->magic, FATBIN_TEXT_MAGIC
             );
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSUtil_CUDA_Fatbin___obtain_fatbin_elf_header;
+            goto exit;
         }
 
         if(unlikely(fatbin_elf_hdr->version != 1)){
@@ -357,7 +370,7 @@ class POSUtil_CUDA_Fatbin {
                 fatbin_elf_hdr->version
             );
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSUtil_CUDA_Fatbin___obtain_fatbin_elf_header;
+            goto exit;
         }
 
         if(unlikely(fatbin_elf_hdr->header_size != sizeof(fat_elf_header_t))){
@@ -366,10 +379,10 @@ class POSUtil_CUDA_Fatbin {
                 fatbin_elf_hdr->header_size, sizeof(fat_elf_header_t)
             );
             retval = POS_FAILED_INVALID_INPUT;
-            goto exit_POSUtil_CUDA_Fatbin___obtain_fatbin_elf_header;
+            goto exit;
         }
 
-    exit_POSUtil_CUDA_Fatbin___obtain_fatbin_elf_header:
+    exit:
         return retval;
     }
 
@@ -380,10 +393,22 @@ class POSUtil_CUDA_Fatbin {
      */
     static pos_retval_t __verify_fatbin_text_header(fat_text_header_t* fatbin_text_base){
         pos_retval_t retval = POS_SUCCESS;
+        
+        POS_CHECK_POINTER(fatbin_text_base);
 
-        // TODO:
+        if(fatbin_text_base->obj_name_offset != 0) {
+            if (
+                ((char*)fatbin_text_base)[fatbin_text_base->obj_name_offset + fatbin_text_base->obj_name_len] != '\0'
+            ){
+                retval = POS_FAILED_INVALID_INPUT;
+                goto exit;
+            } else {
+                char *obj_name = (char*)fatbin_text_base + fatbin_text_base->obj_name_offset;
+                POS_DEBUG("fatbin object name: %s (len:%#x)", obj_name, fatbin_text_base->obj_name_len);
+            }
+        }
 
-    exit_POSUtil_CUDA_Fatbin___verify_fatbin_text_header:
+    exit:
         return retval;
     }
 
@@ -407,7 +432,6 @@ class POSUtil_CUDA_Fatbin {
         POS_CHECK_POINTER(*output = (uint8_t*)malloc(th->decompressed_size + 7)); 
 
         decompress_ret = POSUtil_CUDA_Fatbin::__decompress(input, th->compressed_size, *output, th->decompressed_size);
-
 
         if (unlikely(decompress_ret != th->decompressed_size)) {
             POS_WARN(
@@ -525,16 +549,22 @@ class POSUtil_CUDA_Fatbin {
             
             // verify ELF version
             if((ek=elf_kind(elf)) != ELF_K_ELF){ return POS_FAILED; }
+
             // obtain ELF header
             if(gelf_getehdr(elf, &ehdr) == NULL){ return POS_FAILED; }
+
             // verify ELF class
             if ((elfclass = gelf_getclass(elf)) == ELFCLASSNONE){ return POS_FAILED; }
+
             // verify ELF identification data
             if((id = elf_getident(elf, NULL)) == NULL){ return POS_FAILED; }
+
             // get the number of section within the ELF
             if (elf_getshdrnum(elf, &sections_num) != 0){ return POS_FAILED; }
+
             // get the number of program header within the ELF
-            if (elf_getphdrnum(elf, &program_header_num) != 0){ return POS_FAILED; }
+            // if (elf_getphdrnum(elf, &program_header_num) != 0){ return POS_FAILED; }
+
             // get the section index of the section header table within the ELF
             if(elf_getshdrstrndx(elf, &section_str_num) != 0){ return POS_FAILED; }
 

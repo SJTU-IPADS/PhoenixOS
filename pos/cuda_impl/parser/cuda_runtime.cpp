@@ -49,6 +49,11 @@ namespace cuda_malloc {
         );
         POS_CHECK_POINTER(hm_device);
         POS_CHECK_POINTER(hm_device->latest_used_handle);
+        
+        // record the related handle to QE
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ hm_device->latest_used_handle
+        });
 
         hm_memory = pos_get_client_typed_hm(
             client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
@@ -69,7 +74,10 @@ namespace cuda_malloc {
 
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_malloc): failed to allocate mocked resource within the CUDA memory handler manager");
+            memset(wqe->api_cxt->ret_data, 0, sizeof(uint64_t));
             goto exit;
+        } else {
+            memcpy(wqe->api_cxt->ret_data, &(memory_handle->client_addr), sizeof(uint64_t));
         }
         
         // record the related handle to QE
@@ -78,7 +86,6 @@ namespace cuda_malloc {
         });
 
         // allocate the memory handle in the dag
-
         retval = client->dag.allocate_handle(memory_handle);
         if(unlikely(retval != POS_SUCCESS)){
             goto exit;
@@ -88,6 +95,7 @@ namespace cuda_malloc {
         retval = client->dag.launch_op(wqe);
 
     exit:
+        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
         return retval;
     }
 
@@ -639,7 +647,7 @@ namespace cuda_memcpy_h2d {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVAL > 0
+    #if POS_CKPT_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -888,7 +896,7 @@ namespace cuda_memcpy_h2d_async {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVAL > 0
+    #if POS_CKPT_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that

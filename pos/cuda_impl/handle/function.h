@@ -108,7 +108,7 @@ class POSHandle_CUDA_Function : public POSHandle {
         CUfunction function = NULL;
         POSHandle *module_handle;
 
-        POS_ASSERT(this->parent_handles.size() == 0);
+        POS_ASSERT(this->parent_handles.size() == 1);
         POS_CHECK_POINTER(module_handle = this->parent_handles[0]);
         POS_ASSERT(module_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Module);
         

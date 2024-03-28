@@ -369,6 +369,16 @@ class POSHandle {
         );
     }
 
+    /*!
+     *  \brief  reload checkpoint data to device
+     *  \param  version     version of the checkpoint to be reloaded
+     *  \param  load_latest whether to load the latest checkpoint to the GPU
+     *                      (if this option is enabled, version param will be invalidated)
+     *  \return POS_SUCCESS for successfully reloading
+     */
+    virtual pos_retval_t reload_state_to_device(pos_vertex_id_t version, bool load_latest=false){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  deserialize the state of current handle from binary area
@@ -509,7 +519,6 @@ class POSHandle {
     virtual pos_retval_t __deserialize_extra(void* raw_data){
         return POS_SUCCESS;
     }
-
 
     /*!
      *  \brief  initialize checkpoint bag of this handle

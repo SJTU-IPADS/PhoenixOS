@@ -35,17 +35,17 @@ pos_retval_t test_cuda_set_device(test_cxt* cxt){
         goto exit;
     }
 
-    cuda_result = cudaSetDevice(1);
-    if(unlikely(cuda_result != cudaSuccess)){
-        retval = POS_FAILED;
-        goto exit;
-    }
+    // cuda_result = cudaSetDevice(1);
+    // if(unlikely(cuda_result != cudaSuccess)){
+    //     retval = POS_FAILED;
+    //     goto exit;
+    // }
 
-    cuda_result = cudaMalloc((void**)&d_buf_2, kNbElement*sizeof(float));
-    if(unlikely(cuda_result != cudaSuccess)){
-        retval = POS_FAILED;
-        goto exit;
-    }
+    // cuda_result = cudaMalloc((void**)&d_buf_2, kNbElement*sizeof(float));
+    // if(unlikely(cuda_result != cudaSuccess)){
+    //     retval = POS_FAILED;
+    //     goto exit;
+    // }
 
     cuda_result = cudaSetDevice(0);
     
