@@ -551,17 +551,44 @@ typedef struct POSAPIContext_QE {
 
 } POSAPIContext_QE_t;
 
-#define pos_api_output_handle(qe_ptr, index)            \
+
+#define pos_api_output_handle_view(qe_ptr, index)           \
+    (qe_ptr->output_handle_views[index])
+
+#define pos_api_input_handle_view(qe_ptr, index)            \
+    (qe_ptr->input_handle_views[index])
+
+#define pos_api_create_handle_view(qe_ptr, index)           \
+    (qe_ptr->create_handle_views[index])
+
+#define pos_api_delete_handle_view(qe_ptr, index)           \
+    (qe_ptr->delete_handle_views[index])
+
+#define pos_api_inout_handle_view(qe_ptr, index)            \
+    (qe_ptr->inout_handle_views[index])
+
+
+#define pos_api_output_handle(qe_ptr, index)                \
     (qe_ptr->output_handle_views[index].handle)
 
-#define pos_api_input_handle(qe_ptr, index)             \
+#define pos_api_input_handle(qe_ptr, index)                 \
     (qe_ptr->input_handle_views[index].handle)
 
-#define pos_api_create_handle(qe_ptr, index)            \
+#define pos_api_create_handle(qe_ptr, index)                \
     (qe_ptr->create_handle_views[index].handle)
 
-#define pos_api_delete_handle(qe_ptr, index)            \
+#define pos_api_delete_handle(qe_ptr, index)                \
     (qe_ptr->delete_handle_views[index].handle)
 
-#define pos_api_inout_handle(qe_ptr, index)            \
+#define pos_api_inout_handle(qe_ptr, index)                 \
     (qe_ptr->inout_handle_views[index].handle)
+
+
+#define pos_api_input_handle_offset_server_addr(qe_ptr, index)  \
+    ((void*)((uint64_t)(qe_ptr->input_handle_views[index].handle->server_addr) + (qe_ptr->input_handle_views[index].offset)))
+
+#define pos_api_output_handle_offset_server_addr(qe_ptr, index)  \
+    ((void*)((uint64_t)(qe_ptr->output_handle_views[index].handle->server_addr) + (qe_ptr->output_handle_views[index].offset)))
+
+#define pos_api_inout_handle_offset_server_addr(qe_ptr, index)  \
+    ((void*)((uint64_t)(qe_ptr->inout_handle_views[index].handle->server_addr) + (qe_ptr->inout_handle_views[index].offset)))

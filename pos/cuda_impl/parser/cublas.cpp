@@ -311,7 +311,8 @@ namespace cublas_sgemm {
         }
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ memory_handle_A,
-            /* param_index */ 7
+            /* param_index */ 7,
+            /* offset */ pos_api_param_value(wqe, 7, uint64_t) - (uint64_t)(memory_handle_A->client_addr)
         });
 
         retval = hm_memory->get_handle_by_client_addr(
@@ -327,7 +328,8 @@ namespace cublas_sgemm {
         }
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ memory_handle_B,
-            /* param_index */ 9
+            /* param_index */ 9,
+            /* offset */ pos_api_param_value(wqe, 9, uint64_t) - (uint64_t)(memory_handle_B->client_addr)
         });
 
         retval = hm_memory->get_handle_by_client_addr(
@@ -343,7 +345,8 @@ namespace cublas_sgemm {
         }
         wqe->record_handle<kPOS_Edge_Direction_Out>({
             /* handle */ memory_handle_C,
-            /* param_index */ 12
+            /* param_index */ 12,
+            /* offset */ pos_api_param_value(wqe, 12, uint64_t) - (uint64_t)(memory_handle_C->client_addr)
         });
 
         hm_memory->record_modified_handle(memory_handle_C);
@@ -384,7 +387,7 @@ namespace cublas_sgemm_strided_batched {
     #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(wqe->api_cxt->params.size() != 18)){
             POS_WARN(
-                "parse(cublas_sgemm): failed to parse, given %lu params, %lu expected",
+                "parse(cublas_sgemm_strided_batched): failed to parse, given %lu params, %lu expected",
                 wqe->api_cxt->params.size(), 18
             );
             retval = POS_FAILED_INVALID_INPUT;
@@ -409,7 +412,7 @@ namespace cublas_sgemm_strided_batched {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
-                "parse(cublas_sgemm): no cuBLAS context was founded: client_addr(%p)",
+                "parse(cublas_sgemm_strided_batched): no cuBLAS context was founded: client_addr(%p)",
                 (void*)pos_api_param_value(wqe, 0, uint64_t)
             );
             goto exit;
@@ -425,14 +428,15 @@ namespace cublas_sgemm_strided_batched {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
-                "parse(cublas_sgemm): no memory handle A was founded: client_addr(%p)",
+                "parse(cublas_sgemm_strided_batched): no memory handle A was founded: client_addr(%p)",
                 (void*)pos_api_param_value(wqe, 7, uint64_t)
             );
             goto exit;
         }
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ memory_handle_A,
-            /* param_index */ 7
+            /* param_index */ 7,
+            /* offset */ pos_api_param_value(wqe, 7, uint64_t) - (uint64_t)(memory_handle_A->client_addr)
         });
 
         retval = hm_memory->get_handle_by_client_addr(
@@ -441,14 +445,15 @@ namespace cublas_sgemm_strided_batched {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
-                "parse(cublas_sgemm): no memory handle B was founded: client_addr(%p)",
+                "parse(cublas_sgemm_strided_batched): no memory handle B was founded: client_addr(%p)",
                 (void*)pos_api_param_value(wqe, 10, uint64_t)
             );
             goto exit;
         }
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ memory_handle_B,
-            /* param_index */ 10
+            /* param_index */ 10,
+            /* offset */ pos_api_param_value(wqe, 10, uint64_t) - (uint64_t)(memory_handle_B->client_addr)
         });
 
         retval = hm_memory->get_handle_by_client_addr(
@@ -457,14 +462,15 @@ namespace cublas_sgemm_strided_batched {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
-                "parse(cublas_sgemm): no memory handle C was founded: client_addr(%p)",
+                "parse(cublas_sgemm_strided_batched): no memory handle C was founded: client_addr(%p)",
                 (void*)pos_api_param_value(wqe, 14, uint64_t)
             );
             goto exit;
         }
         wqe->record_handle<kPOS_Edge_Direction_Out>({
             /* handle */ memory_handle_C,
-            /* param_index */ 14
+            /* param_index */ 14,
+            /* offset */ pos_api_param_value(wqe, 14, uint64_t) - (uint64_t)(memory_handle_C->client_addr)
         });
 
         hm_memory->record_modified_handle(memory_handle_C);

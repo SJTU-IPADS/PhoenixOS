@@ -59,7 +59,7 @@ namespace cublas_set_stream {
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *stream_handle, *cublas_context_handle;
-        cudaStream_t worker_stream;
+        // cudaStream_t worker_stream;
 
 
         POS_CHECK_POINTER(ws);
@@ -71,15 +71,15 @@ namespace cublas_set_stream {
         cublas_context_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(cublas_context_handle);
 
-        if(unlikely(ws->worker->worker_stream == nullptr)){
-            POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
-            ws->worker->worker_stream = worker_stream;
-        }
+        // if(unlikely(ws->worker->worker_stream == nullptr)){
+        //     POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
+        //     ws->worker->worker_stream = worker_stream;
+        // }
 
         wqe->api_cxt->return_code = cublasSetStream(
             (cublasHandle_t)(cublas_context_handle->server_addr),
-            (cudaStream_t)(ws->worker->worker_stream)
-            // stream_handle->server_addr
+            // (cudaStream_t)(ws->worker->worker_stream)
+            (cudaStream_t)(stream_handle->server_addr)
         );
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
@@ -163,12 +163,12 @@ namespace cublas_sgemm {
             /* n */ pos_api_param_value(wqe, 4, int),
             /* k */ pos_api_param_value(wqe, 5, int),
             /* alpha */ (float*)pos_api_param_addr(wqe, 6),
-            /* A */ (float*)(memory_handle_A->server_addr),
+            /* A */ (float*)(pos_api_input_handle_offset_server_addr(wqe, 1)),
             /* lda */ pos_api_param_value(wqe, 8, int),
-            /* B */ (float*)(memory_handle_B->server_addr),
+            /* B */ (float*)(pos_api_input_handle_offset_server_addr(wqe, 2)),
             /* ldb */ pos_api_param_value(wqe, 10, int),
             /* beta */ (float*)pos_api_param_addr(wqe, 11),
-            /* C */ (float*)(memory_handle_C->server_addr),
+            /* C */ (float*)(pos_api_output_handle_offset_server_addr(wqe, 0)),
             /* ldc */ pos_api_param_value(wqe, 13, int)
         );
 
@@ -216,14 +216,14 @@ namespace cublas_sgemm_strided_batched {
             /* n */ pos_api_param_value(wqe, 4, int),
             /* k */ pos_api_param_value(wqe, 5, int),
             /* alpha */ (float*)pos_api_param_addr(wqe, 6),
-            /* A */ (float*)(memory_handle_A->server_addr),
+            /* A */ (float*)(pos_api_input_handle_offset_server_addr(wqe, 1)),
             /* lda */ pos_api_param_value(wqe, 8, int),
             /* sA */ pos_api_param_value(wqe, 9, long long int),
-            /* B */ (float*)(memory_handle_B->server_addr),
+            /* B */ (float*)(pos_api_input_handle_offset_server_addr(wqe, 2)),
             /* ldb */ pos_api_param_value(wqe, 11, int),
             /* sB */ pos_api_param_value(wqe, 12, long long int),
             /* beta */ (float*)pos_api_param_addr(wqe, 13),
-            /* C */ (float*)(memory_handle_C->server_addr),
+            /* C */ (float*)(pos_api_output_handle_offset_server_addr(wqe, 0)),
             /* ldc */ pos_api_param_value(wqe, 15, int),
             /* sC */ pos_api_param_value(wqe, 16, long long int),
             /* batchCount */ pos_api_param_value(wqe, 17, int)

@@ -33,8 +33,7 @@ for i in range(2):
     encoding = tokenizer(texts, padding=True, return_tensors='pt').to(device)
     with torch.no_grad():
         generated_ids = model.generate(**encoding, max_length=20)
-    # generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-    print(generated_ids)
+        generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
 T1 = time.time()
 
@@ -42,8 +41,8 @@ for i in range(num_iter):
     encoding = tokenizer(texts, padding=True, return_tensors='pt').to(device)
     with torch.no_grad():
         generated_ids = model.generate(**encoding, max_length=20)
-    # generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-    print(generated_ids)
+        generated_texts = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
     
 T2 = time.time()
 print('time used: ', T2-T1)

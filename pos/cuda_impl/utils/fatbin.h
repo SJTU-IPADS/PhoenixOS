@@ -765,24 +765,24 @@ class POSUtil_CUDA_Fatbin {
         retval = check_elf(elf);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_DETAIL("invalid ELF format detected");
-            goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+            goto exit;
         }
 
         retval = get_symtab(elf, &symbol_table_data, &symnum, &symtab_shdr);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_DETAIL("failed to extract symbol table section from the ELF");
-            goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+            goto exit;
         }
 
         tmp_retval = get_section_by_name(elf, ".nv.info", &section);
         if(unlikely(tmp_retval != POS_SUCCESS)){
             // POS_WARN_DETAIL("failed to obtain section \".nv.info\" in the ELF");
-            goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+            goto exit;
         }
 
         if((data = elf_getdata(section, NULL)) == NULL) {
             POS_WARN_DETAIL("failed to obtain data from \".nv.info\" in the ELF");
-            goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+            goto exit;
         }
 
         // analyse all kernels within this section
@@ -848,6 +848,14 @@ class POSUtil_CUDA_Fatbin {
                 function_desp = cached_desp_map[std::string(kernel_str)];
                 desps->push_back(function_desp);
             } else {
+                /*!
+                 *  \note   we can skip those kernels that won't be called
+                 */
+                if(cached_desp_map.size() > 0){
+                    continue;
+                    // POS_WARN("found uncached kernels while given cached kernel meta, this might cause nsys to crash: device_name(%s)", kernel_str);
+                }
+
                 function_desp = new POSCudaFunctionDesp_t();
                 POS_CHECK_POINTER(function_desp);
 
@@ -857,7 +865,7 @@ class POSUtil_CUDA_Fatbin {
                 retval = get_params_for_kernel(elf, &function_desp, memory, memsize);
                 if(unlikely(retval != POS_SUCCESS)){
                     POS_WARN_DETAIL("failed to extract parameter out of the kernel in the ELF: kernel_name(%s)", kernel_str);
-                    goto exit_POSUtil_CUDA_Fatbin___extract_kernel_info;
+                    goto exit;
                 }
 
                 // parsing the parameters hints (e.g., whether it's a pointer, direction of the pointer)
@@ -871,7 +879,7 @@ class POSUtil_CUDA_Fatbin {
             }
         }
 
-    exit_POSUtil_CUDA_Fatbin___extract_kernel_info:
+    exit:
         return retval;
     }
 };

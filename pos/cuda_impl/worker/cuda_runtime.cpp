@@ -164,7 +164,7 @@ namespace cuda_free {
  *  \brief      launch a user-define computation kernel
  */
 namespace cuda_launch_kernel {
-#define POS_CUDA_LAUNCH_KERNEL_MAX_NB_PARAMS    64
+#define POS_CUDA_LAUNCH_KERNEL_MAX_NB_PARAMS    512
 
     static void* cuda_args[POS_CUDA_LAUNCH_KERNEL_MAX_NB_PARAMS] = {0};
 
@@ -178,7 +178,7 @@ namespace cuda_launch_kernel {
         // void **cuda_args = nullptr;
         void *args, *args_values, *arg_addr;
         uint64_t *addr_list;
-        cudaStream_t worker_stream;
+        // cudaStream_t worker_stream;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -186,13 +186,13 @@ namespace cuda_launch_kernel {
         function_handle = (POSHandle_CUDA_Function*)(pos_api_input_handle(wqe, 0));
         POS_CHECK_POINTER(function_handle);
 
-        // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        // POS_CHECK_POINTER(stream_handle);
+        stream_handle = (POSHandle_CUDA_Stream*)(pos_api_input_handle(wqe, 1));
+        POS_CHECK_POINTER(stream_handle);
 
-        if(unlikely(ws->worker->worker_stream == nullptr)){
-            POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
-            ws->worker->worker_stream = worker_stream;
-        }
+        // if(unlikely(ws->worker->worker_stream == nullptr)){
+        //     POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
+        //     ws->worker->worker_stream = worker_stream;
+        // }
 
         // the 3rd parameter of the API call contains parameter to launch the kernel
         args = pos_api_param_addr(wqe, 3);
@@ -226,14 +226,14 @@ namespace cuda_launch_kernel {
             /* blockDimY */ ((__dim3_t*)pos_api_param_addr(wqe, 2))->y,
             /* blockDimZ */ ((__dim3_t*)pos_api_param_addr(wqe, 2))->z,
             /* sharedMemBytes */ pos_api_param_value(wqe, 4, size_t),
-            // /* hStream */ stream_handle->server_addr,
-            /* hStream */ (CUstream)(ws->worker->worker_stream),
+            /* hStream */ (CUstream)(stream_handle->server_addr),
+            // /* hStream */ (CUstream)(ws->worker->worker_stream),
             /* kernelParams */ cuda_args,
             /* extra */ nullptr
         );
 
         // if(likely(cuda_args != nullptr)){ free(cuda_args); }
-
+        
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
         } else {
@@ -265,7 +265,7 @@ namespace cuda_memcpy_h2d {
         POS_CHECK_POINTER(memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
-            /* dst */ memory_handle->server_addr,
+            /* dst */ pos_api_inout_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_param_addr(wqe, 1),
             /* count */ pos_api_param_size(wqe, 1),
             /* kind */ cudaMemcpyHostToDevice
@@ -302,7 +302,7 @@ namespace cuda_memcpy_d2h {
 
         wqe->api_cxt->return_code = cudaMemcpy(
             /* dst */ wqe->api_cxt->ret_data,
-            /* src */ (const void*)(memory_handle->server_addr),
+            /* src */ (const void*)(pos_api_input_handle_offset_server_addr(wqe, 0)),
             /* count */ pos_api_param_value(wqe, 1, uint64_t),
             /* kind */ cudaMemcpyDeviceToHost
         );
@@ -341,8 +341,8 @@ namespace cuda_memcpy_d2d {
         POS_CHECK_POINTER(src_memory_handle);
 
         wqe->api_cxt->return_code = cudaMemcpy(
-            /* dst */ dst_memory_handle->server_addr,
-            /* src */ src_memory_handle->server_addr,
+            /* dst */ pos_api_output_handle_offset_server_addr(wqe, 0),
+            /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* kind */ cudaMemcpyDeviceToDevice
         );
@@ -381,7 +381,7 @@ namespace cuda_memcpy_h2d_async {
         POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
-            /* dst */ memory_handle->server_addr,
+            /* dst */ pos_api_inout_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_param_addr(wqe, 1),
             /* count */ pos_api_param_size(wqe, 1),
             /* kind */ cudaMemcpyHostToDevice,
@@ -423,7 +423,7 @@ namespace cuda_memcpy_d2h_async {
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ wqe->api_cxt->ret_data,
-            /* src */ memory_handle->server_addr,
+            /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
             /* count */ pos_api_param_value(wqe, 1, uint64_t),
             /* kind */ cudaMemcpyDeviceToHost,
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
@@ -471,8 +471,8 @@ namespace cuda_memcpy_d2d_async {
         POS_CHECK_POINTER(stream_handle);
 
         wqe->api_cxt->return_code = cudaMemcpyAsync(
-            /* dst */ dst_memory_handle->server_addr,
-            /* src */ src_memory_handle->server_addr,
+            /* dst */ pos_api_output_handle_offset_server_addr(wqe, 0),
+            /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* kind */ cudaMemcpyDeviceToDevice,
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
@@ -750,7 +750,7 @@ namespace cuda_occupancy_max_active_bpm_with_flags {
         POS_CHECK_POINTER(function_handle);
 
         wqe->api_cxt->return_code = cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
-            /* numBlock */ (int*)(wqe->api_cxt->ret_data),
+            /* numBlocks */ (int*)(wqe->api_cxt->ret_data),
             /* func */ (CUfunction)(function_handle->server_addr),
             /* blockSize */ pos_api_param_value(wqe, 1, int),
             /* dynamicSMemSize */ pos_api_param_value(wqe, 2, size_t),
@@ -811,26 +811,32 @@ namespace cuda_stream_synchronize {
 namespace cuda_stream_is_capturing {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        // pos_retval_t retval = POS_SUCCESS;
-        // POSHandle_CUDA_Stream *stream_handle;
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *stream_handle;
 
-        // POS_CHECK_POINTER(ws);
-        // POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
 
-        // stream_handle = pos_api_typed_handle(wqe, kPOS_ResourceTypeId_CUDA_Stream, POSHandle_CUDA_Stream, 0);
-        // POS_CHECK_POINTER(stream_handle);
+        stream_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(stream_handle);
 
-        // wqe->api_cxt->return_code = cudaStreamIsCapturing(
-        //     /* stream */ stream_handle->server_addr,
-        //     /* pCaptureStatus */ (cudaStreamCaptureStatus*) wqe->api_cxt->ret_data
-        // );
+        wqe->api_cxt->return_code = cudaStreamIsCapturing(
+            /* stream */ (CUstream)(stream_handle->server_addr),
+            /* pCaptureStatus */ (cudaStreamCaptureStatus*) wqe->api_cxt->ret_data
+        );
 
-        // return retval;
+        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+        return retval;
 
         // we launch this op just for debug
-        POSWorker::__done(ws, wqe);
+        // POSWorker::__done(ws, wqe);
 
-        return POS_SUCCESS;
+        // return POS_SUCCESS;
     }
 } // namespace cuda_stream_is_capturing
 

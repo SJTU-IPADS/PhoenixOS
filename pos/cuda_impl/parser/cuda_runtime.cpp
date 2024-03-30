@@ -361,7 +361,8 @@ namespace cuda_launch_kernel {
             // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ memory_handle,
-                /* param_index */ param_index
+                /* param_index */ param_index,
+                /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
             });
             // e_tick = POSUtilTimestamp::get_tsc();
             // all_tick += (e_tick - s_tick);
@@ -401,7 +402,8 @@ namespace cuda_launch_kernel {
 
             wqe->record_handle<kPOS_Edge_Direction_InOut>({
                 /* handle */ memory_handle,
-                /* param_index */ param_index
+                /* param_index */ param_index,
+                /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
             });
 
             hm_memory->record_modified_handle(memory_handle);
@@ -442,7 +444,8 @@ namespace cuda_launch_kernel {
             // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle<kPOS_Edge_Direction_Out>({
                 /* handle */ memory_handle,
-                /* param_index */ param_index
+                /* param_index */ param_index,
+                /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
             });
             // e_tick = POSUtilTimestamp::get_tsc();
             // all_tick += (e_tick - s_tick);
@@ -499,7 +502,8 @@ namespace cuda_launch_kernel {
 
                         wqe->record_handle<kPOS_Edge_Direction_InOut>({
                             /* handle */ memory_handle,
-                            /* param_index */ param_index
+                            /* param_index */ param_index,
+                            /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
                         });
 
                         hm_memory->record_modified_handle(memory_handle);
@@ -544,7 +548,8 @@ namespace cuda_launch_kernel {
                  // s_tick = POSUtilTimestamp::get_tsc();
                 wqe->record_handle<kPOS_Edge_Direction_InOut>({
                     /* handle */ memory_handle,
-                    /* param_index */ param_index
+                    /* param_index */ param_index,
+                    /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
                 });
                 // e_tick = POSUtilTimestamp::get_tsc();
                 // all_tick += (e_tick - s_tick);
@@ -635,7 +640,9 @@ namespace cuda_memcpy_h2d {
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_InOut>({
-                /* handle */ memory_handle
+                /* handle */ memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
             });
             hm_memory->record_modified_handle(memory_handle);
         }
@@ -713,7 +720,9 @@ namespace cuda_memcpy_d2h {
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_In>({
-                /* handle */ memory_handle
+                /* handle */ memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
             });
         }
 
@@ -777,7 +786,9 @@ namespace cuda_memcpy_d2d {
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_Out>({
-                /* handle */ dst_memory_handle
+                /* handle */ dst_memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(dst_memory_handle->client_addr)
             });
             hm_memory->record_modified_handle(dst_memory_handle);
         }
@@ -790,12 +801,14 @@ namespace cuda_memcpy_d2d {
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
                 "parse(cuda_memcpy_d2d): no source memory was founded: client_addr(%p)",
-                (void*)pos_api_param_value(wqe, 0, uint64_t)
+                (void*)pos_api_param_value(wqe, 1, uint64_t)
             );
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_In>({
-                /* handle */ src_memory_handle
+                /* handle */ src_memory_handle,
+                /* param_index */ 1,
+                /* offset */ pos_api_param_value(wqe, 1, uint64_t) - (uint64_t)(src_memory_handle->client_addr)
             });
         }
 
@@ -867,7 +880,9 @@ namespace cuda_memcpy_h2d_async {
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_InOut>({
-                /* handle */ memory_handle
+                /* handle */ memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
             });
             hm_memory->record_modified_handle(memory_handle);
         }
@@ -969,7 +984,9 @@ namespace cuda_memcpy_d2h_async {
             );
         } else {
             wqe->record_handle<kPOS_Edge_Direction_In>({
-                /* handle */ memory_handle
+                /* handle */ memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
             });
         }
 
@@ -1057,7 +1074,9 @@ namespace cuda_memcpy_d2d_async {
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_Out>({
-                /* handle */ dst_memory_handle
+                /* handle */ dst_memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(dst_memory_handle->client_addr)
             });
             hm_memory->record_modified_handle(dst_memory_handle);
         }
@@ -1070,12 +1089,14 @@ namespace cuda_memcpy_d2d_async {
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
                 "parse(cuda_memcpy_d2d_async): no source memory was founded: client_addr(%p)",
-                (void*)pos_api_param_value(wqe, 0, uint64_t)
+                (void*)pos_api_param_value(wqe, 1, uint64_t)
             );
             goto exit;
         } else {
             wqe->record_handle<kPOS_Edge_Direction_In>({
-                /* handle */ src_memory_handle
+                /* handle */ src_memory_handle,
+                /* param_index */ 1,
+                /* offset */ pos_api_param_value(wqe, 1, uint64_t) - (uint64_t)(src_memory_handle->client_addr)
             });
         }
 
@@ -1675,18 +1696,18 @@ namespace cuda_stream_is_capturing {
             goto exit;
         }
 
-        if(likely(stream_handle->is_capturing == false)){
-            capture_status = cudaStreamCaptureStatusNone;
-        } else {
-            capture_status = cudaStreamCaptureStatusActive;
-        }
-        memcpy(wqe->api_cxt->ret_data, &capture_status, sizeof(cudaStreamCaptureStatus));
+        // if(likely(stream_handle->is_capturing == false)){
+        //     capture_status = cudaStreamCaptureStatusNone;
+        // } else {
+        //     capture_status = cudaStreamCaptureStatusActive;
+        // }
+        // memcpy(wqe->api_cxt->ret_data, &capture_status, sizeof(cudaStreamCaptureStatus));
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
         
         // mark this sync call can be returned after parsing
-        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        // wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
         // launch the op to the dag (TODO: for debug)
         retval = client->dag.launch_op(wqe);
