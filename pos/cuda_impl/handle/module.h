@@ -92,7 +92,7 @@ class POSHandle_CUDA_Module : public POSHandle {
 
         cuda_dv_retval = cuModuleLoadData(
             /* module */ &module,
-            /* image */  pos_api_param_addr(wqe, 1)
+            /* image */  pos_api_param_addr(wqe, host_ckpts[0].param_index)
         );
 
         if(likely(CUDA_SUCCESS == cuda_dv_retval)){

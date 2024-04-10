@@ -183,7 +183,7 @@ pos_retval_t test_cuda_memcpy_h2d_async(test_cxt* cxt){
     
     cxt->duration_ticks = e_tick - s_tick;
 
-    cudaMemcpyAsync(buf_2.data(), d_buf_1, kNbElement*sizeof(float), cudaMemcpyDeviceToHost, 0);
+    cudaMemcpy(buf_2.data(), d_buf_1, kNbElement*sizeof(float), cudaMemcpyDeviceToHost);
 
     for (i=0; i<kNbElement; i++){
         if(buf_1[i] != buf_2[i]){
@@ -254,7 +254,7 @@ pos_retval_t test_cuda_memcpy_d2d_async(test_cxt* cxt){
     
     cxt->duration_ticks = e_tick - s_tick;
     
-    cudaMemcpyAsync(buf_2.data(), d_buf_2, kNbElement*sizeof(float), cudaMemcpyDeviceToHost, 0);
+    cudaMemcpy(buf_2.data(), d_buf_2, kNbElement*sizeof(float), cudaMemcpyDeviceToHost);
 
     for (i=0; i<kNbElement; i++){
         if(buf_1[i] != buf_2[i]){
@@ -265,6 +265,40 @@ pos_retval_t test_cuda_memcpy_d2d_async(test_cxt* cxt){
 
     cudaFree(d_buf_1);
     cudaFree(d_buf_2);
+
+    return retval;
+}
+
+
+pos_retval_t test_cuda_memset_async(test_cxt* cxt){
+    uint64_t i;
+    uint8_t *d_buf_1 = nullptr;
+    std::vector<uint8_t> buf_1;
+    pos_retval_t retval = POS_SUCCESS;
+    uint64_t s_tick, e_tick;
+
+    buf_1.reserve(kNbElement);
+
+    cudaMalloc((void**)&d_buf_1, kNbElement*sizeof(uint8_t));
+    for (i=0; i<kNbElement; i++){
+        buf_1.push_back(0);
+    }
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cudaMemsetAsync(d_buf_1, 3, kNbElement*sizeof(uint8_t), 0);
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    cudaMemcpy(buf_1.data(), d_buf_1, kNbElement*sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    for (i=0; i<kNbElement; i++){
+        if(buf_1[i] != 3){
+            retval = POS_FAILED;
+            break;
+        }
+    }
+
+    cxt->duration_ticks = e_tick - s_tick;
+
+    cudaFree(d_buf_1);
 
     return retval;
 }

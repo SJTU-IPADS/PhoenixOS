@@ -23,6 +23,7 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     CUDA_MEMCPY_HTOD_ASYNC,
     CUDA_MEMCPY_DTOH_ASYNC,
     CUDA_MEMCPY_DTOD_ASYNC,
+    CUDA_MEMSET_ASYNC,
     CUDA_SET_DEVICE,
     CUDA_GET_LAST_ERROR,
     CUDA_GET_ERROR_STRING,
@@ -38,6 +39,7 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     CUDA_EVENT_CREATE_WITH_FLAGS,
     CUDA_EVENT_DESTROY,
     CUDA_EVENT_RECORD,
+    CUDA_EVENT_QUERY,
 
     /* CUDA Driver */
     rpc_cuModuleLoad,
@@ -55,6 +57,7 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
     rpc_cublasSetMathMode,
     rpc_cublasSgemm,
     rpc_cublasSgemmStridedBatched,
+    rpc_cuGetErrorString,
 
     /* remoting */
     rpc_deinit,

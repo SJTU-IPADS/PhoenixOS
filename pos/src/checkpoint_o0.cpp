@@ -11,6 +11,21 @@
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
 
+
+POSCheckpointBag::POSCheckpointBag(
+    uint64_t state_size,
+    pos_custom_ckpt_allocate_func_t allocator,
+    pos_custom_ckpt_deallocate_func_t deallocator,
+    pos_custom_ckpt_allocate_func_t dev_allocator,
+    pos_custom_ckpt_deallocate_func_t dev_deallocator
+) : is_latest_ckpt_finished(false) {
+    this->_state_size = state_size;
+    this->_allocate_func = allocator;
+    this->_deallocate_func = deallocator;
+    this->_dev_allocate_func = dev_allocator;
+    this->_dev_deallocate_func = dev_deallocator;
+}
+
 /*!
  *  \brief  clear current checkpoint bag
  */
@@ -44,11 +59,31 @@ template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<false>(uint64_t ve
  *          POS_FAILED_NOT_EXIST for no checkpoint is found
  */
 template<bool on_device>
-pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version){
+pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t version){
     return POS_FAILED_NOT_IMPLEMENTED;
 }
-template pos_retval_t POSCheckpointBag::get_checkpoint_slot<true>(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version);
-template pos_retval_t POSCheckpointBag::get_checkpoint_slot<false>(POSCheckpointSlot** ckpt_slot, uint64_t& size, uint64_t version);
+template pos_retval_t POSCheckpointBag::get_checkpoint_slot<true>(POSCheckpointSlot** ckpt_slot, uint64_t version);
+template pos_retval_t POSCheckpointBag::get_checkpoint_slot<false>(POSCheckpointSlot** ckpt_slot, uint64_t version);
+
+
+
+/*!
+ *  \brief  obtain the checkpoint version list
+ *  \tparam on_device   whether the slot to be applied is on the device
+ *  \return the checkpoint version list
+ */
+template<bool on_device>
+std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set(){
+    return std::set<uint64_t>();
+}
+template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<true>();
+template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<false>();
+
+/*!
+ *  \brief  obtain overall memory consumption of this checkpoint bag
+ *  \return overall memory consumption of this checkpoint bag
+ */
+uint64_t POSCheckpointBag::get_memory_consumption(){ return 0; }
 
 
 /*!
@@ -64,6 +99,20 @@ pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
 }
 template pos_retval_t POSCheckpointBag::invalidate_by_version<true>(uint64_t version);
 template pos_retval_t POSCheckpointBag::invalidate_by_version<false>(uint64_t version);
+
+
+/*!
+ *  \brief  invalidate all checkpoint from this bag
+ *  \tparam on_device   whether the checkpoints are on the device
+ *  \return POS_SUCCESS for successfully invalidate
+ *          POS_NOT_READY for no checkpoint had been record
+ */
+template<bool on_device>
+pos_retval_t POSCheckpointBag::invalidate_all_version(){
+    return POS_FAILED_NOT_IMPLEMENTED;
+}
+template pos_retval_t POSCheckpointBag::invalidate_all_version<true>();
+template pos_retval_t POSCheckpointBag::invalidate_all_version<false>();
 
 
 /*!

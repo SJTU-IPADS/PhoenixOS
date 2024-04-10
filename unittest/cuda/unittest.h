@@ -32,6 +32,7 @@ class POSUnitTest {
             {   CUDA_MEMCPY_HTOD_ASYNC, test_cuda_memcpy_h2d_async },
             {   CUDA_MEMCPY_DTOH_ASYNC, test_cuda_memcpy_d2h_async },
             {   CUDA_MEMCPY_DTOD_ASYNC, test_cuda_memcpy_d2d_async },
+            {   CUDA_MEMSET_ASYNC, test_cuda_memset_async },
 
             /* device related apis */
             {   CUDA_SET_DEVICE, test_cuda_set_device },
@@ -53,6 +54,7 @@ class POSUnitTest {
             {   CUDA_EVENT_CREATE_WITH_FLAGS, test_cuda_event_create_with_flags },
             {   CUDA_EVENT_RECORD, test_cuda_event_record },
             {   CUDA_EVENT_DESTROY, test_cuda_event_destory },
+            {   CUDA_EVENT_QUERY, test_cuda_event_query },
             {   CUDA_FUNC_GET_ATTRIBUTES, test_cuda_func_get_attributes},
             {   CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS, test_cuda_occupancy_max_active_bpm_with_flags},
             

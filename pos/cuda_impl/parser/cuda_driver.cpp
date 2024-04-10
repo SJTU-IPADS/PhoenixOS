@@ -839,4 +839,39 @@ namespace cu_ctx_get_current {
 } // namespace cu_ctx_get_current
 
 
+/*!
+ *  \related    cuGetErrorString
+ *  \brief      obtain the error string from the CUDA context
+ */
+namespace cu_get_error_string {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSClient_CUDA *client;
+        
+        client = (POSClient_CUDA*)(wqe->client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 1)){
+            POS_WARN(
+                "parse(cuda_get_error_string): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 1
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+
+    exit:   
+        return retval;
+    }
+
+} // namespace cu_get_error_string
+
+
+
 } // namespace ps_functions

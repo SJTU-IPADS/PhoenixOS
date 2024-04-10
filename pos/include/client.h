@@ -36,9 +36,90 @@ typedef struct pos_client_cxt {
 
     // indices of stateful handle type
     std::vector<uint64_t> stateful_handle_type_idx;
-
-    
 } pos_client_cxt_t;
+
+
+/*!
+ *  \brief  station to store the checkpointed data
+ */
+typedef struct pos_client_ckpt_station {
+    std::vector<std::pair<void*, uint64_t>> __chunks;
+    uint64_t byte_size;
+
+    /*!
+     *  \brief  clear this station
+     */
+    inline void clear(){
+        uint64_t i;
+        void *chunk;
+        for(i=0; i<__chunks.size(); i++){
+            POS_CHECK_POINTER(chunk = __chunks[i].first);
+            free(chunk);
+        }
+        __chunks.clear();
+        byte_size = 0;
+    }
+
+    /*!
+     *  \brief  load value to this station
+     *  \tparam T   type of the value to be load
+     *  \param  val value to be load
+     */
+    template<typename T>
+    inline void load_value(const T& val){
+        void *chunk;
+        POS_CHECK_POINTER(chunk = malloc(sizeof(T)));
+        memcpy(chunk, &val, sizeof(T));
+        __chunks.push_back(std::pair<void*,uint64_t>(chunk, sizeof(T)));
+        byte_size += sizeof(T);
+    }
+
+    /*!
+     *  \brief  load memory area via pointer to this station
+     *  \param  area    pointer to the memory area to be loaded
+     *  \param  size    size of the memory area to be loaded
+     */
+    inline void load_mem_area(void* area, uint64_t size){
+        POS_CHECK_POINTER(area);
+        __chunks.push_back(std::pair<void*,uint64_t>(area, size));
+        byte_size += size;
+    }
+
+    /*!
+     *  \brief  dump checkpoints to binary image file
+     *  \param  file_path   path of the binary image file to be dumped
+     *  \return POS_SUCCESS for successfully dumpping
+     *          POS_FAILED for fail to open the file
+     */
+    inline pos_retval_t collapse_to_image_file(std::string& file_path){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i, chunk_size;
+        void *chunk;
+        std::ofstream output_file;
+        
+        output_file.open(file_path.c_str(), std::ios::binary);
+        if(unlikely(output_file.is_open() == false)){
+            POS_WARN("failed to collapse checkpoint to binary file: file_path(%s)", file_path.c_str());
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        for(i=0; i<__chunks.size(); i++){
+            POS_CHECK_POINTER(chunk = __chunks[i].first);
+            chunk_size = __chunks[i].second;
+            output_file.write((const char*)(chunk), chunk_size);
+        }
+
+        output_file.flush();
+        output_file.close();
+
+    exit:
+        return retval;
+    }
+
+    pos_client_ckpt_station() : byte_size(0) {}
+
+} pos_client_ckpt_station_t;
 
 
 #define POS_CLIENT_CXT_HEAD pos_client_cxt cxt_base;
@@ -97,10 +178,11 @@ class POSClient {
 
     #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         // drain out both the parser and worker
-        s_tick = POSUtilTimestamp::get_tsc();
+        // TODO: the way to drain is not correct!
+        // s_tick = POSUtilTimestamp::get_tsc();
         // this->dag.drain_by_dest_id(this->_api_inst_pc-1);
-        e_tick = POSUtilTimestamp::get_tsc();
-        POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
+        // e_tick = POSUtilTimestamp::get_tsc();
+        // POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
     #endif
 
     #if POS_CKPT_ENABLE_PREEMPT == 1
@@ -110,9 +192,10 @@ class POSClient {
 
     #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
         // dump checkpoint to file
-        if(this->_cxt.checkpoint_file_path.size() == 0){
-            this->deinit_dump_checkpoints();
-        }
+        // TODO: remember to decomment this!
+        // if(this->_cxt.checkpoint_file_path.size() == 0){
+        //     this->deinit_dump_checkpoints();
+        // }
     #endif
 
         this->deinit_dump_handle_managers();
@@ -230,6 +313,12 @@ class POSClient {
     }
 
  private:
+    /*!
+     *  \brief  station of the checkpoint data, might be dumpped to file, or transmit via network
+     *          to other machine
+     */
+    pos_client_ckpt_station_t __ckpt_station;
+
     /*!
      *  \brief  launch checkpoint ops to checkpoint all stateful resources
      *  \note   this function should be invoked during the preemption

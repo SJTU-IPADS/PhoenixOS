@@ -108,6 +108,15 @@ class POSApiManager_CUDA : public POSApiManager {
                 }
             },
             { 
+                /* api_id */ CUDA_MEMSET_ASYNC, 
+                { 
+                    /* is_sync */       false, 
+                    /* api_type */      kPOS_API_Type_Set_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaMemsetAsync"
+                }
+            },
+            {
                 /* api_id */ CUDA_LAUNCH_KERNEL, 
                 { 
                     /* is_sync */       false, 
@@ -251,6 +260,15 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cudaEventRecord"
                 }
             },
+            { 
+                /* api_id */ CUDA_EVENT_QUERY, 
+                { 
+                    /* is_sync */       true, 
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Runtime,
+                    /* api_name */      "cudaEventQuery"
+                }
+            },
 
             /* ========== CUDA driver functions ========== */
             { 
@@ -325,7 +343,15 @@ class POSApiManager_CUDA : public POSApiManager {
                     /* api_name */      "cuLaunchKernel"
                 }
             },
-
+            { 
+                /* api_id */ rpc_cuGetErrorString, 
+                { 
+                    /* is_sync */       false,
+                    /* api_type */      kPOS_API_Type_Get_Resource,
+                    /* library_id */    kPOS_CUDA_Library_Id_Driver,
+                    /* api_name */      "cuGetErrorString"
+                }
+            },
 
             /* ========== cuBLAS functions ========== */
             { 

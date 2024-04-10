@@ -233,6 +233,31 @@ exit:
     return retval;
 }
 
+
+pos_retval_t test_cuda_event_query(test_cxt* cxt){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaEvent_t event;
+    cudaError cuda_result;
+    uint64_t s_tick, e_tick;
+
+    cuda_result = cudaEventCreateWithFlags(&event, cudaEventDefault);
+    if(unlikely(cuda_result != cudaSuccess)){
+        POS_WARN_DETAIL("failed: %d", cuda_result);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    s_tick = POSUtilTimestamp::get_tsc();
+    cuda_result = cudaEventQuery(event);
+    e_tick = POSUtilTimestamp::get_tsc();
+
+    cxt->duration_ticks = e_tick - s_tick;
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t test_cuda_func_get_attributes(test_cxt* cxt){
     pos_retval_t retval = POS_SUCCESS;
     cudaError cuda_result;

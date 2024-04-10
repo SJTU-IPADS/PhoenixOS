@@ -160,7 +160,7 @@ exit:
 uint64_t POSHandle::__get_basic_serialize_size(){
     pos_retval_t tmp_retval;
     void *ckpt_data;
-    uint64_t ckpt_version, ckpt_size;
+    uint64_t ckpt_version;
 
     std::set<uint64_t> ckpt_version_set;
     uint64_t ckpt_serialization_size;
@@ -186,9 +186,9 @@ uint64_t POSHandle::__get_basic_serialize_size(){
         );
     } else {
         /*!
-            *  \note   for stateful handle, the size of the basic serialized fields is influenced by checkpoint
-            */
-        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
+         *  \note   for stateful handle, the size of the basic serialized fields is influenced by checkpoint
+         */
+        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set</* on_deivce */false>();
         ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
 
         host_ckpt_records = this->ckpt_bag->get_host_checkpoint_records();
@@ -227,7 +227,7 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
     uint64_t nb_parent_handles;
 
     POSCheckpointSlot *ckpt_slot;
-    uint64_t ckpt_version, ckpt_size, nb_ckpt_version;
+    uint64_t ckpt_version, nb_ckpt_version;
     std::set<uint64_t> ckpt_version_set;
     typename std::set<uint64_t>::iterator set_iter;
 
@@ -265,13 +265,13 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
         POS_CHECK_POINTER(this->ckpt_bag);
 
         // first part: XPU-side checkpoint
-        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set();
+        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set</* on_deivce */false>();
         nb_ckpt_version = ckpt_version_set.size();
         POSUtil_Serializer::write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
 
         for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
             ckpt_version = *set_iter;
-            retval =  this->ckpt_bag->get_checkpoint_slot</* on_device */ false>(&ckpt_slot, ckpt_size, ckpt_version);
+            retval =  this->ckpt_bag->get_checkpoint_slot</* on_device */ false>(&ckpt_slot, ckpt_version);
             if(unlikely(retval != POS_SUCCESS)){
                 POS_ERROR_C(
                     "failed to obtain checkpoint by version within the version set, this's a bug: client_addr(%p), version(%lu)",

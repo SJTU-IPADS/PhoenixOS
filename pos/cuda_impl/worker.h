@@ -32,6 +32,7 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cuda_memcpy_h2d_async);
     POS_WK_DECLARE_FUNCTIONS(cuda_memcpy_d2h_async);
     POS_WK_DECLARE_FUNCTIONS(cuda_memcpy_d2d_async);
+    POS_WK_DECLARE_FUNCTIONS(cuda_memset_async);
     POS_WK_DECLARE_FUNCTIONS(cuda_set_device);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_last_error);
     POS_WK_DECLARE_FUNCTIONS(cuda_get_error_string);
@@ -47,6 +48,7 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cuda_event_create_with_flags);
     POS_WK_DECLARE_FUNCTIONS(cuda_event_destory);
     POS_WK_DECLARE_FUNCTIONS(cuda_event_record);
+    POS_WK_DECLARE_FUNCTIONS(cuda_event_query);
 
     /* CUDA driver functions */
     POS_WK_DECLARE_FUNCTIONS(__register_function);
@@ -56,6 +58,7 @@ namespace wk_functions {
     POS_WK_DECLARE_FUNCTIONS(cu_module_get_global);
     POS_WK_DECLARE_FUNCTIONS(cu_ctx_get_current);
     POS_WK_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);
+    POS_WK_DECLARE_FUNCTIONS(cu_get_error_string);
 
     /* cuBLAS functions */
     POS_WK_DECLARE_FUNCTIONS(cublas_create);
@@ -304,6 +307,10 @@ class POSWorker_CUDA : public POSWorker {
 
             checkpoint_version = cxt->checkpoint_version_map[handle];
 
+            /*!
+             *  \note   [phrase 1]  dump the state of this handle from its origin buffer, either to host buffer or device buffer,
+             *                      depending on whether the checkpoint pipeline is enabled
+             */
         #if POS_CKPT_ENABLE_PIPELINE == 1
             retval = handle->checkpoint_pipeline_add_async(
                 /* version_id */ checkpoint_version,
@@ -338,46 +345,41 @@ class POSWorker_CUDA : public POSWorker {
             }
         #endif
         
-            if(unlikely(std::end(cxt->invalidated_handles) != std::find(cxt->invalidated_handles.begin(), cxt->invalidated_handles.end(), handle))){
-                #if POS_CKPT_ENABLE_PIPELINE == 1
-                    retval = handle->ckpt_bag->invalidate_by_version</* on_deivce */ true>(/* version */ checkpoint_version);
-                #else
-                    retval = handle->ckpt_bag->invalidate_by_version</* on_deivce */ false>(/* version */ checkpoint_version);
-                #endif
-                POS_ASSERT(retval == POS_SUCCESS);
-                wqe->nb_abandon_handles += 1;
-                wqe->abandon_ckpt_size += handle->state_size;
-            } else {
-                #if POS_CKPT_ENABLE_PIPELINE == 1
-                    /*!
-                     *  \note   if no invalidation happened, we can commit this checkpoint from device to host
-                     */
-                    _new_commit_thread = handle->spawn_checkpoint_pipeline_commit_thread(
-                            /* version_id */ checkpoint_version,
-                           /* stream_id */ (uint64_t)(_ckpt_commit_stream)
-                    );
-                    _commit_threads.push_back(_new_commit_thread);
+            /*!
+             *  \note   [phrase 2]  async commit the on-device checkpoint to host buffer
+             *                      this phrase is only enabled when checkpoint pipeline is enabled
+             */
+        #if POS_CKPT_ENABLE_PIPELINE == 1
+            _new_commit_thread = handle->spawn_checkpoint_pipeline_commit_thread(
+                    /* version_id */ checkpoint_version,
+                    /* stream_id */ (uint64_t)(_ckpt_commit_stream)
+            );
+            _commit_threads.push_back(_new_commit_thread);
 
-                    // retval = handle->checkpoint_pipeline_commit_async(
-                    //     /* version_id */ checkpoint_version,
-                    //     /* stream_id */ (uint64_t)(_ckpt_commit_stream)
-                    // );
-                #endif
-                wqe->nb_ckpt_handles += 1;
-                wqe->ckpt_size += handle->state_size;
-            }
+            // retval = handle->checkpoint_pipeline_commit_async(
+            //     /* version_id */ checkpoint_version,
+            //     /* stream_id */ (uint64_t)(_ckpt_commit_stream)
+            // );
+        #endif
+
+            wqe->nb_ckpt_handles += 1;
+            wqe->ckpt_size += handle->state_size;
+            
         }
 
+            /*!
+             *  \note   [phrase 3]  synchronize all commits
+             *                      this phrase is only enabled when checkpoint pipeline is enabled
+             */
         #if POS_CKPT_ENABLE_PIPELINE == 1
+            // wait all commit thread to exit
             for(auto &commit_thread : _commit_threads){
                 if(unlikely(POS_SUCCESS != commit_thread.get())){
                     POS_WARN_C("failure occured within the commit thread");
                 }
             }
 
-            /*!
-             *  \note   we need to wait all commits to be finished
-             */
+            // wait all commit job to finished
             cuda_rt_retval = cudaStreamSynchronize(_ckpt_commit_stream);
             if(unlikely(cuda_rt_retval != cudaSuccess)){
                 POS_WARN_C("failed to synchronize the commit stream: nb_ckpt_handles(%lu), nb_abandon_handles(%lu)", wqe->nb_ckpt_handles, wqe->nb_abandon_handles);
@@ -387,8 +389,8 @@ class POSWorker_CUDA : public POSWorker {
         #endif
 
         POS_LOG(
-            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes)",
-            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size
         );
 
     exit:
@@ -440,6 +442,7 @@ class POSWorker_CUDA : public POSWorker {
             {   CUDA_MEMCPY_HTOD_ASYNC,         wk_functions::cuda_memcpy_h2d_async::launch             },
             {   CUDA_MEMCPY_DTOH_ASYNC,         wk_functions::cuda_memcpy_d2h_async::launch             },
             {   CUDA_MEMCPY_DTOD_ASYNC,         wk_functions::cuda_memcpy_d2d_async::launch             },
+            {   CUDA_MEMSET_ASYNC,              wk_functions::cuda_memset_async::launch                 },
             {   CUDA_SET_DEVICE,                wk_functions::cuda_set_device::launch                   },
             {   CUDA_GET_LAST_ERROR,            wk_functions::cuda_get_last_error::launch               },
             {   CUDA_GET_ERROR_STRING,          wk_functions::cuda_get_error_string::launch             },
@@ -456,6 +459,7 @@ class POSWorker_CUDA : public POSWorker {
             {   CUDA_EVENT_CREATE_WITH_FLAGS,   wk_functions::cuda_event_create_with_flags::launch      },
             {   CUDA_EVENT_DESTROY,             wk_functions::cuda_event_destory::launch                },
             {   CUDA_EVENT_RECORD,              wk_functions::cuda_event_record::launch                 },
+            {   CUDA_EVENT_QUERY,               wk_functions::cuda_event_query::launch                  },
             
             /* CUDA driver functions */
             {   rpc_cuModuleLoad,               wk_functions::cu_module_load::launch                    },
@@ -465,6 +469,7 @@ class POSWorker_CUDA : public POSWorker {
             {   rpc_register_var,               wk_functions::cu_module_get_global::launch              },
             {   rpc_cuDevicePrimaryCtxGetState, wk_functions::cu_device_primary_ctx_get_state::launch   },
             {   rpc_cuLaunchKernel,             wk_functions::cuda_launch_kernel::launch                },
+            {   rpc_cuGetErrorString,           wk_functions::cu_get_error_string::launch               },
             
             /* cuBLAS functions */
             {   rpc_cublasCreate,               wk_functions::cublas_create::launch                     },

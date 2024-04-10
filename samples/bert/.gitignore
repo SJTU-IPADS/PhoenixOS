@@ -1,2 +1,5 @@
 model
 tokenizer
+model_base
+tokenizer_base
+ckpt

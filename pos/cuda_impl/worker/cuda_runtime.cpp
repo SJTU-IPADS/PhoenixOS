@@ -490,6 +490,43 @@ namespace cuda_memcpy_d2d_async {
 } // namespace cuda_memcpy_d2d_async
 
 
+/*!
+ *  \related    cudaMemsetAsync
+ *  \brief      async set memory area to a specific value
+ */
+namespace cuda_memset_async {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *memory_handle, *stream_handle;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        memory_handle = pos_api_output_handle(wqe, 0);
+        POS_CHECK_POINTER(memory_handle);
+
+        stream_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(stream_handle);
+
+        wqe->api_cxt->return_code = cudaMemsetAsync(
+            /* devPtr */ pos_api_output_handle_offset_server_addr(wqe, 0),
+            /* value */ pos_api_param_value(wqe, 1, int),
+            /* count */ pos_api_param_value(wqe, 2, uint64_t),
+            /* stream */ (cudaStream_t)(stream_handle->server_addr)
+        );
+
+        if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+
+    exit:
+        return retval;
+    }
+} // namespace cuda_memcpy_d2d_async
+
 
 
 /*!
@@ -956,6 +993,41 @@ namespace cuda_event_record {
     }
 } // namespace cuda_event_record
 
+
+
+/*!
+ *  \related    cudaEventQuery
+ *  \brief      query the state of an event
+ */
+namespace cuda_event_query {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *event_handle;
+
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(wqe);
+
+        event_handle = pos_api_input_handle(wqe, 0);
+        POS_CHECK_POINTER(event_handle);
+
+        wqe->api_cxt->return_code = cudaEventQuery(
+            /* event */ (cudaEvent_t)(event_handle->server_addr)
+        );
+
+        // no need to check state then
+        // if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+        //     POSWorker::__restore(ws, wqe);
+        // } else {
+        //     POSWorker::__done(ws, wqe);
+        // }
+
+        POSWorker::__done(ws, wqe);
+
+    exit:
+        return retval;
+    }
+} // namespace cuda_event_query
 
 
 

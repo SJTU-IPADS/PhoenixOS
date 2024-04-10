@@ -286,4 +286,32 @@ namespace cu_ctx_get_current {
 } // namespace cu_ctx_get_current
 
 
+/*!
+ *  \related    cuGetErrorString
+ *  \brief      obtain the error string from the CUDA context
+ */
+namespace cu_get_error_string {
+    // launch function
+    POS_WK_FUNC_LAUNCH(){
+        const char* ret_string;
+        wqe->api_cxt->return_code = cuGetErrorString(pos_api_param_value(wqe, 0, CUresult), &ret_string);
+
+        if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
+            if(likely(strlen(ret_string) > 0)){
+                POS_ASSERT(strlen(ret_string)+1 < 128);
+                memcpy(wqe->api_cxt->ret_data, ret_string, strlen(ret_string)+1);
+            }
+        }
+
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+            POSWorker::__restore(ws, wqe);
+        } else {
+            POSWorker::__done(ws, wqe);
+        }
+        
+        return POS_SUCCESS;
+    }
+} // namespace cu_get_error_string
+
+
 } // namespace wk_functions 

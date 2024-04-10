@@ -20,6 +20,7 @@ pos_retval_t test_cuda_memcpy_d2d(test_cxt* cxt);
 pos_retval_t test_cuda_memcpy_h2d_async(test_cxt* cxt);
 pos_retval_t test_cuda_memcpy_d2h_async(test_cxt* cxt);
 pos_retval_t test_cuda_memcpy_d2d_async(test_cxt* cxt);
+pos_retval_t test_cuda_memset_async(test_cxt* cxt);
 
 pos_retval_t test_cuda_set_device(test_cxt* cxt);
 pos_retval_t test_cuda_get_device_count(test_cxt* cxt);
@@ -38,6 +39,7 @@ pos_retval_t test_cuda_stream_is_capturing(test_cxt* cxt);
 pos_retval_t test_cuda_event_create_with_flags(test_cxt* cxt);
 pos_retval_t test_cuda_event_record(test_cxt* cxt);
 pos_retval_t test_cuda_event_destory(test_cxt* cxt);
+pos_retval_t test_cuda_event_query(test_cxt* cxt);
 pos_retval_t test_cuda_func_get_attributes(test_cxt* cxt);
 pos_retval_t test_cuda_occupancy_max_active_bpm_with_flags(test_cxt* cxt);
 

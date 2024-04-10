@@ -47,14 +47,14 @@ ckpt_opt_level = 0
 enable_ckpt_increamental = 0
 
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint pipeline
-enable_ckpt_pipeline = 0
+enable_ckpt_pipeline = 1
 
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
 enable_ckpt_orchestration = 0
 
 # config:   enable preempt checkpoint 
 #           (NOTE: must set ckpt_opt_level as 0 while enable this option)
-enable_ckpt_preempt = 1
+enable_ckpt_preempt = 0
 
 # config:   time to trigger preempt checkpoint
 ckpt_preempt_trigger_time_s = 40
@@ -63,7 +63,7 @@ ckpt_preempt_trigger_time_s = 40
 tsc_reg_freq = 2200000000
 
 # config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 600
+ckpt_interval_ms = 1000
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -169,9 +169,11 @@ sources += ['pos/src/handle.cpp', 'pos/src/oob.cpp', 'pos/src/api_context.cpp', 
 if ckpt_opt_level == 0 and enable_ckpt_preempt == 0
     sources += ['pos/src/checkpoint_o0.cpp']
 elif ckpt_opt_level == 0 and enable_ckpt_preempt == 1
-    sources += ['pos/src/checkpoint_o1_o2.cpp']
-elif ckpt_opt_level == 1 or ckpt_opt_level == 2
-    sources += ['pos/src/checkpoint_o1_o2.cpp']
+    sources += ['pos/src/checkpoint_o1.cpp']
+elif ckpt_opt_level == 1
+    sources += ['pos/src/checkpoint_o1.cpp']
+elif ckpt_opt_level == 2
+    sources += ['pos/src/checkpoint_o2.cpp']
 endif
 
 if target == 'cuda'

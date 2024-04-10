@@ -1129,6 +1129,97 @@ namespace cuda_memcpy_d2d_async {
 
 
 /*!
+ *  \related    cudaMemsetAsync
+ *  \brief      async set memory area to a specific value
+ */
+namespace cuda_memset_async {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS, tmp_retval;
+
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Memory *memory_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandleManager_CUDA_Stream *hm_stream;
+
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 4)){
+            POS_WARN(
+                "parse(cuda_memset_async): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 4
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        hm_memory = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory
+        );
+        POS_CHECK_POINTER(hm_memory);
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
+        POS_CHECK_POINTER(hm_stream);
+
+        // try obtain the destination memory handle
+        retval = hm_memory->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
+            /* handle */ &memory_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_memcpy_d2d_async): no destination memory was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 0, uint64_t)
+            );
+            goto exit;
+        } else {
+            wqe->record_handle<kPOS_Edge_Direction_Out>({
+                /* handle */ memory_handle,
+                /* param_index */ 0,
+                /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
+            });
+            hm_memory->record_modified_handle(memory_handle);
+        }
+
+        // try obtain the stream handle
+        retval = hm_stream->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 3, uint64_t),
+            /* handle */ &stream_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_memcpy_d2d_async): no stream was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 3, uint64_t)
+            );
+            goto exit;
+        } else {
+            wqe->record_handle<kPOS_Edge_Direction_In>({
+                /* handle */ stream_handle
+            });
+        }
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+
+} // namespace cuda_memset_async
+
+
+
+/*!
  *  \related    cudaSetDevice
  *  \brief      specify a CUDA device to use
  */
@@ -1705,7 +1796,7 @@ namespace cuda_stream_is_capturing {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
-        
+
         // mark this sync call can be returned after parsing
         // wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
@@ -1945,6 +2036,68 @@ namespace cuda_event_record {
     }
 
 } // namespace cuda_event_record
+
+
+
+/*!
+ *  \related    cudaEventQuery
+ *  \brief      query the state of an event
+ */
+namespace cuda_event_query {
+    // parser function
+    POS_RT_FUNC_PARSER(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSClient_CUDA *client;
+        POSHandle_CUDA_Event *event_handle;
+        POSHandleManager_CUDA_Event *hm_event;
+
+        POS_CHECK_POINTER(wqe);
+        POS_CHECK_POINTER(ws);
+
+        client = (POSClient_CUDA*)(wqe->client);
+        POS_CHECK_POINTER(client);
+
+        // check whether given parameter is valid
+    #if POS_ENABLE_DEBUG_CHECK
+        if(unlikely(wqe->api_cxt->params.size() != 1)){
+            POS_WARN(
+                "parse(cublas_set_math_mode): failed to parse, given %lu params, %lu expected",
+                wqe->api_cxt->params.size(), 1
+            );
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+    #endif
+
+        hm_event = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Event, POSHandleManager_CUDA_Event
+        );
+        POS_CHECK_POINTER(hm_event);
+
+        // operate on handler manager
+        retval = hm_event->get_handle_by_client_addr(
+            /* client_addr */ (void*)pos_api_param_value(wqe, 0, cudaEvent_t),
+            /* handle */ &event_handle
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cuda_event_record): no CUDA event was founded: client_addr(%p)",
+                (void*)pos_api_param_value(wqe, 0, cudaEvent_t)
+            );
+            goto exit;
+        }
+        wqe->record_handle<kPOS_Edge_Direction_In>({
+            /* handle */ event_handle
+        });
+
+        // launch the op to the dag
+        retval = client->dag.launch_op(wqe);
+
+    exit:
+        return retval;
+    }
+
+} // namespace cuda_event_query
 
 
 

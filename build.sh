@@ -151,7 +151,7 @@ build_cuda() {
                     sleep 3
                     cd $script_dir
                     cd unittest/cuda/build
-                    LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=127.0.0.1 ../bin/per_api_test
+                    LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 ../bin/per_api_test
                     client_retval=$?
                     kill -SIGINT $server_pid
 

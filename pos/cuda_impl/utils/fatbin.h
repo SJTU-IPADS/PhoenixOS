@@ -853,7 +853,7 @@ class POSUtil_CUDA_Fatbin {
                  */
                 if(cached_desp_map.size() > 0){
                     continue;
-                    // POS_WARN("found uncached kernels while given cached kernel meta, this might cause nsys to crash: device_name(%s)", kernel_str);
+                    POS_WARN("found uncached kernels while given cached kernel meta, this might cause nsys to crash: device_name(%s)", kernel_str);
                 }
 
                 function_desp = new POSCudaFunctionDesp_t();

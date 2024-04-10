@@ -22,6 +22,7 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_h2d_async);
     POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2h_async);
     POS_PS_DECLARE_FUNCTIONS(cuda_memcpy_d2d_async);
+    POS_PS_DECLARE_FUNCTIONS(cuda_memset_async);
     POS_PS_DECLARE_FUNCTIONS(cuda_set_device);
     POS_PS_DECLARE_FUNCTIONS(cuda_get_last_error);
     POS_PS_DECLARE_FUNCTIONS(cuda_get_error_string);
@@ -37,6 +38,7 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(cuda_event_create_with_flags);
     POS_PS_DECLARE_FUNCTIONS(cuda_event_destory);
     POS_PS_DECLARE_FUNCTIONS(cuda_event_record);
+    POS_PS_DECLARE_FUNCTIONS(cuda_event_query);
     
     /* CUDA driver functions */
     POS_PS_DECLARE_FUNCTIONS(__register_function);   
@@ -45,7 +47,8 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(cu_module_get_function);
     POS_PS_DECLARE_FUNCTIONS(cu_module_get_global);
     POS_PS_DECLARE_FUNCTIONS(cu_ctx_get_current);
-    POS_PS_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);    
+    POS_PS_DECLARE_FUNCTIONS(cu_device_primary_ctx_get_state);
+    POS_PS_DECLARE_FUNCTIONS(cu_get_error_string);
 
     /* cuBLAS functions */
     POS_PS_DECLARE_FUNCTIONS(cublas_create);
@@ -103,6 +106,7 @@ class POSParser_CUDA : public POSParser {
             {   CUDA_MEMCPY_HTOD_ASYNC,         ps_functions::cuda_memcpy_h2d_async::parse              },
             {   CUDA_MEMCPY_DTOH_ASYNC,         ps_functions::cuda_memcpy_d2h_async::parse              },
             {   CUDA_MEMCPY_DTOD_ASYNC,         ps_functions::cuda_memcpy_d2d_async::parse              },
+            {   CUDA_MEMSET_ASYNC,              ps_functions::cuda_memset_async::parse                  },
             {   CUDA_SET_DEVICE,                ps_functions::cuda_set_device::parse                    },
             {   CUDA_GET_LAST_ERROR,            ps_functions::cuda_get_last_error::parse                },
             {   CUDA_GET_ERROR_STRING,          ps_functions::cuda_get_error_string::parse              },
@@ -119,6 +123,8 @@ class POSParser_CUDA : public POSParser {
             {   CUDA_EVENT_CREATE_WITH_FLAGS,   ps_functions::cuda_event_create_with_flags::parse       },
             {   CUDA_EVENT_DESTROY,             ps_functions::cuda_event_destory::parse                 },
             {   CUDA_EVENT_RECORD,              ps_functions::cuda_event_record::parse                  },
+            {   CUDA_EVENT_QUERY,               ps_functions::cuda_event_query::parse                   },
+
             /* CUDA driver functions */
             {   rpc_cuModuleLoad,               ps_functions::cu_module_load::parse                     },
             {   rpc_cuModuleLoadData,           ps_functions::cu_module_load_data::parse                },
@@ -128,6 +134,7 @@ class POSParser_CUDA : public POSParser {
             {   rpc_cuCtxGetCurrent,            ps_functions::cu_ctx_get_current::parse                 },
             {   rpc_cuDevicePrimaryCtxGetState, ps_functions::cu_device_primary_ctx_get_state::parse    },
             {   rpc_cuLaunchKernel,             ps_functions::cuda_launch_kernel::parse                 },
+            {   rpc_cuGetErrorString,           ps_functions::cu_get_error_string::parse                },
             
             /* cuBLAS functions */
             {   rpc_cublasCreate,               ps_functions::cublas_create::parse                      },
@@ -154,13 +161,30 @@ class POSParser_CUDA : public POSParser {
     pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE* wqe) { 
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *handle;
+        POSHandleManager<POSHandle>* hm;
         POSAPIContext_QE *ckpt_wqe;
+        uint64_t i, nb_handles;
+        POSClient_CUDA *client;
 
         ckpt_wqe = new POSAPIContext_QE_t(
             /* api_id*/ this->_ws->checkpoint_api_id,
             /* client */ wqe->client
         );
         POS_CHECK_POINTER(ckpt_wqe);
+
+        client = (POSClient_CUDA*)(wqe->client);
+
+        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
+            hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
+            POS_CHECK_POINTER(hm);
+            nb_handles = hm->get_nb_handles();
+            for(i=0; i<nb_handles; i++){
+                handle = hm->get_handle_by_id(i);
+                POS_CHECK_POINTER(handle);
+                ckpt_wqe->record_checkpoint_handles(handle);
+            }
+        }
+    
         retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
 
     exit:
@@ -214,6 +238,7 @@ class POSParser_CUDA : public POSParser {
      *  \brief  insert checkpoint op to the DAG based on certain conditions
      *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
      *  \param  wqe the exact WQ element before inserting checkpoint op
+     *  \TODO:  move this function to general implementation!
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
     pos_retval_t checkpoint_insertion(POSAPIContext_QE* wqe) override {

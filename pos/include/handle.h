@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <thread>
 #include <future>
+#include <atomic>
 
 #include <stdint.h>
 #include <assert.h>
@@ -103,7 +104,10 @@ class POSHandle {
     ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-        latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+    {
+        this->_state_preserve_counter.store(0);
+    }
     
 
     /*!
@@ -113,11 +117,15 @@ class POSHandle {
      *  \note   this constructor is for hardware resource, whose client-side address
      *          and server-side address should be equal (e.g., memory)
      */
-    POSHandle(size_t size_, void* hm, size_t state_size_=0)
-        :   client_addr(nullptr), server_addr(nullptr), size(size_),
-            dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-            status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+    POSHandle(
+        size_t size_, void* hm, size_t state_size_=0
+    ) : client_addr(nullptr), server_addr(nullptr), size(size_),
+        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+        status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
+        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+    {
+        this->_state_preserve_counter.store(0);
+    }
 
 
     /*!
@@ -125,11 +133,15 @@ class POSHandle {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle(void* hm)
-        :   client_addr(nullptr), server_addr(nullptr), size(0),
-            dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-            status(kPOS_HandleStatus_Create_Pending), state_size(0),
-            latest_version(0), ckpt_bag(nullptr), _hm(hm) {}
+    POSHandle(
+        void* hm
+    ) : client_addr(nullptr), server_addr(nullptr), size(0),
+        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+        status(kPOS_HandleStatus_Create_Pending), state_size(0),
+        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+    {
+        this->_state_preserve_counter.store(0);
+    }
 
     virtual ~POSHandle() = default;
 
@@ -292,34 +304,103 @@ class POSHandle {
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const { 
+    virtual pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const {
         return POS_FAILED_NOT_IMPLEMENTED; 
+    }
+
+    /*!
+     *  \brief  preserve the state of the resource behind this handle for checkpointing
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id      version of this checkpoint
+     *  \return POS_SUCCESS for successfully reserve the handle state for checkpointing
+     */
+    pos_retval_t preserve_ckpt_state(uint64_t version_id) {
+        pos_retval_t retval = POS_SUCCESS;
+        uint8_t old_counter;
+
+        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        if (old_counter == 0) {
+            // case: no checkpoint has been conducted, start copy-on-write operation
+            retval = this->__copy_on_write(version_id);
+            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        } else if (old_counter == 1) {
+            // case: the checkpoint has been started, but not yet finished, we need to block until it finished
+            while(this->_state_preserve_counter.load() < 2){}
+        } else {
+            // case: the checkpoint has been finished, nothing need to do
+            ;
+        }
+
+    exit:
+        return retval;
+    }
+
+
+    /*!
+     *  \brief  reset the state preserve counter to zero, to start a new checkpoint round
+     */
+    inline void reset_preserve_counter(){
+        this->_state_preserve_counter.store(0);
     }
 
 
     /*!
      *  \brief  checkpoint the state of the resource behind this handle (async)
-     *  \note   only handle of stateful resource should implement this method
+     *  \note   this is a wrapper function that prevent the checkpoint process conflict with the COW,
+     *          the actual logic is implemented in __checkpoint_async
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) const { 
-        return POS_FAILED_NOT_IMPLEMENTED; 
-    }
+    pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) { 
+        pos_retval_t retval = POS_SUCCESS;
+        uint8_t old_counter;
 
+        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        if (old_counter == 0) {
+            // case:    no COW on this handle yet, we can directly checkpoint from the origin buffer
+            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ false);
+            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        } else if (old_counter == 1) {
+            // case:    there's non-finished COW on this handle, we need to wait until the COW finished and
+            //          checkpoint from the new buffer
+            while(this->_state_preserve_counter.load() < 2){}
+            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ true);
+        } else {
+            // case:    there's finished COW on this handle, we can directly checkpoint from the new buffer
+            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ true);
+        }
+
+        return retval;
+    }
 
     /*!
      *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
-     *  \note   only handle of stateful resource should implement this method
+     *  \note   this is a wrapper function that prevent the checkpoint process conflict with the COW,
+     *          the actual logic is implemented in __checkpoint_pipeline_add_async
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const { 
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
+    pos_retval_t checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) { 
+        pos_retval_t retval = POS_SUCCESS;
+        uint8_t old_counter;
 
+        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        if (old_counter == 0) {
+            // case:    no COW on this handle yet, we conduct on-device copy from the origin buffer
+            retval = this->__checkpoint_pipeline_add_async(version_id, stream_id);
+            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        } else if (old_counter == 1) {
+            // case:    there's non-finished COW on this handle, we need to wait until the COW finished
+            while(this->_state_preserve_counter.load() < 2){}
+        } else {
+            // case:    there's finished COW on this handle, nothing need to do
+            ;
+        }
+
+        return retval;
+    }
 
     /*!
      *  \brief  start a new thread to commit the on-device memory to host-side 
@@ -454,9 +535,48 @@ class POSHandle {
 
  protected:
     /*!
+     *  \note   counter for exclude copy-on-write and checkpoint process
+     */
+    std::atomic<uint8_t> _state_preserve_counter;
+
+    /*!
      *  \note   the belonging handle manager
      */
     void *_hm;
+
+    /*!
+     *  \brief  preserve the state of this handle within a on-device buffer, if this handle hasn't
+     *          been checkpointed in current overlapped checkpoint round
+     *  \note   (1) only handle of stateful resource should implement this method
+     *          (2) the COW will conducted on the actual default stream, so that the result can
+     *              synchronize across all streams
+     *  \param  version_id  version of the checkpoint to be commit
+     *  \return POS_SUCCESS for successfully COW
+     */
+    virtual pos_retval_t __copy_on_write(uint64_t version_id) const {
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle (async)
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t __checkpoint_async(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false) const { 
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    virtual pos_retval_t __checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const { 
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  commit the on-device memory to host-side checkpoint area (async)

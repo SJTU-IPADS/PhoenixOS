@@ -34,7 +34,11 @@ enum pos_retval {
 #define UINT_64_MAX (1<<64 -1)
 
 #define POS_ASSERT(x)           assert(x);
+#define POS_STATIC_ASSERT(x)    static_assert(x);
 #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
+
+#define KB(x)   ((size_t) (x) << 10)
+#define MB(x)   ((size_t) (x) << 20)
 
 /*!
  *  \brief  type for resource typeid

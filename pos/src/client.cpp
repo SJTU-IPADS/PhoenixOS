@@ -303,7 +303,7 @@ void POSClient::init_restore_generate_recompute_scheme(
             POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
             POS_CHECK_POINTER(handle->ckpt_bag);
 
-            ckpt_set = handle->ckpt_bag->get_checkpoint_version_set();
+            ckpt_set = handle->ckpt_bag->get_checkpoint_version_set</* on_deivce */false>();
             if(unlikely(ckpt_set.size() == 0)){
                 // no checkpoint founded
                 vh = 0;
@@ -407,7 +407,7 @@ void POSClient::init_restore_generate_recompute_scheme(
                      *  \note   we will continue to trace further upstream of this upstream input handle, if it's not yet checkpointed
                      */
                     POS_CHECK_POINTER(hv.handle->ckpt_bag);
-                    ckpt_version_set = hv.handle->ckpt_bag->get_checkpoint_version_set();
+                    ckpt_version_set = hv.handle->ckpt_bag->get_checkpoint_version_set</* on_deivce */false>();
                     if(ckpt_version_set.count(vi) == 0){
                         POS_LOG("    => insert: client_addr(%p), vi(%lu)", hv.handle->client_addr, vi);
                         missing_vh_map.insert(version_handle_pair_t(vi, hv.handle));
@@ -549,7 +549,6 @@ void POSClient::init_restore_recreate_handles(
  */
 void POSClient::deinit_dump_checkpoints() {
     std::string file_path;
-    std::ofstream output_file;
     
     typename std::map<pos_resource_typeid_t, void*>::iterator hm_map_iter;
     POSHandleManager<POSHandle> *hm;
@@ -565,15 +564,17 @@ void POSClient::deinit_dump_checkpoints() {
     uint64_t s_tick, e_tick, all_tick;
 
     file_path = std::string("./") + this->_cxt.job_name + std::string("_checkpoints_") + std::to_string(this->id) + std::string(".bat");
-    output_file.open(file_path.c_str(), std::ios::binary);
 
-    POS_LOG("dumping checkpoints...");
+    this->__ckpt_station.clear();
+
+    POS_LOG("collecting checkpoints...");
 
     /* ------------------ step 1: dump handles ------------------ */
     all_tick = 0;
     // field: # resource type
     nb_resource_types = this->handle_managers.size();
-    output_file.write((const char*)(&(nb_resource_types)), sizeof(uint64_t));
+    // output_file.write((const char*)(&(nb_resource_types)), sizeof(uint64_t));
+    this->__ckpt_station.load_value<uint64_t>(nb_resource_types);
 
     for(hm_map_iter = this->handle_managers.begin(); hm_map_iter != handle_managers.end(); hm_map_iter++){
         s_tick = POSUtilTimestamp::get_tsc();
@@ -581,10 +582,12 @@ void POSClient::deinit_dump_checkpoints() {
         nb_handles = hm->get_nb_handles();
 
         // field: resource type id
-        output_file.write((const char*)(&(hm_map_iter->first)), sizeof(pos_resource_typeid_t));
+        // output_file.write((const char*)(&(hm_map_iter->first)), sizeof(pos_resource_typeid_t));
+        this->__ckpt_station.load_value<pos_resource_typeid_t>(hm_map_iter->first);
 
         // field: # handles under this manager 
-        output_file.write((const char*)(&nb_handles), sizeof(uint64_t));
+        // output_file.write((const char*)(&nb_handles), sizeof(uint64_t));
+        this->__ckpt_station.load_value<uint64_t>(nb_handles);
 
         for(i=0; i<nb_handles; i++){
             POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
@@ -598,14 +601,16 @@ void POSClient::deinit_dump_checkpoints() {
             serialize_area_size = handle->get_serialize_size();
 
             // field: size of the serialized area of this handle
-            output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            // output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            this->__ckpt_station.load_value<uint64_t>(serialize_area_size);
 
             if(likely(serialize_area_size > 0)){
                 // field: serialized data
-                output_file.write((const char*)(serialize_area), serialize_area_size);
+                // output_file.write((const char*)(serialize_area), serialize_area_size);
+                this->__ckpt_station.load_mem_area(serialize_area, serialize_area_size);
             }
             // output_file.flush();
-            free(serialize_area);
+            // free(serialize_area);
         }
         e_tick = POSUtilTimestamp::get_tsc();
         POS_LOG(
@@ -616,13 +621,17 @@ void POSClient::deinit_dump_checkpoints() {
         all_tick += e_tick - s_tick;
     }
     
-    POS_LOG("    => dumped checkpoints of handles: %lf us", POS_TSC_TO_USEC(all_tick));
+    POS_LOG(
+        "    => dumped checkpoints of handles: duration(%lf us), collect_size(%lu bytes)",
+        POS_TSC_TO_USEC(all_tick), this->__ckpt_station.byte_size
+    );
 
     /* ------------------ step 2: dump api context ------------------ */
     s_tick = POSUtilTimestamp::get_tsc();
     // field: # api context
     nb_api_cxt = this->dag.get_nb_api_cxt();
-    output_file.write((const char*)(&(nb_api_cxt)), sizeof(uint64_t));
+    // output_file.write((const char*)(&(nb_api_cxt)), sizeof(uint64_t));
+    this->__ckpt_station.load_value<uint64_t>(nb_api_cxt);
 
     for(i=0; i<nb_api_cxt; i++){
         POS_CHECK_POINTER(api_cxt = this->dag.get_api_cxt_by_id(i));
@@ -633,24 +642,29 @@ void POSClient::deinit_dump_checkpoints() {
         if(api_cxt->is_ckpt_pruned == true){
             // field: size of the serialized area of this api context
             serialize_area_size = 0;
-            output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            // output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            this->__ckpt_station.load_value<uint64_t>(serialize_area_size);
         } else {
             api_cxt->serialize(&serialize_area);
             POS_CHECK_POINTER(serialize_area);
 
             // field: size of the serialized area of this api context
             serialize_area_size = api_cxt->get_serialize_size();
-            output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            // output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+            this->__ckpt_station.load_value<uint64_t>(serialize_area_size);
             
             // field: serialized data
-            output_file.write((const char*)(serialize_area), serialize_area_size);
+            // output_file.write((const char*)(serialize_area), serialize_area_size);
+            this->__ckpt_station.load_mem_area(serialize_area, serialize_area_size);
             
-            output_file.flush();
-            free(serialize_area);
+            // output_file.flush();
+            // free(serialize_area);
         }
     }
     e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("    => dumped checkpoints of api contexts: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
+    POS_LOG("    => dumped checkpoints of api contexts: duration(%lf us), collect_size(%lu bytes)",
+        POS_TSC_TO_USEC(e_tick-s_tick), this->__ckpt_station.byte_size
+    );
 
     /* ------------------ step 3: dump dag ------------------ */
     /*!
@@ -664,17 +678,25 @@ void POSClient::deinit_dump_checkpoints() {
 
     // field: size of the serialized area of this dag topo
     serialize_area_size = this->dag.get_serialize_size();
-    output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+    // output_file.write((const char*)(&serialize_area_size), sizeof(uint64_t));
+    this->__ckpt_station.load_value<uint64_t>(serialize_area_size);
 
     // field: serialized data
-    output_file.write((const char*)(serialize_area), serialize_area_size);
+    // output_file.write((const char*)(serialize_area), serialize_area_size);
+    this->__ckpt_station.load_mem_area(serialize_area, serialize_area_size);
     
-    output_file.flush();
-    free(serialize_area);
+    // output_file.flush();
+    // free(serialize_area);
 
     e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("    => dumped checkpoints of DAG: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
+    POS_LOG("    => dumped checkpoints of DAG: duration(%lf us), collect_size(%lu bytes)",
+        POS_TSC_TO_USEC(e_tick-s_tick), this->__ckpt_station.byte_size
+    );
 
-    output_file.close();
-    POS_LOG("finish dump checkpoints to %s", file_path.c_str());
+    // output_file.close();
+    // POS_LOG("finish dump checkpoints to %s", file_path.c_str());
+
+    if(likely(POS_SUCCESS == this->__ckpt_station.collapse_to_image_file(file_path))){
+        POS_LOG("dump checkpoints to images file: file_path(%s)", file_path.c_str());
+    }
 }

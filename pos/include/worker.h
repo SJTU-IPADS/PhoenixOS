@@ -39,10 +39,7 @@ typedef struct checkpoint_async_cxt {
     // (latest) version of each handle to be checkpointed
     std::map<POSHandle*, pos_vertex_id_t> checkpoint_version_map;
 
-    // handles whose checkpoint might need to be invalidated due to computation / checkpoint conflict
-    std::vector<POSHandle*> invalidated_handles;
-
-    checkpoint_async_cxt() : is_active(false), invalidated_handles(32) {}
+    checkpoint_async_cxt() : is_active(false) {}
 } checkpoint_async_cxt_t;
 
 
@@ -195,7 +192,7 @@ class POSWorker {
 
     void __daemon_ckpt_async(){
         uint64_t i, j, k, w, api_id;
-        pos_retval_t launch_retval;
+        pos_retval_t launch_retval, tmp_retval;
         POSAPIMeta_t api_meta;
         std::vector<POSClient*> clients;
         POSClient *client;
@@ -236,6 +233,7 @@ class POSWorker {
                          *  \note   so the actual checkpoint interval might not be accurate
                          */
                         if(ckpt_cxt.is_active == true){
+                            POS_LOG("skip checkpoint due to previous one is still non-finished");
                             goto ckpt_finished;
                         }
                         // we need to wait until last checkpoint finished
@@ -250,9 +248,6 @@ class POSWorker {
                             delete ckpt_thread;
                         }
 
-                        // clear old invalidation hint
-                        ckpt_cxt.invalidated_handles.clear();
-
                         // reset checkpoint version map
                         ckpt_cxt.checkpoint_version_map.clear();
                         for(handle_set_iter = wqe->checkpoint_handles.begin(); 
@@ -260,6 +255,7 @@ class POSWorker {
                             handle_set_iter++)
                         {
                             POS_CHECK_POINTER(handle = *handle_set_iter);
+                            handle->reset_preserve_counter();
                             ckpt_cxt.checkpoint_version_map[handle] = handle->latest_version;
                         }
 
@@ -292,13 +288,26 @@ class POSWorker {
                     }
                 #endif
 
-                    // invalidate handles
+                    /*!
+                     *  \brief  before launching the API, we need to preserve the state of all stateful resources for checkpointing
+                     *  \note   there're serval cases handle in preserve_ckpt_state:
+                     *          [1] the state hasn't been checkpoint yet, then it conducts COW on the state
+                     *          [2] the state is under checkpointing, then it blocks until the checkpoint finished
+                     *          [3] the state is already checkpointed, then it directly returns
+                     */
                     for(auto &inout_handle_view : wqe->inout_handle_views){
-                        ckpt_cxt.invalidated_handles.push_back(inout_handle_view.handle);
+                        POS_CHECK_POINTER(handle = inout_handle_view.handle);
+                        if(ckpt_cxt.checkpoint_version_map.count(handle) > 0){
+                            tmp_retval = handle->preserve_ckpt_state(/* version_id */ckpt_cxt.checkpoint_version_map[handle]);
+                            POS_ASSERT(tmp_retval == POS_SUCCESS);
+                        }
                     }
-
-                    for(auto &output_handle_view : wqe->output_handle_views){
-                        ckpt_cxt.invalidated_handles.push_back(output_handle_view.handle);
+                    for(auto &out_handle_view : wqe->output_handle_views){
+                        POS_CHECK_POINTER(handle = out_handle_view.handle);
+                        if(ckpt_cxt.checkpoint_version_map.count(handle) > 0){
+                            tmp_retval = handle->preserve_ckpt_state(/* version_id */ckpt_cxt.checkpoint_version_map[handle]);
+                            POS_ASSERT(tmp_retval == POS_SUCCESS);
+                        }
                     }
 
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
