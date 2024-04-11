@@ -176,7 +176,13 @@ class POSWorker {
         cxt->is_active = false;
     }
 
- private:
+    /*!
+     *  \brief  make the worker thread synchronized
+     */
+    virtual pos_retval_t __synchronize(){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
     /*!
      *  \brief  processing daemon of the worker
      */
@@ -203,6 +209,7 @@ class POSWorker {
         ckpt_cxt.is_active = false;
         typename std::set<POSHandle*>::iterator handle_set_iter;
         POSHandle *handle;
+        uint64_t s_tick, e_tick;
 
         if(unlikely(POS_SUCCESS != daemon_init())){
             POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -226,6 +233,14 @@ class POSWorker {
                         if(unlikely(wqe->checkpoint_handles.size() == 0)){
                             goto ckpt_finished;
                         }
+
+                        // s_tick = POSUtilTimestamp::get_tsc();
+                        if(unlikely(POS_SUCCESS != this->__synchronize())){
+                            POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
+                            goto ckpt_finished;
+                        }
+                        // e_tick = POSUtilTimestamp::get_tsc();
+                        // POS_LOG("sync duration: %lu us", POS_TSC_TO_USEC((e_tick-s_tick)));
 
                         /*!
                          *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
@@ -297,15 +312,33 @@ class POSWorker {
                      */
                     for(auto &inout_handle_view : wqe->inout_handle_views){
                         POS_CHECK_POINTER(handle = inout_handle_view.handle);
+                        if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                                    || handle->status == kPOS_HandleStatus_Create_Pending
+                                    || handle->status == kPOS_HandleStatus_Broken
+                        )){
+                            continue;
+                        }
                         if(ckpt_cxt.checkpoint_version_map.count(handle) > 0){
-                            tmp_retval = handle->preserve_ckpt_state(/* version_id */ckpt_cxt.checkpoint_version_map[handle]);
+                            tmp_retval = handle->preserve_ckpt_state(
+                                /* version_id */ ckpt_cxt.checkpoint_version_map[handle],
+                                /* stream_id */ wqe->execution_stream_id
+                            );
                             POS_ASSERT(tmp_retval == POS_SUCCESS);
                         }
                     }
                     for(auto &out_handle_view : wqe->output_handle_views){
                         POS_CHECK_POINTER(handle = out_handle_view.handle);
+                        if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                                    || handle->status == kPOS_HandleStatus_Create_Pending
+                                    || handle->status == kPOS_HandleStatus_Broken
+                        )){
+                            continue;
+                        }
                         if(ckpt_cxt.checkpoint_version_map.count(handle) > 0){
-                            tmp_retval = handle->preserve_ckpt_state(/* version_id */ckpt_cxt.checkpoint_version_map[handle]);
+                            tmp_retval = handle->preserve_ckpt_state(
+                                /* version_id */ ckpt_cxt.checkpoint_version_map[handle],
+                                /* stream_id */ wqe->execution_stream_id
+                            );
                             POS_ASSERT(tmp_retval == POS_SUCCESS);
                         }
                     }
@@ -368,9 +401,16 @@ class POSWorker {
 
                     // this is a checkpoint op
                     if(unlikely(api_id == this->_ws->checkpoint_api_id)){
+                        if(unlikely(POS_SUCCESS != this->__synchronize())){
+                            POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
+                            goto ckpt_finished;
+                        }
+
                         if(unlikely(POS_SUCCESS != this->checkpoint_sync(wqe))){
                             POS_WARN_C("failed to do checkpointing");
                         }
+                    
+                    ckpt_finished:
                         __done(this->_ws, wqe);
                         wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                         wqe->return_tick = POSUtilTimestamp::get_tsc();

@@ -28,7 +28,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \param  state_size      size of resource state behind this handle  
      */
     POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, uint64_t state_size=0)
-        : POSHandle(client_addr_, size_, hm, state_size)
+        : POSHandle(client_addr_, size_, hm, state_size), lastest_used_stream(nullptr)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }
@@ -36,7 +36,9 @@ class POSHandle_cuBLAS_Context : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_cuBLAS_Context(size_t size_, void* hm, uint64_t state_size=0) : POSHandle(size_, hm, state_size){
+    POSHandle_cuBLAS_Context(size_t size_, void* hm, uint64_t state_size=0) 
+        : POSHandle(size_, hm, state_size), lastest_used_stream(nullptr)
+    {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
@@ -45,7 +47,8 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_cuBLAS_Context(void* hm) : POSHandle(hm)
+    POSHandle_cuBLAS_Context(void* hm) 
+        : POSHandle(hm), lastest_used_stream(nullptr)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }
@@ -74,8 +77,12 @@ class POSHandle_cuBLAS_Context : public POSHandle {
             POS_WARN_C_DETAIL("failed to restore cublas context: %d", cublas_retval);
         }
 
+        // TODO: restore the cuBLAS context on corresponding used stream
+
         return retval;
     }
+
+    POSHandle *lastest_used_stream;
 
  protected:
     /*!
@@ -97,7 +104,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
 
     /*!
      *  \brief  deserialize extra field of this handle
-     *  \param  sraw_data    raw data area that store the serialized data
+     *  \param  raw_data    raw data area that store the serialized data
      *  \return POS_SUCCESS for successfully deserilization
      */
     pos_retval_t __deserialize_extra(void* raw_data) override {
@@ -155,4 +162,5 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
     exit:
         return retval;
     }
+
 };

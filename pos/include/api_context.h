@@ -381,6 +381,9 @@ typedef struct POSAPIContext_QE {
     // std::map<pos_resource_typeid_t, std::set<POSHandle*>> checkpoint_handles;
     std::set<POSHandle*> checkpoint_handles;
 
+    // stream that this api will executed on, could be nullptr for default stream
+    uint64_t execution_stream_id;
+
     /* ======= end of checkpoint op specific fields ======== */
 
     /*!
@@ -397,7 +400,7 @@ typedef struct POSAPIContext_QE {
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
         uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client, void* pos_transport
-    ) : client_id(uuid), client(pos_client), transport(pos_transport),
+    ) : client_id(uuid), client(pos_client), transport(pos_transport), execution_stream_id(0),
         status(kPOS_API_Execute_Status_Init), dag_vertex_id(0), api_inst_id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);
@@ -428,7 +431,7 @@ typedef struct POSAPIContext_QE {
      *  \param  api_id              specialized API index of the checkpointing op
      *  \param  pos_client          pointer to the POSClient instance
      */
-    POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client), is_ckpt_pruned(false) {
+    POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0) {
         api_cxt = new POSAPIContext_t(api_id);
         POS_CHECK_POINTER(api_cxt);
 
@@ -445,7 +448,7 @@ typedef struct POSAPIContext_QE {
      *  \note   this constructor is used only during restore phrase
      *  \param  pos_client          pointer to the POSClient instance
      */
-    POSAPIContext_QE(void* pos_client) : client(pos_client), is_ckpt_pruned(false) {}
+    POSAPIContext_QE(void* pos_client) : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0) {}
 
     /*!
      *  \brief  deconstructor

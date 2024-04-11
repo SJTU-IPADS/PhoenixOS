@@ -312,17 +312,18 @@ class POSHandle {
      *  \brief  preserve the state of the resource behind this handle for checkpointing
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id      version of this checkpoint
+     *  \param  stream_id       index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully reserve the handle state for checkpointing
      */
-    pos_retval_t preserve_ckpt_state(uint64_t version_id) {
+    pos_retval_t preserve_ckpt_state(uint64_t version_id, uint64_t stream_id=0) {
         pos_retval_t retval = POS_SUCCESS;
         uint8_t old_counter;
 
-        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        old_counter = this->_state_preserve_counter.fetch_add(1);
         if (old_counter == 0) {
             // case: no checkpoint has been conducted, start copy-on-write operation
-            retval = this->__copy_on_write(version_id);
-            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+            retval = this->__copy_on_write(version_id, stream_id);
+            this->_state_preserve_counter.fetch_add(1);
         } else if (old_counter == 1) {
             // case: the checkpoint has been started, but not yet finished, we need to block until it finished
             while(this->_state_preserve_counter.load() < 2){}
@@ -356,15 +357,15 @@ class POSHandle {
         pos_retval_t retval = POS_SUCCESS;
         uint8_t old_counter;
 
-        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        old_counter = this->_state_preserve_counter.fetch_add(1);
         if (old_counter == 0) {
             // case:    no COW on this handle yet, we can directly checkpoint from the origin buffer
             retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ false);
-            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+            this->_state_preserve_counter.fetch_add(1);
         } else if (old_counter == 1) {
             // case:    there's non-finished COW on this handle, we need to wait until the COW finished and
             //          checkpoint from the new buffer
-            while(this->_state_preserve_counter.load() < 2){}
+            while(this->_state_preserve_counter < 2){}
             retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ true);
         } else {
             // case:    there's finished COW on this handle, we can directly checkpoint from the new buffer
@@ -386,14 +387,14 @@ class POSHandle {
         pos_retval_t retval = POS_SUCCESS;
         uint8_t old_counter;
 
-        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+        old_counter = this->_state_preserve_counter.fetch_add(1);
         if (old_counter == 0) {
             // case:    no COW on this handle yet, we conduct on-device copy from the origin buffer
             retval = this->__checkpoint_pipeline_add_async(version_id, stream_id);
-            this->_state_preserve_counter.fetch_add(1, std::memory_order_release);
+            this->_state_preserve_counter.fetch_add(1);
         } else if (old_counter == 1) {
             // case:    there's non-finished COW on this handle, we need to wait until the COW finished
-            while(this->_state_preserve_counter.load() < 2){}
+            while(this->_state_preserve_counter < 2){}
         } else {
             // case:    there's finished COW on this handle, nothing need to do
             ;
@@ -551,9 +552,10 @@ class POSHandle {
      *          (2) the COW will conducted on the actual default stream, so that the result can
      *              synchronize across all streams
      *  \param  version_id  version of the checkpoint to be commit
+     *  \param  stream_id       index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully COW
      */
-    virtual pos_retval_t __copy_on_write(uint64_t version_id) const {
+    virtual pos_retval_t __copy_on_write(uint64_t version_id, uint64_t stream_id=0) const {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 

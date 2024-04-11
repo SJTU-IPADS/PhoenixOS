@@ -26,6 +26,7 @@ namespace cublas_create {
         POSClient_CUDA *client;
         POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandleManager_CUDA_Context* hm_context;
+        POSHandleManager_CUDA_Stream *hm_stream;
         POSHandleManager_cuBLAS_Context* hm_cublas_context;
 
         POS_CHECK_POINTER(wqe);
@@ -43,6 +44,11 @@ namespace cublas_create {
             client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
         );
         POS_CHECK_POINTER(hm_cublas_context);
+
+        hm_stream = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream
+        );
+        POS_CHECK_POINTER(hm_stream);
 
         // operate on handler manager
         retval = hm_cublas_context->allocate_mocked_resource(
@@ -64,6 +70,9 @@ namespace cublas_create {
             )
             memcpy(wqe->api_cxt->ret_data, &(cublas_context_handle->client_addr), sizeof(cublasHandle_t));
         }
+
+        // record the used stream as latest used stream
+        cublas_context_handle->lastest_used_stream = hm_stream->latest_used_handle;
 
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
@@ -163,6 +172,9 @@ namespace cublas_set_stream {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ cublas_context_handle
         });
+
+        // record the used stream
+        cublas_context_handle->lastest_used_stream = stream_handle;
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
@@ -351,6 +363,9 @@ namespace cublas_sgemm {
 
         hm_memory->record_modified_handle(memory_handle_C);
 
+        POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
+        wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
+
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);
 
@@ -474,6 +489,9 @@ namespace cublas_sgemm_strided_batched {
         });
 
         hm_memory->record_modified_handle(memory_handle_C);
+
+        POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
+        wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);

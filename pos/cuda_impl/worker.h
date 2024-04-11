@@ -166,8 +166,8 @@ class POSWorker_CUDA : public POSWorker {
         }
 
         POS_LOG(
-            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), #abandoned_handles(%lu), size(%lu Bytes), duration(%lf us)",
-            wqe->nb_ckpt_handles, wqe->ckpt_size, wqe->nb_abandon_handles, wqe->abandon_ckpt_size, POS_TSC_TO_USEC(all_tick)
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes), duration(%lf us)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size, POS_TSC_TO_USEC(all_tick)
         );
 
         return retval;
@@ -230,6 +230,11 @@ class POSWorker_CUDA : public POSWorker {
             retval = POS_FAILED;
             goto exit;
         }
+
+        POS_LOG(
+            "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",
+            wqe->nb_ckpt_handles, wqe->ckpt_size
+        );
 
     exit:
         return retval;
@@ -299,6 +304,13 @@ class POSWorker_CUDA : public POSWorker {
         for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
             POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
+            
+            if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                        || handle->status == kPOS_HandleStatus_Create_Pending
+                        || handle->status == kPOS_HandleStatus_Broken
+            )){
+                continue;
+            }
 
             if(unlikely(cxt->checkpoint_version_map.count(handle) == 0)){
                 POS_WARN_C("failed to checkpoint handle, no checkpoint version provided: client_addr(%p)", handle->client_addr);
@@ -397,7 +409,22 @@ class POSWorker_CUDA : public POSWorker {
         cxt->is_active = false;
     }
 
- private:
+    /*!
+     *  \brief  make the worker thread synchronized
+     */
+    pos_retval_t __synchronize() override {
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)0);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C_DETAIL("failed to synchronize worker, is this a bug?: cuda_rt_retval(%d)", cuda_rt_retval);
+            retval = POS_FAILED;
+        }
+
+        return retval;
+    }
+
     /*!
      *  \brief  stream for overlapped memcpy while computing happens
      */

@@ -103,10 +103,8 @@ pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot
     if(unlikely(version_to_check != version)){
         retval = POS_FAILED_NOT_READY;
         *ckpt_slot = nullptr;
-        size = 0;
     } else {
         *ckpt_slot = _use_front ? _ckpt_back : _ckpt_front;
-        size = _state_size;
     }
     
 exit:
@@ -122,7 +120,7 @@ template pos_retval_t POSCheckpointBag::get_checkpoint_slot<false>(POSCheckpoint
  */
 template<bool on_device>
 uint64_t POSCheckpointBag::get_nb_checkpoint_slots(){
-    return _ckpt_map.size();
+    return 1;
 }
 template uint64_t POSCheckpointBag::get_nb_checkpoint_slots<false>();
 

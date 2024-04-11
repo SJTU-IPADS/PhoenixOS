@@ -316,6 +316,7 @@ namespace cuda_launch_kernel {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
+        wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
         // the 3rd parameter of the API call contains parameter to launch the kernel
         args = pos_api_param_addr(wqe, 3);
@@ -902,6 +903,7 @@ namespace cuda_memcpy_h2d_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
+            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
         
         // launch the op to the dag
@@ -1004,6 +1006,7 @@ namespace cuda_memcpy_d2h_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
+            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
         // launch the op to the dag
@@ -1115,6 +1118,7 @@ namespace cuda_memcpy_d2d_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
+            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
         // launch the op to the dag
@@ -1206,6 +1210,7 @@ namespace cuda_memset_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
+            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
         // launch the op to the dag
@@ -2027,6 +2032,7 @@ namespace cuda_event_record {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
+        wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
         // launch the op to the dag
         retval = client->dag.launch_op(wqe);

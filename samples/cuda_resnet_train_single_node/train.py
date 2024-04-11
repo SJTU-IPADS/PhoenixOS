@@ -17,8 +17,8 @@ print(f"process id: {os.getpid()}")
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 n_class = 10
 
-model = ResNet50()
-# model = ResNet101()
+# model = ResNet50()
+model = ResNet101()
 
 model = model.to(device)
 
@@ -26,7 +26,7 @@ model = model.to(device)
 def run_train():
     criterion = nn.CrossEntropyLoss().to(device)
     
-    batch_size = 128
+    batch_size = 1024
     
     n_epochs = 1
     valid_loss_min = np.Inf # track change in validation loss
