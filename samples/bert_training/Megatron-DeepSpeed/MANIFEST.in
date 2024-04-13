@@ -1,3 +1,0 @@
-include megatron/data/Makefile
-include megatron/data/helpers.cpp
-recursive-include megatron/fused_kernels *.cpp *.h *.cu *.tr *.cuh *.cc

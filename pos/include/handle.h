@@ -304,36 +304,8 @@ class POSHandle {
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const {
-        return POS_FAILED_NOT_IMPLEMENTED; 
-    }
-
-    /*!
-     *  \brief  preserve the state of the resource behind this handle for checkpointing
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id      version of this checkpoint
-     *  \param  stream_id       index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully reserve the handle state for checkpointing
-     */
-    pos_retval_t preserve_ckpt_state(uint64_t version_id, uint64_t stream_id=0) {
-        pos_retval_t retval = POS_SUCCESS;
-        uint8_t old_counter;
-
-        old_counter = this->_state_preserve_counter.fetch_add(1);
-        if (old_counter == 0) {
-            // case: no checkpoint has been conducted, start copy-on-write operation
-            retval = this->__copy_on_write(version_id, stream_id);
-            this->_state_preserve_counter.fetch_add(1);
-        } else if (old_counter == 1) {
-            // case: the checkpoint has been started, but not yet finished, we need to block until it finished
-            while(this->_state_preserve_counter.load() < 2){}
-        } else {
-            // case: the checkpoint has been finished, nothing need to do
-            ;
-        }
-
-    exit:
-        return retval;
+    pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const {
+        return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_async */ true);
     }
 
 
@@ -346,74 +318,87 @@ class POSHandle {
 
 
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle (async)
-     *  \note   this is a wrapper function that prevent the checkpoint process conflict with the COW,
-     *          the actual logic is implemented in __checkpoint_async
+     *  \brief  commit the state of the resource behind this handle
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t checkpoint_async(uint64_t version_id, uint64_t stream_id=0) { 
+
+    pos_retval_t checkpoint_commit(uint64_t version_id, uint64_t stream_id=0) { 
         pos_retval_t retval = POS_SUCCESS;
-        uint8_t old_counter;
-
-        old_counter = this->_state_preserve_counter.fetch_add(1);
-        if (old_counter == 0) {
-            // case:    no COW on this handle yet, we can directly checkpoint from the origin buffer
-            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ false);
-            this->_state_preserve_counter.fetch_add(1);
-        } else if (old_counter == 1) {
-            // case:    there's non-finished COW on this handle, we need to wait until the COW finished and
-            //          checkpoint from the new buffer
-            while(this->_state_preserve_counter < 2){}
-            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ true);
-        } else {
-            // case:    there's finished COW on this handle, we can directly checkpoint from the new buffer
-            retval = this->__checkpoint_async(version_id, stream_id, /* from_cow */ true);
-        }
-
+        
+        #if POS_CKPT_ENABLE_PIPELINE == 1
+            //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
+            //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+        #else
+            uint8_t old_counter;
+            old_counter = this->_state_preserve_counter.fetch_add(1);
+            if (old_counter == 0) {
+                /*!
+                 *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
+                 *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
+                 *          commit must be sync, as there could have CoW waiting on this commit to be finished
+                 */
+                retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_async */ true);
+                this->_state_preserve_counter.store(2);
+            } else if (old_counter == 1) {
+                /*!
+                *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
+                *                  commit from the new buffer
+                *  \note   we commit from the cache under this hood, and the commit process is async as there's not CoW 
+                *          on this handle anymore
+                */
+                while(this->_state_preserve_counter.load() < 2){}
+                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+            } else {  
+                /*!
+                *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
+                *  \note   same as the last case
+                */
+                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+            }
+        #endif  // POS_CKPT_ENABLE_PIPELINE        
+        
         return retval;
     }
 
+
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
-     *  \note   this is a wrapper function that prevent the checkpoint process conflict with the COW,
-     *          the actual logic is implemented in __checkpoint_pipeline_add_async
+     *  \brief  add the state of the resource behind this handle to another on-device resource syncly
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) { 
+    pos_retval_t checkpoint_add(uint64_t version_id, uint64_t stream_id=0) { 
         pos_retval_t retval = POS_SUCCESS;
         uint8_t old_counter;
 
-        old_counter = this->_state_preserve_counter.fetch_add(1);
-        if (old_counter == 0) {
-            // case:    no COW on this handle yet, we conduct on-device copy from the origin buffer
-            retval = this->__checkpoint_pipeline_add_async(version_id, stream_id);
-            this->_state_preserve_counter.fetch_add(1);
-        } else if (old_counter == 1) {
-            // case:    there's non-finished COW on this handle, we need to wait until the COW finished
-            while(this->_state_preserve_counter < 2){}
-        } else {
-            // case:    there's finished COW on this handle, nothing need to do
-            ;
+        /*!
+         *  \brief  [case]  the adding has been finished, nothing need to do
+         */
+        if(this->_state_preserve_counter >= 2){
+            retval = POS_WARN_ABANDONED;
+            goto exit;
         }
 
-        return retval;
-    }
+        old_counter = this->_state_preserve_counter.fetch_add(1);
+        if (old_counter == 0) {
+            /*!
+             *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
+             *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
+             */
+            retval = this->__add(version_id, stream_id);
+            this->_state_preserve_counter.store(2);
+        } else if (old_counter == 1) {
+            /*!
+             *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
+             */
+            while(this->_state_preserve_counter.load() < 2){}
+        }
 
-    /*!
-     *  \brief  start a new thread to commit the on-device memory to host-side 
-     *          checkpoint area (async)
-     *  \param  version_id  version of the checkpoint to be commit
-     *  \param  stream_id   index of the stream to do this commit
-     *  \return future handle to obtain thread return value
-     */
-    std::shared_future<pos_retval_t> spawn_checkpoint_pipeline_commit_thread(uint64_t version_id, uint64_t stream_id=0) const { 
-        return std::async([this, version_id, stream_id]{
-            return this->__checkpoint_pipeline_commit_async(version_id, stream_id);
-        });
+    exit:
+        return retval;
     }
 
 
@@ -546,37 +531,25 @@ class POSHandle {
     void *_hm;
 
     /*!
-     *  \brief  preserve the state of this handle within a on-device buffer, if this handle hasn't
-     *          been checkpointed in current overlapped checkpoint round
-     *  \note   (1) only handle of stateful resource should implement this method
-     *          (2) the COW will conducted on the actual default stream, so that the result can
-     *              synchronize across all streams
-     *  \param  version_id  version of the checkpoint to be commit
-     *  \param  stream_id       index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully COW
-     */
-    virtual pos_retval_t __copy_on_write(uint64_t version_id, uint64_t stream_id=0) const {
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    /*!
-     *  \brief  checkpoint the state of the resource behind this handle (async)
+     *  \brief  commit the state of the resource behind this handle
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_async    whether the commit process should be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t __checkpoint_async(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false) const { 
+    virtual pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false, bool is_async=false) const { 
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
+     *  \brief  add the state of the resource behind this handle to on-device memory
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t __checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const { 
+    virtual pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) const { 
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
@@ -587,9 +560,9 @@ class POSHandle {
      *  \param  stream_id   index of the stream to do this commit
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t __checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
+    // virtual pos_retval_t __checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
+    //     return POS_FAILED_NOT_IMPLEMENTED;
+    // }
 
     /*!
      *  \brief  obtain the serilization size of basic fields of POSHandle

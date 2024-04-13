@@ -133,61 +133,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
         }
     }
 
-    /*!
-     *  \brief  checkpoint the state of the resource behind this handle (sync)
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id  version of this checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const override { 
-        pos_retval_t retval = POS_SUCCESS;
-        cudaError_t cuda_rt_retval;
-        POSCheckpointSlot* ckpt_slot;
-
-        struct rusage s_r_usage, e_r_usage;
-        uint64_t s_tick = 0, e_tick = 0;
-        double duration_us = 0;
-        
-        // apply new checkpoint slot
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */false>
-                                        (/* version */ version_id, /* ptr */ &ckpt_slot, /* force_overwrite */ true)
-        )){
-            POS_WARN_C("failed to apply checkpoint slot");
-            retval = POS_FAILED;
-            goto exit;
-        }
-        
-        /*!
-         *  \note   it's necessary here to setCtx for worker thread
-         *  \ref    https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DRIVER.html#group__CUDART__DRIVER
-         */
-        cudaSetDevice(((POSHandle_CUDA_Device*)(this->parent_handles[0]))->device_id);
-
-        // checkpoint
-        cuda_rt_retval = cudaMemcpy(
-            /* dst */ ckpt_slot->expose_pointer(), 
-            /* src */ this->server_addr,
-            /* size */ this->state_size,
-            /* kind */ cudaMemcpyDeviceToHost
-        );
-
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C(
-                "failed to checkpoint memory handle: server_addr(%p), state_size(%lu), retval(%d)",
-                this->server_addr, this->state_size, cuda_rt_retval
-            );
-            cudaGetLastError();
-            retval = POS_FAILED;
-            goto exit;
-        }
     
-    exit:
-        return retval;
-    }
-
-
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
@@ -345,73 +291,14 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
  protected:
     /*!
-     *  \brief  preserve the state of this handle within a on-device buffer, if this handle hasn't
-     *          been checkpointed in current overlapped checkpoint round
-     *  \note   (1) only handle of stateful resource should implement this method
-     *          (2) the COW will conducted on the actual default stream, so that the result can
-     *              synchronize across all streams
-     *  \param  version_id  version of the checkpoint to be commit
-     *  \param  stream_id       index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully COW
-     */
-    pos_retval_t __copy_on_write(uint64_t version_id, uint64_t stream_id=0) const override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSCheckpointSlot* ckpt_slot;
-        cudaError_t cuda_rt_retval;
-
-        // apply new on-device checkpoint slot
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ true>
-                                        (/* version */ version_id, /* ptr */ &ckpt_slot, /* force_overwrite */ true)
-        )){
-            POS_WARN_C("failed to apply checkpoint slot");
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        if(unlikely(stream_id == 0)){
-            POS_LOG("COW on default stream, is this a bug?: server_addr(%p), size(%lu), stream(%p)", this->server_addr, this->state_size, stream_id);
-        }
-
-        cuda_rt_retval = cudaMemcpyAsync(
-            /* dst */ ckpt_slot->expose_pointer(), 
-            /* src */ this->server_addr,
-            /* size */ this->state_size,
-            /* kind */ cudaMemcpyDeviceToDevice,
-            /* stream */ (cudaStream_t)(stream_id)
-        );
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C(
-                "failed to copy-on-write memory handle on device: server_addr(%p), retval(%d)",
-                this->server_addr, cuda_rt_retval
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C(
-                "failed to synchronize COW memcpy process: server_addr(%p), retval(%d)",
-                this->server_addr, cuda_rt_retval
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-    exit:
-        return retval;
-    }
-
-    /*!
-     *  \brief  checkpoint the state of the resource behind this handle (async)
-     *  \note   only handle of stateful resource should implement this method
+     *  \brief  commit the state of the resource behind this handle
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_async    whether the commit process should be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t __checkpoint_async(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false) const override { 
+    pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cache=false, bool is_async=false) const override { 
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         POSCheckpointSlot *ckpt_slot, *cow_ckpt_slot;
@@ -426,8 +313,8 @@ class POSHandle_CUDA_Memory : public POSHandle {
             goto exit;
         }
 
-        if(from_cow == false){
-            // checkpoint from origin buffer
+        if(from_cache == false){
+            // commit from origin buffer
             cuda_rt_retval = cudaMemcpyAsync(
                 /* dst */ ckpt_slot->expose_pointer(), 
                 /* src */ this->server_addr,
@@ -444,12 +331,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
                 goto exit;
             }
         } else {
-            // checkpoint from COW buffer
+            // commit from cache buffer
             if(unlikely(
                 POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */ true>(/* ptr */ &cow_ckpt_slot, /* version */ version_id)
             )){
                 POS_ERROR_C_DETAIL(
-                    "no COW buffer with the version founded, this is a bug: version_id(%lu), server_addr(%p)",
+                    "no cache buffer with the version founded, this is a bug: version_id(%lu), server_addr(%p)",
                     version_id, this->server_addr
                 );
             }
@@ -469,19 +356,31 @@ class POSHandle_CUDA_Memory : public POSHandle {
                 goto exit;
             }
         }
+
+        if(is_async){
+            cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN_C(
+                    "failed to synchronize after commiting memory handle: server_addr(%p), retval(%d)",
+                    this->server_addr, cuda_rt_retval
+                );
+                retval = POS_FAILED;
+                goto exit;
+            }
+        }
         
     exit:
         return retval;
     }
 
-
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle to on-device memory (async)
+     *  \brief  add the state of the resource behind this handle to on-device memory
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t __checkpoint_pipeline_add_async(uint64_t version_id, uint64_t stream_id=0) const override {
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) const override {
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         POSCheckpointSlot* ckpt_slot;
@@ -503,7 +402,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
             /* kind */ cudaMemcpyDeviceToDevice,
             /* stream */ (cudaStream_t)(stream_id)
         );
-
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(
                 "failed to checkpoint memory handle on device: server_addr(%p), retval(%d)",
@@ -513,84 +411,11 @@ class POSHandle_CUDA_Memory : public POSHandle {
             goto exit;
         }
 
-        // POS_LOG("checkpoint by async add: server_addr(%p), size(%lu)", this->server_addr, this->state_size);
-
-    exit:
-        return retval;
-    }
-
-
-    /*!
-     *  \brief  commit the on-device memory to host-side checkpoint area (async)
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id  version of the checkpoint to be commit
-     *  \param  stream_id   index of the stream to do this commit
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t __checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const override { 
-        pos_retval_t retval = POS_SUCCESS;
-        cudaError_t cuda_rt_retval;
-        POSCheckpointSlot *host_ckpt_slot, *dev_ckpt_slot;
-        uint64_t s_tick, e_tick;
-
-        // step 1: get device-side checkpoint slot
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */ true>
-                                (/* ckpt_slot */ &dev_ckpt_slot, /* version */ version_id)
-        )){
-            POS_WARN_C(
-                "failed to commit checkpoint due to unexist device-side checkpoint: client_addr(%p), verion(%lu)",
-                this->client_addr, version_id
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // step 2: apply new host-side checkpoint slot
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ false>
-                                        (/* version */ version_id, /* ptr */ &host_ckpt_slot, /* force_overwrite */ true)
-        )){
-            POS_WARN_C("failed to apply host-side checkpoint slot");
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // step 3: memcpy from device to host
-        cuda_rt_retval = cudaMemcpyAsync(
-            /* dst */ host_ckpt_slot->expose_pointer(), 
-            /* src */ dev_ckpt_slot->expose_pointer(),
-            /* size */ this->state_size,
-            /* kind */ cudaMemcpyDeviceToHost,
-            /* stream */ (cudaStream_t)(stream_id)
-        );
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(
-                "failed to commit device-side checkpoint: client_addr(%p), retval(%d)",
-                this->client_addr, cuda_rt_retval
-            );
-            retval = POS_FAILED;
-
-            // invalidate the applied host-side checkpoint area
-            if(unlikely(
-                POS_SUCCESS != this->ckpt_bag->invalidate_by_version</* on_device */ false>(/* version */ version_id)
-            )){
-                POS_WARN_C(
-                    "failed to invalidate host-side checkpoint: client_addr(%p), version(%lu)",
-                    this->client_addr, version_id
-                );
-            }
-
-            goto exit;
-        }
-
-        // step 4: invalidate device-side checkpoint
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->invalidate_by_version</* on_device */ true>(/* version */ version_id)
-        )){
-            POS_WARN_C(
-                "failed to invalidate device-side checkpoint: client_addr(%p), version(%lu)",
-                this->client_addr, version_id
+                "failed to synchronize after checkpointing memory handle on device: server_addr(%p), retval(%d)",
+                this->server_addr, cuda_rt_retval
             );
             retval = POS_FAILED;
             goto exit;

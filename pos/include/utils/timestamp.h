@@ -15,6 +15,9 @@
 #define POS_TSC_TO_USEC(tick) \
     (double)(tick) / (double) POS_TSC_FREQ * (double)1000000.0f
 
+#define POS_TSC_TO_MSEC(tick) \
+    (double)(tick) / (double) POS_TSC_FREQ * (double)1000.0f
+
 #define POS_USEC_TO_TSC(usec) \
     (double)(usec) / (double)1000000.0f * (double) POS_TSC_FREQ
 

@@ -1,7 +1,0 @@
-[2024-01-20 13:23:10,604] [WARNING] [runner.py:190:fetch_hostfile] Unable to find hostfile, will proceed with training with local resources only.
-Traceback (most recent call last):
-  File "/opt/conda/bin/deepspeed", line 6, in <module>
-    main()
-  File "/opt/conda/lib/python3.8/site-packages/deepspeed/launcher/runner.py", line 406, in main
-    raise RuntimeError("Unable to proceed, no GPU resources available")
-RuntimeError: Unable to proceed, no GPU resources available

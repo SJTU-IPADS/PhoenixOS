@@ -1,3 +1,0 @@
-pybind11
-torch
-regex

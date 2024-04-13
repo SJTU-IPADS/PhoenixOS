@@ -4,6 +4,7 @@ config_conf = configuration_data()
 
 switches_conf.set('pos_enable_debug_check', enable_runtime_debug_check)
 switches_conf.set('pos_enable_hijack_api_check', enable_hijack_api_check)
+switches_conf.set('pos_enable_trace', enable_trace)
 configure_file(input : 'switches.h.in', output : 'switches.h', configuration : switches_conf)
 
 log_conf.set('pos_print_error', enable_print_error)

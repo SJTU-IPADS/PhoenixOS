@@ -6,6 +6,7 @@ project('PhoenixOS', ['CPP'],
 project_name = 'phoenix_os'
 project_name_abbreviation = 'pos'
 
+add_project_arguments('-O0',  language : 'cpp')
 
 # >>>>>>>>>>>>>> build prepare >>>>>>>>>>>>>>
 # get environment variables of the build process
@@ -74,7 +75,10 @@ enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 0
+enable_hijack_api_check = 1
+
+# switch:   whether to trace the statistics
+enable_trace = 0
 
 # switch:   whether to print all fatal messages
 enable_print_error = 1
@@ -123,6 +127,7 @@ message('>>>>>> [Config] checkpoint interval (ms):                  ' + ckpt_int
 message('>>>>>> [Config] log file output path:                      ' + log_file_path)
 message('>>>>>> [Switch] enable_runtime_debug_check:                ' + enable_runtime_debug_check.to_string())
 message('>>>>>> [Switch] enable_hijack_api_check:                   ' + enable_hijack_api_check.to_string())
+message('>>>>>> [Switch] enable_trace:                              ' + enable_trace.to_string())
 message('>>>>>> [Switch] enable_print_error:                        ' + enable_print_error.to_string())
 message('>>>>>> [Switch] enable_print_warn:                         ' + enable_print_warn.to_string())
 message('>>>>>> [Switch] enable_print_log:                          ' + enable_print_log.to_string())
@@ -164,7 +169,15 @@ message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
-sources += ['pos/src/handle.cpp', 'pos/src/oob.cpp', 'pos/src/api_context.cpp', 'pos/src/client.cpp']
+sources += [
+    'pos/src/handle.cpp',
+    'pos/src/oob.cpp',
+    'pos/src/api_context.cpp',
+    'pos/src/client.cpp',
+    'pos/src/trace.cpp',
+    'pos/src/worker.cpp',
+    'pos/src/parser.cpp'
+]
 
 if ckpt_opt_level == 0 and enable_ckpt_preempt == 0
     sources += ['pos/src/checkpoint_o0.cpp']
