@@ -218,7 +218,8 @@ namespace cuda_launch_kernel {
             // for printing input / output
             auto __unit_print_input_output = [](std::vector<uint32_t>& vec, const char* dir_string){
                 uint64_t i, param_index;
-                char param_idx[512] = {0};
+                static char param_idx[2048] = {0};
+                memset(param_idx, 0, sizeof(param_idx));
                 for(i=0; i<vec.size(); i++){
                     param_index = vec[i];
                     if(likely(i!=0)){
@@ -233,7 +234,8 @@ namespace cuda_launch_kernel {
             // for printing inout
             auto __unit_print_inout = [](std::vector<std::pair<uint32_t, uint64_t>>& vec, const char* dir_string){
                 uint64_t i, struct_offset, param_index;
-                char param_idx[512] = {0};
+                static char param_idx[2048] = {0};
+                memset(param_idx, 0, sizeof(param_idx));
                 for(i=0; i<vec.size(); i++){
                     param_index = vec[i].first;
                     struct_offset = vec[i].second;
