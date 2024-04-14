@@ -87,6 +87,7 @@ fprintf(stdout, "\n");                                      \
 _POS_ERROR(__VA_ARGS__)         \
 fflush(0);                      \
 throw "SHUTDOWN BY POS ERROR";  \
+exit(1);                        \
 }
 
 /*!
@@ -98,6 +99,7 @@ throw "SHUTDOWN BY POS ERROR";  \
 _POS_ERROR_C(__VA_ARGS__)       \
 fflush(0);                      \
 throw "SHUTDOWN BY POS ERROR";  \
+exit(1);                        \
 }
 
 /*!
@@ -109,6 +111,7 @@ _POS_ERROR(__VA_ARGS__)         \
 _POS_PRINT_POSITION(stderr)     \
 fflush(0);                      \
 throw "SHUTDOWN BY POS ERROR";  \
+exit(1);                        \
 }
 
 /*!
@@ -121,6 +124,7 @@ _POS_ERROR_C(__VA_ARGS__)       \
 _POS_PRINT_POSITION(stderr)     \
 fflush(0);                      \
 throw "SHUTDOWN BY POS ERROR";  \
+exit(1);                        \
 }
 #else
 #define POS_ERROR(...)

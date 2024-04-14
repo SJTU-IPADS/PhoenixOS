@@ -6,7 +6,10 @@
 
 #if POS_ENABLE_TRACE
 
-/* tick traces */
+/* ========== tick traces ========== */
 POS_TRACE_TICK_LIST_DECLARE(worker);
+
+/* ========== counter traces ========== */
+POS_TRACE_COUNTER_LIST_DECLARE(worker);
 
 #endif // POS_ENABLE_TRACE

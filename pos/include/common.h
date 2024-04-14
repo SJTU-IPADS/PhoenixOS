@@ -38,8 +38,8 @@ enum pos_retval {
     #define POS_ASSERT(x)           assert(x);
     #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 #else
-    #define POS_ASSERT(x)
-    #define POS_CHECK_POINTER(ptr)  ptr;
+    #define POS_ASSERT(x)           (x);
+    #define POS_CHECK_POINTER(ptr)  (ptr);
 #endif
 
 #define POS_STATIC_ASSERT(x)    static_assert(x);

@@ -9,7 +9,7 @@
 
 #include "mb_common/ticks.h"
 
-#define PROFILING_FILE_PATH "/root/memcpy_performance/profile.txt"
+#define PROFILING_FILE_PATH "/root/microbench/memcpy_performance/profile.txt"
 
 
 int main(){
@@ -28,6 +28,8 @@ int main(){
 
     output_file.open(PROFILING_FILE_PATH, std::fstream::in | std::fstream::out | std::fstream::trunc);
     
+    cudaSetDevice(6);
+
     // set buffer sizes
     for(i=0; i<nb_buffers; i++){
         buffer_sizes.push_back(1<<i);

@@ -305,7 +305,7 @@ class POSHandle {
      *  \return POS_SUCCESS for successfully checkpointed
      */
     pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const {
-        return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_async */ true);
+        return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
     }
 
 
@@ -330,18 +330,18 @@ class POSHandle {
         #if POS_CKPT_ENABLE_PIPELINE == 1
             //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
             //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
         #else
             uint8_t old_counter;
-            old_counter = this->_state_preserve_counter.fetch_add(1);
+            old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
             if (old_counter == 0) {
                 /*!
                  *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
                  *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
                  *          commit must be sync, as there could have CoW waiting on this commit to be finished
                  */
-                retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_async */ true);
-                this->_state_preserve_counter.store(2);
+                retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+                this->_state_preserve_counter.store(3, std::memory_order_relaxed);
             } else if (old_counter == 1) {
                 /*!
                 *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
@@ -349,14 +349,14 @@ class POSHandle {
                 *  \note   we commit from the cache under this hood, and the commit process is async as there's not CoW 
                 *          on this handle anymore
                 */
-                while(this->_state_preserve_counter.load() < 2){}
-                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+                while(this->_state_preserve_counter < 3){}
+                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
             } else {  
                 /*!
                 *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
                 *  \note   same as the last case
                 */
-                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_async */ false);
+                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
             }
         #endif  // POS_CKPT_ENABLE_PIPELINE        
         
@@ -378,23 +378,24 @@ class POSHandle {
          *  \brief  [case]  the adding has been finished, nothing need to do
          */
         if(this->_state_preserve_counter >= 2){
-            retval = POS_WARN_ABANDONED;
+            retval = POS_FAILED_ALREADY_EXIST;
             goto exit;
         }
 
-        old_counter = this->_state_preserve_counter.fetch_add(1);
+        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
         if (old_counter == 0) {
             /*!
              *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
              *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
              */
             retval = this->__add(version_id, stream_id);
-            this->_state_preserve_counter.store(2);
+            this->_state_preserve_counter.store(3, std::memory_order_relaxed);
         } else if (old_counter == 1) {
             /*!
              *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
              */
-            while(this->_state_preserve_counter.load() < 2){}
+            retval = POS_WARN_ABANDONED;
+            while(this->_state_preserve_counter < 3){}
         }
 
     exit:
@@ -535,10 +536,10 @@ class POSHandle {
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
-     *  \param  is_async    whether the commit process should be sync
+     *  \param  is_sync     whether the commit process should be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false, bool is_async=false) const { 
+    virtual pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false, bool is_sync=false) const { 
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 

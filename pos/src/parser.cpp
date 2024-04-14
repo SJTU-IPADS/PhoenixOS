@@ -15,7 +15,9 @@ void POSParser::__daemon(){
     POSAPIMeta_t api_meta;
     std::vector<POSAPIContext_QE*> wqes;
     POSAPIContext_QE* wqe;
+    POSClient *client;
     uint64_t last_ckpt_tick = 0, current_tick;
+    typename std::map<pos_client_uuid_t, POSClient*>::iterator client_map_iter;
 
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -67,7 +69,7 @@ void POSParser::__daemon(){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();                    
                 this->_ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
 
-                goto checkpoint_entrance;
+                continue;
             }
             
             /*!
@@ -88,18 +90,18 @@ void POSParser::__daemon(){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 this->_ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
             }
-
-        checkpoint_entrance:
+            
             /*!
              *  \brief  ================== phrase 2 - checkpoint insertion ==================
              */
             #if POS_CKPT_OPT_LEVEL > 0
-                // TODO: this checkpoint tick should be modified as per-client
-                current_tick = POSUtilTimestamp::get_tsc();
-                if(unlikely(current_tick - last_ckpt_tick >= this->checkpoint_interval_tick)){
-                    last_ckpt_tick = current_tick;
-                    if(unlikely(POS_SUCCESS != this->__checkpoint_insertion(wqe))){
-                        POS_WARN_C("failed to insert checkpointing op");
+                std::map<pos_client_uuid_t, POSClient*>& client_map = this->_ws->get_client_map();
+                for(client_map_iter = client_map.begin(); client_map_iter != client_map.end(); client_map_iter++){
+                    POS_CHECK_POINTER(client = client_map_iter->second);
+                    if(client->is_time_for_ckpt()){
+                        if(unlikely(POS_SUCCESS != this->__checkpoint_insertion(client))){
+                            POS_WARN_C("failed to insert checkpointing op");
+                        }
                     }
                 }
             #else
@@ -108,6 +110,24 @@ void POSParser::__daemon(){
         }
 
         wqes.clear();
+
+        /*!
+         *  \brief  ================== phrase 2 - checkpoint insertion ==================
+         *  \note   we need to do again as there might no wqe polled
+         */
+        #if POS_CKPT_OPT_LEVEL > 0
+            std::map<pos_client_uuid_t, POSClient*>& client_map = this->_ws->get_client_map();
+            for(client_map_iter = client_map.begin(); client_map_iter != client_map.end(); client_map_iter++){
+                POS_CHECK_POINTER(client = client_map_iter->second);
+                if(client->is_time_for_ckpt()){
+                    if(unlikely(POS_SUCCESS != this->__checkpoint_insertion(client))){
+                        POS_WARN_C("failed to insert checkpointing op");
+                    }
+                }
+            }
+        #else
+            /* do nothing */ ;
+        #endif
     }
 }
 
@@ -115,14 +135,14 @@ void POSParser::__daemon(){
 /*!
  *  \brief  insert checkpoint op to the DAG based on certain conditions
  *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
- *  \param  wqe the exact WQ element before inserting checkpoint op
+ *  \param  client  the client to be checkpointed
  *  \return POS_SUCCESS for successfully checkpoint insertion
  */
-pos_retval_t POSParser::__checkpoint_insertion(POSAPIContext_QE* wqe) {
+pos_retval_t POSParser::__checkpoint_insertion(POSClient* client) {
     #if POS_CKPT_ENABLE_INCREMENTAL == 1
-        return this->__checkpoint_insertion_incremental(wqe);
+        return this->__checkpoint_insertion_incremental(client);
     #else
-        return this->__checkpoint_insertion_naive(wqe);
+        return this->__checkpoint_insertion_naive(client);
     #endif
 }
 
@@ -131,24 +151,23 @@ pos_retval_t POSParser::__checkpoint_insertion(POSAPIContext_QE* wqe) {
  *  \brief  naive implementation of checkpoint insertion procedure
  *  \note   this implementation naively insert a checkpoint op to the dag, 
  *          without any optimization hint
- *  \param  wqe the exact WQ element before inserting checkpoint op
+ *  \param  client  the client to be checkpointed
  *  \return POS_SUCCESS for successfully checkpoint insertion
  */
-pos_retval_t POSParser::__checkpoint_insertion_naive(POSAPIContext_QE* wqe) { 
+pos_retval_t POSParser::__checkpoint_insertion_naive(POSClient* client) { 
     pos_retval_t retval = POS_SUCCESS;
     POSHandle *handle;
     POSHandleManager<POSHandle>* hm;
     POSAPIContext_QE *ckpt_wqe;
     uint64_t i, nb_handles;
-    POSClient *client;
+
+    POS_CHECK_POINTER(client);
 
     ckpt_wqe = new POSAPIContext_QE_t(
         /* api_id*/ this->_ws->checkpoint_api_id,
-        /* client */ wqe->client
+        /* client */ client
     );
     POS_CHECK_POINTER(ckpt_wqe);
-
-    client = (POSClient*)(wqe->client);
 
     for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
         hm = pos_get_client_typed_hm(client, stateful_handle_id, POSHandleManager<POSHandle>);
@@ -161,7 +180,7 @@ pos_retval_t POSParser::__checkpoint_insertion_naive(POSAPIContext_QE* wqe) {
         }
     }
 
-    retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
+    retval = client->dag.launch_op(ckpt_wqe);
 
 exit:
     return retval;
@@ -172,23 +191,20 @@ exit:
  *  \brief  level-1/2 optimization of checkpoint insertion procedure
  *  \note   this implementation give hints of those memory handles that
  *          been modified (INOUT/OUT) since last checkpoint
- *  \param  wqe the exact WQ element before inserting checkpoint op
+ *  \param  client  the client to be checkpointed
  *  \return POS_SUCCESS for successfully checkpoint insertion
  */
-pos_retval_t POSParser::__checkpoint_insertion_incremental(POSAPIContext_QE* wqe) {
+pos_retval_t POSParser::__checkpoint_insertion_incremental(POSClient* client) {
     pos_retval_t retval = POS_SUCCESS;
-    POSClient *client;
     POSHandleManager<POSHandle>* hm;
     POSAPIContext_QE *ckpt_wqe;
     uint64_t i;
 
-    POS_CHECK_POINTER(wqe);
+    POS_CHECK_POINTER(client);
 
-    client = (POSClient*)(wqe->client);
-    
     ckpt_wqe = new POSAPIContext_QE_t(
         /* api_id*/ this->_ws->checkpoint_api_id,
-        /* client */ wqe->client
+        /* client */ client
     );
     POS_CHECK_POINTER(ckpt_wqe);
 
@@ -205,7 +221,7 @@ pos_retval_t POSParser::__checkpoint_insertion_incremental(POSAPIContext_QE* wqe
         hm->clear_modified_handle();
     }
 
-    retval = ((POSClient*)wqe->client)->dag.launch_op(ckpt_wqe);
+    retval = client->dag.launch_op(ckpt_wqe);
     
 exit:
     return retval;

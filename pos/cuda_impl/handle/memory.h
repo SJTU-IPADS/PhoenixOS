@@ -295,14 +295,16 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
-     *  \param  is_async    whether the commit process should be sync
+     *  \param  is_sync    whether the commit process should be sync
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cache=false, bool is_async=false) const override { 
+    pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cache=false, bool is_sync=false) const override { 
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
         POSCheckpointSlot *ckpt_slot, *cow_ckpt_slot;
         
+        cudaSetDevice(0);
+
         // apply new host-side checkpoint slot
         if(unlikely(
             POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot</* on_device */ false>
@@ -357,7 +359,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
             }
         }
 
-        if(is_async){
+        if(is_sync){
             cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
             if(unlikely(cuda_rt_retval != cudaSuccess)){
                 POS_WARN_C(

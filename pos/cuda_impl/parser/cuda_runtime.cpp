@@ -516,7 +516,7 @@ namespace cuda_launch_kernel {
 
             function_handle->has_verified_params = true;
             
-            __print_kernel_directions(function_handle);
+            // __print_kernel_directions(function_handle);
         } else {
             for(i=0; i<function_handle->confirmed_suspicious_params.size(); i++){
                 param_index = function_handle->confirmed_suspicious_params[i].first;

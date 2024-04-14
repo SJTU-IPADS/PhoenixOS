@@ -35,16 +35,16 @@ start_server() {
     ip_addr=10.66.10.$container_id
 
     if [ $mount = false ] ; then
-        sudo docker run --gpus all -dit --privileged --network=pos_net \
+         docker run --gpus all -dit --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         cd $script_dir && cd .. && cd ..
-        sudo docker cp . $container_name:/root
-        sudo docker exec -it $container_name bash
+         docker cp . $container_name:/root
+         docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..
-        sudo docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
+         docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
-        sudo docker exec -it $container_name bash
+         docker exec -it $container_name bash
     fi
 }
 
@@ -55,8 +55,8 @@ close_server() {
         exit 1
     fi
     container_name=pos_svr_$container_id
-    sudo docker container stop $container_name
-    sudo docker container rm $container_name
+     docker container stop $container_name
+     docker container rm $container_name
 }
 
 
@@ -68,17 +68,17 @@ close_server() {
 #     container_name=pos_svr_$container_id
 
 #     # remove old content
-#     sudo docker exec -it $container_name /bin/bash -c 'cd /root && rm -rf ./*'
+#      docker exec -it $container_name /bin/bash -c 'cd /root && rm -rf ./*'
 
 #     # copy new content
 #     cd $script_dir && cd .. && cd ..
-#     sudo docker cp . $container_name:/root
+#      docker cp . $container_name:/root
 # }
 
 
 enter_server() {
     container_name=pos_svr_$container_id
-    sudo docker exec -it $container_name bash
+     docker exec -it $container_name bash
 }
 
 

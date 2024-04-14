@@ -62,6 +62,6 @@ foreach( test_target ${TEST_TARGETS} )
     target_compile_features(${test_target} PUBLIC cxx_std_17)
     target_compile_options(
         ${test_target} PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:SHELL:-gencode arch=compute_70,code=sm_70 -gencode arch=compute_86,code=sm_86>
+        $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_80,code=sm_80>
     )
 endforeach( test_target ${TEST_TARGETS} )

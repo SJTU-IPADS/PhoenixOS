@@ -226,7 +226,8 @@ class POSUtil_CUDA_Fatbin {
                 );
 
                 // section does not cotain device code (e.g. only PTX)
-                if (fatbin_text_hdr->kind != 2) { 
+                if (fatbin_text_hdr->kind != 2) {
+                    POS_DEBUG("skip this text section as it doesn't contain any device code");
                     input_pos += fatbin_text_hdr->size;
                     continue;
                 }

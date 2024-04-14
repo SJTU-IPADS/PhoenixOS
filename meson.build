@@ -42,7 +42,7 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
-ckpt_opt_level = 0
+ckpt_opt_level = 1
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
 enable_ckpt_increamental = 0
@@ -64,7 +64,7 @@ ckpt_preempt_trigger_time_s = 40
 tsc_reg_freq = 2200000000
 
 # config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 1000
+ckpt_interval_ms = 1500
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -75,7 +75,7 @@ enable_runtime_debug_check = 0
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 1
+enable_hijack_api_check = 0
 
 # switch:   whether to trace the statistics
 enable_trace = 0
@@ -232,16 +232,16 @@ message('>>> Setup libclang done\n')
 # inc_dirs += hiredis_inc_dirs
 # message('>>> Setup hiredis done\n')
 
-message('>>> Setup libevent')
-libevent_ld_args = ['-levent']
-libevent_inc_dirs = ['./third_party/libevent/include']
-message('>>>>>> Link option:')
-message(libevent_ld_args)
-message('>>>>>> Include path:')
-message(libevent_inc_dirs)
-ld_args += libevent_ld_args
-inc_dirs += libevent_inc_dirs
-message('>>> Setup libevent done\n')
+# message('>>> Setup libevent')
+# libevent_ld_args = ['-levent']
+# libevent_inc_dirs = ['./third_party/libevent/include']
+# message('>>>>>> Link option:')
+# message(libevent_ld_args)
+# message('>>>>>> Include path:')
+# message(libevent_inc_dirs)
+# ld_args += libevent_ld_args
+# inc_dirs += libevent_inc_dirs
+# message('>>> Setup libevent done\n')
 
 message('>>> Setup librt') # for support shm_x
 ld_args += ['-lrt']

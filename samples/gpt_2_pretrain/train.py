@@ -17,6 +17,12 @@ num_workers = 10
 epochs = 1
 device = 'cuda:0'
 
+# model_path = '/root/samples/model/gpt2'
+model_path = '/root/samples/model/gpt2_xl'
+
+# tokenizer_path = '/root/samples/tokenizer/gpt2'
+tokenizer_path = '/root/samples/tokenizer/gpt2_xl'
+
 ignore_index = -100
 gradient_accumulation_steps = 4
 max_grad_norm = 2.0
@@ -116,12 +122,20 @@ def train_epoch(model, train_dataloader, optimizer, epoch):
             break
 
     np_duration_list = np.array(duration_list)
+    
+    mean = np.mean(np_duration_list)
+    std = np.std(np_duration_list)
+    cut_off = std * 3
+    lower, upper = mean - cut_off, mean + cut_off
+    new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+    print(f"drop wierd duration lower than {lower} or larger than {upper}")
+    
     print(
         f"latency:"
-        f" p10({np.percentile(np_duration_list, 10)} ms), "
-        f" p50({np.percentile(np_duration_list, 50)} ms), "
-        f" p99({np.percentile(np_duration_list, 99)} ms), "
-        f" mean({np.mean(np_duration_list)} ms)"
+        f" p10({np.percentile(new_np_duration_list, 10)} ms), "
+        f" p50({np.percentile(new_np_duration_list, 50)} ms), "
+        f" p99({np.percentile(new_np_duration_list, 99)} ms), "
+        f" mean({np.mean(new_np_duration_list)} ms)"
     )
 
 
@@ -179,8 +193,8 @@ def main():
     train_dataset, validate_dataset = load_dataset()
 
     print("loading model...")
-    model = GPT2LMHeadModel.from_pretrained('./model').to(device)
-    tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer')
+    model = GPT2LMHeadModel.from_pretrained(model_path).to(device)
+    tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_path)
     assert model.config.vocab_size == tokenizer.vocab_size
     num_parameters = 0
     parameters = model.parameters()

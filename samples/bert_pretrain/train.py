@@ -2,8 +2,14 @@ import torch
 import numpy as np
 from transformers import BertTokenizer
 import pandas as pd
+import time
 
-tokenizer = BertTokenizer.from_pretrained('./tokenizer')
+model_path = '/root/samples/model/bert'
+tokenizer_path = '/root/samples/tokenizer/bert'
+batch_size = 8
+
+
+tokenizer = BertTokenizer.from_pretrained(tokenizer_path)
 labels = {
     'business':0,
     'entertainment':1,
@@ -47,7 +53,7 @@ from transformers import BertModel
 class BertClassifier(nn.Module):
     def __init__(self, dropout=0.5):
         super(BertClassifier, self).__init__()
-        self.bert = BertModel.from_pretrained('./model')
+        self.bert = BertModel.from_pretrained(model_path)
         self.dropout = nn.Dropout(dropout)
         # self.linear = nn.Linear(768, 5)
         self.linear = nn.Linear(1024, 5)
@@ -68,12 +74,12 @@ def train(model, train_data, val_data, learning_rate, epochs):
     train, val = Dataset(train_data), Dataset(val_data)
     
     # DataLoader根据batch_size获取数据，训练时选择打乱样本
-    train_dataloader = torch.utils.data.DataLoader(train, batch_size=2, shuffle=True)
-    val_dataloader = torch.utils.data.DataLoader(val, batch_size=2)
+    train_dataloader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True)
+    val_dataloader = torch.utils.data.DataLoader(val, batch_size=batch_size)
     
     # 判断是否使用GPU
     use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
+    device = torch.device("cuda:0" if use_cuda else "cpu")
     
     # 定义损失函数和优化器
     criterion = nn.CrossEntropyLoss()
@@ -89,8 +95,11 @@ def train(model, train_data, val_data, learning_rate, epochs):
         total_acc_train = 0
         total_loss_train = 0
 
+        duration_list = [] # ms
+
         # 进度条函数tqdm
-        for train_input, train_label in tqdm(train_dataloader):
+        for batch_idx, (train_input, train_label) in enumerate(tqdm(train_dataloader)):
+            s_time = time.time()
             train_label = train_label.to(device)
             mask = train_input['attention_mask'].to(device)
             input_id = train_input['input_ids'].squeeze(1).to(device)
@@ -106,6 +115,31 @@ def train(model, train_data, val_data, learning_rate, epochs):
             model.zero_grad()
             batch_loss.backward()
             optimizer.step()
+
+            e_time = time.time()
+            duration_list.append(int(round((e_time-s_time) * 1000))) # ms
+            
+            if batch_idx == 128:
+                break
+        
+        np_duration_list = np.array(duration_list)
+    
+        mean = np.mean(np_duration_list)
+        std = np.std(np_duration_list)
+        cut_off = std * 3
+        lower, upper = mean - cut_off, mean + cut_off
+        new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+        
+        print(
+            f"latency:"
+            f" p10({np.percentile(new_np_duration_list, 10)} ms), "
+            f" p50({np.percentile(new_np_duration_list, 50)} ms), "
+            f" p99({np.percentile(new_np_duration_list, 99)} ms), "
+            f" mean({np.mean(new_np_duration_list)} ms)"
+        )
+
+        exit(0)
 
         # ------ 验证模型 -----------
         # 定义两个变量，用于存储验证集的准确率和损失
@@ -129,12 +163,12 @@ def train(model, train_data, val_data, learning_rate, epochs):
                 acc = (output.argmax(dim=1) == val_label).sum().item()
                 total_acc_val += acc
         
-        print(
-            f'''Epochs: {epoch_num + 1} 
-            | Train Loss: {total_loss_train / len(train_data): .3f} 
-            | Train Accuracy: {total_acc_train / len(train_data): .3f} 
-            | Val Loss: {total_loss_val / len(val_data): .3f} 
-            | Val Accuracy: {total_acc_val / len(val_data): .3f}''')
+        # print(
+        #     f'''Epochs: {epoch_num + 1} 
+        #     | Train Loss: {total_loss_train / len(train_data): .3f} 
+        #     | Train Accuracy: {total_acc_train / len(train_data): .3f} 
+        #     | Val Loss: {total_loss_val / len(val_data): .3f} 
+        #     | Val Accuracy: {total_acc_val / len(val_data): .3f}''')
 
 
 def main():

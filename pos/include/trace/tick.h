@@ -7,7 +7,7 @@
 #include "pos/include/common.h"
 #include "pos/include/utils/timestamp.h"
 
-// define a new list of tracing couters
+// define a new list of tracing tikcs
 #define POS_TRACE_TICK_LIST_DEF(list_name, collect_interval_us, ...)            \
     typedef struct __pos_trace_list_##list_name {                               \   
         struct __data_u64 {                                                     \

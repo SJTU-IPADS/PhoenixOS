@@ -138,10 +138,11 @@ class POSClient {
         :   id(id),
             dag({ .checkpoint_api_id = cxt.checkpoint_api_id }),
             _api_inst_pc(0), 
-            _cxt(cxt)
+            _cxt(cxt),
+            _last_ckpt_tick(0)
     {}
 
-    POSClient() : id(0), dag({ .checkpoint_api_id = 0 }) {
+    POSClient() : id(0), dag({ .checkpoint_api_id = 0 }), _last_ckpt_tick(0) {
         POS_ERROR_C("shouldn't call, just for passing compilation");
     }
     
@@ -250,6 +251,22 @@ class POSClient {
     virtual void deinit_dump_handle_managers(){}
 
     /*!
+     *  \brief  get whether it's time to checkpoint this client
+     *  \return the state identify whether it's time to checkpoint this client
+     */
+    inline bool is_time_for_ckpt(){
+        bool retval = false;
+        uint64_t current_tick = POSUtilTimestamp::get_tsc();
+
+        if(unlikely(current_tick - this->_last_ckpt_tick >= POS_MESC_TO_TSC(POS_CKPT_INTERVAL))){
+            retval = true;
+            this->_last_ckpt_tick = current_tick;
+        }
+
+        return retval;
+    }
+
+    /*!
      *  \brief  dump checkpoints to file
      */
     void deinit_dump_checkpoints();
@@ -318,6 +335,11 @@ class POSClient {
      *          to other machine
      */
     pos_client_ckpt_station_t __ckpt_station;
+
+    /*!
+     *  \brief  last time to do ckpt of this client
+     */
+    uint64_t _last_ckpt_tick;
 
     /*!
      *  \brief  launch checkpoint ops to checkpoint all stateful resources

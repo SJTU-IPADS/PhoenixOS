@@ -264,12 +264,32 @@ namespace cuda_memcpy_h2d {
         memory_handle = pos_api_inout_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize(0);
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpy(
             /* dst */ pos_api_inout_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_param_addr(wqe, 1),
             /* count */ pos_api_param_size(wqe, 1),
             /* kind */ cudaMemcpyHostToDevice
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        ws->worker->async_ckpt_cxt.membus_lock = false;
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -300,12 +320,34 @@ namespace cuda_memcpy_d2h {
         memory_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize(0);
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpy(
             /* dst */ wqe->api_cxt->ret_data,
             /* src */ (const void*)(pos_api_input_handle_offset_server_addr(wqe, 0)),
             /* count */ pos_api_param_value(wqe, 1, uint64_t),
             /* kind */ cudaMemcpyDeviceToHost
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            ws->worker->async_ckpt_cxt.membus_lock = false;
+        }
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -340,12 +382,34 @@ namespace cuda_memcpy_d2d {
         src_memory_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(src_memory_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize(0);
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpy(
             /* dst */ pos_api_output_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* kind */ cudaMemcpyDeviceToDevice
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            ws->worker->async_ckpt_cxt.membus_lock = false;
+        }
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -380,6 +444,22 @@ namespace cuda_memcpy_h2d_async {
         stream_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(stream_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ pos_api_inout_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_param_addr(wqe, 1),
@@ -387,6 +467,16 @@ namespace cuda_memcpy_h2d_async {
             /* kind */ cudaMemcpyHostToDevice,
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = false;
+        }
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -421,6 +511,22 @@ namespace cuda_memcpy_d2h_async {
         stream_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(stream_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ wqe->api_cxt->ret_data,
             /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
@@ -433,6 +539,10 @@ namespace cuda_memcpy_d2h_async {
         wqe->api_cxt->return_code = cudaStreamSynchronize(
             (cudaStream_t)(stream_handle->server_addr)
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        ws->worker->async_ckpt_cxt.membus_lock = false;
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -470,6 +580,22 @@ namespace cuda_memcpy_d2d_async {
         stream_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(stream_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemcpyAsync(
             /* dst */ pos_api_output_handle_offset_server_addr(wqe, 0),
             /* src */ pos_api_input_handle_offset_server_addr(wqe, 0),
@@ -477,6 +603,16 @@ namespace cuda_memcpy_d2d_async {
             /* kind */ cudaMemcpyDeviceToDevice,
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = false;
+        }
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -509,12 +645,38 @@ namespace cuda_memset_async {
         stream_handle = pos_api_input_handle(wqe, 0);
         POS_CHECK_POINTER(stream_handle);
 
+        /*!
+         *  \note   if we enable overlapped checkpoint, we need to prevent
+         *          the checkpoint memcpy conflict with the current memcpy,
+         *          so we raise the flag to notify overlapped checkpoint to
+         *          provisionally stop
+         */
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = true;
+        }
+    #endif
+
         wqe->api_cxt->return_code = cudaMemsetAsync(
             /* devPtr */ pos_api_output_handle_offset_server_addr(wqe, 0),
             /* value */ pos_api_param_value(wqe, 1, int),
             /* count */ pos_api_param_value(wqe, 2, uint64_t),
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
+
+    #if POS_CKPT_OPT_LEVEL == 2
+        if(ws->worker->async_ckpt_cxt.is_active == true){
+            wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
+            if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
+                POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
+            }
+            ws->worker->async_ckpt_cxt.membus_lock = false;
+        }
+    #endif
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);

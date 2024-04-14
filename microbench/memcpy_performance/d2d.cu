@@ -9,7 +9,7 @@
 
 #include "mb_common/ticks.h"
 
-#define PROFILING_FILE_PATH "/root/microbench/memcpy_performance/build/profile.txt"
+#define PROFILING_FILE_PATH "/root/microbench/memcpy_performance/profile.txt"
 
 
 int main(){

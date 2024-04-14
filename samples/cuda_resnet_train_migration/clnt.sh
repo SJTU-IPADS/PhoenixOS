@@ -40,17 +40,17 @@ start_client() {
 
     if [ $mount = false ] ; then
         cd $script_dir && cd .. && cd ..
-        sudo docker run --gpus all -dit -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged --network=pos_net \
+         docker run --gpus all -dit -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name $used_image
         
         # note: we copy files except the samples and utils folder, which we mount to the container
-        while read line; do sudo docker cp $line $container_name:/root; done < <(find . -mindepth 1 -maxdepth 1 | grep -v "samples$" | grep -v  "utils$")
-        sudo docker exec -it $container_name bash
+        while read line; do  docker cp $line $container_name:/root; done < <(find . -mindepth 1 -maxdepth 1 | grep -v "samples$" | grep -v  "utils$")
+         docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..
-        sudo docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
+         docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name $used_image
-        sudo docker exec -it $container_name bash
+         docker exec -it $container_name bash
     fi
 }
 
@@ -60,13 +60,13 @@ close_client() {
         exit 1
     fi
     container_name=pos_clnt_$container_id
-    sudo docker container stop $container_name
-    sudo docker container rm $container_name
+     docker container stop $container_name
+     docker container rm $container_name
 }
 
 enter_client() {
     container_name=pos_clnt_$container_id
-    sudo docker exec -it $container_name bash
+     docker exec -it $container_name bash
 }
 
 while getopts ":m:hi:s:c:r:e:" opt; do

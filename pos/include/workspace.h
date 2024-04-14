@@ -419,6 +419,14 @@ class POSWorkspace {
     }
 
     /*!
+     *  \brief  obtain client map
+     *  \return client map
+     */
+    inline std::map<pos_client_uuid_t, POSClient*>& get_client_map(){
+        return this->_client_map;
+    }
+
+    /*!
      *  \brief  entrance of POS processing
      *  \param  api_id          index of the called API
      *  \param  uuid            uuid of the remote client

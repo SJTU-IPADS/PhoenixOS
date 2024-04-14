@@ -116,6 +116,10 @@ class POSWorker_CUDA : public POSWorker {
             POS_ASSERT(
                 cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_stream_id))
             );
+
+            POS_ASSERT(
+                cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_cow_stream_id))
+            );
         #endif
 
         #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1

@@ -116,26 +116,26 @@ class POSParser {
     /*!
      *  \brief  insert checkpoint op to the DAG based on certain conditions
      *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
-     *  \param  wqe the exact WQ element before inserting checkpoint op
+     *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion(POSAPIContext_QE* wqe);
+    pos_retval_t __checkpoint_insertion(POSClient* client);
 
     /*!
      *  \brief  naive implementation of checkpoint insertion procedure
      *  \note   this implementation naively insert a checkpoint op to the dag, 
      *          without any optimization hint
-     *  \param  wqe the exact WQ element before inserting checkpoint op
+     *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_naive(POSAPIContext_QE* wqe);
+    pos_retval_t __checkpoint_insertion_naive(POSClient* client);
 
     /*!
      *  \brief  level-1/2 optimization of checkpoint insertion procedure
      *  \note   this implementation give hints of those memory handles that
      *          been modified (INOUT/OUT) since last checkpoint
-     *  \param  wqe the exact WQ element before inserting checkpoint op
+     *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_incremental(POSAPIContext_QE* wqe);
+    pos_retval_t __checkpoint_insertion_incremental(POSClient* client);
 };

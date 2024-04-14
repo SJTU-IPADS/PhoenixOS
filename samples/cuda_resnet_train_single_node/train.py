@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
 from utils.readData import read_dataset
-from utils.ResNet import ResNet50, ResNet101
+from utils.ResNet import ResNet50, ResNet101, ResNet152
 import time
 import os
 
@@ -18,7 +18,7 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 n_class = 10
 
 # model = ResNet50()
-model = ResNet101()
+model = ResNet152()
 
 model = model.to(device)
 
@@ -26,7 +26,7 @@ model = model.to(device)
 def run_train():
     criterion = nn.CrossEntropyLoss().to(device)
     
-    batch_size = 1024
+    batch_size = 32
     
     n_epochs = 1
     valid_loss_min = np.Inf # track change in validation loss
@@ -89,7 +89,7 @@ def run_train():
         mean = np.mean(np_iter_durations)
         std = np.std(np_iter_durations)
 
-        cut_off = std * 3
+        cut_off = std
         lower, upper = mean - cut_off, mean + cut_off
         new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
 
@@ -155,7 +155,7 @@ def run_infer():
         mean = np.mean(np_iter_durations)
         std = np.std(np_iter_durations)
 
-        cut_off = std * 3
+        cut_off = std
         lower, upper = mean - cut_off, mean + cut_off
         new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
 

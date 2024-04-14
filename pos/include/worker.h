@@ -33,6 +33,11 @@ namespace wk_functions {
 };  // namespace ps_functions
 
 
+#if POS_CKPT_OPT_LEVEL == 2
+
+/*!
+ *  \brief  context of the overlapped checkpoint thread
+ */
 typedef struct checkpoint_async_cxt {
     // flag: checkpoint thread to notify the worker thread that the previous checkpoint has done
     bool is_active;
@@ -43,8 +48,17 @@ typedef struct checkpoint_async_cxt {
     // (latest) version of each handle to be checkpointed
     std::map<POSHandle*, pos_vertex_id_t> checkpoint_version_map;
 
+    //  this flag should be raise by memcpy API worker function, to avoid slow down by
+    //  overlapped checkpoint process
+    bool membus_lock;
+
+    // thread handle
+    std::thread *thread;
+
     checkpoint_async_cxt() : is_active(false) {}
 } checkpoint_async_cxt_t;
+
+#endif // POS_CKPT_OPT_LEVEL == 2
 
 
 /*!
@@ -63,6 +77,7 @@ class POSWorker {
         
         #if POS_CKPT_OPT_LEVEL == 2
             _ckpt_stream_id = 0;
+            _cow_stream_id = 0;
         #endif
         #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
             _ckpt_commit_stream_id = 0;
@@ -156,6 +171,11 @@ class POSWorker {
      */
     void *worker_stream;
 
+    #if POS_CKPT_OPT_LEVEL == 2
+        // overlapped checkpoint context
+        checkpoint_async_cxt_t async_ckpt_cxt;
+    #endif
+
  protected:
     // stop flag to indicate the daemon thread to stop
     bool _stop_flag;
@@ -171,7 +191,10 @@ class POSWorker {
 
     #if POS_CKPT_OPT_LEVEL == 2
         // stream for overlapped memcpy while computing happens
-        uint64_t _ckpt_stream_id;  
+        uint64_t _ckpt_stream_id;
+
+        // stream for doing CoW
+        uint64_t _cow_stream_id;
     #endif
 
     #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
@@ -247,9 +270,8 @@ class POSWorker {
          *  \note   this thread will be raised by level-2 ckpt
          *  \note   aware of the macro POS_CKPT_ENABLE_PIPELINE
          *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
-         *  \param  cxt     the context of this checkpointing
          */
-        void __checkpoint_async_thread(checkpoint_async_cxt_t* cxt);
+        void __checkpoint_async_thread();
     #endif
 
     /*!

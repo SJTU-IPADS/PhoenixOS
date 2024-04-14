@@ -13,13 +13,16 @@
     (double)(e_tick - s_tick) / (double) POS_TSC_FREQ * (double)1000000.0f
 
 #define POS_TSC_TO_USEC(tick) \
-    (double)(tick) / (double) POS_TSC_FREQ * (double)1000000.0f
+    (double)(tick) * (double)1000000.0f / (double) POS_TSC_FREQ 
 
 #define POS_TSC_TO_MSEC(tick) \
-    (double)(tick) / (double) POS_TSC_FREQ * (double)1000.0f
+    (double)(tick) * (double)1000.0f / (double) POS_TSC_FREQ 
 
 #define POS_USEC_TO_TSC(usec) \
-    (double)(usec) / (double)1000000.0f * (double) POS_TSC_FREQ
+    (double)(usec) * (double) POS_TSC_FREQ / (double)1000000.0f 
+
+#define POS_MESC_TO_TSC(mesc) \
+    (double)(mesc) / (double)1000.0f * (double) POS_TSC_FREQ 
 
 #define POS_SEC_TO_TSC(sec) \
     sec * POS_TSC_FREQ

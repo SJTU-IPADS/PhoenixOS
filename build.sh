@@ -62,6 +62,7 @@ build_cuda() {
             cd $script_dir
             cd remoting/cuda/cpu
             make clean
+            rm --force core.*
         echo "[4] cleaning unittest"
             cd $script_dir
             cd unittest/cuda
