@@ -217,7 +217,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
                     this->client_addr, this->state_size, cuda_dv_retval
                 );
                 retval = POS_FAILED;
-                goto exit;  
+                goto exit;
             }
         } else {
             /*!

@@ -5,7 +5,8 @@ if [ -f "./client_exist.txt" ]; then
     rm ./client_exist.txt
 fi
 
-LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../remoting/cuda/cpu/:../../build LD_PRELOAD=../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 python3 ./main.py --Max_train_steps 5000 --eval_interval 500 --T_horizon 256 --net_width 131072
+# 16384 * 16384 = 268435456 (268.43M)
+LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../remoting/cuda/cpu/:../../build LD_PRELOAD=../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 python3 ./main.py --Max_train_steps 1500 --eval_interval 100 --T_horizon 256 --net_width 4096
 
 
 # nsys for client behaviour:

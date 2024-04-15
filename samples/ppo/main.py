@@ -134,12 +134,20 @@ def main():
         eval_env.close()
 
         np_duration_list = np.array(duration_list)
+
+        mean = np.mean(np_duration_list)
+        std = np.std(np_duration_list)
+        cut_off = std * 1.5
+        lower, upper = mean - cut_off, mean + cut_off
+        new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+
         print(
             f"latency:"
-            f" p10({np.percentile(np_duration_list, 10)} ms), "
-            f" p50({np.percentile(np_duration_list, 50)} ms), "
-            f" p99({np.percentile(np_duration_list, 99)} ms), "
-            f" mean({np.mean(np_duration_list)} ms)"
+            f" p10({np.percentile(new_np_duration_list, 10)} ms), "
+            f" p50({np.percentile(new_np_duration_list, 50)} ms), "
+            f" p99({np.percentile(new_np_duration_list, 99)} ms), "
+            f" mean({np.mean(new_np_duration_list)} ms)"
         )
 
 

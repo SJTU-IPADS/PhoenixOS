@@ -50,3 +50,7 @@ bash build.sh -t cuda -j -u true
 [] Develop client-server switch of POS and cricket
 [] Develop dumping checkpoint state to memory / file
 [] Try migration development (i.e., restore mechanism)
+
+```bash
+alias proxy_on='export http_proxy=http://172.17.0.1:7890; export https_proxy=http://172.17.0.1:7890; export all_proxy=http://172.17.0.1:7890; export HTTP_PROXY=http://172.17.0.1:7890; export HTTPS_PROXY=http://172.17.0.1:7890; export ALL_PROXY=http://172.17.0.1:7890'
+```
