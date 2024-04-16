@@ -697,14 +697,16 @@ exit:
                     }
                 #endif
 
-                    // invalidate handles
-                    for(auto &inout_handle_view : wqe->inout_handle_views){
-                        this->async_migration_cxt.invalidate_handles.insert(inout_handle_view.handle);
+                    if(unlikely(this->_ws->mock_migration_signal > 0)){
+                        // invalidate handles
+                        for(auto &inout_handle_view : wqe->inout_handle_views){
+                            this->async_migration_cxt.invalidate_handles.insert(inout_handle_view.handle);
+                        }
+                        for(auto &output_handle_view : wqe->output_handle_views){
+                            this->async_migration_cxt.invalidate_handles.insert(output_handle_view.handle);
+                        }
                     }
-                    for(auto &output_handle_view : wqe->output_handle_views){
-                        this->async_migration_cxt.invalidate_handles.insert(output_handle_view.handle);
-                    }
-
+                    
                     launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
                     wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
 

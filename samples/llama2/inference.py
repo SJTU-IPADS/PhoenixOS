@@ -58,10 +58,11 @@ def test_lat_bw():
     duration_list = [] # s
     thpr_list = [] # token / min
 
-    for _ in range(0, 16):
+    for i in range(0, 32):
         duration, thpr, _ = stream('Count to 128', batch_size=1)
         duration_list.append(duration)
         thpr_list.append(thpr)
+        print(f'loop {i}, duration({duration} ms)')
 
     np_duration_list = np.array(duration_list)
     print(

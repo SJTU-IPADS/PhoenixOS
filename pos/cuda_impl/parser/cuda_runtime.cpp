@@ -665,6 +665,7 @@ namespace cuda_memcpy_h2d {
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
         retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
     #endif
+        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;
@@ -923,6 +924,7 @@ namespace cuda_memcpy_h2d_async {
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
         retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
     #endif
+        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;

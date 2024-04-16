@@ -3,6 +3,7 @@
 # >>>>>>>>>> common variables <<<<<<<<<<
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+SUDO=sudo
 
 # >>>>>>>>>> action configurations <<<<<<<<<<
 container_id=0
@@ -35,16 +36,16 @@ start_server() {
     ip_addr=10.66.10.$container_id
 
     if [ $mount = false ] ; then
-         docker run --gpus all -dit --privileged --network=pos_net \
+        $SUDO docker run --gpus all -dit --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         cd $script_dir && cd .. && cd ..
-         docker cp . $container_name:/root
-         docker exec -it $container_name bash
+        $SUDO docker cp . $container_name:/root
+        $SUDO docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..
-         docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
+        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
                         --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
-         docker exec -it $container_name bash
+        $SUDO docker exec -it $container_name bash
     fi
 }
 
@@ -55,8 +56,8 @@ close_server() {
         exit 1
     fi
     container_name=pos_svr_$container_id
-     docker container stop $container_name
-     docker container rm $container_name
+    $SUDO docker container stop $container_name
+    $SUDO docker container rm $container_name
 }
 
 
@@ -78,7 +79,7 @@ close_server() {
 
 enter_server() {
     container_name=pos_svr_$container_id
-     docker exec -it $container_name bash
+    $SUDO docker exec -it $container_name bash
 }
 
 
