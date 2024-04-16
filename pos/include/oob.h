@@ -45,6 +45,8 @@ enum pos_oob_msg_typeid_t {
     kPOS_Oob_Unregister_Client,
     kPOS_Oob_Connect_Transport,
     kPOS_Oob_Mock_Api_Call,
+    kPOS_Oob_Migration_Signal,
+    kPOS_Oob_Restore_Signal
 };
 
 /*!
@@ -115,6 +117,9 @@ namespace oob_functions {
     POS_OOB_DECLARE_FUNCTIONS(unregister_client);
     POS_OOB_DECLARE_FUNCTIONS(connect_transport);
     POS_OOB_DECLARE_FUNCTIONS(mock_api_call);
+    POS_OOB_DECLARE_FUNCTIONS(migration_signal);
+    POS_OOB_DECLARE_FUNCTIONS(restore_signal);
+
 }; // namespace oob_functions
 
 /*!
@@ -139,7 +144,9 @@ class POSOobServer {
             {   kPOS_Oob_Register_Client,   oob_functions::register_client::sv      },
             {   kPOS_Oob_Unregister_Client, oob_functions::unregister_client::sv    },
             {   kPOS_Oob_Connect_Transport, oob_functions::connect_transport::sv    },
-            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::sv        }
+            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::sv        },
+            {   kPOS_Oob_Migration_Signal,  oob_functions::migration_signal::sv     },
+            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::sv       }
         });
 
         // step 2: create server socket

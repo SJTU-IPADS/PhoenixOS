@@ -26,18 +26,6 @@ namespace remoting_deinit {
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
 
-    #if POS_CKPT_ENABLE_PREEMPT
-        POS_LOG("RPC deinitialization signal received, start preemption checkpoint")
-        client = (POSClient_CUDA*)(wqe->client);
-        POS_CHECK_POINTER(client);
-        ckpt_wqe = new POSAPIContext_QE_t(
-            /* api_id*/ ws->checkpoint_api_id,
-            /* client */ client
-        );
-        POS_CHECK_POINTER(ckpt_wqe);
-        retval = client->dag.launch_op(ckpt_wqe);
-    #endif
-
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 

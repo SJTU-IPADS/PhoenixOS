@@ -14,6 +14,7 @@
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
 #include "pos/include/client.h"
+#include "pos/include/handle.h"
 #include "pos/include/trace/base.h"
 #include "pos/include/trace/tick.h"
 
@@ -60,6 +61,26 @@ typedef struct checkpoint_async_cxt {
 
 #endif // POS_CKPT_OPT_LEVEL == 2
 
+#if POS_MIGRATION_OPT_LEVEL == 2
+
+/*!
+ *  \brief  context of the overlapped pre-copy process
+ */
+typedef struct migration_async_cxt {
+    pos_vertex_id_t precopy_start_pc;
+
+    bool precopy_finished;
+
+    POSClient *client;
+
+    std::set<POSHandle*> invalidate_handles;
+    std::set<POSHandle*> delta_copy_set;
+
+    migration_async_cxt() : precopy_finished(false), precopy_start_pc(0), client(nullptr) {}
+} migration_async_cxt_t;
+
+#endif
+
 
 /*!
  *  \brief  POS Worker
@@ -79,8 +100,13 @@ class POSWorker {
             _ckpt_stream_id = 0;
             _cow_stream_id = 0;
         #endif
+
         #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
             _ckpt_commit_stream_id = 0;
+        #endif
+
+        #if POS_MIGRATION_OPT_LEVEL == 2
+            _migration_precopy_stream_id = 0;
         #endif
 
         // initialize trace tick list
@@ -176,6 +202,10 @@ class POSWorker {
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
 
+    #if POS_MIGRATION_OPT_LEVEL == 2
+        migration_async_cxt_t async_migration_cxt;
+    #endif
+
  protected:
     // stop flag to indicate the daemon thread to stop
     bool _stop_flag;
@@ -202,6 +232,11 @@ class POSWorker {
         uint64_t _ckpt_commit_stream_id;
     #endif
 
+    #if POS_MIGRATION_OPT_LEVEL == 2
+        // stream for precopy
+        uint64_t _migration_precopy_stream_id;
+    #endif
+
     /*!
      *  \brief  insertion of worker functions
      *  \return POS_SUCCESS for succefully insertion
@@ -226,6 +261,17 @@ class POSWorker {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
+    #if POS_MIGRATION_OPT_LEVEL == 2
+        virtual pos_retval_t migration_remote_malloc(POSClient* clien){
+            return POS_FAILED_NOT_IMPLEMENTED;
+        }
+
+        virtual void migration_precopy_asyc_thread(){
+            POS_LOG("step 3: pre-copy");
+            this->async_migration_cxt.precopy_finished = true;
+        }
+    #endif
+
  private:
     /*!
      *  \brief  processing daemon of the worker
@@ -236,12 +282,20 @@ class POSWorker {
             return;
         }
 
-        #if POS_CKPT_OPT_LEVEL <= 1
-            this->__daemon_ckpt_sync();
-        #elif POS_CKPT_OPT_LEVEL == 2
-            this->__daemon_ckpt_async();
+        #if POS_MIGRATION_OPT_LEVEL == 0
+            // case: continuous checkpoint
+            #if POS_CKPT_OPT_LEVEL <= 1
+                this->__daemon_ckpt_sync();
+            #elif POS_CKPT_OPT_LEVEL == 2
+                this->__daemon_ckpt_async();
+            #endif
         #else
-            static_assert(false, "error checkpoint level");
+            // case: migration
+            #if POS_MIGRATION_OPT_LEVEL == 1
+                this->__daemon_migration_naive();
+            #else
+                this->__daemon_migration_opt();
+            #endif
         #endif
     }
 
@@ -272,6 +326,18 @@ class POSWorker {
          *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
          */
         void __checkpoint_async_thread();
+    #endif
+
+    #if POS_MIGRATION_OPT_LEVEL == 1
+        /*!
+         *  \brief  worker daemon with naive migration support (singularity)
+         */
+        void __daemon_migration_naive();
+    #else
+        /*!
+         *  \brief  worker daemon with optimized migration support (POS)
+         */
+        void __daemon_migration_opt();
     #endif
 
     /*!

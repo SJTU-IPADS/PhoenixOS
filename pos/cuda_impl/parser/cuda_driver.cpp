@@ -141,7 +141,7 @@ namespace cu_module_load {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -295,7 +295,7 @@ namespace cu_module_load_data {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that

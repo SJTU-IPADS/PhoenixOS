@@ -177,7 +177,7 @@ class POSClient {
         POSAPIContext_QE *ckpt_wqe;
         uint64_t s_tick, e_tick;
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0
         // drain out both the parser and worker
         // TODO: the way to drain is not correct!
         // s_tick = POSUtilTimestamp::get_tsc();
@@ -186,12 +186,7 @@ class POSClient {
         // POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
     #endif
 
-    #if POS_CKPT_ENABLE_PREEMPT == 1
-        __preempt_checkpoint_all_resource(&ckpt_wqe);
-        this->dag.drain();
-    #endif
-
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0
         // dump checkpoint to file
         // TODO: remember to decomment this!
         // if(this->_cxt.checkpoint_file_path.size() == 0){

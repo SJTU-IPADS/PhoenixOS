@@ -408,6 +408,13 @@ class POSHandle {
      *  \return POS_SUCCESS for successfully restore
      */
     virtual pos_retval_t restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
+
+
+    /*!
+     *  \brief  restore the current handle REMOTELY when it becomes broken status
+     *  \return POS_SUCCESS for successfully restore
+     */
+    virtual pos_retval_t remote_restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
     
 
     /*!
@@ -471,6 +478,9 @@ class POSHandle {
 
     // the actual server-side address of the handle
     void *server_addr;
+    
+    // remote sserver address on the backup device
+    void *remote_server_addr;
 
     // pointer to the instance of parent handle
     std::vector<POSHandle*> parent_handles;

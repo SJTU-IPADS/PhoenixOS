@@ -34,7 +34,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         // initialize checkpoint bag
         if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
@@ -238,6 +238,25 @@ class POSHandle_CUDA_Memory : public POSHandle {
         }
 
         this->mark_status(kPOS_HandleStatus_Active);
+
+    exit:
+        return retval;
+    }
+
+
+    /*!
+     *  \brief  restore the current handle REMOTELY when it becomes broken status
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t remote_restore() override {
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+
+        cudaSetDevice(1);
+        
+        cuda_rt_retval = cudaMalloc(&this->remote_server_addr, this->state_size);
+
+        cudaSetDevice(0);
 
     exit:
         return retval;
@@ -507,7 +526,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *          and server-side handle address are equal
      */
     POSHandleManager_CUDA_Memory(POSHandle_CUDA_Device* device_handle, bool is_restoring) : POSHandleManager(/* passthrough */ true, /* is_stateful */ true) {
-        int num_device, i;
+        int num_device, i, j;
         
         /*!
          *  \brief  reserve a large portion of virtual memory space on a specified device
@@ -570,9 +589,18 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
             }
             POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] = ptr;
             POS_LOG("reserved virtual memory space: device_id(%d), base(%p), size(%lu)", device_id, ptr, reserved_size);
-        
+            
         exit:
             ;
+        };
+
+        auto __set_peer_access = [](int src_device_id, int dst_device_id){
+            // switch to target device
+            if(unlikely(cudaSuccess != cudaSetDevice(src_device_id))){
+                POS_ERROR_DETAIL("failed to call cudaSetDevice");
+            }
+            cudaDeviceSynchronize();
+            cudaDeviceEnablePeerAccess(dst_device_id, 0);
         };
 
         // no need to conduct reserving if previous hm has already done
@@ -588,6 +616,16 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         // we reserve virtual memory spave on each device
         for(i=0; i<num_device; i++){
             __reserve_device_vm_space(i);
+        }
+
+        // setup peer access of all devices
+        for(i=0; i<num_device; i++){
+            for(j=0; j<num_device; j++){
+                if(unlikely(i == j)){
+                    continue;
+                }
+                __set_peer_access(i, j);
+            }
         }
 
         if(is_restoring == false){

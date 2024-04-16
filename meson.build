@@ -42,7 +42,10 @@ meson_file_dir = meson.source_root()
 target = 'cuda'
 
 # config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
-ckpt_opt_level = 2
+#           0: no continuous ckpt support
+#           1: naive continuous ckpt support
+#           2: pos continuous ckpt support
+ckpt_opt_level = 0
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
 enable_ckpt_increamental = 0
@@ -53,18 +56,17 @@ enable_ckpt_pipeline = 1
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
 enable_ckpt_orchestration = 0
 
-# config:   enable preempt checkpoint 
-#           (NOTE: must set ckpt_opt_level as 0 while enable this option)
-enable_ckpt_preempt = 0
+# config:   checkpoint interval (unit in ms)
+ckpt_interval_ms = 6000
 
-# config:   time to trigger preempt checkpoint
-ckpt_preempt_trigger_time_s = 40
+# config:   migration optimization level
+#           0: no migration support
+#           1: naive migration support
+#           2: pos migration support
+migration_opt_level = 2
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
-
-# config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 6000
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
@@ -104,13 +106,7 @@ message('>>> Build configurations:')
 message('>>>>>> [Config] target:                                    ' + target)
 message('>>>>>> [Config] TSC register frequency:                    ' + tsc_reg_freq.to_string())
 message('>>>>>> [Config] checkpoint optimization level:             ' + ckpt_opt_level.to_string())
-if ckpt_opt_level == 0
-    message('       >>>>>> [Config] enable_ckpt_preempt:            ' + enable_ckpt_preempt.to_string())
-    message('       >>>>>> [Config] ckpt_preempt_trigger_time_s:    ' + ckpt_preempt_trigger_time_s.to_string())
-else
-    message('       >>>>>> [Config] enable_ckpt_preempt:            N/A')
-    message('       >>>>>> [Config] ckpt_preempt_trigger_time:      N/A')
-endif
+message('>>>>>> [Config] migration optimization level:              ' + migration_opt_level.to_string())
 if ckpt_opt_level >= 1
     message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())
 else
@@ -179,9 +175,9 @@ sources += [
     'pos/src/parser.cpp'
 ]
 
-if ckpt_opt_level == 0 and enable_ckpt_preempt == 0
+if ckpt_opt_level == 0 and migration_opt_level == 0
     sources += ['pos/src/checkpoint_o0.cpp']
-elif ckpt_opt_level == 0 and enable_ckpt_preempt == 1
+elif ckpt_opt_level == 0 and migration_opt_level > 0
     sources += ['pos/src/checkpoint_o1.cpp']
 elif ckpt_opt_level == 1
     sources += ['pos/src/checkpoint_o1.cpp']
