@@ -222,7 +222,7 @@ class POSCheckpointBag {
     // all on-device versions that this bag stored
     std::set<uint64_t> _dev_ckpt_version_set;
 
-#elif POS_CKPT_OPT_LEVEL == 1 || POS_CKPT_ENABLE_PREEMPT == 1
+#elif POS_CKPT_OPT_LEVEL == 1 || POS_MIGRATION_OPT_LEVEL > 0
     /*!
      *  \brief  indicate which checkpoint slot to use (front / back)
      */

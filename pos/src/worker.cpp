@@ -579,6 +579,164 @@ exit:
 #endif // POS_CKPT_OPT_LEVEL
 
 
+#if POS_MIGRATION_OPT_LEVEL == 1
+    /*!
+     *  \brief  worker daemon with naive migration support (singularity)
+     */
+    void POSWorker::__daemon_migration_naive(){
+    exit:
+        ;
+    }
+#else
+    /*!
+     *  \brief  worker daemon with optimized migration support (POS)
+     */
+    void POSWorker::__daemon_migration_opt(){
+        uint64_t i, j, k, w, api_id;
+        pos_retval_t launch_retval;
+        POSAPIMeta_t api_meta;
+        std::vector<POSClient*> clients;
+        POSClient* client;
+        POSAPIContext_QE *wqe;
+        std::thread *precopy_thread = nullptr;
+
+        pos_vertex_id_t current_pc = 0;
+
+        auto __migration_check = [&]() -> pos_retval_t {
+            pos_retval_t retval = POS_SUCCESS;
+
+            // if the migration signal is raised
+            if(unlikely(this->_ws->mock_migration_signal == 1)){
+                /*! \case   start to pre-copy*/
+                
+                // step 1: malloc new buffers on backup device
+                POS_LOG("step 1: reserve buffers on backup device");
+                if(unlikely(retval = this->migration_remote_malloc(client) != POS_SUCCESS)){
+                    POS_WARN_C_DETAIL("failed to remote malloc");
+                    goto migration_exit;
+                }
+
+                // step 2: drain
+                POS_LOG("step 2: drain");
+                if(unlikely(retval = this->sync() != POS_SUCCESS)){
+                    POS_WARN_C_DETAIL("failed to drain before starting pre-copy");
+                    goto migration_exit;
+                }
+                
+                // step 3: raise pre-copy thread
+                this->async_migration_cxt.precopy_start_pc = current_pc;    // unsafe
+                this->async_migration_cxt.client = client;                  // unsafe
+                precopy_thread = new std::thread(&POSWorker::migration_precopy_asyc_thread, this);
+                POS_CHECK_POINTER(precopy_thread);
+
+                this->_ws->mock_migration_signal = 2;
+            } else if(unlikely(this->_ws->mock_migration_signal == 2)){
+                /*! \case   finished pre-copy*/
+                if(this->async_migration_cxt.precopy_finished == true){
+                    // step 4: drain
+                    POS_LOG("step 4: drain");
+                    if(unlikely(retval = this->sync() != POS_SUCCESS)){
+                        POS_WARN_C_DETAIL("failed to drain after starting pre-copy");
+                        goto migration_exit;
+                    }
+
+                    // step 4: delta-copy
+                    POS_LOG("step 5: delta copy");
+
+                    // lock worker thread
+                    this->_ws->mock_migration_signal = 3;
+                    POS_LOG("step 6: lock worker thread");
+                }
+            } else if(unlikely(this->_ws->mock_migration_signal == 3)){
+                /*! \case   worker thraed locked */
+                retval = POS_WARN_NOT_READY;
+            }
+
+        migration_exit:
+            return retval;
+        };
+
+        while(!_stop_flag){
+            this->_ws->poll_client_dag(&clients);
+
+            if(unlikely(__migration_check() == POS_WARN_NOT_READY)){
+                continue;
+            }
+
+            for(i=0; i<clients.size(); i++){
+                POS_CHECK_POINTER(client = clients[i]);
+
+                if(unlikely(__migration_check() == POS_WARN_NOT_READY)){
+                    continue;
+                }
+
+                // keep popping next pending op until we finished all operation
+                while(POS_SUCCESS == client->dag.get_next_pending_op(&wqe)){
+                    wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
+                    api_id = wqe->api_cxt->api_id;
+                    
+                    current_pc = wqe->dag_vertex_id;
+
+                    if(unlikely(__migration_check() == POS_WARN_NOT_READY)){
+                        continue;
+                    }
+
+                    api_meta = _ws->api_mgnr->api_metas[api_id];
+
+                    // check and restore broken handles
+                    if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
+                        POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
+                        continue;
+                    }
+
+                #if POS_ENABLE_DEBUG_CHECK
+                    if(unlikely(_launch_functions.count(api_id) == 0)){
+                        POS_ERROR_C_DETAIL(
+                            "runtime has no worker launch function for api %lu, need to implement", api_id
+                        );
+                    }
+                #endif
+
+                    // invalidate handles
+                    for(auto &inout_handle_view : wqe->inout_handle_views){
+                        this->async_migration_cxt.invalidate_handles.insert(inout_handle_view.handle);
+                    }
+                    for(auto &output_handle_view : wqe->output_handle_views){
+                        this->async_migration_cxt.invalidate_handles.insert(output_handle_view.handle);
+                    }
+
+                    launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
+                    wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+
+                    // cast return code
+                    wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
+                        /* pos_retval */ launch_retval, 
+                        /* library_id */ api_meta.library_id
+                    );
+
+                    // check whether the execution is success
+                    if(unlikely(launch_retval != POS_SUCCESS)){
+                        wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                    }
+
+                    // check whether we need to return to frontend
+                    if(wqe->status == kPOS_API_Execute_Status_Init){
+                        // we only return the QE back to frontend when it hasn't been returned before
+                        wqe->return_tick = POSUtilTimestamp::get_tsc();
+                        _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                    } 
+
+                } // client->dag.get_next_pending_op
+            } // foreach client
+
+            clients.clear();
+        
+        } // stop_flag
+    }
+
+#endif // POS_MIGRATION_OPT_LEVEL
+
+
 /*!
  *  \brief  check and restore all broken handles, if there's any exists
  *  \param  wqe         the op to be checked and restored

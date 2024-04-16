@@ -53,4 +53,5 @@ bash build.sh -t cuda -j -u true
 
 ```bash
 alias proxy_on='export http_proxy=http://172.17.0.1:7890; export https_proxy=http://172.17.0.1:7890; export all_proxy=http://172.17.0.1:7890; export HTTP_PROXY=http://172.17.0.1:7890; export HTTPS_PROXY=http://172.17.0.1:7890; export ALL_PROXY=http://172.17.0.1:7890'
+export CUDA_VISIBLE_DEVICES=6,7
 ```

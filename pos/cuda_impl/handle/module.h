@@ -37,7 +37,7 @@ class POSHandle_CUDA_Module : public POSHandle {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
 
         // initialize checkpoint bag
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
         }

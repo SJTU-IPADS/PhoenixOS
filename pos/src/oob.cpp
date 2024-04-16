@@ -88,6 +88,7 @@ namespace register_client {
     }
 } // namespace register_client
 
+
 namespace unregister_client {
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
@@ -117,6 +118,7 @@ namespace unregister_client {
         return POS_SUCCESS;
     }
 };
+
 
 /*!
  *  \related    kPOS_Oob_Connect_Transport
@@ -184,6 +186,7 @@ namespace connect_transport {
         return retval;
     }
 } // namespace connect_transport
+
 
 /*!
  *  \note   this is a special oob routine, client-side could call this routine
@@ -291,5 +294,40 @@ namespace mock_api_call {
         return POS_SUCCESS;
     }
 } // namespace mock_api_call
+
+
+/*!
+ *  \related    kPOS_Oob_Migration_Signal
+ *  \brief      migration signal send from CRIU action script
+ */
+namespace migration_signal {
+    // server
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
+        #if POS_MIGRATION_OPT_LEVEL > 0
+            POS_LOG("receive migration signal, lock POS worker");
+            ws->mock_migration_signal = 1;
+        #else
+            POS_WARN("receive migration signal, but POS is compiled without migration support, omit");
+        #endif
+    }
+} // namespace migration_signal
+
+
+/*!
+ *  \related    kPOS_Oob_Restore_Signal
+ *  \brief      restore signal send from CRIU action script
+ */
+namespace restore_signal {
+    // server
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
+        #if POS_MIGRATION_OPT_LEVEL > 0
+            POS_LOG("receive restore signal, unlock POS worker");
+            ws->mock_migration_signal = 0;
+        #else
+            POS_WARN("receive restore signal, but POS is compiled without migration support, omit");
+        #endif
+    }
+} // namespace restore_signal
+
 
 } // namespace oob_functions

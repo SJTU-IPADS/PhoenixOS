@@ -122,7 +122,7 @@ def run_infer():
     iter_durations = []
     nb_iteration = 0
 
-    batch_size = 1
+    batch_size = 128
     train_loader, valid_loader, test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 
     with torch.no_grad():
@@ -146,7 +146,7 @@ def run_infer():
 
             # POS: we only train 15 iteration for test
             # change this number to 15 while enable level-1 continuous checkpoint
-            if nb_iteration == 4:
+            if nb_iteration == 16:
                 print(f"reach {nb_iteration}, break")
                 break
         all_end_t = time.time()
@@ -185,5 +185,5 @@ def run_infer():
         print(f"all duration: {(all_end_t - all_start_t)*1000:.2f} ms")
 
 if __name__ == '__main__':
-    run_train()
-    # run_infer()
+    # run_train()
+    run_infer()
