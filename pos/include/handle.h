@@ -716,6 +716,18 @@ class POSHandleManager {
     inline void record_modified_handle(T_POSHandle* handle){
         POS_CHECK_POINTER(handle);
         _modified_handles.insert(handle);
+
+        if(_host_stateful_handles.count(handle) > 0){
+            _host_stateful_handles.erase(handle);
+        }
+    }
+
+    inline void record_host_stateful_handle(T_POSHandle* handle){
+        _host_stateful_handles.insert(handle);
+    }
+
+    inline bool is_host_stateful_handle(T_POSHandle* handle){
+        return _host_stateful_handles.count(handle) > 0;
     }
 
     /*!
@@ -923,6 +935,11 @@ class POSHandleManager {
      *          checkpointing op
      */
     std::set<T_POSHandle*> _modified_handles;
+
+    /*!
+     *  \brief  all staful handles, whose statee come from host, and never been modified
+     */
+    std::set<T_POSHandle*> _host_stateful_handles;
 
     /*!
      *  \brief  allocate new mocked resource within the manager
