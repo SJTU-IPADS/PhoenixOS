@@ -657,7 +657,7 @@ namespace cuda_memcpy_h2d {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -921,7 +921,7 @@ namespace cuda_memcpy_h2d_async {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that

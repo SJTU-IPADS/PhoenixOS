@@ -677,6 +677,19 @@ exit:
                         this->_client->migration_ctx.invalidated_handles.insert(output_handle_view.handle);
                     }
                 }
+
+                if(unlikely(this->_client->migration_ctx.is_ondemand_reloading() == true)){
+                    // invalidate handles
+                    for(auto &input_handle_view : wqe->input_handle_views){
+                        while(input_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
+                    }
+                    for(auto &output_handle_view : wqe->output_handle_views){
+                        while(output_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
+                    }
+                    for(auto &inout_handle_view : wqe->inout_handle_views){
+                        while(inout_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
+                    }
+                }
                 
                 launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
                 wqe->worker_e_tick = POSUtilTimestamp::get_tsc();

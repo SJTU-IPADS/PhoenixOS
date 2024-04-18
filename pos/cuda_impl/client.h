@@ -440,6 +440,32 @@ class POSClient_CUDA : public POSClient {
         }
     }
 
+    void __TMP__migration_ondemand_reload() override {
+        pos_retval_t retval = POS_SUCCESS;
+        typename std::set<POSHandle*>::iterator set_iter;
+        POSHandle *memory_handle;
+        cudaError_t cuda_rt_retval;
+        uint64_t s_tick, e_tick;
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        for(
+            set_iter = this->migration_ctx.__TMP__host_handles.begin();
+            set_iter != this->migration_ctx.__TMP__host_handles.end(); 
+            set_iter++
+        ){
+            memory_handle = *set_iter;
+            POS_CHECK_POINTER(memory_handle);
+
+            if(unlikely(POS_SUCCESS != memory_handle->reload_state(this->worker->_migration_precopy_stream_id))){
+                POS_WARN("failed to reload state of handle within on-demand reload thread: server_addr(%p)", memory_handle->server_addr);
+            } else {
+                memory_handle->state_status = kPOS_HandleStatus_StateReady;
+            }
+        }
+        e_tick = POSUtilTimestamp::get_tsc();
+        POS_LOG("on-demand reload finished: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+    }
+
  protected:
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type

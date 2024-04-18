@@ -144,8 +144,8 @@ pos_retval_t POSHandle::reload_state(uint64_t stream_id){
         }
     } else {
         /*!
-            *  \note   [option 2]  try reload from dumped result first
-            */
+         *  \note   [option 2]  reload from dumped result
+         */
         final_dumped_version = host_dumped_version > on_device_dumped_version ? host_dumped_version : on_device_dumped_version;
         if(host_dumped_version > on_device_dumped_version){
             if(unlikely(POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */false>(&ckpt_slot, final_dumped_version))){
