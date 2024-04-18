@@ -137,12 +137,18 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
         }
             
 
-        case kPOS_MigrationStage_Restore: {
+        case kPOS_MigrationStage_RestoreCtx: {
             s_tick = POSUtilTimestamp::get_tsc();
             this->_client->__TMP__migration_restore_context(true);
             e_tick = POSUtilTimestamp::get_tsc();
 
             POS_LOG("restore context: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+
+            // raise pre-copy thread
+            this->_ondemand_reload_thread = new std::thread(&POSMigrationCtx::__ondemand_reload_async_thread, this);
+            POS_CHECK_POINTER(this->_ondemand_reload_thread);
+            this->_is_ondemand_reload_thread_active = true;
+            POS_LOG("launched on-demand restore");
 
             retval = POS_SUCCESS;
             this->_migration_stage = kPOS_MigrationStage_Ease;
@@ -166,4 +172,10 @@ void POSMigrationCtx::__precopy_async_thread(){
     this->_client->__TMP__migration_precopy();
 exit:
     this->_is_precopy_thread_active = false;
+}
+
+void POSMigrationCtx::__ondemand_reload_async_thread(){
+    this->_client->__TMP__migration_ondemand_reload();
+exit:
+    this->_is_ondemand_reload_thread_active = false;
 }

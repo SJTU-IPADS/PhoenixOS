@@ -279,6 +279,7 @@ class POSClient {
     virtual void __TMP__migration_deltacopy(){}
     virtual void __TMP__migration_tear_context(bool do_tear_module){}
     virtual void __TMP__migration_restore_context(bool do_restore_module){}
+    virtual void __TMP__migration_ondemand_reload(){}
 
     /*!
      *  \brief  get whether it's time to checkpoint this client

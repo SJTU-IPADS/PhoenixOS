@@ -10,11 +10,14 @@
 #include "pos/include/handle.h"
 
 enum pos_migration_stage_t : uint8_t {
+    // ckpt
     kPOS_MigrationStage_Ease = 0,
     kPOS_MigrationStage_Init,
     kPOS_MigrationStage_Wait_Precopy,
     kPOS_MigrationStage_Block,
-    kPOS_MigrationStage_Restore
+
+    // restore (tmp)
+    kPOS_MigrationStage_RestoreCtx
 };
 
 class POSClient;
@@ -26,7 +29,9 @@ class POSMigrationCtx {
  public:
 
     POSMigrationCtx(POSClient* client) 
-        : _client(client), _migration_stage(kPOS_MigrationStage_Ease), _precopy_thread(nullptr), _is_precopy_thread_active(false)
+        : _client(client), _migration_stage(kPOS_MigrationStage_Ease), 
+        _precopy_thread(nullptr), _is_precopy_thread_active(false),
+        _ondemand_reload_thread(nullptr), _is_ondemand_reload_thread_active(false)
     {}
 
     /*!
@@ -44,7 +49,7 @@ class POSMigrationCtx {
     }
 
     inline void restore(){
-        this->_migration_stage = kPOS_MigrationStage_Restore;
+        this->_migration_stage = kPOS_MigrationStage_RestoreCtx;
     }
 
     /*!
@@ -64,8 +69,8 @@ class POSMigrationCtx {
      *  \brief  check whether current migration context is active
      */
     inline bool is_precopying(){ return _is_precopy_thread_active; }
-
     inline bool is_blocking() { return _migration_stage == kPOS_MigrationStage_Block; }
+    inline bool is_ondemand_reloading() { return _is_ondemand_reload_thread_active; }
 
     /*!
      *  \brief  watch dog of this migration context, should be invoked within worker thread
@@ -77,6 +82,9 @@ class POSMigrationCtx {
      */
     pos_retval_t watch_dog(pos_vertex_id_t pc);
 
+
+    /* ========== pre-copy fields ========== */
+
     // all conflict handles during migration process
     std::set<POSHandle*> invalidated_handles;
 
@@ -85,6 +93,9 @@ class POSMigrationCtx {
 
     // all host-side stateful handles
     std::set<POSHandle*> __TMP__host_handles;
+
+    /* ========== on-demand reload fields ========== */
+    std::set<POSHandle*> odr_invalidated_handles;
     
  private:
     /* ====== common fields ====== */
@@ -104,6 +115,9 @@ class POSMigrationCtx {
     // thread handle for conducting pre-copy
     std::thread *_precopy_thread;
     bool _is_precopy_thread_active;
+    
+    std::thread *_ondemand_reload_thread;
+    bool _is_ondemand_reload_thread_active;
 
     /* ====== trace fields ====== */
 
@@ -111,4 +125,9 @@ class POSMigrationCtx {
      *  \brief  async thread for conducting precopy
      */
     void __precopy_async_thread();
+
+    /*!
+     *  \brief  async thread for on-demand reload
+     */
+    void __ondemand_reload_async_thread();
 };
