@@ -667,7 +667,7 @@ namespace cuda_memcpy_h2d {
             .wqe = wqe,
             .param_index = 1,
             .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
-            .size = pos_api_param_value(wqe, 2, uint64_t)
+            .size = pos_api_param_size(wqe, 1)
         });
     #endif
         hm_memory->record_host_stateful_handle(memory_handle);
@@ -931,7 +931,7 @@ namespace cuda_memcpy_h2d_async {
             .wqe = wqe,
             .param_index = 1,
             .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
-            .size = pos_api_param_value(wqe, 2, uint64_t)
+            .size = pos_api_param_size(wqe, 1)
         });
     #endif
         hm_memory->record_host_stateful_handle(memory_handle);

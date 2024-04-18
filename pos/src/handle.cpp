@@ -118,9 +118,9 @@ pos_retval_t POSHandle::reload_state(uint64_t stream_id){
     
     if(host_dumped_version == 0 && on_device_dumped_version == 0){
         /*!
-            *  \note   [option 1]  nothing have been dumped, reload from host origin,
+         *  \note   [option 1]  nothing have been dumped, reload from host origin,
                                 try reload from origin host value in order
-            */
+         */
         records = this->ckpt_bag->get_host_checkpoint_records();
         for(i=0; i<records.size(); i++){
             pos_host_ckpt_t &record = records[i];

@@ -59,10 +59,6 @@ class POSHandle_CUDA_Var : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Var"); }
 
-    // name of the kernel
-    std::string name;
-
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -95,6 +91,10 @@ class POSHandle_CUDA_Var : public POSHandle {
         return retval;
     }
 
+    // name of the kernel
+    std::string name;
+
+ protected:
 
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type

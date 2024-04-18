@@ -155,8 +155,6 @@ class POSHandle_CUDA_Memory : public POSHandle {
         return retval;
     }
 
-
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -259,7 +257,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
         return retval;
     }
 
-
+ protected:
     /*!
      *  \brief  reload state of this handle back to the device
      *  \param  data        source data to be reloaded

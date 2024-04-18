@@ -605,15 +605,7 @@ exit:
 #endif // POS_CKPT_OPT_LEVEL
 
 
-#if POS_MIGRATION_OPT_LEVEL == 1
-    /*!
-     *  \brief  worker daemon with naive migration support (singularity)
-     */
-    void POSWorker::__daemon_migration_naive(){
-    exit:
-        ;
-    }
-#else
+#if POS_MIGRATION_OPT_LEVEL > 0
     /*!
      *  \brief  worker daemon with optimized migration support (POS)
      */

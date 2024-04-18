@@ -61,6 +61,37 @@ class POSHandle_CUDA_Function : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Function"); }
 
+    /*!
+     *  \brief  restore the current handle when it becomes broken state
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t __restore() override {
+        pos_retval_t retval = POS_SUCCESS;
+        CUresult cuda_dv_retval;
+        CUfunction function = NULL;
+        POSHandle *module_handle;
+
+        POS_ASSERT(this->parent_handles.size() == 1);
+        POS_CHECK_POINTER(module_handle = this->parent_handles[0]);
+        POS_ASSERT(module_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Module);
+        
+        POS_ASSERT(this->name.size() > 0);
+
+        cuda_dv_retval = cuModuleGetFunction(
+            &function, (CUmodule)(module_handle->server_addr), this->name.c_str()
+        );
+
+        if(likely(CUDA_SUCCESS == cuda_dv_retval)){
+            this->set_server_addr((void*)function);
+            this->mark_status(kPOS_HandleStatus_Active);
+        } else {
+            retval = POS_FAILED;
+            POS_WARN_C_DETAIL("failed to restore CUDA function: %d", cuda_dv_retval);
+        }
+
+        return retval;
+    }
+
     // name of the kernel
     std::string name;
 
@@ -99,38 +130,6 @@ class POSHandle_CUDA_Function : public POSHandle {
     uint64_t cbank_param_size;
 
  protected:
-    /*!
-     *  \brief  restore the current handle when it becomes broken state
-     *  \return POS_SUCCESS for successfully restore
-     */
-    pos_retval_t __restore() override {
-        pos_retval_t retval = POS_SUCCESS;
-        CUresult cuda_dv_retval;
-        CUfunction function = NULL;
-        POSHandle *module_handle;
-
-        POS_ASSERT(this->parent_handles.size() == 1);
-        POS_CHECK_POINTER(module_handle = this->parent_handles[0]);
-        POS_ASSERT(module_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Module);
-        
-        POS_ASSERT(this->name.size() > 0);
-
-        cuda_dv_retval = cuModuleGetFunction(
-            &function, (CUmodule)(module_handle->server_addr), this->name.c_str()
-        );
-
-        if(likely(CUDA_SUCCESS == cuda_dv_retval)){
-            this->set_server_addr((void*)function);
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            retval = POS_FAILED;
-            POS_WARN_C_DETAIL("failed to restore CUDA function: %d", cuda_dv_retval);
-        }
-
-        return retval;
-    }
-
-
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle

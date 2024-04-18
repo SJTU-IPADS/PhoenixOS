@@ -89,7 +89,7 @@ class POSWorker {
             _ckpt_commit_stream_id = 0;
         #endif
 
-        #if POS_MIGRATION_OPT_LEVEL == 2
+        #if POS_MIGRATION_OPT_LEVEL > 0
             _migration_precopy_stream_id = 0;
         #endif
 
@@ -150,7 +150,7 @@ class POSWorker {
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
     
-    #if POS_MIGRATION_OPT_LEVEL == 2
+    #if POS_MIGRATION_OPT_LEVEL > 0
         // stream for precopy
         uint64_t _migration_precopy_stream_id;
     #endif
@@ -227,12 +227,7 @@ class POSWorker {
                 this->__daemon_ckpt_async();
             #endif
         #else
-            // case: migration
-            #if POS_MIGRATION_OPT_LEVEL == 1
-                this->__daemon_migration_naive();
-            #else
-                this->__daemon_migration_opt();
-            #endif
+            this->__daemon_migration_opt();
         #endif
     }
 
@@ -265,12 +260,7 @@ class POSWorker {
         void __checkpoint_async_thread();
     #endif
 
-    #if POS_MIGRATION_OPT_LEVEL == 1
-        /*!
-         *  \brief  worker daemon with naive migration support (singularity)
-         */
-        void __daemon_migration_naive();
-    #else
+    #if POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  worker daemon with optimized migration support (POS)
          */

@@ -59,10 +59,6 @@ class POSHandle_CUDA_Stream : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Stream"); }
 
-    bool is_capturing;
-
-
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -81,7 +77,9 @@ class POSHandle_CUDA_Stream : public POSHandle {
         return POS_SUCCESS;
     }
 
+    bool is_capturing;
 
+ protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -151,7 +149,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
             this->latest_used_handle = this->_handles[0];
 
         #if POS_ENABLE_CONTEXT_POOL == 1
-            this->preserve_pooled_handles(4);
+            this->preserve_pooled_handles(8);
         #endif // POS_ENABLE_CONTEXT_POOL
         }
     }

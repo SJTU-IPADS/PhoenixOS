@@ -135,19 +135,33 @@ def main():
 
         np_duration_list = np.array(duration_list)
 
-        mean = np.mean(np_duration_list)
-        std = np.std(np_duration_list)
-        cut_off = std * 1.5
-        lower, upper = mean - cut_off, mean + cut_off
-        new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
-        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+        # mean = np.mean(np_duration_list)
+        # std = np.std(np_duration_list)
+        # cut_off = std * 1.5
+        # lower, upper = mean - cut_off, mean + cut_off
+        # new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+        # print(f"drop wierd duration lower than {lower} or larger than {upper}")
 
+        throughput_list_str = "0, "
+        time_list_str = "0, "
+        time_accu = 0 #s
+        for i, duration in enumerate(np_duration_list):
+            time_accu += duration / 1000
+            if i != len(np_duration_list) - 1:
+                throughput_list_str += f"{60000/duration:.2f}, "
+                time_list_str += f"{time_accu:.2f}, "
+            else:
+                throughput_list_str += f"{60000/duration:.2f}"
+                time_list_str += f"{time_accu:.2f}"
+
+        print(f"throughput list: {throughput_list_str}")
+        print(f"time list: {time_list_str}")
         print(
             f"latency:"
-            f" p10({np.percentile(new_np_duration_list, 10)} ms), "
-            f" p50({np.percentile(new_np_duration_list, 50)} ms), "
-            f" p99({np.percentile(new_np_duration_list, 99)} ms), "
-            f" mean({np.mean(new_np_duration_list)} ms)"
+            f" p10({np.percentile(np_duration_list, 10)} ms), "
+            f" p50({np.percentile(np_duration_list, 50)} ms), "
+            f" p99({np.percentile(np_duration_list, 99)} ms), "
+            f" mean({np.mean(np_duration_list)} ms)"
         )
 
 

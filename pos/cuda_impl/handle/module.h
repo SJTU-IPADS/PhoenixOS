@@ -69,11 +69,6 @@ class POSHandle_CUDA_Module : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Module"); }
 
-    // function descriptors under this module
-    std::vector<POSCudaFunctionDesp*> function_desps;
-
-    
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -107,7 +102,12 @@ class POSHandle_CUDA_Module : public POSHandle {
 
         return retval;
     }
+
+    // function descriptors under this module
+    std::vector<POSCudaFunctionDesp*> function_desps;
+
     
+ protected:
     /*!
      *  \brief  reload state of this handle back to the device
      *  \param  data        source data to be reloaded
@@ -116,7 +116,7 @@ class POSHandle_CUDA_Module : public POSHandle {
      *  \param  stream_id   stream for reloading the state
      *  \param  on_device   whether the source data is on device
      */
-    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
+    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device) override {
         pos_retval_t retval = POS_SUCCESS;
 
         /*!

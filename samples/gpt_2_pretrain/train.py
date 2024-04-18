@@ -13,7 +13,7 @@ train_path = './dataset/train.plb'
 val_num = 1
 max_len = 150
 batch_size = 2
-num_workers = 10
+num_workers = 0
 epochs = 1
 device = 'cuda:0'
 
@@ -118,25 +118,43 @@ def train_epoch(model, train_dataloader, optimizer, epoch):
         e_time = time.time()
         duration_list.append(int(round((e_time-s_time) * 1000))) # ms
 
-        if batch_idx == 128:
+        if batch_idx == 64:
             break
 
     np_duration_list = np.array(duration_list)
     
     mean = np.mean(np_duration_list)
     std = np.std(np_duration_list)
-    cut_off = std * 3
-    lower, upper = mean - cut_off, mean + cut_off
-    new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
-    print(f"drop wierd duration lower than {lower} or larger than {upper}")
     
+    # cut_off = std * 3
+    # lower, upper = mean - cut_off, mean + cut_off
+    # new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+    # print(f"drop wierd duration lower than {lower} or larger than {upper}")
+    
+    new_np_iter_durations = np_duration_list
+
+    throughput_list_str = "0, "
+    time_list_str = "0, "
+    time_accu = 0 #s
+    for i, duration in enumerate(new_np_iter_durations):
+        time_accu += duration / 1000
+        if i != len(new_np_iter_durations) - 1:
+            throughput_list_str += f"{60000/duration:.2f}, "
+            time_list_str += f"{time_accu:.2f}, "
+        else:
+            throughput_list_str += f"{60000/duration:.2f}"
+            time_list_str += f"{time_accu:.2f}"
+
     print(
         f"latency:"
-        f" p10({np.percentile(new_np_duration_list, 10)} ms), "
-        f" p50({np.percentile(new_np_duration_list, 50)} ms), "
-        f" p99({np.percentile(new_np_duration_list, 99)} ms), "
-        f" mean({np.mean(new_np_duration_list)} ms)"
+        f" p10({np.percentile(new_np_iter_durations, 10)} ms), "
+        f" p50({np.percentile(new_np_iter_durations, 50)} ms), "
+        f" p99({np.percentile(new_np_iter_durations, 99)} ms), "
+        f" mean({np.mean(new_np_iter_durations)} ms)"
     )
+
+    print(f"throughput list: {throughput_list_str}")
+    print(f"time list: {time_list_str}")
 
 
 def validate_epoch(model, validate_dataloader, epoch):
