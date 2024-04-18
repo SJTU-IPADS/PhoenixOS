@@ -196,6 +196,7 @@ class POSClient_CUDA : public POSClient {
         typename std::set<POSHandle_CUDA_Memory*>::iterator memory_handle_set_iter;
 
         uint64_t nb_precopy_handle = 0, precopy_size = 0; 
+        uint64_t nb_host_handle = 0, host_handle_size = 0;
 
         hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
         POS_CHECK_POINTER(hm_memory);
@@ -210,7 +211,10 @@ class POSClient_CUDA : public POSClient {
                 // skip duplicated buffers
                 if(hm_memory->is_host_stateful_handle(memory_handle)){
                     this->migration_ctx.__TMP__host_handles.insert(memory_handle);
-                    continue;
+                    nb_host_handle += 1;
+                    host_handle_size += memory_handle->state_size;
+                    // we still copy it, and deduplicate on the CPU-side
+                    // continue;
                 }
 
                 cuda_rt_retval = cudaMemcpyPeerAsync(
@@ -243,10 +247,12 @@ class POSClient_CUDA : public POSClient {
         POS_LOG(
             "pre-copy finished: "
             "duration(%lf us), "
-            "nb_precopy_handle(%lu), precopy_size(%lu Bytes)"
+            "nb_precopy_handle(%lu), precopy_size(%lu Bytes), "
+            "nb_host_handle(%lu), host_handle_size(%lu Bytes)"
             ,
             POS_TSC_TO_USEC(e_tick-s_tick),
-            nb_precopy_handle, precopy_size
+            nb_precopy_handle, precopy_size,
+            nb_host_handle, host_handle_size
         );
 
         hm_memory->clear_modified_handle();
@@ -445,7 +451,9 @@ class POSClient_CUDA : public POSClient {
         typename std::set<POSHandle*>::iterator set_iter;
         POSHandle *memory_handle;
         cudaError_t cuda_rt_retval;
+
         uint64_t s_tick, e_tick;
+        uint64_t nb_handles = 0, reload_size = 0;
 
         s_tick = POSUtilTimestamp::get_tsc();
         for(
@@ -460,10 +468,87 @@ class POSClient_CUDA : public POSClient {
                 POS_WARN("failed to reload state of handle within on-demand reload thread: server_addr(%p)", memory_handle->server_addr);
             } else {
                 memory_handle->state_status = kPOS_HandleStatus_StateReady;
+                nb_handles += 1;
+                reload_size += memory_handle->state_size;
             }
         }
         e_tick = POSUtilTimestamp::get_tsc();
-        POS_LOG("on-demand reload finished: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
+        POS_LOG("on-demand reload finished: %lf us, #handles(%lu), reload_size(%lu Bytes), stream_id(%p)", POS_TSC_TO_USEC(e_tick-s_tick), nb_handles, reload_size, this->worker->_migration_precopy_stream_id);
+    }
+
+    void __TMP__migration_allcopy() override {
+        POSHandleManager_CUDA_Memory *hm_memory;
+        uint64_t i, nb_handles;
+        uint64_t s_tick, e_tick;
+        uint64_t dump_size = 0;
+        POSHandle_CUDA_Memory *memory_handle;
+
+        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
+        POS_CHECK_POINTER(hm_memory);
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        nb_handles = hm_memory->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            memory_handle = hm_memory->get_handle_by_id(i);
+            if(unlikely(memory_handle->status != kPOS_HandleStatus_Active)){
+                continue;
+            }
+
+            if(unlikely(POS_SUCCESS != memory_handle->checkpoint_sync(
+                /* version_id */ memory_handle->latest_version, 
+                /* stream_id */ 0
+            ))){
+                POS_WARN(
+                    "failed to checkpoint handle: server_addr(%p), state_size(%lu)",
+                    memory_handle->server_addr,
+                    memory_handle->state_size
+                );
+            }
+            
+            dump_size += memory_handle->state_size;
+        }
+        e_tick = POSUtilTimestamp::get_tsc();
+
+        POS_LOG(
+            "sync dump finished: duration(%lf us), nb_handles(%lu), dump_size(%lu Bytes)",
+            POS_TSC_TO_USEC(e_tick-s_tick), nb_handles, dump_size
+        );
+    }
+
+    void __TMP__migration_allreload() override {
+        POSHandleManager_CUDA_Memory *hm_memory;
+        uint64_t i, nb_handles;
+        uint64_t s_tick, e_tick;
+        uint64_t reload_size = 0;
+        POSHandle_CUDA_Memory *memory_handle;
+
+        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
+        POS_CHECK_POINTER(hm_memory);
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        nb_handles = hm_memory->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            memory_handle = hm_memory->get_handle_by_id(i);
+            if(unlikely(memory_handle->status != kPOS_HandleStatus_Active)){
+                continue;
+            }
+
+            if(unlikely(POS_SUCCESS != memory_handle->reload_state(/* stream_id */ 0))){
+                POS_WARN(
+                    "failed to reload state of handle: server_addr(%p), state_size(%lu)",
+                    memory_handle->server_addr,
+                    memory_handle->state_size
+                );
+            }
+            
+            reload_size += memory_handle->state_size;
+        }
+        e_tick = POSUtilTimestamp::get_tsc();
+
+        POS_LOG(
+            "sync reload finished: duration(%lf us), nb_handles(%lu), reload_size(%lu Bytes)",
+            POS_TSC_TO_USEC(e_tick-s_tick), nb_handles, reload_size
+        );
     }
 
  protected:

@@ -59,9 +59,6 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("cuBLAS Context"); }
 
-    POSHandle *lastest_used_stream;
-
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -84,7 +81,10 @@ class POSHandle_cuBLAS_Context : public POSHandle {
 
         return retval;
     }
+
+    POSHandle *lastest_used_stream;
     
+ protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -120,7 +120,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
  public:
     POSHandleManager_cuBLAS_Context() : POSHandleManager() {
     #if POS_ENABLE_CONTEXT_POOL == 1
-        this->preserve_pooled_handles(4);
+        this->preserve_pooled_handles(8);
     #endif // POS_ENABLE_CONTEXT_POOL
     }
 

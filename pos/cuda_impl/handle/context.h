@@ -59,7 +59,6 @@ class POSHandle_CUDA_Context : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Context"); }
 
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -95,6 +94,7 @@ class POSHandle_CUDA_Context : public POSHandle {
         return retval;
     }
 
+ protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle

@@ -16,8 +16,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 # exit(0)
 
-model_path = '/root/samples/model/llama2'
-tokenizer_path = '/root/samples/tokenizer/llama2'
+model_path = '/root/samples/model/llama2-13b'
+tokenizer_path = '/root/samples/tokenizer/llama2-13b'
 
 model = AutoModelForCausalLM.from_pretrained(model_path).to('cuda:0')
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
@@ -40,7 +40,7 @@ def stream(user_prompt, batch_size=1):
 
     s_time = time.time()
     # Despite returning the usual output, the streamer will also print the generated text to stdout.
-    reply = model.generate(**inputs, max_new_tokens=500)
+    reply = model.generate(**inputs, max_new_tokens=20)
     e_time = time.time()
 
     num_tokens = 0
@@ -73,7 +73,20 @@ def test_lat_bw():
         f" mean({np.mean(np_duration_list)} ms)"
     )
 
-    print(f"thpr list: {thpr_list}")
+    time_accu = 0 #s
+    time_list_str = "0, "
+    throughput_list_str = "0, "
+    for i, duration in enumerate(duration_list):
+        time_accu += duration / 1000
+        if i != len(duration_list) - 1:
+            time_list_str += f"{time_accu:.2f}, "
+            throughput_list_str += f"{thpr_list[i]:.2f}, "
+        else:
+            time_list_str += f"{time_accu:.2f}"
+            throughput_list_str += f"{thpr_list[i]:.2f}"
+
+    print(f"thpr list: {throughput_list_str}")
+    print(f"time list: {time_list_str}")
 
 
 def test_restore():

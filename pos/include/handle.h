@@ -502,6 +502,15 @@ class POSHandle {
 
 
     /*!
+     *  \brief  restore the current handle when it becomes broken status
+     *  \return POS_SUCCESS for successfully restore
+     */
+    virtual pos_retval_t __restore(){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+
+    /*!
     *  \brief  the typeid of the resource kind which this handle represents
     *  \note   the children class of this base class should replace this value
     *          with their own typeid
@@ -569,6 +578,7 @@ class POSHandle {
      */
     bool is_lastest_used_handle;
 
+
  protected:
     /*!
      *  \note   counter for exclude copy-on-write and checkpoint process
@@ -580,14 +590,6 @@ class POSHandle {
      */
     void *_hm;
 
-    /*!
-     *  \brief  restore the current handle when it becomes broken status
-     *  \return POS_SUCCESS for successfully restore
-     */
-    virtual pos_retval_t __restore(){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-    
     /*!
      *  \brief  reload state of this handle back to the device
      *  \param  data        source data to be reloaded
@@ -736,7 +738,7 @@ class POSHandleManager {
                 goto exit;
             }
 
-            retval = handle->restore();
+            retval = handle->__restore();
             if(unlikely(retval != POS_SUCCESS)){
                 POS_WARN_C("failed to restore %s handle after allocation for fast restoring", handle->get_resource_name().c_str());
                 retval = POS_FAILED;

@@ -61,7 +61,6 @@ class POSHandle_CUDA_Device : public POSHandle {
     // identifier of the device
     int device_id;
 
- protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
@@ -84,7 +83,7 @@ class POSHandle_CUDA_Device : public POSHandle {
         return retval;
     }
 
-
+ protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle

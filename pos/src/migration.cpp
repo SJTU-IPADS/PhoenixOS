@@ -33,10 +33,28 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
             break;
         }
 
+    #define __TMP__context_pool_include_module true
+
         /*!
          *  \note   [case]  the migration just start
          */
         case kPOS_MigrationStage_Init: {
+        #if POS_MIGRATION_OPT_LEVEL == 1
+            // drain
+            if(unlikely( (retval = this->_client->worker->sync()) != POS_SUCCESS )){
+                POS_WARN_C_DETAIL("failed to synchornize before pre-copy");
+                goto exit;
+            }
+            
+            // dump all buffers
+            this->_client->__TMP__migration_allcopy();
+            this->_migration_stage = kPOS_MigrationStage_Block;
+            
+            // TMP: for exp
+            // mark all handles to be broken
+            this->_client->__TMP__migration_tear_context(__TMP__context_pool_include_module);
+            POS_LOG("[migration] tear context, and lock worker thread");
+        #elif POS_MIGRATION_OPT_LEVEL == 2
             // generate the copy plan, and remote malloc
             this->_client->__TMP__migration_remote_malloc();
 
@@ -54,9 +72,13 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
             this->_is_precopy_thread_active = true;
             
             this->_migration_stage = kPOS_MigrationStage_Wait_Precopy;
+        #endif
+        
             retval = POS_SUCCESS;
             break;
         }
+
+        
 
         /*!
         *  \note   [case]  the pre-copy thread has been launched, we wait until it finished, and
@@ -114,7 +136,7 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
 
             // TMP: for exp
             // mark all handles to be broken
-            this->_client->__TMP__migration_tear_context(true);
+            this->_client->__TMP__migration_tear_context(__TMP__context_pool_include_module);
 
             POS_LOG("[migration] tear context, and lock worker thread");
             POS_LOG(
@@ -139,16 +161,20 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
 
         case kPOS_MigrationStage_RestoreCtx: {
             s_tick = POSUtilTimestamp::get_tsc();
-            this->_client->__TMP__migration_restore_context(true);
+            this->_client->__TMP__migration_restore_context(__TMP__context_pool_include_module);
             e_tick = POSUtilTimestamp::get_tsc();
 
             POS_LOG("restore context: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
-            // raise pre-copy thread
-            this->_ondemand_reload_thread = new std::thread(&POSMigrationCtx::__ondemand_reload_async_thread, this);
-            POS_CHECK_POINTER(this->_ondemand_reload_thread);
-            this->_is_ondemand_reload_thread_active = true;
-            POS_LOG("launched on-demand restore");
+        #if POS_MIGRATION_OPT_LEVEL == 1
+            this->_client->__TMP__migration_allreload();
+        #elif POS_MIGRATION_OPT_LEVEL == 2
+            // raise on-demand reload thread (no need, we duplicate on the CPU-side)
+            // this->_ondemand_reload_thread = new std::thread(&POSMigrationCtx::__ondemand_reload_async_thread, this);
+            // POS_CHECK_POINTER(this->_ondemand_reload_thread);
+            // this->_is_ondemand_reload_thread_active = true;
+            // POS_LOG("launched on-demand restore");
+        #endif
 
             retval = POS_SUCCESS;
             this->_migration_stage = kPOS_MigrationStage_Ease;

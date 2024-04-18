@@ -81,7 +81,7 @@ def run_train():
 
             # POS: we only train 15 iteration for test
             # change this number to 15 while enable level-1 continuous checkpoint
-            if nb_iteration == 16:
+            if nb_iteration == 64:
                 print(f"reach {nb_iteration}, break")
                 break
         
@@ -89,11 +89,12 @@ def run_train():
         mean = np.mean(np_iter_durations)
         std = np.std(np_iter_durations)
 
-        cut_off = std
-        lower, upper = mean - cut_off, mean + cut_off
-        new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
+        # cut_off = std
+        # lower, upper = mean - cut_off, mean + cut_off
+        # new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
+        # print(f"drop wierd duration lower than {lower} or larger than {upper}")
 
-        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+        new_np_iter_durations = np_iter_durations
 
         throughput_list_str = "0, "
         time_list_str = "0, "
@@ -146,7 +147,7 @@ def run_infer():
 
             # POS: we only train 15 iteration for test
             # change this number to 15 while enable level-1 continuous checkpoint
-            if nb_iteration == 16:
+            if nb_iteration == 64:
                 print(f"reach {nb_iteration}, break")
                 break
         all_end_t = time.time()
@@ -155,11 +156,12 @@ def run_infer():
         mean = np.mean(np_iter_durations)
         std = np.std(np_iter_durations)
 
-        cut_off = std
-        lower, upper = mean - cut_off, mean + cut_off
-        new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
+        # cut_off = std
+        # lower, upper = mean - cut_off, mean + cut_off
+        # new_np_iter_durations = np_iter_durations[(np_iter_durations > lower) & (np_iter_durations < upper)]
+        # print(f"drop wierd duration lower than {lower} or larger than {upper}")
 
-        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+        new_np_iter_durations = np_iter_durations
 
         throughput_list_str = "0, "
         time_list_str = "0, "
@@ -185,5 +187,5 @@ def run_infer():
         print(f"all duration: {(all_end_t - all_start_t)*1000:.2f} ms")
 
 if __name__ == '__main__':
-    # run_train()
-    run_infer()
+    run_train()
+    # run_infer()
