@@ -59,8 +59,6 @@ namespace cublas_set_stream {
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *stream_handle, *cublas_context_handle;
-        // cudaStream_t worker_stream;
-
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -71,14 +69,8 @@ namespace cublas_set_stream {
         cublas_context_handle = pos_api_input_handle(wqe, 1);
         POS_CHECK_POINTER(cublas_context_handle);
 
-        // if(unlikely(ws->worker->worker_stream == nullptr)){
-        //     POS_ASSERT(cudaSuccess == cudaStreamCreate(&worker_stream));
-        //     ws->worker->worker_stream = worker_stream;
-        // }
-
         wqe->api_cxt->return_code = cublasSetStream(
             (cublasHandle_t)(cublas_context_handle->server_addr),
-            // (cudaStream_t)(ws->worker->worker_stream)
             (cudaStream_t)(stream_handle->server_addr)
         );
 

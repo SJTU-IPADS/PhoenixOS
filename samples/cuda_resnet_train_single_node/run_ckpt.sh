@@ -29,7 +29,7 @@ function get_latest_ckpt_version(){
 }
 
 ckpt_without_stop() {
-    pid=$(ps -ef | grep python3 | grep -v grep | awk '{print $2}')
+    pid=$(ps -ef | grep train.py | grep -v grep | awk '{print $2}')
 
     if [ -z "$pid" ]
     then
@@ -43,17 +43,17 @@ ckpt_without_stop() {
         mkdir $next_ckpt_dir
         if [ $prev_ckpt_version = 0 ]; then
             # criu pre-dump --tree $pid --images-dir $next_ckpt_dir --leave-running --track-mem --shell-job --display-stats
-            criu dump --tree $pid --images-dir $next_ckpt_dir --leave-running --shell-job --display-stats
+            criu dump --tree $pid --images-dir $next_ckpt_dir --leave-running --shell-job --display-stats --action-script $script_dir/../migrate_action_script.sh
         else
             # criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
-            criu dump --tree $pid --images-dir $next_ckpt_dir --leave-running --shell-job --display-stats
+            criu dump --tree $pid --images-dir $next_ckpt_dir --leave-running --shell-job --display-stats --action-script $script_dir/../migrate_action_script.sh
         fi
         echo "ckpt to: $next_ckpt_dir"
     fi
 }
 
 ckpt_with_stop() {
-    pid=$(ps -ef | grep python3 | grep -v grep | awk '{print $2}')
+    pid=$(ps -ef | grep train.py | grep -v grep | awk '{print $2}')
 
     if [ -z "$pid" ]
     then
@@ -66,9 +66,9 @@ ckpt_with_stop() {
         next_ckpt_dir="$dir_path/$next_ckpt_version"
         mkdir $next_ckpt_dir
         if [ $prev_ckpt_version = 0 ]; then
-            criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats --action-script $script_dir/../migrate_action_script.sh
+            criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats 
         else
-            criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats --action-script $script_dir/../migrate_action_script.sh
+            criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats
             # criu dump --tree $pid --prev-images-dir $prev_ckpt_dir --images-dir $next_ckpt_dir --shell-job --display-stats --action-script $script_dir/../migrate_action_script.sh
         fi
         echo "ckpt version: $next_ckpt_dir"

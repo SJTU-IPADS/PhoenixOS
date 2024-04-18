@@ -72,11 +72,13 @@ class POSHandle_CUDA_Module : public POSHandle {
     // function descriptors under this module
     std::vector<POSCudaFunctionDesp*> function_desps;
 
+    
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         CUresult cuda_dv_retval;
         std::vector<pos_host_ckpt_t> host_ckpts;
@@ -105,8 +107,26 @@ class POSHandle_CUDA_Module : public POSHandle {
 
         return retval;
     }
+    
+    /*!
+     *  \brief  reload state of this handle back to the device
+     *  \param  data        source data to be reloaded
+     *  \param  offset      offset from the base address of this handle to be reloaded
+     *  \param  size        reload size
+     *  \param  stream_id   stream for reloading the state
+     *  \param  on_device   whether the source data is on device
+     */
+    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
+        pos_retval_t retval = POS_SUCCESS;
 
- protected:
+        /*!
+         *  \note   the state is restoring in restore function, so we do nothing here
+         */
+
+    exit:
+        return retval;
+    }
+
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -338,7 +358,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
         context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
         POS_CHECK_POINTER(context_handle);
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA module in the manager");
             goto exit;
@@ -348,5 +368,24 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
 
     exit:
         return retval;
+    }
+
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
+        return POS_SUCCESS;
+    }
+
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Module* handle) override {
+        return POS_FAILED;
     }
 };

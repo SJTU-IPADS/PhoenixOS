@@ -59,11 +59,12 @@ class POSHandle_CUDA_Context : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Context"); }
 
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_res;
         CUresult cuda_dv_res;
@@ -94,7 +95,6 @@ class POSHandle_CUDA_Context : public POSHandle {
         return retval;
     }
 
- protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -152,5 +152,24 @@ class POSHandleManager_CUDA_Context : public POSHandleManager<POSHandle_CUDA_Con
             this->_handles.push_back(ctx_handle);
             this->latest_used_handle = this->_handles[0];
         }
+    }
+
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
+        return POS_SUCCESS;
+    }
+
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Context* handle) override {
+        return POS_FAILED;
     }
 };

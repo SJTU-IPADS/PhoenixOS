@@ -61,11 +61,13 @@ class POSHandle_CUDA_Stream : public POSHandle {
 
     bool is_capturing;
 
+
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         cudaError_t cuda_rt_res;
         cudaStream_t stream_addr;
 
@@ -79,7 +81,7 @@ class POSHandle_CUDA_Stream : public POSHandle {
         return POS_SUCCESS;
     }
 
- protected:
+
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -120,7 +122,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
      */
     POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context* ctx_handle, bool is_restoring) : POSHandleManager() {
         POSHandle_CUDA_Stream *stream_handle;
-
+    
         /*!
          *  \note  we only create a new stream while NOT restoring
          */
@@ -147,6 +149,10 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
             // record in the manager
             this->_handles.push_back(stream_handle);
             this->latest_used_handle = this->_handles[0];
+
+        #if POS_ENABLE_CONTEXT_POOL == 1
+            this->preserve_pooled_handles(4);
+        #endif // POS_ENABLE_CONTEXT_POOL
         }
     }
 
@@ -185,7 +191,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
         ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
         POS_CHECK_POINTER(ctx_handle);
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
             goto exit;

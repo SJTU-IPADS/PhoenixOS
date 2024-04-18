@@ -21,6 +21,7 @@ enum pos_retval {
     POS_WARN_DUPLICATED,
     POS_WARN_NOT_READY,
     POS_WARN_ABANDONED,
+    POS_WARN_BLOCKED,
     POS_FAILED,
     POS_FAILED_NOT_EXIST,
     POS_FAILED_ALREADY_EXIST,
@@ -46,6 +47,7 @@ enum pos_retval {
 
 #define KB(x)   ((size_t) (x) << 10)
 #define MB(x)   ((size_t) (x) << 20)
+#define GB(x)   ((size_t) (x) << 30)
 
 /*!
  *  \brief  type for resource typeid

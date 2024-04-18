@@ -61,11 +61,13 @@ class POSHandle_CUDA_Event : public POSHandle {
 
     int flags;
 
+    
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_res;
         cudaEvent_t ptr;
@@ -82,8 +84,8 @@ class POSHandle_CUDA_Event : public POSHandle {
     exit:
         return retval;
     }
-
- protected:
+    
+    
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle

@@ -70,6 +70,12 @@ typedef struct pos_host_ckpt {
 
     // index of the parameter that stores the host-side value
     uint32_t param_index;
+
+    // offset from the base address of the handle
+    uint64_t offset;
+
+    // size of this host checkpoint
+    uint64_t size;
 } pos_host_ckpt_t;
 
 
@@ -180,7 +186,9 @@ class POSCheckpointBag {
     std::vector<pos_host_ckpt_t> get_host_checkpoint_records();
 
     // waitlist of the host-side checkpoint record, populated during restore phrase
-    std::vector<std::pair<pos_vertex_id_t, uint32_t>> host_ckpt_waitlist;
+    std::vector<std::tuple<
+        /* wqe_id */ pos_vertex_id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
+    > host_ckpt_waitlist;
 
     // indicate whether the checkpoint has been finished in the latest checkpoint round
     bool is_latest_ckpt_finished;

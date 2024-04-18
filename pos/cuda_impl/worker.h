@@ -11,12 +11,10 @@
 
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
-#include "pos/include/client.h"
 #include "pos/include/transport.h"
 #include "pos/include/worker.h"
 #include "pos/include/checkpoint.h"
 
-#include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_index.h"
 #include "pos/cuda_impl/handle/memory.h"
 
@@ -73,10 +71,9 @@ namespace wk_functions {
  */
 class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws) {}
+    POSWorker_CUDA(POSWorkspace* ws, POSClient* client) : POSWorker(ws, client) {}
     ~POSWorker_CUDA(){};
 
- protected:
     /*!
      *  \brief  make the worker thread synchronized
      *  \param  stream_id   index of the stream to be synced, default to be 0
@@ -96,7 +93,8 @@ class POSWorker_CUDA : public POSWorker {
 
         return retval;
     }
-    
+
+ protected:    
     /*!
      *  \brief      initialization of the worker daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread
@@ -137,102 +135,6 @@ class POSWorker_CUDA : public POSWorker {
         return POS_SUCCESS; 
     }
 
-    #if POS_MIGRATION_OPT_LEVEL == 2
-
-        pos_retval_t migration_remote_malloc(POSClient* client) override {
-            pos_retval_t retval = POS_SUCCESS;
-            POSHandleManager_CUDA_Memory *hm_memory;
-            POSHandle_CUDA_Memory *memory_handle;
-            uint64_t i, nb_handles;
-
-            hm_memory = pos_get_client_typed_hm(client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
-            POS_CHECK_POINTER(hm_memory);
-
-            // TODO: we should only traverse those non-host buffer
-            nb_handles = hm_memory->get_nb_handles();
-            for(i=0; i<nb_handles; i++){
-                memory_handle = hm_memory->get_handle_by_id(i);
-                POS_CHECK_POINTER(memory_handle);
-                if(unlikely(POS_SUCCESS != memory_handle->remote_restore())){
-                    POS_WARN("failed to remotely restore memory handle: server_addr(%p)", memory_handle->server_addr);
-                }
-            }
-
-            // force switch to origin device
-            cudaSetDevice(0);
-
-        exit:
-            return retval;
-        }
-
-        void migration_precopy_asyc_thread() override {
-            POS_LOG("step 3: pre-copy");
-            POSHandleManager_CUDA_Memory *hm_memory;
-            POSHandle_CUDA_Memory *memory_handle;
-            uint64_t i, nb_handles;
-            cudaError_t cuda_rt_retval;
-            typename std::set<POSHandle_CUDA_Memory*>::iterator memory_handle_set_iter;
-
-            uint64_t nb_precopy_handle = 0, precopy_size = 0, nb_invalidate_handle = 0, invalidate_size = 0;
-
-            hm_memory = pos_get_client_typed_hm(this->async_migration_cxt.client, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
-            POS_CHECK_POINTER(hm_memory);
-
-            std::set<POSHandle_CUDA_Memory*>& modified_handles = hm_memory->get_modified_handles();
-            if(likely(modified_handles.size() > 0)){
-                for(memory_handle_set_iter = modified_handles.begin(); memory_handle_set_iter != modified_handles.end(); memory_handle_set_iter++){
-                    memory_handle = *memory_handle_set_iter;
-                    POS_CHECK_POINTER(memory_handle);
-                    
-                    // skip duplicated buffers
-                    if(hm_memory->is_host_stateful_handle(memory_handle)){
-                        continue;
-                    }
-
-                    cuda_rt_retval = cudaMemcpyPeerAsync(
-                        /* dst */ memory_handle->remote_server_addr,
-                        /* dstDevice */ 1,
-                        /* src */ memory_handle->server_addr,
-                        /* srcDevice */ 0,
-                        /* count */ memory_handle->state_size,
-                        /* stream */ (cudaStream_t)(this->_migration_precopy_stream_id)
-                    );
-                    if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
-                        POS_WARN("failed to p2p copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
-                        continue;
-                    }
-
-                    cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(this->_migration_precopy_stream_id));
-                    if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
-                        POS_WARN("failed to synchronize p2p copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
-                        continue;
-                    }
-
-                    // invalidate handles
-                    if(this->async_migration_cxt.invalidate_handles.count(memory_handle) > 0){
-                        this->async_migration_cxt.delta_copy_set.insert(memory_handle);
-                        nb_invalidate_handle += 1;
-                        invalidate_size += memory_handle->state_size;
-                    } else {
-                        nb_precopy_handle += 1;
-                        precopy_size += memory_handle->state_size;
-                    }
-                }
-            }
-
-            nb_handles = hm_memory->get_nb_handles();
-            POS_LOG(
-                "    pre-copy finished: nb_precopy_handle(%lu), precopy_size(%lu Bytes), nb_invalidate_handle(%lu), invalidate_size(%lu), duplicated rate(%lf)",
-                nb_precopy_handle, precopy_size, nb_invalidate_handle, invalidate_size, (double)(nb_handles - modified_handles.size())/(double)(nb_handles)
-            );
-
-            hm_memory->clear_modified_handle();
-            
-        exit:
-            this->async_migration_cxt.precopy_finished = true;
-        }
-
-    #endif // POS_MIGRATION_OPT_LEVEL == 2
     
     /*!
      *  \brief  insertion of worker functions

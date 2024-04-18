@@ -3,13 +3,11 @@
 #include <iostream>
 
 #include "pos/include/common.h"
-#include "pos/include/transport.h"
 #include "pos/include/oob.h"
 #include "pos/include/api_context.h"
 
 /*!
  *  \brief  client-side PhoenixOS agent, manages all POS resources
- *  \tparam transport implementation    
  */
 class POSAgent {
  public:
@@ -39,34 +37,11 @@ class POSAgent {
         );
         POS_CHECK_POINTER(_pos_oob_client);
 
-        // step 1: register client
+        // register client
         if(POS_SUCCESS != _pos_oob_client->call(kPOS_Oob_Register_Client, nullptr)){
             POS_ERROR_C_DETAIL("failed to register the client");
         }
         POS_DEBUG_C("successfully register client: uuid(%lu)", _uuid);
-
-        // step 2: open transport (top-half)
-        // TODO: we need to select transport type here
-        transport = new POSTransport_SHM(
-            /* id*/ _uuid,
-            /* non_blocking */ true,
-            /* role */ kPOS_Transport_RoleId_Client,
-            /* timeout */ 5000
-        );
-        POS_CHECK_POINTER(transport);
-        POS_DEBUG_C("successfully open transport (top-half)");
-
-        // step 3: connect transport
-        if(POS_SUCCESS != _pos_oob_client->call(kPOS_Oob_Connect_Transport, nullptr)){
-            POS_ERROR_C_DETAIL("failed to connect the transport");
-        }
-        POS_DEBUG_C("successfully connect the transport");
-
-        // step 4: open transport (top-half)
-        if(POS_SUCCESS != transport->init_bh()){
-            POS_ERROR_C_DETAIL("failed to open transport (bottom-half)");
-        }
-        POS_DEBUG_C("successfully open transport (bottom-half)");
     }
 
     /*!
@@ -76,7 +51,6 @@ class POSAgent {
         if(POS_SUCCESS != _pos_oob_client->call(kPOS_Oob_Unregister_Client, nullptr)){
             POS_ERROR_C_DETAIL("failed to unregister the client");
         }
-        delete transport;
         delete _pos_oob_client;
     }
 
@@ -104,9 +78,6 @@ class POSAgent {
      *          (i.e., register_client oob type)
      */
     inline void set_uuid(pos_client_uuid_t id){ _uuid = id; }
-
-    // pointer to the transportation layer
-    POSTransport *transport;
 
  private:
     // pointer to the out-of-band client

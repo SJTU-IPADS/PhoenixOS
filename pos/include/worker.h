@@ -10,13 +10,15 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/workspace.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
-#include "pos/include/client.h"
 #include "pos/include/handle.h"
 #include "pos/include/trace/base.h"
 #include "pos/include/trace/tick.h"
+
+// forward declaration
+class POSClient;
+class POSWorkspace;
 
 /*!
  *  \brief prototype for worker launch function for each API call
@@ -61,34 +63,16 @@ typedef struct checkpoint_async_cxt {
 
 #endif // POS_CKPT_OPT_LEVEL == 2
 
-#if POS_MIGRATION_OPT_LEVEL == 2
-
-/*!
- *  \brief  context of the overlapped pre-copy process
- */
-typedef struct migration_async_cxt {
-    pos_vertex_id_t precopy_start_pc;
-
-    bool precopy_finished;
-
-    POSClient *client;
-
-    std::set<POSHandle*> invalidate_handles;
-    std::set<POSHandle*> delta_copy_set;
-
-    migration_async_cxt() : precopy_finished(false), precopy_start_pc(0), client(nullptr) {}
-} migration_async_cxt_t;
-
-#endif
-
+// forward declaration
+class POSClient;
 
 /*!
  *  \brief  POS Worker
  */
 class POSWorker {
  public:
-    POSWorker(POSWorkspace* ws)
-        : _ws(ws), _stop_flag(false)
+    POSWorker(POSWorkspace* ws, POSClient* client)
+        : _ws(ws), _client(client), _stop_flag(false)
     {
         int rc;
 
@@ -151,17 +135,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
-        POS_ERROR_DETAIL(
-            "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
-            wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->dag_vertex_id
-        ); 
-        /*!
-         *  \todo   1. how to identify user-handmake error and hardware error?
-         *          2. mark broken handles;
-         *          3. reset the _pc of the DAG to the last sync point;
-         */
-    }
+    static void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe);
 
     /*!
      *  \brief  generic complete procedure
@@ -169,42 +143,25 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __done(POSWorkspace* ws, POSAPIContext_QE* wqe){
-        POSClient *client;
-        uint64_t i;
-
-        POS_CHECK_POINTER(wqe);
-        POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
-
-        // forward the DAG pc
-        client->dag.forward_pc();
-
-        // set the latest version of all output handles
-        for(i=0; i<wqe->output_handle_views.size(); i++){
-            POSHandleView_t &hv = wqe->output_handle_views[i];
-            hv.handle->latest_version = wqe->dag_vertex_id;
-        }
-
-        // set the latest version of all inout handles
-        for(i=0; i<wqe->inout_handle_views.size(); i++){
-            POSHandleView_t &hv = wqe->inout_handle_views[i];
-            hv.handle->latest_version = wqe->dag_vertex_id;
-        }
-    }
-
-    /*!
-     *  TODO: we only prepare one worker stream here, is this sufficient?
-     */
-    void *worker_stream;
+    static void __done(POSWorkspace* ws, POSAPIContext_QE* wqe);
 
     #if POS_CKPT_OPT_LEVEL == 2
         // overlapped checkpoint context
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
-
+    
     #if POS_MIGRATION_OPT_LEVEL == 2
-        migration_async_cxt_t async_migration_cxt;
+        // stream for precopy
+        uint64_t _migration_precopy_stream_id;
     #endif
+
+    /*!
+     *  \brief  make the specified stream synchronized
+     *  \param  stream_id   index of the stream to be synced, default to be 0
+     */
+    virtual pos_retval_t sync(uint64_t stream_id=0){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
  protected:
     // stop flag to indicate the daemon thread to stop
@@ -215,6 +172,9 @@ class POSWorker {
 
     // global workspace
     POSWorkspace *_ws;
+
+    // corresonding client
+    POSClient *_client;
 
     // worker function map
     std::map<uint64_t, pos_worker_launch_function_t> _launch_functions;
@@ -232,11 +192,7 @@ class POSWorker {
         uint64_t _ckpt_commit_stream_id;
     #endif
 
-    #if POS_MIGRATION_OPT_LEVEL == 2
-        // stream for precopy
-        uint64_t _migration_precopy_stream_id;
-    #endif
-
+    
     /*!
      *  \brief  insertion of worker functions
      *  \return POS_SUCCESS for succefully insertion
@@ -252,25 +208,6 @@ class POSWorker {
     virtual pos_retval_t daemon_init(){
         return POS_SUCCESS; 
     }
-
-    /*!
-     *  \brief  make the specified stream synchronized
-     *  \param  stream_id   index of the stream to be synced, default to be 0
-     */
-    virtual pos_retval_t sync(uint64_t stream_id=0){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
-    #if POS_MIGRATION_OPT_LEVEL == 2
-        virtual pos_retval_t migration_remote_malloc(POSClient* clien){
-            return POS_FAILED_NOT_IMPLEMENTED;
-        }
-
-        virtual void migration_precopy_asyc_thread(){
-            POS_LOG("step 3: pre-copy");
-            this->async_migration_cxt.precopy_finished = true;
-        }
-    #endif
 
  private:
     /*!
