@@ -37,6 +37,7 @@ enum : pos_resource_typeid_t {
  *  \brief  status of a handle instance
  */
 enum pos_handle_status_t : uint8_t {
+    /* ========= Status of Handle Existance ========= */
     /*!
      *  \brief  the resource behind this handle is active 
      *          on the XPU device, if an op rely on this 
@@ -77,7 +78,26 @@ enum pos_handle_status_t : uint8_t {
      *          resource before launching any op that rely
      *          on it
      */
-    kPOS_HandleStatus_Broken
+    kPOS_HandleStatus_Broken,
+
+    /* ========= Status of Handle State ========= */
+    /*!
+     *  \brief  the state of resource behind this handle is
+     *          ready on the XPU device
+     */
+    kPOS_HandleStatus_StateReady,
+
+    /*!
+     *  \brief  the state of resource behind this handle is
+     *          missing on the XPU device, one need to reload
+     *          the state before executing ops rely on it
+     */
+    kPOS_HandleStatus_StateMiss,
+
+    /*!
+     *  \brief  the state of this handle is pending to reload
+     */
+    kPOS_HandleStatus_StateReloadPending
 };
 
 
@@ -103,8 +123,8 @@ class POSHandle {
         void *client_addr_, size_t size_, void* hm, size_t state_size_=0
     ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
+        state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -121,8 +141,8 @@ class POSHandle {
         size_t size_, void* hm, size_t state_size_=0
     ) : client_addr(nullptr), server_addr(nullptr), size(size_),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending), state_size(state_size_),
-        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
+        state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -137,8 +157,8 @@ class POSHandle {
         void* hm
     ) : client_addr(nullptr), server_addr(nullptr), size(0),
         dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending), state_size(0),
-        latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending),  state_status(kPOS_HandleStatus_StateMiss),
+        state_size(0), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -298,6 +318,16 @@ class POSHandle {
 
 
     /*!
+     *  \brief  mark the status of state of the resource behind this handle
+     *  \param  status the state status to mark
+     */
+    inline void mark_state_status(pos_handle_status_t status){
+        POS_ASSERT(status == kPOS_HandleStatus_StateReady || status == kPOS_HandleStatus_StateMiss);
+        this->state_status = status;
+    }
+
+
+    /*!
      *  \brief  checkpoint the state of the resource behind this handle (sync)
      *  \note   only handle of stateful resource should implement this method
      *  \param  version_id  version of this checkpoint
@@ -407,7 +437,7 @@ class POSHandle {
      *  \brief  restore the current handle when it becomes broken status
      *  \return POS_SUCCESS for successfully restore
      */
-    virtual pos_retval_t restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
+    pos_retval_t restore();
 
 
     /*!
@@ -416,6 +446,14 @@ class POSHandle {
      */
     virtual pos_retval_t remote_restore(){ return POS_FAILED_NOT_IMPLEMENTED; }
     
+
+    /*!
+     *  \brief  reload the state behind current handle to the device
+     *  \param  stream_id   stream for reloading the state
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t reload_state(uint64_t stream_id=0);
+
 
     /*!
      *  \brief  obtain the resource name begind this handle
@@ -470,8 +508,9 @@ class POSHandle {
     */
     pos_resource_typeid_t resource_type_id;
 
-    // status of the resource behind this handle
+    // exitance and state status of the resource behind this handle
     pos_handle_status_t status;
+    pos_handle_status_t state_status;
 
     // the mocked client-side address of the handle
     void *client_addr;
@@ -540,6 +579,26 @@ class POSHandle {
      *  \note   the belonging handle manager
      */
     void *_hm;
+
+    /*!
+     *  \brief  restore the current handle when it becomes broken status
+     *  \return POS_SUCCESS for successfully restore
+     */
+    virtual pos_retval_t __restore(){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+    
+    /*!
+     *  \brief  reload state of this handle back to the device
+     *  \param  data        source data to be reloaded
+     *  \param  offset      offset from the base address of this handle to be reloaded
+     *  \param  size        reload size
+     *  \param  stream_id   stream for reloading the state
+     *  \param  on_device   whether the source data is on device
+     */
+    virtual pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  commit the state of the resource behind this handle
@@ -653,10 +712,73 @@ class POSHandleManager {
      *  \param  is_stateful indicate whether the resource behind such handle conatains state
      */
     POSHandleManager(bool passthrough = false, bool is_stateful = false)
-        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough), _is_stateful(is_stateful) {}
+        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough), _is_stateful(is_stateful)
+    {}
 
     ~POSHandleManager() = default;
     
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    virtual pos_retval_t preserve_pooled_handles(uint64_t amount){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i=0;
+        T_POSHandle *handle = nullptr;
+        
+        for(i=0; i<amount; i++){
+            retval = this->__allocate_mocked_resource(&handle, false);
+            POS_CHECK_POINTER(handle);
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C("failed to preserve %s handle for fast restoring", handle->get_resource_name().c_str());
+                retval = POS_FAILED;
+                goto exit;
+            }
+
+            retval = handle->restore();
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C("failed to restore %s handle after allocation for fast restoring", handle->get_resource_name().c_str());
+                retval = POS_FAILED;
+                goto exit;
+            }
+
+            this->_pooled_handles.insert(handle);
+        }
+
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    virtual pos_retval_t try_restore_from_pool(T_POSHandle* handle){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle *preserved_handle;
+
+        POS_CHECK_POINTER(handle);
+
+        if(unlikely(this->_pooled_handles.size() == 0)){
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        preserved_handle = (*(this->_pooled_handles.begin()));
+        POS_CHECK_POINTER(preserved_handle);
+        this->_pooled_handles.erase(this->_pooled_handles.begin());
+
+        //! \todo   is simply reasssign server-side address enough?
+        handle->server_addr = preserved_handle->server_addr;
+        handle->status = kPOS_HandleStatus_Active;
+
+    exit:
+        return retval;
+    }
+
     /*!
      *  \brief  allocate new mocked resource within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
@@ -761,6 +883,9 @@ class POSHandleManager {
      *            (e.g., cudaGetDevice, cudaMalloc)
      */
     T_POSHandle* latest_used_handle;
+
+    //! \todo  mock
+    void* backup_base_memory;
 
     /*!
      *  \brief  obtain the number of recorded handles
@@ -928,7 +1053,7 @@ class POSHandleManager {
     bool _is_stateful;
 
     std::vector<T_POSHandle*> _handles;
-
+    
     /*!
      *  \brief  this map records all modified buffers since last checkpoint, 
      *          will be updated during parsing, and cleared during launching
@@ -942,6 +1067,11 @@ class POSHandleManager {
     std::set<T_POSHandle*> _host_stateful_handles;
 
     /*!
+     *  \brief  pooled active handles for fast restore
+     */
+    std::set<T_POSHandle*> _pooled_handles;
+
+    /*!
      *  \brief  allocate new mocked resource within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
      *  \param  size            size of the newly allocated resource
@@ -952,7 +1082,7 @@ class POSHandleManager {
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t __allocate_mocked_resource(
-        T_POSHandle** handle, size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr=0, uint64_t state_size = 0
+        T_POSHandle** handle, bool do_put = true, size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr=0, uint64_t state_size = 0
     );
 
     /*!
@@ -991,7 +1121,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
     uint64_t expected_addr,
     uint64_t state_size
 ){
-    return __allocate_mocked_resource(handle, size, state_size);
+    return __allocate_mocked_resource(handle, true, size, state_size);
 }
 
 /*!
@@ -1007,6 +1137,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
 template<class T_POSHandle>
 pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
     T_POSHandle** handle,
+    bool do_put,
     size_t size,
     uint64_t expected_addr,
     uint64_t state_size
@@ -1052,7 +1183,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         _base_ptr, size, (*handle)->resource_type_id
     );
 
-    this->_handles.push_back(*handle);
+    if(do_put)
+        this->_handles.push_back(*handle);
 
   exit:
     return retval;

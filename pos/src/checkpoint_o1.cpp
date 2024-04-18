@@ -110,6 +110,7 @@ pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot
 exit:
     return retval;
 }
+template pos_retval_t POSCheckpointBag::get_checkpoint_slot<true>(POSCheckpointSlot** ckpt_slot, uint64_t version); /* for migration */
 template pos_retval_t POSCheckpointBag::get_checkpoint_slot<false>(POSCheckpointSlot** ckpt_slot, uint64_t version);
 
 
@@ -143,6 +144,7 @@ std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set(){
         return _use_front ? std::set<uint64_t>({_back_version}) : std::set<uint64_t>({_front_version});
     }
 }
+template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<true>();   /* for migration */
 template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<false>();
 
 /*!

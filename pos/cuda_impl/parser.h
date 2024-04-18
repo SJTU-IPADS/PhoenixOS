@@ -4,10 +4,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
-#include "pos/include/client.h"
 #include "pos/include/transport.h"
 #include "pos/include/parser.h"
-#include "pos/cuda_impl/client.h"
 
 #include "pos/cuda_impl/api_index.h"
 
@@ -61,32 +59,22 @@ namespace ps_functions {
     POS_PS_DECLARE_FUNCTIONS(remoting_deinit);
 } // namespace ps_functions
 
+class POSClient_CUDA;
+
 /*!
- *  \brief  POS Runtime (CUDA Implementation)
- *  \note   1. Parser:      parsing each API call, translate virtual handles to physicall handles;
- *          2. DAG:         maintainance of launch flow for checkpoint/restore and scheduling;
- *          3. Scheduler:   launch unfinished / previously-failed call to worker
+ *  \brief  POS Parser (CUDA Implementation)
  */
 class POSParser_CUDA : public POSParser {
  public:
-    POSParser_CUDA(POSWorkspace* ws) : POSParser(ws){}
+    POSParser_CUDA(POSWorkspace* ws, POSClient* client) : POSParser(ws, client){}
     ~POSParser_CUDA() = default;
-
+    
  private:
     /*!
      *  \brief      initialization of the runtime daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread
      */
     pos_retval_t daemon_init() override {
-        // /*!
-        //  *  \note   make sure the worker thread is bound to a CUDA context
-        //  *          if we don't do this and use the driver API, it might be unintialized
-        //  */
-        // if(cudaSetDevice(0) != cudaSuccess){
-        //     POS_WARN_C_DETAIL("runtime thread failed to invoke cudaSetDevice");
-        //     return POS_FAILED; 
-        // }
-        // cudaDeviceSynchronize();
         return POS_SUCCESS; 
     }
 

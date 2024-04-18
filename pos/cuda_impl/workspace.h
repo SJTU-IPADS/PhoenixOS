@@ -27,16 +27,6 @@ class POSWorkspace_CUDA : public POSWorkspace{
      *  \return POS_SUCCESS for successfully initialization
      */
     pos_retval_t init() override {
-        // create runtime
-        this->runtime = new POSParser_CUDA(/* ws */ this);
-        POS_CHECK_POINTER(this->runtime);
-        this->runtime->init();
-
-        // create worker
-        this->worker = new POSWorker_CUDA( /* ws */ this );
-        POS_CHECK_POINTER(this->worker);
-        this->worker->init();
-
         // create the api manager
         this->api_mgnr = new POSApiManager_CUDA();
         POS_CHECK_POINTER(this->api_mgnr);
@@ -62,7 +52,7 @@ class POSWorkspace_CUDA : public POSWorkspace{
         client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
         client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
 
-        POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* id */ _current_max_uuid, /* cxt */ client_cxt));
+        POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* ws */ this, /* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();
         
         *uuid = _current_max_uuid;
@@ -72,4 +62,45 @@ class POSWorkspace_CUDA : public POSWorkspace{
         POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), *uuid);
         return POS_SUCCESS;
     }
+
+ protected:
+    /*!
+     *  \brief  thread for ondemand reload stateful handles during restore
+     */
+    // void __ondemand_reload_thread() override {
+    //     pos_ondemand_reload_job_t *plan;
+
+    //     auto __process_one_plan = [&](pos_ondemand_reload_job_t *plan){
+    //         POS_CHECK_POINTER(plan->handle);
+    //         POS_CHECK_POINTER(plan->client);
+
+    //         switch(handle->resource_type_id){
+    //         case: kPOS_ResourceTypeId_CUDA_Memory:
+    //             if(unlikely(POS_SUCCESS != plan->handle->reload_state())){
+    //                 POS_WARN("failed to reload state of handle: server_addr(%p)", handle->server_addr);
+    //             }
+    //             break;
+    //         case: kPOS_ResourceTypeId_CUDA_Module:
+    //             // do nothing
+    //             break;
+    //         default:
+    //             POS_WARN("unsupport CUDA resource for reloading state, this is a bug: resource_type_id(%u)", handle->resource_type_id);
+    //         };
+    //     };
+
+    //     while(!this->ondemand_reload_cxt.stop_flag){
+    //         if(POS_SUCCESS == this->ondemand_reload_cxt.wq_from_parser->dequeue(plan)){ 
+    //             POS_CHECK_POINTER(plan);
+    //             __process_one_plan(plan);
+    //         }
+            
+    //         if(POS_SUCCESS == this->ondemand_reload_cxt.wq_from_worker->dequeue(plan)){ 
+    //             POS_CHECK_POINTER(plan);
+    //             __process_one_plan(plan);
+    //         }
+    //     }
+
+    // exit:
+    //     this->ondemand_reload_cxt.is_active = false;
+    // }
 };

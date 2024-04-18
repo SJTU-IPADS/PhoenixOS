@@ -10,6 +10,8 @@
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/handle/cublas.h"
 #include "pos/cuda_impl/api_index.h"
+#include "pos/cuda_impl/parser.h"
+#include "pos/cuda_impl/worker.h"
 
 
 /*!
@@ -26,11 +28,22 @@ class POSClient_CUDA : public POSClient {
      *  \param  id  client identifier
      *  \param  cxt context to initialize this client
      */
-    POSClient_CUDA(uint64_t id, pos_client_cxt_CUDA_t cxt) 
-        : POSClient(id, cxt.cxt_base), _cxt_CUDA(cxt){}
+    POSClient_CUDA(POSWorkspace *ws, uint64_t id, pos_client_cxt_CUDA_t cxt) 
+        : POSClient(id, cxt.cxt_base), _cxt_CUDA(cxt)
+    {
+        // raise parser thread
+        this->parser = new POSParser_CUDA(/* ws */ ws, /* client */ this);
+        POS_CHECK_POINTER(this->parser);
+        this->parser->init();
+
+        // raise worker thread
+        this->worker = new POSWorker_CUDA(/* ws */ ws, /* client */ this);
+        POS_CHECK_POINTER(this->worker);
+        this->worker->init();
+    }
 
     POSClient_CUDA(){}
-    ~POSClient_CUDA(){};
+    ~POSClient_CUDA(){}
     
     /*!
      *  \brief  instantiate handle manager for all used CUDA resources
@@ -143,7 +156,290 @@ class POSClient_CUDA : public POSClient {
         this->__dump_hm_cuda_functions();
     }
 
- 
+    /*! 
+     *  \brief  remote malloc memories during migration
+     */
+    void __TMP__migration_remote_malloc(){
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        uint64_t i, nb_handles;
+
+        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
+        POS_CHECK_POINTER(hm_memory);
+
+        nb_handles = hm_memory->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            memory_handle = hm_memory->get_handle_by_id(i);
+            POS_CHECK_POINTER(memory_handle);
+            if(unlikely(POS_SUCCESS != memory_handle->remote_restore())){
+                POS_WARN("failed to remotely restore memory handle: server_addr(%p)", memory_handle->server_addr);
+            }
+        }
+
+        // force switch to origin device
+        cudaSetDevice(0);
+
+    exit:
+        ;
+    }
+
+    /*! 
+     *  \brief  precopy stateful handles to another device during migration
+     */
+    void __TMP__migration_precopy() override {
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandle_CUDA_Memory *memory_handle;
+        uint64_t i, nb_handles;
+        cudaError_t cuda_rt_retval;
+        uint64_t s_tick, e_tick;
+        typename std::set<POSHandle_CUDA_Memory*>::iterator memory_handle_set_iter;
+
+        uint64_t nb_precopy_handle = 0, precopy_size = 0; 
+
+        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
+        POS_CHECK_POINTER(hm_memory);
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        std::set<POSHandle_CUDA_Memory*>& modified_handles = hm_memory->get_modified_handles();
+        if(likely(modified_handles.size() > 0)){
+            for(memory_handle_set_iter = modified_handles.begin(); memory_handle_set_iter != modified_handles.end(); memory_handle_set_iter++){
+                memory_handle = *memory_handle_set_iter;
+                POS_CHECK_POINTER(memory_handle);
+
+                // skip duplicated buffers
+                if(hm_memory->is_host_stateful_handle(memory_handle)){
+                    this->migration_ctx.__TMP__host_handles.insert(memory_handle);
+                    continue;
+                }
+
+                cuda_rt_retval = cudaMemcpyPeerAsync(
+                    /* dst */ memory_handle->remote_server_addr,
+                    /* dstDevice */ 1,
+                    /* src */ memory_handle->server_addr,
+                    /* srcDevice */ 0,
+                    /* count */ memory_handle->state_size,
+                    /* stream */ (cudaStream_t)(this->worker->_migration_precopy_stream_id)
+                );
+                if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
+                    POS_WARN("failed to p2p copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
+                    continue;
+                }
+            
+                cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(this->worker->_migration_precopy_stream_id));
+                if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
+                    POS_WARN("failed to synchronize p2p copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
+                    continue;
+                }
+
+                this->migration_ctx.precopy_handles.insert(memory_handle);
+                nb_precopy_handle += 1;
+                precopy_size += memory_handle->state_size;
+            }
+        }
+        e_tick = POSUtilTimestamp::get_tsc();
+
+        nb_handles = hm_memory->get_nb_handles();
+        POS_LOG(
+            "pre-copy finished: "
+            "duration(%lf us), "
+            "nb_precopy_handle(%lu), precopy_size(%lu Bytes)"
+            ,
+            POS_TSC_TO_USEC(e_tick-s_tick),
+            nb_precopy_handle, precopy_size
+        );
+
+        hm_memory->clear_modified_handle();
+
+    exit:
+        ;
+    }
+    
+    /*! 
+     *  \brief  deltacopy stateful handles to another device during migration
+     */
+    void __TMP__migration_deltacopy() override {
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        typename std::set<POSHandle*>::iterator set_iter;
+        POSHandle *memory_handle;
+        uint64_t nb_deltacopy_handle = 0, deltacopy_size = 0;
+        cudaError_t cuda_rt_retval;
+        uint64_t s_tick, e_tick;
+
+        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
+        POS_CHECK_POINTER(hm_memory);
+
+        s_tick = POSUtilTimestamp::get_tsc();
+        for(set_iter = this->migration_ctx.invalidated_handles.begin(); set_iter != this->migration_ctx.invalidated_handles.end(); set_iter++){
+            memory_handle = *set_iter;
+
+            // skip duplicated buffers
+            if(hm_memory->is_host_stateful_handle((POSHandle_CUDA_Memory*)(memory_handle))){
+                continue;
+            }
+
+            cuda_rt_retval = cudaMemcpyPeerAsync(
+                /* dst */ memory_handle->remote_server_addr,
+                /* dstDevice */ 1,
+                /* src */ memory_handle->server_addr,
+                /* srcDevice */ 0,
+                /* count */ memory_handle->state_size,
+                /* stream */ (cudaStream_t)(this->worker->_migration_precopy_stream_id)
+            );
+            if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
+                POS_WARN("failed to p2p delta copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
+                continue;
+            }
+
+            cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(this->worker->_migration_precopy_stream_id));
+            if(unlikely(cuda_rt_retval != CUDA_SUCCESS)){
+                POS_WARN("failed to synchronize p2p delta copy memory: server_addr(%p), state_size(%lu)", memory_handle->server_addr, memory_handle->state_size);
+                continue;
+            }
+
+            nb_deltacopy_handle += 1;
+            deltacopy_size += memory_handle->state_size;
+        }
+        e_tick = POSUtilTimestamp::get_tsc();
+
+        POS_LOG(
+            "    delta-copy finished: "
+            "duration(%lf us), nb_delta_handle(%lu), delta_copy_size(%lu Bytes)", 
+            POS_TSC_TO_USEC(e_tick-s_tick), nb_deltacopy_handle, deltacopy_size
+        );
+
+    exit:
+        ;
+    }
+
+    void __TMP__migration_tear_context(bool do_tear_module) override {
+        POSHandleManager_CUDA_Context *hm_context;
+        POSHandleManager_cuBLAS_Context *hm_cublas;
+        POSHandleManager_CUDA_Stream *hm_stream;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Function *hm_function;
+
+        POSHandle_CUDA_Context *context_handle;
+        POSHandle_cuBLAS_Context *cublas_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Function *function_handle;
+
+        uint64_t i, nb_handles;
+
+        hm_context = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context);
+        POS_CHECK_POINTER(hm_context);
+        hm_cublas = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context);
+        POS_CHECK_POINTER(hm_cublas);
+        hm_stream = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream);
+        POS_CHECK_POINTER(hm_stream);
+        hm_module = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module);
+        POS_CHECK_POINTER(hm_module);
+        hm_function = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function);
+        POS_CHECK_POINTER(hm_function);
+
+        POS_LOG("destory cublas")
+        nb_handles = hm_cublas->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            cublas_handle = hm_cublas->get_handle_by_id(i);
+            POS_CHECK_POINTER(cublas_handle);
+            if(cublas_handle->status == kPOS_HandleStatus_Active){
+                cublasDestroy_v2((cublasHandle_t)(cublas_handle->server_addr));
+                cublas_handle->status = kPOS_HandleStatus_Broken;
+            }
+        }
+
+        // destory streams
+        POS_LOG("destory streams")
+        nb_handles = hm_stream->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            stream_handle = hm_stream->get_handle_by_id(i);
+            POS_CHECK_POINTER(stream_handle);
+            if(stream_handle->status == kPOS_HandleStatus_Active){
+                cudaStreamDestroy((cudaStream_t)(stream_handle->server_addr));
+                stream_handle->status = kPOS_HandleStatus_Broken;
+            }
+        }
+
+        if(do_tear_module){
+            POS_LOG("modules & functions")
+            nb_handles = hm_module->get_nb_handles();
+            for(i=0; i<nb_handles; i++){
+                module_handle = hm_module->get_handle_by_id(i);
+                POS_CHECK_POINTER(module_handle);
+                if(module_handle->status == kPOS_HandleStatus_Active){
+                    cuModuleUnload((CUmodule)(module_handle->server_addr));
+                    module_handle->status = kPOS_HandleStatus_Broken;
+                }
+            }
+
+            nb_handles = hm_function->get_nb_handles();
+            for(i=0; i<nb_handles; i++){
+                function_handle = hm_function->get_handle_by_id(i);
+                if(function_handle->status == kPOS_HandleStatus_Active){
+                    function_handle->status = kPOS_HandleStatus_Broken;
+                }
+            }
+        }
+    }
+
+    void __TMP__migration_restore_context(bool do_restore_module){
+        POSHandleManager_CUDA_Context *hm_context;
+        POSHandleManager_cuBLAS_Context *hm_cublas;
+        POSHandleManager_CUDA_Stream *hm_stream;
+        POSHandleManager_CUDA_Module *hm_module;
+        POSHandleManager_CUDA_Function *hm_function;
+
+        POSHandle_CUDA_Context *context_handle;
+        POSHandle_cuBLAS_Context *cublas_handle;
+        POSHandle_CUDA_Stream *stream_handle;
+        POSHandle_CUDA_Module *module_handle;
+        POSHandle_CUDA_Function *function_handle;
+
+        uint64_t i, nb_handles;
+
+        hm_context = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context);
+        POS_CHECK_POINTER(hm_context);
+        hm_cublas = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context);
+        POS_CHECK_POINTER(hm_cublas);
+        hm_stream = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Stream, POSHandleManager_CUDA_Stream);
+        POS_CHECK_POINTER(hm_stream);
+        hm_module = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module);
+        POS_CHECK_POINTER(hm_module);
+        hm_function = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Function, POSHandleManager_CUDA_Function);
+        POS_CHECK_POINTER(hm_function);
+
+        // restore cublas
+        nb_handles = hm_cublas->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            cublas_handle = hm_cublas->get_handle_by_id(i);
+            cublas_handle->restore();
+        }
+
+        // restore streams
+        nb_handles = hm_stream->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            stream_handle = hm_stream->get_handle_by_id(i);
+            stream_handle->restore();
+        }
+
+        // restore modules & functions
+        if(do_restore_module){
+            nb_handles = hm_module->get_nb_handles();
+            for(i=0; i<nb_handles; i++){
+                module_handle = hm_module->get_handle_by_id(i);
+                module_handle->restore();
+            }
+
+            nb_handles = hm_function->get_nb_handles();
+            for(i=0; i<nb_handles; i++){
+                function_handle = hm_function->get_handle_by_id(i);
+                function_handle->restore();
+            }
+        }
+    }
+
  protected:
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type

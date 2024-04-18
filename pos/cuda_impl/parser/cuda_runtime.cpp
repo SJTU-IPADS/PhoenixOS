@@ -663,7 +663,12 @@ namespace cuda_memcpy_h2d {
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 1,
+            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
+            .size = pos_api_param_value(wqe, 2, uint64_t)
+        });
     #endif
         hm_memory->record_host_stateful_handle(memory_handle);
 
@@ -922,7 +927,12 @@ namespace cuda_memcpy_h2d_async {
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 1,
+            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
+            .size = pos_api_param_value(wqe, 2, uint64_t)
+        });
     #endif
         hm_memory->record_host_stateful_handle(memory_handle);
 

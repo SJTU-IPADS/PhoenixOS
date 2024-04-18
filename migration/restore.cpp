@@ -11,65 +11,29 @@
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
 
+#define CLIENT_IP "10.66.20.1"
 #define SERVER_IP "10.66.10.1"
 #define SERVER_UDP_PORT POS_OOB_SERVER_DEFAULT_PORT
 
-void printf_error();
-
-typedef struct POSOobMsg_RestoreSignal {
-    // type of the message
-    pos_oob_msg_typeid_t msg_type;
-
-    // meta data of a out-of-band client
-    POSOobClientMeta_t client_meta;
-} POSOobMsg_RestoreSignal_t;
+typedef struct migration_cli_meta {
+    uint64_t client_uuid;
+} migration_cli_meta_t;
 
 int main(){
     int retval;
-    int s;
-    int len;
-    char recvbuf[128];
-    char sendbuf[128];
-    struct sockaddr_in local, remote;
-    
-    POSOobMsg_RestoreSignal_t restore_signal_msg;
 
-    // create socket
-    s = socket(AF_INET, SOCK_DGRAM, 0);
-    if (s < 0) {
-        printf_error();
-        goto exit;
-    }
+    migration_cli_meta_t cli_meta;
+    cli_meta.client_uuid = 0;
 
-    // set up server address
-    remote.sin_family = AF_INET;
-    //remote.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    remote.sin_addr.s_addr = inet_addr(SERVER_IP);
-    remote.sin_port = htons(SERVER_UDP_PORT);
-    
-    // send
-    memset(&restore_signal_msg, 0, sizeof(POSOobMsg_RestoreSignal_t));
-    restore_signal_msg.msg_type = kPOS_Oob_Restore_Signal;
+    POSOobClient oob_client(
+        /* local_port */ 10086,
+        /* local_ip */ CLIENT_IP,
+        /* server_port */ POS_OOB_SERVER_DEFAULT_PORT,
+        /* server_ip */ SERVER_IP
+    );
 
-    len = sizeof(remote);
-    retval = sendto(s, &restore_signal_msg, sizeof(POSOobMsg_RestoreSignal_t), 0, (struct sockaddr*)&remote, len);
-    if(retval < 0){
-        printf_error();
-        goto exit;
-    }
-    fprintf(stdout, "[POS] successfully restore signal\n");
+    oob_client.call(kPOS_Oob_Restore_Signal, &cli_meta);
     
 exit:       
-    if(s > 0){
-        close(s);
-    }
-}
-
-void printf_error() {
-    #ifdef _WIN32
-        int retval = WSAGetLastError();
-        fprintf(stderr, "socket error: %d\n", retval);
-    #elif __linux__
-        fprintf(stderr, "socket error: %s(errno: %d)\n",strerror(errno),errno);
-    #endif
+    return retval;
 }

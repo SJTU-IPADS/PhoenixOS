@@ -1,4 +1,4 @@
-if [ "$CRTOOLS_SCRIPT_ACTION" = pre-dump ]; then    # it maybe not correct to be pre-dump
+if [ "$CRTOOLS_SCRIPT_ACTION" = pre-dump ]; then
     /root/samples/migrate
 fi
 

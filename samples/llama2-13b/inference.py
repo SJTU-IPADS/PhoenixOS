@@ -6,10 +6,10 @@ from huggingface_hub import login
 login(token = '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')
 
 model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto')
-model.save_pretrained('./model')
+model.save_pretrained('../model/llama2-13b')
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-tokenizer.save_pretrained('./tokenizer')
+tokenizer.save_pretrained('../tokenizer/llama2-13b')
 
 exit(0)
 

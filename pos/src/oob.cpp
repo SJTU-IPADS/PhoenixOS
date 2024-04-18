@@ -4,7 +4,6 @@
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
 #include "pos/include/log.h"
-#include "pos/include/transport.h"
 #include "pos/include/api_context.h"
 #include "pos/include/workspace.h"
 #include "pos/include/agent.h"
@@ -30,7 +29,6 @@ namespace register_client {
         oob_payload_t *payload;
 
         POSClient *clnt;
-        POSTransport_SHM *trans;
 
         POS_CHECK_POINTER(remote);
         POS_CHECK_POINTER(msg);
@@ -47,9 +45,7 @@ namespace register_client {
         }
         POS_DEBUG("create queue pair: uuid(%lu)", msg->client_meta.uuid);
 
-        // create transport
-        // todo: we need to select transport type
-        ws->create_transport<POSTransport_SHM>(&trans, msg->client_meta.uuid);
+        clnt->status = kPOS_ClientStatus_Active;
 
         payload->is_registered = true;
 
@@ -96,9 +92,6 @@ namespace unregister_client {
         POS_CHECK_POINTER(msg);
         POS_CHECK_POINTER(ws);
 
-        // remove transport
-        ws->remove_transport(msg->client_meta.uuid);
-
         // remove queue pair
         // ws->remove_qp(msg->client_meta.uuid);
 
@@ -106,6 +99,8 @@ namespace unregister_client {
         ws->remove_client(msg->client_meta.uuid);
 
         __POS_OOB_SEND();
+
+        return POS_SUCCESS;
     }
 
     // client
@@ -118,74 +113,6 @@ namespace unregister_client {
         return POS_SUCCESS;
     }
 };
-
-
-/*!
- *  \related    kPOS_Oob_Connect_Transport
- *  \brief      connect the transport between client and server
- */
-namespace connect_transport {
-    // payload format
-    typedef struct oob_payload {
-        /* client */
-        /* server */
-        bool transport_connected;
-    } oob_payload_t;
-
-    // server
-    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
-        oob_payload_t *payload;
-
-        POSTransport *trpt;
-
-        POS_CHECK_POINTER(remote);
-        POS_CHECK_POINTER(msg);
-        POS_CHECK_POINTER(ws);
-
-        payload = (oob_payload_t*)msg->payload;
-
-        trpt = ws->get_transport_by_uuid(msg->client_meta.uuid);
-        if(trpt == nullptr){
-            POS_WARN_DETAIL(
-                "[OOB %u]failed to get transport: uuid(%lu), this might be a bug",
-                kPOS_Oob_Connect_Transport,
-                msg->client_meta.uuid
-            );
-            payload->transport_connected = false;
-        } else {
-            if(POS_SUCCESS != trpt->init_bh()){
-                payload->transport_connected = false;
-            } else {
-                payload->transport_connected = true;
-            }
-        }
-
-        __POS_OOB_SEND();
-    }
-
-    // client
-    pos_retval_t clnt(
-        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
-    ){
-        int retval = POS_SUCCESS;
-        oob_payload_t *payload;
-
-        msg->msg_type = kPOS_Oob_Connect_Transport;
-        memset(msg->payload, 0, sizeof(msg->payload));
-        __POS_OOB_SEND();
-        
-        __POS_OOB_RECV();
-        payload = (oob_payload_t*)msg->payload;
-        if(payload->transport_connected == true){
-            POS_DEBUG("[OOB %u] successfully connect transport", kPOS_Oob_Connect_Transport);
-        } else {
-            POS_DEBUG("[OOB %u] failed to connect transport", kPOS_Oob_Connect_Transport);
-            retval = POS_FAILED;
-        }
-
-        return retval;
-    }
-} // namespace connect_transport
 
 
 /*!
@@ -301,31 +228,124 @@ namespace mock_api_call {
  *  \brief      migration signal send from CRIU action script
  */
 namespace migration_signal {
+    // payload format
+    typedef struct oob_payload {
+        /* client */
+        uint64_t client_uuid;
+        uint32_t remote_ipv4;
+        uint32_t port;
+        /* server */
+    } oob_payload_t;
+
+    typedef struct migration_cli_meta {
+        uint64_t client_uuid;
+    } migration_cli_meta_t;
+
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         #if POS_MIGRATION_OPT_LEVEL > 0
-            POS_LOG("receive migration signal, lock POS worker");
-            ws->mock_migration_signal = 1;
+            oob_payload_t *payload;
+            POSClient *client;
+            // pos_migration_job_t *mjob;
+
+            payload = (oob_payload_t*)msg->payload;
+            client = ws->get_client_by_uuid(payload->client_uuid);
+
+            POS_LOG("received migration signal, notify POS worker: client_uuid(%lu)", payload->client_uuid);
+            client->migration_ctx.start(payload->remote_ipv4, payload->port);
+
+            // we block until the GPU conext is finished saved, then we notify the CPU-side
+            while(client->migration_ctx.is_blocking() == false){}
+            
+            __POS_OOB_SEND();
         #else
-            POS_WARN("receive migration signal, but POS is compiled without migration support, omit");
+            POS_WARN("received migration signal, but POS is compiled without migration support, omit");
         #endif
+    }
+
+    // client
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        migration_cli_meta_t *cli_meta;
+        oob_payload_t *payload;
+
+        msg->msg_type = kPOS_Oob_Migration_Signal;
+
+        POS_CHECK_POINTER(call_data);
+        cli_meta = (migration_cli_meta_t*)call_data;
+
+        // setup payload
+        memset(msg->payload, 0, sizeof(msg->payload));
+        payload = (oob_payload_t*)msg->payload;
+        payload->client_uuid = cli_meta->client_uuid;
+        __POS_OOB_SEND();
+        
+        // wait until the GPU-side finished 
+        __POS_OOB_RECV();
+
+        return POS_SUCCESS;
     }
 } // namespace migration_signal
 
 
 /*!
- *  \related    kPOS_Oob_Restore_Signal
+ *  \related    kPOS_Oob_Restore_Signal [MOCK]
  *  \brief      restore signal send from CRIU action script
  */
 namespace restore_signal {
+    // payload format
+    typedef struct oob_payload {
+        /* client */
+        uint64_t client_uuid;
+        /* server */
+    } oob_payload_t;
+
+    typedef struct migration_cli_meta {
+        uint64_t client_uuid;
+    } migration_cli_meta_t;
+
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
         #if POS_MIGRATION_OPT_LEVEL > 0
-            POS_LOG("receive restore signal, unlock POS worker");
-            ws->mock_migration_signal = 0;
+            oob_payload_t *payload;
+            POSClient *client;
+
+            payload = (oob_payload_t*)msg->payload;
+            client = ws->get_client_by_uuid(payload->client_uuid);
+
+            POS_LOG("received restore signal, notify POS worker: client_uuid(%lu)", payload->client_uuid);
+            client->migration_ctx.restore();
         #else
             POS_WARN("receive restore signal, but POS is compiled without migration support, omit");
         #endif
+
+        return POS_SUCCESS;
+    }
+
+    // client
+    pos_retval_t clnt(
+        int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
+    ){
+        pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
+        migration_cli_meta_t *cli_meta;
+        oob_payload_t *payload;
+
+        msg->msg_type = kPOS_Oob_Restore_Signal;
+
+        POS_CHECK_POINTER(call_data);
+        cli_meta = (migration_cli_meta_t*)call_data;
+
+        // setup payload
+        memset(msg->payload, 0, sizeof(msg->payload));
+        payload = (oob_payload_t*)msg->payload;
+        payload->client_uuid = cli_meta->client_uuid;
+        __POS_OOB_SEND();
+
+        return POS_SUCCESS;
     }
 } // namespace restore_signal
 

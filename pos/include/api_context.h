@@ -331,9 +331,6 @@ typedef struct POSAPIContext_QE {
     // pointer to the POSClient instance
     void *client;
 
-    // pointer to the POSTransport instance
-    void *transport;
-
     // uuid of this API call instance within the client
     uint64_t api_inst_id;
 
@@ -395,12 +392,11 @@ typedef struct POSAPIContext_QE {
      *  \param  retval_data     pointer to the memory area that store the returned value
      *  \param  retval_size     size of the return value
      *  \param  pos_client      pointer to the POSClient instance
-     *  \param  pos_transport   pointer to the POSTransport instance
      */
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
-        uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client, void* pos_transport
-    ) : client_id(uuid), client(pos_client), transport(pos_transport), execution_stream_id(0),
+        uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client
+    ) : client_id(uuid), client(pos_client), execution_stream_id(0),
         status(kPOS_API_Execute_Status_Init), dag_vertex_id(0), api_inst_id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);

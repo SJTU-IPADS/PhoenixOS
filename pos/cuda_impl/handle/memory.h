@@ -142,10 +142,26 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
 
     /*!
+     *  \brief  restore the current handle REMOTELY when it becomes broken status
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t remote_restore() override {
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+
+        this->remote_server_addr = ((POSHandleManager<POSHandle_CUDA_Memory>*)(this->_hm))->backup_base_memory;
+        
+    exit:
+        return retval;
+    }
+
+
+ protected:
+    /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         
         cudaError_t cuda_rt_retval;
@@ -245,70 +261,44 @@ class POSHandle_CUDA_Memory : public POSHandle {
 
 
     /*!
-     *  \brief  restore the current handle REMOTELY when it becomes broken status
-     *  \return POS_SUCCESS for successfully restore
+     *  \brief  reload state of this handle back to the device
+     *  \param  data        source data to be reloaded
+     *  \param  offset      offset from the base address of this handle to be reloaded
+     *  \param  size        reload size
+     *  \param  stream_id   stream for reloading the state
+     *  \param  on_device   whether the source data is on device
      */
-    pos_retval_t remote_restore() override {
+    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
         pos_retval_t retval = POS_SUCCESS;
         cudaError_t cuda_rt_retval;
 
-        cudaSetDevice(1);
-        
-        cuda_rt_retval = cudaMalloc(&this->remote_server_addr, this->state_size);
+        POS_CHECK_POINTER(data);
 
-        cudaSetDevice(0);
+        cuda_rt_retval = cudaMemcpyAsync(
+            /* dst */ this->server_addr,
+            /* src */ data,
+            /* count */ size,
+            /* kind */ on_device == false ? cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice,
+            /* stream */ (cudaStream_t)(stream_id)
+        );
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed to reload state of CUDA memory: server_addr(%p), retval(%d)", this->server_addr, cuda_rt_retval);
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed to synchronize after reloading state of CUDA memory: server_addr(%p), retval(%d)", this->server_addr, cuda_rt_retval);
+            retval = POS_FAILED;
+            goto exit;
+        }
 
     exit:
         return retval;
     }
 
 
-    /*!
-     *  \brief  reload checkpoint data to device
-     *  \param  version     version of the checkpoint to be reloaded
-     *  \param  load_latest whether to load the latest checkpoint to the GPU
-     *                      (if this option is enabled, version param will be invalidated)
-     *  \return POS_SUCCESS for successfully reloading
-     */
-    pos_retval_t reload_state_to_device(pos_vertex_id_t version, bool load_latest=false) override {
-        pos_retval_t retval = POS_SUCCESS;
-        cudaError_t cuda_rt_retval;
-        std::set<uint64_t> ckpt_version_set;
-        uint64_t ckpt_version;
-        POSCheckpointSlot *ckpt_slot = nullptr;
-        void *src_data;
-
-        POS_ASSERT(this->status == kPOS_HandleStatus_Active);
-        POS_CHECK_POINTER(this->ckpt_bag);
-
-        if(load_latest){
-            ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set</* on_deivce */false>();
-            version = *(ckpt_version_set.rbegin());
-        }
-
-        retval = this->ckpt_bag->get_checkpoint_slot</* on_device */false>(&ckpt_slot, version);
-        POS_ASSERT(retval == POS_SUCCESS);
-        POS_CHECK_POINTER(ckpt_slot);
-        POS_CHECK_POINTER(src_data = ckpt_slot->expose_pointer());
-
-        cuda_rt_retval = cudaMemcpy(
-            /* dst */ this->server_addr,
-            /* src */ src_data,
-            /* size */ this->state_size,
-            /* kind */ cudaMemcpyHostToDevice
-        );
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C_DETAIL(
-                "failed to cudaMemcpy checkpoint to GPU: client_addr(%p), retval(%d)",
-                this->client_addr, cuda_rt_retval
-            );
-            retval = POS_FAILED;
-        }
-
-        return retval;
-    }
-
- protected:
     /*!
      *  \brief  commit the state of the resource behind this handle
      *  \param  version_id  version of this checkpoint
@@ -603,6 +593,26 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
             cudaDeviceEnablePeerAccess(dst_device_id, 0);
         };
 
+        // we mock that we have preallocated a huge b
+        auto __malloc_huge_backup_memory_for_migration = [](int device_id) -> void* {
+            cudaError_t cuda_rt_retval;
+            void *ptr;
+
+            // switch to target device
+            if(unlikely(cudaSuccess != cudaSetDevice(device_id))){
+                POS_ERROR_DETAIL("failed to call cudaSetDevice");
+            }
+            cudaDeviceSynchronize();
+
+            cuda_rt_retval = cudaMalloc(&ptr, GB(12));
+            if(unlikely(cuda_rt_retval != cudaSuccess)){
+                POS_WARN("failed to preserve %lu bytes on the backup device", GB(12));
+            }
+            POS_LOG("reserved backup memory space: device_id(%d), size(%lu)", device_id, GB(12));
+
+            return ptr;
+        };
+
         // no need to conduct reserving if previous hm has already done
         if(has_finshed_reserved == true){
             goto exit;
@@ -613,10 +623,9 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
             POS_ERROR_C_DETAIL("failed to call cudaGetDeviceCount");
         }
 
-        // we reserve virtual memory spave on each device
-        for(i=0; i<num_device; i++){
-            __reserve_device_vm_space(i);
-        }
+        // we reserve virtual memory space on each device
+        __reserve_device_vm_space(0);
+        this->backup_base_memory = __malloc_huge_backup_memory_for_migration(1);
 
         // setup peer access of all devices
         for(i=0; i<num_device; i++){
@@ -695,7 +704,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         POSHandleManager_CUDA_Memory::alloc_ptrs[device_handle->device_id] += aligned_alloc_size;
     #undef ROUND_UP
         
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, aligned_alloc_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, aligned_alloc_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA memory in the manager");
             goto exit;
@@ -707,5 +716,24 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
 
     exit:
         return retval;
+    }
+
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
+        return POS_SUCCESS;
+    }
+
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Memory* handle) override {
+        return POS_FAILED;
     }
 };

@@ -98,11 +98,12 @@ class POSHandle_CUDA_Function : public POSHandle {
     // cbank parameter size (p.s., what is this?)
     uint64_t cbank_param_size;
 
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         CUresult cuda_dv_retval;
         CUfunction function = NULL;
@@ -129,7 +130,7 @@ class POSHandle_CUDA_Function : public POSHandle {
         return retval;
     }
 
- protected:
+
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -338,7 +339,7 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
         module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
         POS_CHECK_POINTER(module_handle);
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
             goto exit;
@@ -348,5 +349,24 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
 
     exit:
         return retval;
+    }
+
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
+        return POS_SUCCESS;
+    }
+
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Function* handle) override {
+        return POS_FAILED;
     }
 };

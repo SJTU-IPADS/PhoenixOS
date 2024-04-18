@@ -39,6 +39,8 @@
 
 static_assert(!(POS_MIGRATION_OPT_LEVEL == 1 && POS_MIGRATION_OPT_LEVEL == 1));
 
+#define POS_ENABLE_CONTEXT_POOL         @pos_enable_context_pool@
+
 /*!
  *  \brief  common checkpoint configurations
  */

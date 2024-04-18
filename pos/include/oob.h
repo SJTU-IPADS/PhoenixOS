@@ -43,7 +43,6 @@ typedef struct POSOobClientMeta {
 enum pos_oob_msg_typeid_t {
     kPOS_Oob_Register_Client=0,
     kPOS_Oob_Unregister_Client,
-    kPOS_Oob_Connect_Transport,
     kPOS_Oob_Mock_Api_Call,
     kPOS_Oob_Migration_Signal,
     kPOS_Oob_Restore_Signal
@@ -115,7 +114,6 @@ namespace oob_functions {
 
     POS_OOB_DECLARE_FUNCTIONS(register_client);
     POS_OOB_DECLARE_FUNCTIONS(unregister_client);
-    POS_OOB_DECLARE_FUNCTIONS(connect_transport);
     POS_OOB_DECLARE_FUNCTIONS(mock_api_call);
     POS_OOB_DECLARE_FUNCTIONS(migration_signal);
     POS_OOB_DECLARE_FUNCTIONS(restore_signal);
@@ -143,10 +141,9 @@ class POSOobServer {
         _callback_map.insert({
             {   kPOS_Oob_Register_Client,   oob_functions::register_client::sv      },
             {   kPOS_Oob_Unregister_Client, oob_functions::unregister_client::sv    },
-            {   kPOS_Oob_Connect_Transport, oob_functions::connect_transport::sv    },
             {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::sv        },
             {   kPOS_Oob_Migration_Signal,  oob_functions::migration_signal::sv     },
-            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::sv       }
+            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::sv       },
         });
 
         // step 2: create server socket
@@ -200,7 +197,7 @@ class POSOobServer {
             // invoke corresponding callback function
             if(unlikely(_callback_map.count(recvmsg->msg_type)) == 0){
                 POS_ERROR_C_DETAIL(
-                    "no callback function register for oob msg type %lu, this is a bug",
+                    "no callback function register for oob msg type %d, this is a bug",
                     recvmsg->msg_type
                 )
             }
@@ -270,14 +267,71 @@ class POSOobClient {
         uint16_t local_port, const char* local_ip="0.0.0.0",
         uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
     ) : _agent(agent) {
+        __init(local_port, local_ip, server_port, server_ip);
+    }
+
+    /*!
+     *  \brief  constructor
+     *  \param  local_port  expected local port to bind
+     *  \param  local_ip    exepected local ip to bind
+     *  \param  server_port destination server port
+     *  \param  server_ip   destination server ipv4
+     */
+    POSOobClient(
+        uint16_t local_port, const char* local_ip="0.0.0.0",
+        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
+    ) : _agent(nullptr) {
+        __init(local_port, local_ip, server_port, server_ip);
+    }
+    
+    /*!
+     *  \brief  call OOB RPC request procedure according to OOB message type
+     *  \param  id          the OOB message type
+     *  \param  call_data   calling payload, coule bd null
+     *  \return POS_SUCCESS for successfully requesting
+     */
+    inline pos_retval_t call(pos_oob_msg_typeid_t id, void *call_data){
+        if(unlikely(_request_map.count(id) == 0)){
+            POS_ERROR_C_DETAIL("no request function for type %d is registered, this is a bug", id);
+        }
+        return (*(_request_map[id]))(_fd, &_remote_addr, &_msg, _agent, this, call_data);
+    }
+
+    /*!
+     *  \brief  deconstrutor
+     */
+    ~POSOobClient(){
+        if(_fd > 0){ close(_fd); }
+    }
+
+    /*!
+     *  \brief  set the uuid of the client
+     *  \note   this function is invoked during the registeration process 
+     *          (i.e., register_client oob type)
+     */
+    inline void set_uuid(pos_client_uuid_t id){ _msg.client_meta.uuid = id; }
+
+ private:
+    /*!
+     *  \brief  internal inialization function of oob client
+     *  \param  local_port  local UDP port to bind
+     *  \param  local_ip    local IPv4 to bind
+     *  \param  server_port remote UDP port to send UDP datagram
+     *  \param  server_ip   remote IPv4 address pf POS server process
+     */
+    inline void __init(
+        uint16_t local_port, const char* local_ip="0.0.0.0",
+        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
+    ){
         uint8_t retry_time = 1;
 
         // step 1: insert oob request map
         _request_map.insert({
             {   kPOS_Oob_Register_Client,   oob_functions::register_client::clnt    },
             {   kPOS_Oob_Unregister_Client, oob_functions::unregister_client::clnt  },
-            {   kPOS_Oob_Connect_Transport, oob_functions::connect_transport::clnt  },
-            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::clnt      }
+            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::clnt      },
+            {   kPOS_Oob_Migration_Signal,  oob_functions::migration_signal::clnt   },
+            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::clnt     },
         });
 
         // step 2: obtain the process id
@@ -317,34 +371,6 @@ class POSOobClient {
         _remote_addr.sin_port = htons(server_port);
     }
 
-    /*!
-     *  \brief  call OOB RPC request procedure according to OOB message type
-     *  \param  id          the OOB message type
-     *  \param  call_data   calling payload, coule bd null
-     *  \return POS_SUCCESS for successfully requesting
-     */
-    inline pos_retval_t call(pos_oob_msg_typeid_t id, void *call_data){
-        if(unlikely(_request_map.count(id) == 0)){
-            POS_ERROR_C_DETAIL("no request function for type %lu is registered, this is a bug", id);
-        }
-        return (*(_request_map[id]))(_fd, &_remote_addr, &_msg, _agent, this, call_data);
-    }
-
-    /*!
-     *  \brief  deconstrutor
-     */
-    ~POSOobClient(){
-        if(_fd > 0){ close(_fd); }
-    }
-
-    /*!
-     *  \brief  set the uuid of the client
-     *  \note   this function is invoked during the registeration process 
-     *          (i.e., register_client oob type)
-     */
-    inline void set_uuid(pos_client_uuid_t id){ _msg.client_meta.uuid = id; }
-
- private:
     // UDP socket
     int _fd;
 

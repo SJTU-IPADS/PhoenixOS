@@ -26,5 +26,8 @@ config_conf.set('pos_ckpt_interval_ms', ckpt_interval_ms)
 # for migration
 config_conf.set('pos_migration_opt_level', migration_opt_level)
 
+# others
+config_conf.set('pos_enable_context_pool', enable_context_pool)
+
 config_conf.set('pos_log_file_path', log_file_path)
 configure_file(input : 'config.h.in', output : 'config.h', configuration : config_conf)

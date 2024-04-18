@@ -59,11 +59,14 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("cuBLAS Context"); }
 
+    POSHandle *lastest_used_stream;
+
+ protected:
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         pos_retval_t retval = POS_SUCCESS;
         cublasHandle_t actual_handle;
         cublasStatus_t cublas_retval;
@@ -81,10 +84,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
 
         return retval;
     }
-
-    POSHandle *lastest_used_stream;
-
- protected:
+    
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -118,6 +118,12 @@ class POSHandle_cuBLAS_Context : public POSHandle {
  */
 class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS_Context> {
  public:
+    POSHandleManager_cuBLAS_Context() : POSHandleManager() {
+    #if POS_ENABLE_CONTEXT_POOL == 1
+        this->preserve_pooled_handles(4);
+    #endif // POS_ENABLE_CONTEXT_POOL
+    }
+
     /*!
      *  \brief  allocate new mocked cuBLAS context within the manager
      *  \param  handle          pointer to the mocked handle of the newly allocated resource
@@ -151,7 +157,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
 
         context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked cuBLAS context in the manager");
             goto exit;
@@ -162,5 +168,4 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
     exit:
         return retval;
     }
-
 };

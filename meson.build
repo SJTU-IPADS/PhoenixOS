@@ -65,6 +65,9 @@ ckpt_interval_ms = 6000
 #           2: pos migration support
 migration_opt_level = 2
 
+# config:   whether to enable context pool
+enable_context_pool = 1
+
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
 
@@ -120,6 +123,7 @@ else
     message('       >>>>>> [Config] enable_ckpt_orchestration:      N/A')
 endif
 message('>>>>>> [Config] checkpoint interval (ms):                  ' + ckpt_interval_ms.to_string())
+message('>>>>>> [Config] enable_context_pool:                       ' + enable_context_pool.to_string())
 message('>>>>>> [Config] log file output path:                      ' + log_file_path)
 message('>>>>>> [Switch] enable_runtime_debug_check:                ' + enable_runtime_debug_check.to_string())
 message('>>>>>> [Switch] enable_hijack_api_check:                   ' + enable_hijack_api_check.to_string())
@@ -172,13 +176,17 @@ sources += [
     'pos/src/client.cpp',
     'pos/src/trace.cpp',
     'pos/src/worker.cpp',
-    'pos/src/parser.cpp'
+    'pos/src/parser.cpp',
+    'pos/src/workspace.cpp',
+    'pos/src/migration.cpp' 
 ]
 
-if ckpt_opt_level == 0 and migration_opt_level == 0
-    sources += ['pos/src/checkpoint_o0.cpp']
-elif ckpt_opt_level == 0 and migration_opt_level > 0
-    sources += ['pos/src/checkpoint_o1.cpp']
+if ckpt_opt_level == 0
+    if migration_opt_level == 0
+        sources += ['pos/src/checkpoint_o0.cpp']
+    else
+        sources += ['pos/src/checkpoint_o1.cpp']
+    endif
 elif ckpt_opt_level == 1
     sources += ['pos/src/checkpoint_o1.cpp']
 elif ckpt_opt_level == 2
