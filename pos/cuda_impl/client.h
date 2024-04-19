@@ -156,6 +156,8 @@ class POSClient_CUDA : public POSClient {
         this->__dump_hm_cuda_functions();
     }
 
+    #if POS_MIGRATION_OPT_LEVEL > 0
+
     /*! 
      *  \brief  remote malloc memories during migration
      */
@@ -550,6 +552,8 @@ class POSClient_CUDA : public POSClient {
             POS_TSC_TO_USEC(e_tick-s_tick), nb_handles, reload_size
         );
     }
+
+    #endif // POS_MIGRATION_OPT_LEVEL > 0
 
  protected:
     /*!
