@@ -63,7 +63,7 @@ ckpt_interval_ms = 6000
 #           0: no migration support
 #           1: naive migration support
 #           2: pos migration support
-migration_opt_level = 1
+migration_opt_level = 0
 
 # config:   whether to enable context pool
 enable_context_pool = 0
