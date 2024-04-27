@@ -34,42 +34,6 @@ enum pos_queue_type_t : uint8_t {
 class POSWorker;
 class POSParser;
 
-
-// /* ============== structures for ondemand reload ============== */
-// /*!
-//  *  \brief  job of reloading a handle's state
-//  */
-// typedef struct pos_ondemand_reload_job {
-//     // client for this ondemand reload job
-//     POSClient *client;
-    
-//     // target handle to restore state
-//     POSHandle *handle;
-// } pos_ondemand_reload_job_t;
-
-// /*!
-//  *  \brief  context of the ondemand state reload thread
-//  */
-// typedef struct pos_ondemand_reload_async_cxt {
-//     // flag: reload thread to notify the worker thread that whether the reload process has done
-//     bool is_active;
-
-//     // work queue for submiting reloading job
-//     POSLockFreeQueue<pos_ondemand_reload_job_t*> *wq_from_parser;
-//     POSLockFreeQueue<pos_ondemand_reload_job_t*> *wq_from_worker;
-
-//     // stop flag of the thread
-//     bool stop_flag;
-
-//     pos_ondemand_reload_async_cxt() : is_active(false), stop_flag(false) {
-//         wq_from_parser = new POSLockFreeQueue<pos_ondemand_reload_job_t*>();
-//         POS_CHECK_POINTER(wq_from_parser);
-//         wq_from_worker = new POSLockFreeQueue<pos_ondemand_reload_job_t*>();
-//         POS_CHECK_POINTER(wq_from_worker);
-//     }
-// } pos_pos_ondemand_reload_async_cxt_t;
-
-
 /*!
  * \brief   base workspace of PhoenixOS
  */
@@ -384,5 +348,15 @@ class POSWorkspace {
     // context for creating the client
     pos_client_cxt_t _template_client_cxt;
 
+    /*!
+     *  \brief  preserve resource on posd
+     *  \param  rid     the resource type to preserve
+     *  \param  data    source data for preserving
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    virtual pos_retval_t preserve_resource(pos_resource_typeid_t rid, void *data){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+    
     void parse_command_line_options(int argc, char *argv[]);
 };

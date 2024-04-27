@@ -32,18 +32,6 @@ build_cuda() {
             if [ -d "./build" ] || [ -d "./include" ] || [ -d "./lib" ] || [ -d "./share" ]; then
                 rm -rf build include lib share
             fi
-
-            echo "    [1.2] cleaning hiredis"
-            cd $script_dir
-            cd third_party/hiredis
-            make clean
-
-            echo "    [1.3] cleaning libevent"
-            cd $script_dir
-            cd third_party/libevent
-            if [ -d "./build" ]; then
-                rm -rf build
-            fi
         else
             echo "    SKIPED"
         fi
@@ -54,7 +42,15 @@ build_cuda() {
                 rm -rf ./build
             fi
             rm /lib/x86_64-linux-gnu/libpos.so
-        echo "[3] cleaning remoting framework (cricket)"
+        
+        echo "[3] cleaning POS CLI"
+            cd $script_dir
+            cd pos/cli
+            if [ -d "./build" ]; then
+                rm -rf ./build
+            fi
+
+        echo "[4] cleaning remoting framework (cricket)"
             cd $script_dir
             cd remoting/cuda/submodules/libtirpc
             make clean
@@ -63,7 +59,8 @@ build_cuda() {
             cd remoting/cuda/cpu
             make clean
             rm --force core.*
-        echo "[4] cleaning unittest"
+        
+        echo "[5] cleaning unittest"
             cd $script_dir
             cd unittest/cuda
             if [ -d "./build" ]; then
@@ -87,21 +84,6 @@ build_cuda() {
                 # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
                 cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
                 cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
-
-                echo "    [1.2] building hiredis"
-                cd $script_dir
-                cd third_party/hiredis
-                make -j
-                # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
-                cp $script_dir/third_party/hiredis/*.so* /lib/x86_64-linux-gnu/
-                cp $script_dir/third_party/hiredis/*.a* /lib/x86_64-linux-gnu/
-
-                echo "    [1.3] building libevent"
-                cd $script_dir
-                cd third_party/libevent
-                mkdir build && cd build
-                cmake ..
-                make install -j
             else
                 echo "    SKIPED"
             fi
@@ -115,6 +97,18 @@ build_cuda() {
             ninja clean
             ninja
             cp $script_dir/build/*.so /lib/x86_64-linux-gnu/
+        
+        echo "[3] building POS CLI"
+            cd $script_dir
+            cd pos/cli
+            if [ ! -d "./build" ]; then
+                mkdir build
+            fi
+            cd build && rm -rf ./*
+            cmake ..
+            make -j
+            cp ../bin/* /usr/local/bin
+
         echo "[3] building remoting framework (cricket)"
             export POS_ENABLE=true
             cd $script_dir

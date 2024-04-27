@@ -15,7 +15,7 @@ execute_process( COMMAND ${CMAKE_COMMAND} -E make_directory ../${PATH_LIBRARY})
 SET(LIBRARY_OUTPUT_PATH ../${PATH_LIBRARY})
 
 # find CUDA path
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-11.3)
+set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.1)
 
 # cudam library
 # # 1: buffer analyzer
