@@ -76,11 +76,11 @@ log_file_path = '/root/dag.pos'
 
 # switch:   whether to check correctness of function parameters, return values, etc.,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_runtime_debug_check = 0
+enable_runtime_debug_check = 1
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 0
+enable_hijack_api_check = 1
 
 # switch:   whether to trace the statistics
 enable_trace = 0
@@ -136,7 +136,7 @@ message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    cuda_version = '11.3'
+    cuda_version = '12.1'
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []
@@ -225,28 +225,6 @@ ld_args += libclang_ld_args
 inc_dirs += libclang_inc_dirs
 message('>>> Setup libclang done\n')
 
-# message('>>> Setup hiredis')
-# hiredis_ld_args = ['-lhiredis']
-# hiredis_inc_dirs = ['./third_party/hiredis']
-# message('>>>>>> Link option:')
-# message(hiredis_ld_args)
-# message('>>>>>> Include path:')
-# message(hiredis_inc_dirs)
-# ld_args += hiredis_ld_args
-# inc_dirs += hiredis_inc_dirs
-# message('>>> Setup hiredis done\n')
-
-# message('>>> Setup libevent')
-# libevent_ld_args = ['-levent']
-# libevent_inc_dirs = ['./third_party/libevent/include']
-# message('>>>>>> Link option:')
-# message(libevent_ld_args)
-# message('>>>>>> Include path:')
-# message(libevent_inc_dirs)
-# ld_args += libevent_ld_args
-# inc_dirs += libevent_inc_dirs
-# message('>>> Setup libevent done\n')
-
 message('>>> Setup librt') # for support shm_x
 ld_args += ['-lrt']
 message('>>> Setup librt done\n')
@@ -259,20 +237,13 @@ message('>>> Setup libelf') # for support elf_x
 ld_args += ['-lelf']
 message('>>> Setup libelf done\n')
 
-# message('>>> Setup boost')
-# boost_dep = dependency('boost')
-# deps += boost_dep
-# message('>>> Setup boost done\n')
-
-
-
-
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
 c_args += ['--std=c++17']
 
 
 # >>>>>>>>>>>>>> start building >>>>>>>>>>>>>>
-library(project_name_abbreviation, sources,
+# libpos.so
+libpos = library(project_name_abbreviation, sources,
 	dependencies : deps,
 	cpp_args: c_args,
 	link_args: ld_args,

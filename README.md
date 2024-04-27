@@ -1,10 +1,6 @@
 # PhoenixOS
 
-**PhoenixOS** is an generic framework for transparently checkpointing / restoring XPU state.
-
-TODO: give effect of fast rasing container here
-
-TODO: give effect of training migration here
+**PhoenixOS** is an OS service for checkpointing and restroing GPU process with transparency and efficiency.
 
 ## I. Build
 
@@ -37,19 +33,7 @@ bash build.sh -t cuda -j -u true
 
 ### III. Development Guidance
 
-## IV. Roadmap
-
-[] (Jan.3) Fast checkpoint of all stateful resources
-    [*] develop performance code to measure checkpoint performance
-    - verify stream behaviour
-    - develop overlap version
-[] (Jan.2) Develop container environment
-[] (Jan.2) Develop central node & redis (using golang)
-[] (Jan.2) Develop communication channel across multiple POS servers
-
-[] Develop client-server switch of POS and cricket
-[] Develop dumping checkpoint state to memory / file
-[] Try migration development (i.e., restore mechanism)
+## IV. Stuff
 
 ```bash
 alias proxy_on='export http_proxy=http://172.17.0.1:7890; export https_proxy=http://172.17.0.1:7890; export all_proxy=http://172.17.0.1:7890; export HTTP_PROXY=http://172.17.0.1:7890; export HTTPS_PROXY=http://172.17.0.1:7890; export ALL_PROXY=http://172.17.0.1:7890'

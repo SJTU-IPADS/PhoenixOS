@@ -63,44 +63,33 @@ class POSWorkspace_CUDA : public POSWorkspace{
         return POS_SUCCESS;
     }
 
- protected:
     /*!
-     *  \brief  thread for ondemand reload stateful handles during restore
+     *  \brief  preserve resource on posd
+     *  \param  rid     the resource type to preserve
+     *  \param  data    source data for preserving
+     *  \return POS_SUCCESS for successfully preserving
      */
-    // void __ondemand_reload_thread() override {
-    //     pos_ondemand_reload_job_t *plan;
+    pos_retval_t preserve_resource(pos_resource_typeid_t rid, void *data) override {
+        pos_retval_t retval = POS_SUCCESS;
 
-    //     auto __process_one_plan = [&](pos_ondemand_reload_job_t *plan){
-    //         POS_CHECK_POINTER(plan->handle);
-    //         POS_CHECK_POINTER(plan->client);
+        switch (rid)
+        {
+        case kPOS_ResourceTypeId_CUDA_Context:
+            // no need to preserve context
+            goto exit;
+        
+        case kPOS_ResourceTypeId_CUDA_Module:
+            goto exit;
 
-    //         switch(handle->resource_type_id){
-    //         case: kPOS_ResourceTypeId_CUDA_Memory:
-    //             if(unlikely(POS_SUCCESS != plan->handle->reload_state())){
-    //                 POS_WARN("failed to reload state of handle: server_addr(%p)", handle->server_addr);
-    //             }
-    //             break;
-    //         case: kPOS_ResourceTypeId_CUDA_Module:
-    //             // do nothing
-    //             break;
-    //         default:
-    //             POS_WARN("unsupport CUDA resource for reloading state, this is a bug: resource_type_id(%u)", handle->resource_type_id);
-    //         };
-    //     };
+        default:
+            retval = POS_FAILED_NOT_IMPLEMENTED;
+            goto exit;
+        }
 
-    //     while(!this->ondemand_reload_cxt.stop_flag){
-    //         if(POS_SUCCESS == this->ondemand_reload_cxt.wq_from_parser->dequeue(plan)){ 
-    //             POS_CHECK_POINTER(plan);
-    //             __process_one_plan(plan);
-    //         }
-            
-    //         if(POS_SUCCESS == this->ondemand_reload_cxt.wq_from_worker->dequeue(plan)){ 
-    //             POS_CHECK_POINTER(plan);
-    //             __process_one_plan(plan);
-    //         }
-    //     }
+    exit:
+        return retval;
+    }
 
-    // exit:
-    //     this->ondemand_reload_cxt.is_active = false;
-    // }
+ protected:
+
 };

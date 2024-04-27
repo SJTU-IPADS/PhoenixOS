@@ -31,9 +31,11 @@
  */
 class POSTransportServer_RDMA {
  public:
+    POSTransportServer_RDMA(){}
+    ~POSTransportServer_RDMA(){}
 
  private:
-
+    
 };
 
 

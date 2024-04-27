@@ -16,10 +16,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 # exit(0)
 
-model_path = '/root/samples/model/llama2-13b'
-tokenizer_path = '/root/samples/tokenizer/llama2-13b'
+model_path = '/root/samples/model/llama2'
+tokenizer_path = '/root/samples/tokenizer/llama2'
 
 model = AutoModelForCausalLM.from_pretrained(model_path).to('cuda:0')
+# model_cpu = AutoModelForCausalLM.from_pretrained(model_path).to('cpu')
+
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 
 # pip install accelerate

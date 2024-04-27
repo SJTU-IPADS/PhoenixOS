@@ -29,6 +29,10 @@ max_grad_norm = 2.0
 eps = 1.0e-09
 lr = 2.6e-5
 
+with_torch_ckpt = True
+torch_ckpt_interval = 3
+torch_ckpt_ptr = 0
+
 class GPT2Dataset(Dataset):
     def __init__(self, input_list, max_len):
         self.input_list = input_list
@@ -117,6 +121,13 @@ def train_epoch(model, train_dataloader, optimizer, epoch):
 
         e_time = time.time()
         duration_list.append(int(round((e_time-s_time) * 1000))) # ms
+
+        # checkpoint using naive torch
+        if with_torch_ckpt and torch_ckpt_ptr == torch_ckpt_interval:
+            torch.save(model.state_dict(), PATH)
+            torch_ckpt_ptr = 0
+        else:
+            torch_ckpt_ptr += 1
 
         if batch_idx == 64:
             break

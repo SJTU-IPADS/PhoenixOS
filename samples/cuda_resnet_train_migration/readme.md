@@ -53,6 +53,15 @@ bash ./svr.sh -r 1
 
 ```bash
 bash ./clnt.sh -s 1 -i zobinhuang/pytorch:1.13.1-v2-criu-transformers -m false
+
+bash ./clnt.sh -s 1 -i zobinhuang/pytorch:2.2-devel
+```
+
+to build images:
+
+```bash
+sudo docker run -dit -v /disk1/hzb/projects/pos:/root --name pos_clnt_torch2_build zobinhuang/pytorch:2.2-devel
+sudo docker exec -it pos_clnt_torch2_build bash
 ```
 
 we need to change the g++ --version inside client because it's a old ubuntu18.04 image
