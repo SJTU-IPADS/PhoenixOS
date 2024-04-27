@@ -12,7 +12,7 @@ do_close=false
 do_refresh=false
 do_enter=false
 
-SUDO=sudo
+SUDO=
 
 print_usage() {
     echo ">>>>>>>>>> PhoenixOS Client <<<<<<<<<<"
