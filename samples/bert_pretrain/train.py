@@ -97,6 +97,10 @@ def train(model, train_data, val_data, learning_rate, epochs):
 
         duration_list = [] # ms
 
+        with_torch_ckpt = False
+        torch_ckpt_ptr = 0
+        torch_ckpt_interval = 10
+
         # 进度条函数tqdm
         for batch_idx, (train_input, train_label) in enumerate(tqdm(train_dataloader)):
             s_time = time.time()
@@ -116,10 +120,19 @@ def train(model, train_data, val_data, learning_rate, epochs):
             batch_loss.backward()
             optimizer.step()
 
+            # checkpoint using naive torch
+            if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+                # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+                # umount /root/samples/torch_ckpt
+                torch.save(model.state_dict(), '/root/samples/torch_ckpt/model.dict')
+                torch_ckpt_ptr = 0
+            else:
+                torch_ckpt_ptr += 1
+
             e_time = time.time()
             duration_list.append(int(round((e_time-s_time) * 1000))) # ms
-            
-            if batch_idx == 64:
+
+            if batch_idx == 128:
                 break
         
         np_duration_list = np.array(duration_list)

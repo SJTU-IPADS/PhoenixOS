@@ -90,6 +90,11 @@ def main():
     else:
         traj_lenth, total_steps = 0, 0
         duration_list = [] # ms
+
+        with_torch_ckpt = False
+        torch_ckpt_ptr = 0
+        torch_ckpt_interval = 400
+
         s_time = time.time()
         while total_steps < opt.Max_train_steps:
             s, info = env.reset(seed=env_seed) # Do not use opt.seed directly, or it can overfit to opt.seed
@@ -126,6 +131,15 @@ def main():
                     print('EnvName:',EnvName[opt.EnvIdex],'seed:',opt.seed,'steps: {}k'.format(int(total_steps/1000)),'score:', score)
                     s_time = time.time()
 
+                # checkpoint using naive torch
+                if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+                    # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+                    # umount /root/samples/torch_ckpt
+                    torch.save(agent.actor.state_dict(), '/root/samples/torch_ckpt/model.dict')
+                    torch_ckpt_ptr = 0
+                else:
+                    torch_ckpt_ptr += 1
+                
                 '''Save model'''
                 # if total_steps % opt.save_interval==0:
                 #     agent.save(BrifEnvName[opt.EnvIdex], int(total_steps/1000))

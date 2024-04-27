@@ -50,18 +50,19 @@ def run_train():
         
         nb_iteration = 0
 
+        with_torch_ckpt = False
+        torch_ckpt_ptr = 0
+        torch_ckpt_interval = 5
+
         model.train()
         for data, target in train_loader:
             start_t = time.time()
 
-         
             data = data.to(device)
             target = target.to(device)
-                    
-         
+                             
             output = model(data).to(device)
 
-            
             optimizer.zero_grad()
             loss = criterion(output, target)
             loss.backward()
@@ -74,13 +75,20 @@ def run_train():
             # torch.cuda.default_stream(0).synchronize()
             host_output = output.to("cpu")
             
+            # checkpoint using naive torch
+            if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+                # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+                # umount /root/samples/torch_ckpt
+                torch.save(model.state_dict(), '/root/samples/torch_ckpt/model.dict')
+                torch_ckpt_ptr = 0
+            else:
+                torch_ckpt_ptr += 1
+
             end_t = time.time()
 
             print(f"itetration {nb_iteration} duration: {int(round((end_t-start_t) * 1000))} ms")
             iter_durations.append(int(round((end_t-start_t) * 1000)))
 
-            # POS: we only train 15 iteration for test
-            # change this number to 15 while enable level-1 continuous checkpoint
             if nb_iteration == 64:
                 print(f"reach {nb_iteration}, break")
                 break
@@ -187,5 +195,5 @@ def run_infer():
         print(f"all duration: {(all_end_t - all_start_t)*1000:.2f} ms")
 
 if __name__ == '__main__':
-    # run_train()
-    run_infer()
+    run_train()
+    # run_infer()

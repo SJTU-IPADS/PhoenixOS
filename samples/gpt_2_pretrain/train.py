@@ -29,10 +29,6 @@ max_grad_norm = 2.0
 eps = 1.0e-09
 lr = 2.6e-5
 
-with_torch_ckpt = True
-torch_ckpt_interval = 3
-torch_ckpt_ptr = 0
-
 class GPT2Dataset(Dataset):
     def __init__(self, input_list, max_len):
         self.input_list = input_list
@@ -81,6 +77,10 @@ def calculate_acc(logit, labels, ignore_index=-100):
 def train_epoch(model, train_dataloader, optimizer, epoch):
     model.train()
 
+    with_torch_ckpt = False
+    torch_ckpt_ptr = 0
+    torch_ckpt_interval = 50
+
     epoch_correct_num, epoch_total_num = 0, 0
     duration_list = [] # ms
 
@@ -119,17 +119,19 @@ def train_epoch(model, train_dataloader, optimizer, epoch):
 
         del input_ids, outputs
 
-        e_time = time.time()
-        duration_list.append(int(round((e_time-s_time) * 1000))) # ms
-
         # checkpoint using naive torch
-        if with_torch_ckpt and torch_ckpt_ptr == torch_ckpt_interval:
-            torch.save(model.state_dict(), PATH)
+        if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+            # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+            # umount /root/samples/torch_ckpt
+            torch.save(model.state_dict(), '/root/samples/torch_ckpt/model.dict')
             torch_ckpt_ptr = 0
         else:
             torch_ckpt_ptr += 1
 
-        if batch_idx == 64:
+        e_time = time.time()
+        duration_list.append(int(round((e_time-s_time) * 1000))) # ms
+
+        if batch_idx == 256:
             break
 
     np_duration_list = np.array(duration_list)
