@@ -19,9 +19,9 @@ n_class = 10
 
 # model = ResNet50()
 model = ResNet152()
-
 model = model.to(device)
 
+mock_coldstart = True
 
 def run_train():
     criterion = nn.CrossEntropyLoss().to(device)
@@ -130,8 +130,11 @@ def run_train():
 def run_infer():
     iter_durations = []
     nb_iteration = 0
-
     batch_size = 128
+
+    if mock_coldstart:
+        exit(0)
+
     train_loader, valid_loader, test_loader = read_dataset(batch_size=batch_size,pic_path='dataset')
 
     with torch.no_grad():
@@ -195,5 +198,5 @@ def run_infer():
         print(f"all duration: {(all_end_t - all_start_t)*1000:.2f} ms")
 
 if __name__ == '__main__':
-    run_train()
-    # run_infer()
+    # run_train()
+    run_infer()
