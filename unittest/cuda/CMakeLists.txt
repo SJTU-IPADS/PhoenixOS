@@ -10,7 +10,7 @@ execute_process( COMMAND ${CMAKE_COMMAND} -E make_directory ../${PATH_EXECUTABLE
 SET(EXECUTABLE_OUTPUT_PATH ../${PATH_EXECUTABLE})
 
 # find CUDA Toolkit Extension library
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.1)
+set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
 find_library(CUDA_NVTX_LIBRARY
   NAMES nvToolsExt nvTools nvtoolsext nvtools nvtx NVTX
   PATHS "${CUDA_CUDART_LIBRARY_DIR}" "${CUDA_TOOLKIT_ROOT_DIR}" ENV LD_LIBRARY_PATH
