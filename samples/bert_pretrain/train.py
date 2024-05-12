@@ -132,6 +132,8 @@ def train(model, train_data, val_data, learning_rate, epochs):
             e_time = time.time()
             duration_list.append(int(round((e_time-s_time) * 1000))) # ms
 
+            print(f"{int(round((e_time-s_time) * 1000))} ms")
+
             if batch_idx == 128:
                 break
         

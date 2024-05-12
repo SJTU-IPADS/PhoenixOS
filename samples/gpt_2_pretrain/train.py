@@ -130,6 +130,7 @@ def train_epoch(model, train_dataloader, optimizer, epoch):
 
         e_time = time.time()
         duration_list.append(int(round((e_time-s_time) * 1000))) # ms
+        print(f'{int(round((e_time-s_time) * 1000))} ms')
 
         if batch_idx == 256:
             break

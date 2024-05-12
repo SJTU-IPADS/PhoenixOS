@@ -198,5 +198,5 @@ def run_infer():
         print(f"all duration: {(all_end_t - all_start_t)*1000:.2f} ms")
 
 if __name__ == '__main__':
-    # run_train()
-    run_infer()
+    run_train()
+    # run_infer()

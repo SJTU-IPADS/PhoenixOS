@@ -1,10 +1,6 @@
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cd $script_dir
 
 dir_path="./ckpt"
-if [ ! -d "$dir_path" ]; then
-    mkdir ckpt
-fi
 
 # checkpoint to stop?
 do_stop=true
@@ -114,6 +110,14 @@ ckpt_with_stop() {
     fi
 }
 
+mount_mem_ckpt() {
+    mount -t tmpfs -o size=80g tmpfs $dir_path
+}
+
+umount_mem_ckpt() {
+    umount $dir_path
+}
+
 while getopts ":s:cg" opt; do
   case $opt in
     s)
@@ -139,8 +143,15 @@ while getopts ":s:cg" opt; do
   esac
 done
 
+cd $script_dir
+if [ ! -d "$dir_path" ]; then
+    mkdir ckpt
+    mount_mem_ckpt
+fi
+
 if [ $do_clear = true ]; then
-    rm -rf $dir_path/*
+    umount_mem_ckpt
+    rm -rf $dir_path
     exit 0
 fi
 
