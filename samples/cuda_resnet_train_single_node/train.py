@@ -21,7 +21,7 @@ n_class = 10
 model = ResNet152()
 model = model.to(device)
 
-mock_coldstart = True
+mock_coldstart = False
 
 def run_train():
     criterion = nn.CrossEntropyLoss().to(device)
