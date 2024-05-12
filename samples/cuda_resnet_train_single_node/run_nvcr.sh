@@ -114,6 +114,14 @@ ckpt_with_stop() {
     fi
 }
 
+mount_mem_ckpt() {
+    mount -t tmpfs -o size=80g tmpfs $dir_path
+}
+
+mount_mem_ckpt() {
+    umount $dir_path
+}
+
 while getopts ":s:cg" opt; do
   case $opt in
     s)
