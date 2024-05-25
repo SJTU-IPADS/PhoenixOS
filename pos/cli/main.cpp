@@ -40,7 +40,7 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
     );
 
     struct option long_opt[] = {
-        // basic types
+        // action types
         {"help",        no_argument,        NULL,   kPOS_CliAction_Help},
         {"migrate",     no_argument,        NULL,   kPOS_CliAction_Migrate},
         {"preserve",    no_argument,        NULL,   kPOS_CliAction_Preserve},
@@ -51,6 +51,7 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         {"oport",       required_argument,  NULL,   kPOS_CliMeta_OobPort},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_DataplaneIp},
         {"dport",       required_argument,  NULL,   kPOS_CliMeta_DataplanePort},
+        
         {NULL,          0,                  NULL,   0}
     };
 

@@ -323,6 +323,7 @@ typedef struct POSHandleView {
 /*!
  *  \brief  work queue element, as the element within work 
  *          queue between frontend and runtime
+ *  TODO:   add type field to wqe
  */
 typedef struct POSAPIContext_QE {
     // uuid of the remote client
