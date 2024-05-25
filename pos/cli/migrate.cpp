@@ -80,6 +80,10 @@ pos_retval_t handle_migrate(pos_cli_options_t &clio){
         },
     });
 
+    // step 1: create remote transport
+
+    // step 2: connect 
+
 exit:
     return retval;
 }
