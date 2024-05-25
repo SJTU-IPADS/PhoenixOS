@@ -59,8 +59,8 @@ def add_copyright_cpp():
                         if start_index == -1:
                             break
                         end_index =                                                             \
-                            content.find("limitations under the License.\n*/\n", start_index)   \
-                            + len("limitations under the License.\n */\n")
+                            content.find(" * limitations under the License.\n*/\n", start_index)   \
+                            + len(" * limitations under the License.\n */\n")
                         content = content[:start_index] + content[end_index:]
                     
                     # add new copyright
