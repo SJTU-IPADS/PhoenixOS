@@ -3,10 +3,7 @@
 	url = git@ipads.se.sjtu.edu.cn:scaleaisys/cricket.git
 	branch = pos/add_stub
 
-[submodule "third_party/hiredis"]
-	path = third_party/hiredis
-	url = git@github.com:redis/hiredis.git
-
-[submodule "third_party/libevent"]
-	path = third_party/libevent
-	url = git@github.com:libevent/libevent.git
+[submodule "third_party/cuda-checkpoint"]
+	path = third_party/cuda-checkpoint
+	url = git@github.com:NVIDIA/cuda-checkpoint.git
+	branch = main

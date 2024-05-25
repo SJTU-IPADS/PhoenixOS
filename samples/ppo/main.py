@@ -128,7 +128,13 @@ def main():
                     if opt.write: writer.add_scalar('ep_r', score, global_step=total_steps)
                     e_time = time.time()
                     duration_list.append(int(round((e_time-s_time) * 1000))) # ms
-                    print('EnvName:',EnvName[opt.EnvIdex],'seed:',opt.seed,'steps: {}k'.format(int(total_steps/1000)),'score:', score)
+                    print(
+                        'EnvName:',EnvName[opt.EnvIdex],
+                        'seed: ',opt.seed,
+                        'steps: {}k'.format(int(total_steps/1000)),
+                        'score: ', score,
+                        'duration: {} ms'.format(int(round((e_time-s_time) * 1000))),
+                    )
                     s_time = time.time()
 
                 # checkpoint using naive torch

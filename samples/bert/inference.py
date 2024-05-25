@@ -27,6 +27,9 @@ tokenizer = BertTokenizer.from_pretrained(tokenizer_path)
 # model.save_pretrained('./model_base')
 model = BertForMaskedLM.from_pretrained(model_path).to(device)
 
+mock_coldstart = True
+if mock_coldstart:
+    exit(0)
 
 masked_sentences = ["The primary [MASK] of the United States is English." for _ in range(batch_size)]
 pos_masks = [3 for _ in range(batch_size)]
