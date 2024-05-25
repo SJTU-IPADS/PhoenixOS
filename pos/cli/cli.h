@@ -15,11 +15,27 @@
 enum pos_cli_arg : int {
     kPOS_CliAction_Unknown = 0,
     /* ============ basic types ============ */
-    // print help message
+    /*!
+     *  \brief  print help message
+     */
     kPOS_CliAction_Help,
-    // migrate specified process
+
+    /*!
+     *  \brief  migrate context of a XPU process to a new process
+     *  \param  pid     [Required] PID of the process to be migrated
+     *  \param  oip     [Required] out-of-band control plane IP of the remote host
+     *  \param  oport   [Required] out-of-band control plane UDP port of the remote host
+     *  \param  dip     [Required] dataplane IP of the remote host
+     *  \param  dport   [Required] dataplane port of the remote host
+     */
     kPOS_CliAction_Migrate,
-    // preserve context resources
+
+    /*!
+     *  \brief  preserve XPU resources for fast restoring
+     *  \param  rid                 [Required]  type id of the resource to be preserved
+     *  \param  path_kernel_meta    [Optional]  path to the file that contains kernel parsing metadata, required when
+     *                                          preserving XPU modules
+     */
     kPOS_CliAction_Preserve,
     kPOS_CliAction_PLACEHOLDER,
     
@@ -34,6 +50,7 @@ enum pos_cli_arg : int {
     kPOS_CliMeta_DataplaneIp,
     // dataplane port
     kPOS_CliMeta_DataplanePort,
+    // file path to the kernel metadata
     kPOS_CliMeta_PLACEHOLDER,
 };
 
