@@ -34,6 +34,10 @@ tokenizer.pad_token = tokenizer.eos_token
 # model.save_pretrained('./model/')
 model = GPT2LMHeadModel.from_pretrained(model_path).to(device)
 
+mock_coldstart = False
+if mock_coldstart:
+    exit(0)
+
 texts = ["Hello, I'm a language model," for _ in range(batch_size)]
 
 # remove initial overhead

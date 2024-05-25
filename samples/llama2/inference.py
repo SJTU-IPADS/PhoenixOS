@@ -1,6 +1,7 @@
 model_id = 'meta-llama/Llama-2-7b-chat-hf'
 
 import time
+import os
 import numpy as np
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
@@ -16,6 +17,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 # exit(0)
 
+print(f"process id: {os.getpid()}")
+
 model_path = '/root/samples/model/llama2'
 tokenizer_path = '/root/samples/tokenizer/llama2'
 
@@ -23,6 +26,10 @@ model = AutoModelForCausalLM.from_pretrained(model_path).to('cuda:0')
 # model_cpu = AutoModelForCausalLM.from_pretrained(model_path).to('cpu')
 
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+
+mock_coldstart = True
+if mock_coldstart:
+    exit(0)
 
 # pip install accelerate
 # pip install -i https://pypi.org/simple/ bitsandbytes

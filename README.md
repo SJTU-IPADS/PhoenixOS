@@ -1,7 +1,7 @@
 # PhoenixOS
 
 <div align="center">
-    <img src="./docs/pos_logo_small.png" width="200px" />
+    <img src="./docs/pos_logo_small.png" width="250px" />
 </div>
 
 **PhoenixOS** is an OS service for checkpointing and restroing GPU process with transparency and efficiency.

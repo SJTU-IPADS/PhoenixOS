@@ -136,7 +136,7 @@ message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    cuda_version = '12.1'
+    cuda_version = '11.3'
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []

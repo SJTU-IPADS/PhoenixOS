@@ -1,4 +1,4 @@
-model_id = 'meta-llama/Meta-Llama-3-8B'
+model_id = 'NousResearch/Meta-Llama-3-8B'
 
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
@@ -19,7 +19,7 @@ exit(0)
 # pip install accelerate
 # pip install -i https://pypi.org/simple/ bitsandbytes
 
-#Llama 2 Inference
+#Llama 3 Inference
 def stream(user_prompt):
     system_prompt = 'You are a helpful assistant that provides accurate and concise responses'
 
