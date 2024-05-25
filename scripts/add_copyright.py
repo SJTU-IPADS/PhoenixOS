@@ -44,9 +44,7 @@ def add_copyright_cpp():
                 file_path = os.path.join(root, file)
 
                 # don't process file under 'build' directory
-                print(file_path)
                 directory_names = os.path.dirname(file_path).split('/')
-                print(directory_names)
                 if "build" in directory_names:
                     continue
 
@@ -58,8 +56,8 @@ def add_copyright_cpp():
                         start_index = content.find("/*\n * Copyright ")
                         if start_index == -1:
                             break
-                        end_index =                                                             \
-                            content.find(" * limitations under the License.\n*/\n", start_index)   \
+                        end_index =                                                                 \
+                            content.find(" * limitations under the License.\n */\n", start_index)    \
                             + len(" * limitations under the License.\n */\n")
                         content = content[:start_index] + content[end_index:]
                     
@@ -75,9 +73,7 @@ def add_copyright_py():
                 file_path = os.path.join(root, file)
 
                 # don't process file under 'build' directory
-                print(file_path)
                 directory_names = os.path.dirname(file_path).split('/')
-                print(directory_names)
                 if "build" in directory_names:
                     continue
 
