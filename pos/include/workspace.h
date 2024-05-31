@@ -50,6 +50,17 @@ class POSWorker;
 class POSParser;
 
 /*!
+ *  \brief  function prototypes for cli oob server
+ */
+namespace oob_functions {
+    POS_OOB_DECLARE_SVR_FUNCTIONS(agent_register_client);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(agent_unregister_client);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_migration_signal);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore_signal);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(utils_mock_api_call);
+}; // namespace oob_functions
+
+/*!
  * \brief   base workspace of PhoenixOS
  */
 class POSWorkspace {
@@ -61,7 +72,19 @@ class POSWorkspace {
         this->parse_command_line_options(argc, argv);
 
         // create out-of-band server
-        _oob_server = new POSOobServer( /* ws */ this );
+        _oob_server = new POSOobServer(
+            /* ws */ this,
+            /* callback_handlers */ {
+                {   kPOS_OOB_Msg_Agent_Register_Client,   oob_functions::agent_register_client::sv      },
+                {   kPOS_OOB_Msg_Agent_Unregister_Client, oob_functions::agent_unregister_client::sv    },
+                {   kPOS_OOB_Msg_Utils_MockAPICall,     oob_functions::utils_mock_api_call::sv        },
+                {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::sv     },
+                {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::sv       },
+            },
+            /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
+            /* port */ POS_OOB_SERVER_DEFAULT_PORT,
+            /* use_daemon */ true
+        );
         POS_CHECK_POINTER(_oob_server);
 
         POS_LOG(
@@ -344,7 +367,10 @@ class POSWorkspace {
     std::vector<uint64_t> stateful_handle_type_idx;
 
  protected:
-    // the out-of-band server
+    /*!
+     *  \brief  out-of-band server
+     *  \note   use cases: intereact with CLI, and also agent-side
+     */
     POSOobServer *_oob_server;
 
     // queue pairs between frontend and runtime (per client)

@@ -38,6 +38,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/oob.h"
 #include "pos/include/utils/timestamp.h"
 
 
@@ -45,18 +46,11 @@
 #define POS_TRANSPORT_RDMA_CQ_SIZE           128
 #define POS_TRANSPORT_RDMA_MAX_SGE_PER_WQE   16
 
-/*!
- * \brief   context for RDMA queues
- */
-typedef struct pos_ib_queue_ctx {
-   struct ibv_pd *pd = nullptr;
-   struct ibv_qp *qp = nullptr;
-   struct ibv_cq *cq = nullptr;
-} pos_ib_queue_ctx_t;
 
 /*!
  * \brief   represent a RDMA-based transport endpoint
  */
+template<bool is_server>
 class POSTransport_RDMA {
    /*!
     * \brief   constructor of RDMA transport end-point
@@ -65,7 +59,6 @@ class POSTransport_RDMA {
     */
    POSTransport_RDMA(std::string dev_name, int local_ib_port){
       pos_retval_t tmp_retval;
-      pos_ib_queue_ctx_t qctx;
 
       POS_ASSERT(POSTransport_RDMA::has_ib_device());
 
@@ -76,11 +69,10 @@ class POSTransport_RDMA {
       }
 
       // create the first Reliable & Connect-oriented (RC) QP and corresponding PD and CQ
-      tmp_retval = this->__create_qctx(IBV_QPT_RC, qctx);
+      tmp_retval = this->__create_qctx(IBV_QPT_RC);
       if(unlikely(POS_SUCCESS != tmp_retval)){
          goto exit;
       }
-      this->_qctxs.push_back(qctx);
 
    exit:
       ;
@@ -92,9 +84,15 @@ class POSTransport_RDMA {
     *          this function would be invoked on the server-side
     * \return  POS_SUCCESS for succesfully connected
     */
-   pos_retval_t oob_listen(){
+   pos_retval_t handshake(){
       pos_retval_t retval = POS_SUCCESS;
       
+      if constexpr (is_server == true) {
+         
+      } else {
+
+      }
+
    exit:
       return retval;
    }
@@ -199,11 +197,9 @@ class POSTransport_RDMA {
 
    /*!
     * \brief   [control-plane] create new queue context (i.e., PD, QP, CQ)
-    * \param   qp_type  type of the QP to be created
-    * \param   qctx     queue context
     * \return  POS_SUCCESS for successfully creation
     */
-   pos_retval_t __create_qctx(ibv_qp_type qp_type, pos_ib_queue_ctx_t &qctx){
+   pos_retval_t __create_qctx(ibv_qp_type qp_type){
       pos_retval_t retval = POS_SUCCESS;
       struct ibv_pd *pd = nullptr;
       struct ibv_qp *qp = nullptr;
@@ -261,9 +257,9 @@ class POSTransport_RDMA {
          POS_TRANSPORT_RDMA_MAX_SGE_PER_WQE,
          POS_TRANSPORT_RDMA_CQ_SIZE
       );
-      qctx.pd = pd;
-      qctx.qp = qp;
-      qctx.cq = cq;
+      this->_pd = pd;
+      this->_qp = qp;
+      this->_cq = cq;
 
    exit:
       if(unlikely(retval != POS_SUCCESS)){
@@ -291,10 +287,13 @@ class POSTransport_RDMA {
 
    // IB port attributes
    struct ibv_port_attr _port_attr;
-   
-   // map of handles of the protection domain, and corresponding QP and CQ
-   std::vector<pos_ib_queue_ctx_t> _qctxs;
+      
+   // structures for IB queues
+   ibv_pd *_pd;
+   ibv_cq *_cq;
+   ibv_qp *_qp;
 
-   // TCP socket for building connection
-	int sock;
+   // OOB server / client
+   POSOobServer *_oob_server;
+   POSOobClient *_oob_client;
 };

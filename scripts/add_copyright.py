@@ -1,7 +1,9 @@
 import datetime
 import os
 
+
 YEAR = str(datetime.date.today().year)
+
 
 c_cpp_cu_license_text = """/*
  * Copyright {} The PhoenixOS Authors. All rights reserved.
@@ -18,6 +20,7 @@ c_cpp_cu_license_text = """/*
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */""".format(YEAR)
+
 
 py_license_text = """# Copyright {} The PhoenixOS Authors. All rights reserved.
 #
@@ -38,9 +41,11 @@ def add_copyright_cpp():
     for root, dirs, files in os.walk('./pos'):
         for file in files:
             # modify this line to match the type of files you want to handle
-            if file.endswith('.cpp') or file.endswith('.hpp')       \
-                or file.endswith('.c') or file.endswith('.h')       \
-                or file.endswith('.cu') or file.endswith('.cuh'):
+            if file.endswith('.cpp') or file.endswith('.hpp')           \
+                or file.endswith('.c') or file.endswith('.h')           \
+                or file.endswith('.cu') or file.endswith('.cuh')        \
+                or file.endswith('.c.in')  or file.endswith('.cpp.in')  \
+                or file.endswith('.h.in')  or file.endswith('.hpp.in'):
                 file_path = os.path.join(root, file)
 
                 # don't process file under 'build' directory
@@ -64,6 +69,7 @@ def add_copyright_cpp():
                     # add new copyright
                     f.seek(0, 0)
                     f.write(c_cpp_cu_license_text + '\n' + content)
+
 
 def add_copyright_py():
     for root, dirs, files in os.walk('./pos'):
@@ -93,6 +99,7 @@ def add_copyright_py():
                     # add new copyright
                     f.seek(0, 0)
                     f.write(py_license_text + '\n' + content)
+
 
 add_copyright_cpp()
 add_copyright_py()

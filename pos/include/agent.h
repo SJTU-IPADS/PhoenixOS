@@ -22,6 +22,14 @@
 #include "pos/include/api_context.h"
 
 /*!
+ *  \brief  function prototypes for cli oob client
+ */
+namespace oob_functions {
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_register_client);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_unregister_client);
+}; // namespace oob_functions
+
+/*!
  *  \brief  client-side PhoenixOS agent, manages all POS resources
  */
 class POSAgent {
@@ -45,6 +53,10 @@ class POSAgent {
 
         _pos_oob_client = new POSOobClient(
             /* agent */ this,
+            /* req_functions */ {
+                {   kPOS_OOB_Msg_Agent_Register_Client,   oob_functions::agent_register_client::clnt    },
+                {   kPOS_OOB_Msg_Agent_Unregister_Client, oob_functions::agent_unregister_client::clnt  },
+            },
             /* local_port */ POS_OOB_CLIENT_DEFAULT_PORT,
             /* local_ip */ "0.0.0.0",
             /* server_port */ POS_OOB_SERVER_DEFAULT_PORT,
@@ -53,7 +65,7 @@ class POSAgent {
         POS_CHECK_POINTER(_pos_oob_client);
 
         // register client
-        if(POS_SUCCESS != _pos_oob_client->call(kPOS_Oob_Register_Client, nullptr)){
+        if(POS_SUCCESS != _pos_oob_client->call(kPOS_OOB_Msg_Agent_Register_Client, nullptr)){
             POS_ERROR_C_DETAIL("failed to register the client");
         }
         POS_DEBUG_C("successfully register client: uuid(%lu)", _uuid);
@@ -63,7 +75,7 @@ class POSAgent {
      *  \brief  deconstructor
      */
     ~POSAgent(){
-        if(POS_SUCCESS != _pos_oob_client->call(kPOS_Oob_Unregister_Client, nullptr)){
+        if(POS_SUCCESS != _pos_oob_client->call(kPOS_OOB_Msg_Agent_Unregister_Client, nullptr)){
             POS_ERROR_C_DETAIL("failed to unregister the client");
         }
         delete _pos_oob_client;
@@ -90,7 +102,7 @@ class POSAgent {
     /*!
      *  \brief  set the uuid of the client
      *  \note   this function is invoked during the registeration process 
-     *          (i.e., register_client oob type)
+     *          (i.e., agent_register_client oob type)
      */
     inline void set_uuid(pos_client_uuid_t id){ _uuid = id; }
 

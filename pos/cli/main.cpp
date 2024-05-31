@@ -43,15 +43,13 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
     sprintf(
         short_opt,
         /* action */    "%d%d%d"
-        /* meta */      "%d:%d:%d:%d:%d:",
+        /* meta */      "%d:%d:%d:",
         kPOS_CliAction_Help,
         kPOS_CliAction_Migrate,
         kPOS_CliAction_Preserve,
         kPOS_CliMeta_Pid,
-        kPOS_CliMeta_OobIp,
-        kPOS_CliMeta_OobPort,
-        kPOS_CliMeta_DataplaneIp,
-        kPOS_CliMeta_DataplanePort
+        kPOS_CliMeta_Dip,
+        kPOS_CliMeta_Dport,
     );
 
     struct option long_opt[] = {
@@ -62,10 +60,8 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         
         // metadatas
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
-        {"oip",         required_argument,  NULL,   kPOS_CliMeta_OobIp},
-        {"oport",       required_argument,  NULL,   kPOS_CliMeta_OobPort},
-        {"dip",         required_argument,  NULL,   kPOS_CliMeta_DataplaneIp},
-        {"dport",       required_argument,  NULL,   kPOS_CliMeta_DataplanePort},
+        {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},
+        {"dport",       required_argument,  NULL,   kPOS_CliMeta_Dport},
         
         {NULL,          0,                  NULL,   0}
     };
@@ -92,6 +88,16 @@ inline pos_retval_t __dispatch(pos_cli_options_t &clio){
 }
 
 
+/*!
+ *  \brief  function prototypes for cli oob client
+ */
+namespace oob_functions {
+    // TODO: define other client-side functions here
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_migration_signal);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_restore_signal);
+}; // namespace oob_functions
+
+
 int main(int argc, char *argv[]){
     pos_retval_t retval;
     pos_cli_options_t clio;
@@ -99,10 +105,12 @@ int main(int argc, char *argv[]){
     __readin_raw_cli(argc, argv, clio);
 
     clio.local_oob_client = new POSOobClient(
+        /* req_functions */ {
+            {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::clnt   },
+            {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::clnt     },
+        },
         /* local_port */ 10086,
-        /* local_ip */ CLIENT_IP,
-        /* server_port */ POS_OOB_SERVER_DEFAULT_PORT,
-        /* server_ip */ SERVER_IP
+        /* local_ip */ CLIENT_IP
     );
     POS_CHECK_POINTER(clio.local_oob_client);
     

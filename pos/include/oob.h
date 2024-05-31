@@ -18,6 +18,7 @@
 #include <iostream>
 #include <thread>
 #include <map>
+#include <set>
 
 #include <stdio.h>
 #include <string.h>
@@ -35,6 +36,7 @@ class POSAgent;
 class POSOobServer;
 class POSOobClient;
 
+
 /*!
  *  \brief  metadata of a out-of-band client
  */
@@ -50,18 +52,63 @@ typedef struct POSOobClientMeta {
 
     // uuid of the client on the server
     pos_client_uuid_t uuid;
+
+    // id of the session
+    uint64_t session_id = 0;
 } POSOobClientMeta_t;
+
 
 /*!
  *  \brief  out-of-band message type id
  */
 enum pos_oob_msg_typeid_t {
-    kPOS_Oob_Register_Client=0,
-    kPOS_Oob_Unregister_Client,
-    kPOS_Oob_Mock_Api_Call,
-    kPOS_Oob_Migration_Signal,
-    kPOS_Oob_Restore_Signal
+    kPOS_OOB_Msg_Unknown=0,
+
+    // ========== OOB management ==========
+    kPOS_OOB_Msg_Mgnt_OpenSession,
+    kPOS_OOB_Msg_Mgnt_CloseSession,
+
+    // ========== agent message ==========
+    kPOS_OOB_Msg_Agent_Register_Client,
+    kPOS_OOB_Msg_Agent_Unregister_Client,
+
+    // ========== cli message ==========
+    /*!
+     *  \note   migration
+     */
+    kPOS_OOB_Msg_CLI_Migration_RemotePrepare,
+    kPOS_OOB_Msg_CLI_Migration_LocalPrepare,
+    kPOS_OOB_Msg_CLI_Migration_Signal,
+    kPOS_OOB_Msg_CLI_Restore_Signal,
+
+    // ========== util message ==========
+    kPOS_OOB_Msg_Utils_MockAPICall
 };
+
+
+/*!
+ *  \brief  residing state of a session
+ */
+typedef struct POSOobSession {
+    // sock fd for this session
+    int fd = 0;
+    
+    // server-side UDP port
+    uint16_t server_port;
+
+    // socket address of this session
+    struct sockaddr_in sock_addr;
+
+    // whether to force quiting the session
+    bool quit_flag = false;
+
+    // handle of the session thread
+    std::thread *daemon = nullptr;
+
+    // mark whether this is the main session
+    bool main_session = false;
+} POSOobSession_t;
+
 
 /*!
  *  \brief  out-of-band message content
@@ -72,11 +119,29 @@ typedef struct POSOobMsg {
 
     // meta data of a out-of-band client
     POSOobClientMeta_t client_meta;
-    
+
+    /*!
+     *  \brief  pointer to the corresponding session structure
+     *  \note   this field is valid only on server-side
+     */
+    POSOobSession_t *session = nullptr;
+
     // out-of-band message payload
 #define POS_OOB_MSG_MAXLEN 1024
     uint8_t payload[POS_OOB_MSG_MAXLEN];
 } POSOobMsg_t;
+
+
+/*!
+ *  \brief  payload of the request to create a new session
+ */
+typedef struct oob_payload_create_session {
+    /* client */    
+    /* server */
+    uint64_t session_id;
+    uint16_t port;
+} oob_payload_create_session_t;
+
 
 /*!
  *  \brief  default endpoint config of OOB server
@@ -85,15 +150,18 @@ typedef struct POSOobMsg {
 #define POS_OOB_SERVER_DEFAULT_PORT 5213
 #define POS_OOB_CLIENT_DEFAULT_PORT 12123
 
+
 /*!
  *  \brief  prototype of the server-side function
  */
 using oob_server_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMsg_t*, POSWorkspace*, POSOobServer*);
 
+
 /*!
  *  \brief  prototype of the client-side function
  */
 using oob_client_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMsg_t*, POSAgent*, POSOobClient*, void*);
+
 
 /*!
  *  \brief  macro for sending OOB message between client & server
@@ -102,9 +170,10 @@ using oob_client_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMs
 {                                                                                                                       \
     if(unlikely(sendto(fd, msg, sizeof(POSOobMsg_t), 0, (struct sockaddr*)remote, sizeof(struct sockaddr_in)) < 0)){    \
         POS_WARN_DETAIL("failed oob sending: %s", strerror(errno));                                                     \
-        return POS_FAILED;                                                                                              \
+        return POS_FAILED_NETWORK;                                                                                      \
     }                                                                                                                   \
 }
+
 
 /*!
  *  \brief  macro for receiving OOB message between client & server
@@ -114,26 +183,24 @@ using oob_client_function_t = pos_retval_t(*)(int, struct sockaddr_in*, POSOobMs
     socklen_t __socklen__ = sizeof(struct sockaddr_in);                                                                 \
     if(unlikely(recvfrom(fd, msg, sizeof(POSOobMsg_t), 0, (struct sockaddr*)remote, &__socklen__) < 0)){                \
         POS_WARN_DETAIL("failed oob sending: %s", strerror(errno));                                                     \
-        return POS_FAILED;                                                                                              \
+        return POS_FAILED_NETWORK;                                                                                      \
     }                                                                                                                   \
 }
 
+
 /*!
- *  \brief  function prototypes for all out-of-band message types
+ *  \brief  macro for declare server-side handlers / client-side functions
  */
 namespace oob_functions {
-#define POS_OOB_DECLARE_FUNCTIONS(oob_type) namespace oob_type {                                                                        \
-    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server);                  \
-    pos_retval_t clnt(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void *call_data);  \
+#define POS_OOB_DECLARE_SVR_FUNCTIONS(oob_type) namespace oob_type {                                                    \
+    pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server);  \
 }
 
-    POS_OOB_DECLARE_FUNCTIONS(register_client);
-    POS_OOB_DECLARE_FUNCTIONS(unregister_client);
-    POS_OOB_DECLARE_FUNCTIONS(mock_api_call);
-    POS_OOB_DECLARE_FUNCTIONS(migration_signal);
-    POS_OOB_DECLARE_FUNCTIONS(restore_signal);
-
+#define POS_OOB_DECLARE_CLNT_FUNCTIONS(oob_type) namespace oob_type {                                                                   \
+    pos_retval_t clnt(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void *call_data);  \
+}
 }; // namespace oob_functions
+
 
 /*!
  *  \brief  UDP-based out-of-band RPC server
@@ -142,66 +209,85 @@ class POSOobServer {
  public:
     /*!
      *  \brief  constructor
-     *  \param  ws      the workspace that include current oob server
-     *  \param  ip_str  ip address to bind
-     *  \param  port    udp port to bind
+     *  \param  ws                  the workspace that include current oob server
+     *  \param  callback_handlers   callback handlers of this OOB server
+     *  \param  ip_str              ip address to bind
+     *  \param  port                udp port to bind
      */
     POSOobServer(
         POSWorkspace* ws,
-        const char *ip_str=POS_OOB_SERVER_DEFAULT_IP, uint16_t port=POS_OOB_SERVER_DEFAULT_PORT
-    ) : _ws(ws), _stop_flag(false) {
+        std::map<pos_oob_msg_typeid_t, oob_server_function_t> callback_handlers,
+        const char *ip_str=POS_OOB_SERVER_DEFAULT_IP,
+        uint16_t port=POS_OOB_SERVER_DEFAULT_PORT
+    ) : _ws(ws), _stop_flag(false), _session_used_port(POS_OOB_SERVER_DEFAULT_PORT + 1) {
+        pos_retval_t retval;
+        POSOobSession_t *session;
+
         POS_CHECK_POINTER(ws);
 
         // step 1: insert oob callback map
-        _callback_map.insert({
-            {   kPOS_Oob_Register_Client,   oob_functions::register_client::sv      },
-            {   kPOS_Oob_Unregister_Client, oob_functions::unregister_client::sv    },
-            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::sv        },
-            {   kPOS_Oob_Migration_Signal,  oob_functions::migration_signal::sv     },
-            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::sv       },
-        });
+        _callback_map.insert(callback_handlers.begin(), callback_handlers.end());
 
-        // step 2: create server socket
-        _listen_fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-        if (_listen_fd < 0) {
-            POS_ERROR_C_DETAIL(
-                "failed to create listen_fd for out-of-band UDP server: %s",
-                strerror(errno)
-            );
+        // step 2: create main session
+        retval = this->create_new_session</* is_main_session */ true>(&session);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_ERROR_C_DETAIL("failed to create OOB main session");
         }
-        _local_addr.sin_family = AF_INET;
-        _local_addr.sin_addr.s_addr = inet_addr(ip_str);
-        _local_addr.sin_port = htons(port);
-        if(bind(_listen_fd, (struct sockaddr*)&_local_addr, sizeof(_local_addr)) < 0){
-            close(_listen_fd);
-            POS_ERROR_C_DETAIL(
-                "failed to bind out-of-band UDP server to \"%s:%u\": %s",
-                ip_str, port, strerror(errno)
-            );
-        }
-        POS_DEBUG_C("out-of-band UDP server is binded to %s:%u", ip_str, port);
-
-        // step 3: start daemon thread
-        _daemon_thread = new std::thread(&POSOobServer::daemon, this);
-        POS_CHECK_POINTER(_daemon_thread);
     }
 
+
     /*!
-     *  \brief  processing daemon of the OOB UDP server
+     *  \brief  deconstructor
      */
-    void daemon(){
+    ~POSOobServer(){ shutdown(); }
+
+
+    /*!
+     *  \brief  raise the shutdown signal to stop the daemon
+     */
+    inline void shutdown(){
+        pos_retval_t tmp_retval;
+        typename std::map<uint16_t, POSOobSession_t*>::iterator session_map_iter;
+
+        for(session_map_iter = this->_session_map.begin(); session_map_iter != this->_session_map.end(); session_map_iter++) {
+            tmp_retval = this->__remove_session(session_map_iter->first);
+            if(unlikely(tmp_retval != POS_SUCCESS)){
+                POS_WARN_C("failed to shutdown session: udp_port(%u), retval(%u)", session_map_iter->first, tmp_retval);
+            } else {
+                POS_DEBUG_C("shutdown session: udp_port(%u)", session_map_iter->first);
+            }
+        }
+    }
+
+
+    /*!
+     *  \brief  processing daemon of the session thread
+     *  \tparam is_main_session     mark whether is the main session
+     *  \param  session handle of the session
+     */
+    template<bool is_main_session>
+    void session_daemon(POSOobSession_t *session){
+        pos_retval_t retval = POS_SUCCESS;
         int sock_retval;
         struct sockaddr_in remote_addr;
         socklen_t len = sizeof(remote_addr);
         uint8_t recvbuf[sizeof(POSOobMsg)] = {0};
         POSOobMsg *recvmsg;
+        typename std::set<uint16_t>::iterator port_set_iter;
 
-        POS_DEBUG_C("daemon of the out-of-band UDP server start running");
+        POS_CHECK_POINTER(session);
 
-        while(!_stop_flag){
+        while(session->quit_flag == false){
             memset(recvbuf, 0, sizeof(recvbuf));
-            sock_retval = recvfrom(_listen_fd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&remote_addr, &len);
-            if(sock_retval < 0){ continue; }
+            sock_retval = recvfrom(session->fd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&remote_addr, &len);
+            if(sock_retval < 0){
+                if(errno == EAGAIN){
+                    continue;
+                } else {
+                    POS_WARN_C("failed to recv oob message, daemon stop due to socket broken: errno(%d)", errno);
+                    break;
+                }
+            }
             
             recvmsg = (POSOobMsg*)recvbuf;
             POS_DEBUG_C(
@@ -216,53 +302,211 @@ class POSOobServer {
                     recvmsg->msg_type
                 )
             }
-            (*(_callback_map[recvmsg->msg_type]))(_listen_fd, &remote_addr, recvmsg, _ws, this);
-        }
+            retval = (*(_callback_map[recvmsg->msg_type]))(session->fd, &remote_addr, recvmsg, _ws, this);
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C("failed to execute OOB function: retval(%u)", retval);
+            }
 
-        POS_DEBUG_C("oob daemon shutdown");
-        return;
-    }
-
-    /*!
-     *  \brief  raise the shutdown signal to stop the daemon
-     */
-    inline void shutdown(){ 
-        _stop_flag = true;
-        if(_daemon_thread != nullptr){
-            _daemon_thread->join();
-            delete _daemon_thread;
-            _daemon_thread = nullptr;
-            POS_DEBUG_C("OOB daemon thread shutdown");
+            // clean closed session
+            if constexpr (is_main_session == true) {
+                for(port_set_iter = this->_close_session_ports.begin(); port_set_iter != this->_close_session_ports.end(); port_set_iter++){
+                    retval = this->__remove_session(*port_set_iter);
+                    if(unlikely(retval != POS_SUCCESS)){
+                        POS_WARN_C("failed to clean closed session: retval(%u), udp_port(%u)", retval, *port_set_iter);
+                    }
+                }
+            }
         }
     }
 
+
     /*!
-     *  \brief  deconstructor
+     *  \brief  create a new session
+     *  \tparam is_main_session     mark whether is the main session
+     *  \param  new_session         pointer to stored the created session
+     *  \param  ip_str              specified ip address to bind this session on
+     *  \param  port                specified UDP port to bind this session on
+     *                              (for main session, it must be POS_OOB_SERVER_DEFAULT_PORT)
+     *  \return POS_SUCCESS for succesfully session creation
      */
-    ~POSOobServer(){
-        shutdown();
-        if(_listen_fd > 0){ close(_listen_fd); }
+    template<bool is_main_session>
+    pos_retval_t create_new_session(
+        POSOobSession_t **new_session,
+        const char *ip_str=POS_OOB_SERVER_DEFAULT_IP,
+        uint16_t port=POS_OOB_SERVER_DEFAULT_PORT
+    ){
+        pos_retval_t retval = POS_SUCCESS;
+        uint8_t retry_time = 1;
+        struct sockaddr_in spec_addr, res_addr;
+        uint16_t new_session_port;
+        int fd_flag;
+
+        POS_CHECK_POINTER(new_session);
+
+        *new_session = new POSOobSession_t();
+        POS_CHECK_POINTER(*new_session);
+
+        // create new socket
+        (*new_session)->fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if ((*new_session)->fd < 0) {
+            POS_WARN_C("failed to create socket for new session: error(%s)", strerror(errno));
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        /*!
+         *  \brief  try bind the socket to a local address
+         *  \note   for the creation of main session, we bind the socket to a specific UDP port; for side session
+         *          required by client, we bind the socket to a random UDP port
+         */
+        if constexpr (is_main_session == true){
+            POS_ASSERT(port == POS_OOB_SERVER_DEFAULT_PORT);
+            (*new_session)->sock_addr.sin_family = AF_INET;
+            (*new_session)->sock_addr.s_addr = inet_addr(ip_str);
+            (*new_session)->sock_addr.sin_port = htons(port);
+            if(bind((*new_session)->fd, (struct sockaddr*)&((*new_session)->sock_addr), sizeof((*new_session)->sock_addr)) < 0){
+                POS_WARN_C(
+                    "failed to obtain socket address for the main session: %s", strerror(errno)
+                );
+                retval = POS_FAILED;
+                goto exit;
+            }
+            (*new_session)->server_port = port;
+            POS_DEBUG_C("OOB main session is binded to %s:%u", ip_str, port);
+        } else { // if constexpr (is_main_session == false)
+            spec_addr.sin_family = AF_INET;
+            spec_addr.sin_addr.s_addr = inet_addr(ip_str);
+            spec_addr.sin_port = htons(0);
+            while(bind((*new_session)->fd, (struct sockaddr*)&spec_addr, sizeof(spec_addr)) != 0){
+                if(retry_time == 512){
+                    POS_WARN_C("failed to bind socket address for session: error(%s), retry_time(%u)", strerror(errno), retry_time);
+                    retval = POS_FAILED_DRAIN;
+                    goto exit;
+                }
+                retry_time += 1;
+            }
+            if(getsockname((*new_session)->fd, &((*new_session)->sock_addr), sizeof((*new_session)->sock_addr)) < 0){
+                POS_WARN_C(
+                    "failed to obtain socket address for the new side session: %s", strerror(errno)
+                );
+                retval = POS_FAILED;
+                goto exit;
+            }
+            (*new_session)->server_port = ntohs((*new_session)->sock_addr.sin_port);
+            POS_ASSERT((*new_session)->server_port != POS_OOB_SERVER_DEFAULT_PORT);
+            POS_DEBUG("create new side session: udp_port(%u)", (*new_session)->server_port);
+        }
+
+        // set socket as non-block
+        fd_flag = fcntl((*new_session)->fd, F_GETFL, 0);
+        fcntl((*new_session)->fd, F_SETFL, fd_flag|O_NONBLOCK);
+
+        // create handle thread for the session
+        (*new_session)->daemon = new std::thread(&POSOobServer::session_daemon<is_main_session>, this, *new_session);
+        POS_CHECK_POINTER((*new_session)->daemon);
+
+        // insert the newly created session to the map
+        POS_ASSERT(this->_session_map.count((*new_session)->server_port) == 0);
+        this->_session_map[(*new_session)->server_port] = (*new_session);
+
+    exit:
+        if(unlikely(retval != POS_SUCCESS)){
+            // release session resource
+            if((*new_session) != nullptr){
+                // 1. close socket
+                if((*new_session)->fd > 0){
+                    close((*new_session)->fd);
+                }
+
+                // 2. stop daemon thread for the session
+                if((*new_session)->daemon != nullptr){
+                    (*new_session)->quit_flag = true;
+                    (*new_session)->daemon->join();
+                    delete (*new_session)->daemon;
+                }
+
+                // 3. delete session context
+                delete (*new_session);
+            }
+        }
+
+        return retval;
+    }
+
+    /*!
+     *  \brief  mark session as closed
+     *  \param  port    UDP port of the session to be closed
+     *  \return POS_SUCCESS for successful closure;
+     *          POS_FAILED_NOT_EXIST for unexist session
+     */
+    pos_retval_t mark_session_closed(uint16_t port){
+        pos_retval_t retval = POS_SUCCESS;
+
+        if(unlikely(this->_session_map.count(port) == 0)){
+            retval = POS_FAILED_NOT_EXIST;
+            goto exit;
+        }
+        this->_close_session_ports.insert(port);
+
+    exit:
+        return retval;
     }
 
  private:
-    // UDP socket
-    int _listen_fd;
+    /*!
+     *  \brief  remove old session with specified UDP port
+     *  \note   this function should only be called within the main session
+     *  \param  port    specified UDP port
+     *  \return POS_SUCCESS for succesfully remove
+     */
+    pos_retval_t __remove_session(uint16_t port){
+        pos_retval_t retval = POS_SUCCESS;
+        POSOobSession_t *session;
 
-    // local network address
-    struct sockaddr_in _local_addr;
+        if(unlikely(this->session_map.count(port) == 0)){
+            POS_WARN_C("failed to remove session, no session with specified UDP port exit: udp_pory(%u)", port);
+            retval = POS_FAILED_NOT_EXIST;
+            goto exit;
+        }
 
-    // stop flag to indicate the daemon thread to stop
-    bool _stop_flag;
+        session = this->session_map[port];
+        POS_CHECK_POINTER(session);
 
-    // the daemon thread for receiving and processing OOB request
-    std::thread *_daemon_thread;
+        // 1. close socket
+        if(session->fd > 0){
+            close(session->fd);
+        }
+
+        // 2. stop daemon thread for the session
+        if(session->daemon != nullptr){
+            session->quit_flag = true;
+            session->daemon->join();
+            delete session->daemon;
+        }
+
+        // 3. delete session context
+        delete session;
+
+        // 4. remove from session map
+        this->session_map.erase(port);
+
+    exit:
+        return retval;
+    }
 
     // map of callback functions
     std::map<pos_oob_msg_typeid_t, oob_server_function_t> _callback_map;
 
     // pointer to the server-side workspace
     POSWorkspace *_ws;
+
+    // map of sessions (udp port -> session context)
+    std::map<uint16_t, POSOobSession_t*> _session_map;
+
+    // port of session to be closed
+    std::set<uint16_t> _close_session_ports;
 };
+
 
 /*!
  *  \brief  UDP-based out-of-band RPC client
@@ -271,32 +515,54 @@ class POSOobClient {
  public:
     /*!
      *  \brief  constructor
-     *  \param  agent       pointer to the client-side agent
-     *  \param  local_port  expected local port to bind
-     *  \param  local_ip    exepected local ip to bind
-     *  \param  server_port destination server port
-     *  \param  server_ip   destination server ipv4
+     *  \param  agent           pointer to the client-side agent
+     *  \param  req_functions   request handlers of this OOB client
+     *  \param  local_port      expected local port to bind
+     *  \param  local_ip        exepected local ip to bind
+     *  \param  server_port     destination server port
+     *  \param  server_ip       destination server ipv4
      */
     POSOobClient(
         POSAgent *agent,
-        uint16_t local_port, const char* local_ip="0.0.0.0",
-        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
+        std::map<pos_oob_msg_typeid_t, oob_client_function_t> req_functions,
+        uint16_t local_port,
+        const char* local_ip,
+        uint16_t server_port,
+        const char* server_ip
     ) : _agent(agent) {
-        __init(local_port, local_ip, server_port, server_ip);
+        __init(req_functions, local_port, local_ip, server_port, server_ip);
     }
 
     /*!
      *  \brief  constructor
-     *  \param  local_port  expected local port to bind
-     *  \param  local_ip    exepected local ip to bind
-     *  \param  server_port destination server port
-     *  \param  server_ip   destination server ipv4
+     *  \param  req_functions   request handlers of this OOB client
+     *  \param  local_port      expected local port to bind
+     *  \param  local_ip        exepected local ip to bind
+     *  \param  server_port     destination server port
+     *  \param  server_ip       destination server ipv4
      */
     POSOobClient(
-        uint16_t local_port, const char* local_ip="0.0.0.0",
-        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
+        std::map<pos_oob_msg_typeid_t, oob_client_function_t> req_functions,
+        uint16_t local_port,
+        const char* local_ip,
+        uint16_t server_port,
+        const char* server_ip
     ) : _agent(nullptr) {
-        __init(local_port, local_ip, server_port, server_ip);
+        __init(req_functions, local_port, local_ip, server_port, server_ip);
+    }
+
+    /*!
+     *  \brief  constructor
+     *  \param  req_functions   request handlers of this OOB client
+     *  \param  local_port      expected local port to bind
+     *  \param  local_ip        exepected local ip to bind
+     */
+    POSOobClient(
+        std::map<pos_oob_msg_typeid_t, oob_client_function_t> req_functions,
+        uint16_t local_port,
+        const char* local_ip
+    ) : _agent(nullptr) {
+        __init(req_functions, local_port, local_ip);
     }
     
     /*!
@@ -313,6 +579,34 @@ class POSOobClient {
     }
 
     /*!
+     *  \brief  call OOB RPC request procedure according to OOB message type
+     *  \param  id          the OOB message type
+     *  \param  server_port destination server port
+     *  \param  server_ip   destination server ipv4
+     *  \param  call_data   calling payload, coule bd null
+     *  \return POS_SUCCESS for successfully requesting
+     */
+    inline pos_retval_t call(
+        pos_oob_msg_typeid_t id,
+        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT,
+        const char* server_ip="127.0.0.1",
+        void *call_data=nullptr
+    ){
+        struct sockaddr_in remote_addr;
+
+        if(unlikely(_request_map.count(id) == 0)){
+            POS_ERROR_C_DETAIL("no request function for type %d is registered, this is a bug", id);
+        }
+
+        // setup server addr
+        remote_addr.sin_family = AF_INET;
+        remote_addr.sin_addr.s_addr = inet_addr(server_ip);
+        remote_addr.sin_port = htons(server_port);
+
+        return (*(_request_map[id]))(_fd, &remote_addr, &_msg, _agent, this, call_data);
+    }
+
+    /*!
      *  \brief  deconstrutor
      */
     ~POSOobClient(){
@@ -322,32 +616,30 @@ class POSOobClient {
     /*!
      *  \brief  set the uuid of the client
      *  \note   this function is invoked during the registeration process 
-     *          (i.e., register_client oob type)
+     *          (i.e., agent_register_client oob type)
      */
     inline void set_uuid(pos_client_uuid_t id){ _msg.client_meta.uuid = id; }
 
  private:
     /*!
      *  \brief  internal inialization function of oob client
-     *  \param  local_port  local UDP port to bind
-     *  \param  local_ip    local IPv4 to bind
-     *  \param  server_port remote UDP port to send UDP datagram
-     *  \param  server_ip   remote IPv4 address pf POS server process
+     *  \param  req_functions   request handlers of this OOB client
+     *  \param  local_port      local UDP port to bind
+     *  \param  local_ip        local IPv4 to bind
+     *  \param  server_port     remote UDP port to send UDP datagram
+     *  \param  server_ip       remote IPv4 address pf POS server process
      */
     inline void __init(
-        uint16_t local_port, const char* local_ip="0.0.0.0",
-        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT, const char* server_ip="127.0.0.1"
+        std::map<pos_oob_msg_typeid_t, oob_client_function_t> &req_functions,
+        uint16_t local_port,
+        const char* local_ip="0.0.0.0",
+        uint16_t server_port=POS_OOB_SERVER_DEFAULT_PORT,
+        const char* server_ip="127.0.0.1"
     ){
         uint8_t retry_time = 1;
 
         // step 1: insert oob request map
-        _request_map.insert({
-            {   kPOS_Oob_Register_Client,   oob_functions::register_client::clnt    },
-            {   kPOS_Oob_Unregister_Client, oob_functions::unregister_client::clnt  },
-            {   kPOS_Oob_Mock_Api_Call,     oob_functions::mock_api_call::clnt      },
-            {   kPOS_Oob_Migration_Signal,  oob_functions::migration_signal::clnt   },
-            {   kPOS_Oob_Restore_Signal,    oob_functions::restore_signal::clnt     },
-        });
+        _request_map.insert(req_functions.begin(), req_functions.end());
 
         // step 2: obtain the process id
         _msg.client_meta.pid = getpid();
