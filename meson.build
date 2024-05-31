@@ -171,14 +171,18 @@ message('>>> Detecting CUDA toolkit done\n')
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
 sources += [
     'pos/src/handle.cpp',
-    'pos/src/oob.cpp',
     'pos/src/api_context.cpp',
     'pos/src/client.cpp',
     'pos/src/trace.cpp',
     'pos/src/worker.cpp',
     'pos/src/parser.cpp',
     'pos/src/workspace.cpp',
-    'pos/src/migration.cpp' 
+    'pos/src/migration.cpp',
+    'pos/src/oob/agent.cpp',
+    'pos/src/oob/cli.cpp',
+    'pos/src/oob/utils.cpp',
+    'pos/src/oob/migration.cpp',
+    'pos/src/oob/mgnt.cpp'
 ]
 
 if ckpt_opt_level == 0

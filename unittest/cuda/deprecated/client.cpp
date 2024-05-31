@@ -36,7 +36,7 @@ int main(){
     //     { .value = mock_param_array_1, .size = sizeof(mock_param_array_1) }
     // });
     // call_meta.ret_data_size = 0;
-    // pos_agent->oob_call(kPOS_Oob_Mock_Api_Call, &call_meta);
+    // pos_agent->oob_call(kPOS_OOB_Msg_Utils_MockAPICall, &call_meta);
     // POS_DEBUG("cuModuleLoad: retcode(%d)", call_meta.ret_code);
 
     // mock call cudaMalloc
@@ -48,7 +48,7 @@ int main(){
         .size = sizeof(size_t)
     });
     call_meta.ret_data_size = sizeof(uint64_t);
-    pos_agent->oob_call(kPOS_Oob_Mock_Api_Call, &call_meta);
+    pos_agent->oob_call(kPOS_OOB_Msg_Utils_MockAPICall, &call_meta);
     POS_DEBUG("cuda_malloc: retcode(%d), addr(%p)", call_meta.ret_code, *((uint64_t*)(call_meta.ret_data)));
 
     delete pos_agent;

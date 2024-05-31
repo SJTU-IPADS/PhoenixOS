@@ -46,56 +46,33 @@ pos_retval_t handle_migrate(pos_cli_options_t &clio){
             /* is_required */ true
         },
         {
-            /* meta_type */ kPOS_CliMeta_OobIp,
-            /* meta_name */ "oip",
-            /* meta_desp */ "out-of-band ip of remote host",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.target_host_oob_ip = inet_addr(meta_val.c_str());
-            exit:
-                return retval;
-            },
-            /* is_required */ true
-        },
-        {
-            /* meta_type */ kPOS_CliMeta_OobPort,
-            /* meta_name */ "oport",
-            /* meta_desp */ "out-of-band port of remote host",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.target_host_oob_port = std::stoul(meta_val);
-            exit:
-                return retval;
-            },
-            /* is_required */ true
-        },
-        {
-            /* meta_type */ kPOS_CliMeta_DataplaneIp,
+            /* meta_type */ kPOS_CliMeta_Dip,
             /* meta_name */ "dip",
-            /* meta_desp */ "dataplane ip of remote host",
+            /* meta_desp */ "ip of destination host",
             /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
                 pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.target_host_dp_ip = inet_addr(meta_val.c_str());
+                clio.metas.migrate.dip = inet_addr(meta_val.c_str());
             exit:
                 return retval;
             },
             /* is_required */ true
         },
         {
-            /* meta_type */ kPOS_CliMeta_DataplanePort,
+            /* meta_type */ kPOS_CliMeta_Dport,
             /* meta_name */ "dport",
-            /* meta_desp */ "dataplane port of remote host",
+            /* meta_desp */ "port of posd on destination host",
             /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
                 pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.target_host_dp_port = std::stoul(meta_val);
+                clio.metas.migrate.dport = std::stoul(meta_val);
             exit:
                 return retval;
             },
-            /* is_required */ true
+            /* is_required */ false
         },
     });
 
-    // step 1: create remote transport
+    // step 1: remote prepare
+    
 
     // step 2: connect 
 

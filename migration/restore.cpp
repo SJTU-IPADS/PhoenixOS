@@ -19,6 +19,17 @@ typedef struct migration_cli_meta {
     uint64_t client_uuid;
 } migration_cli_meta_t;
 
+/*!
+ *  \brief  function prototypes for cli oob client
+ */
+namespace oob_functions {
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_register_client);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_unregister_client);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(utils_mock_api_call);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_migration_signal);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_restore_signal);
+}; // namespace oob_functions
+
 int main(){
     int retval;
 
@@ -26,13 +37,16 @@ int main(){
     cli_meta.client_uuid = 0;
 
     POSOobClient oob_client(
+        /* req_functions */ {
+            {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::clnt     },
+        },
         /* local_port */ 10086,
         /* local_ip */ CLIENT_IP,
         /* server_port */ POS_OOB_SERVER_DEFAULT_PORT,
         /* server_ip */ SERVER_IP
     );
 
-    oob_client.call(kPOS_Oob_Restore_Signal, &cli_meta);
+    oob_client.call(kPOS_OOB_Msg_CLI_Restore_Signal, &cli_meta);
     
 exit:       
     return retval;

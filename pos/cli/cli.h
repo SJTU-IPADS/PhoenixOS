@@ -58,14 +58,11 @@ enum pos_cli_arg : int {
     // target process id
     kPOS_CliMeta_Pid,
     // oob ip
-    kPOS_CliMeta_OobIp,
+    kPOS_CliMeta_Dip,
     // oob port
-    kPOS_CliMeta_OobPort,
-    // dataplane ip
-    kPOS_CliMeta_DataplaneIp,
-    // dataplane port
-    kPOS_CliMeta_DataplanePort,
+    kPOS_CliMeta_Dport,
     // file path to the kernel metadata
+    kPOS_CliMeta_KernelMeta,
     kPOS_CliMeta_PLACEHOLDER,
 };
 
@@ -95,10 +92,8 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
 
 typedef struct pos_cli_migrate_metas {
     uint64_t pid;
-    in_addr_t target_host_oob_ip;
-    uint32_t target_host_oob_port;
-    in_addr_t target_host_dp_ip;
-    uint32_t target_host_dp_port;
+    in_addr_t dip;
+    uint32_t dport;
 } pos_cli_migrate_metas_t;
 
 
