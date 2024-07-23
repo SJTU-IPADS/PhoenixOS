@@ -27,7 +27,7 @@ tokenizer = BertTokenizer.from_pretrained(tokenizer_path)
 # model.save_pretrained('./model_base')
 model = BertForMaskedLM.from_pretrained(model_path).to(device)
 
-mock_coldstart = True
+mock_coldstart = False
 if mock_coldstart:
     exit(0)
 
