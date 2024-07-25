@@ -3,7 +3,7 @@
 # >>>>>>>>>> common variables <<<<<<<<<<
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-SUDO=
+SUDO=sudo
 
 # >>>>>>>>>> action configurations <<<<<<<<<<
 container_id=0

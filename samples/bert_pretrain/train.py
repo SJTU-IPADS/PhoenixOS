@@ -107,6 +107,7 @@ def train(model, train_data, val_data, learning_rate, epochs):
             train_label = train_label.to(device)
             mask = train_input['attention_mask'].to(device)
             input_id = train_input['input_ids'].squeeze(1).to(device)
+
             # 通过模型得到输出
             output = model(input_id, mask)
             # 计算损失
@@ -134,7 +135,7 @@ def train(model, train_data, val_data, learning_rate, epochs):
 
             print(f"{int(round((e_time-s_time) * 1000))} ms")
 
-            if batch_idx == 128:
+            if batch_idx == 16:
                 break
         
         np_duration_list = np.array(duration_list)

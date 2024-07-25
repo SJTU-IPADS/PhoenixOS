@@ -40,32 +40,51 @@ ckpt_without_stop() {
         next_ckpt_version=$(($prev_ckpt_version + 1))
         next_ckpt_dir="$dir_path/$next_ckpt_version"
         mkdir $next_ckpt_dir
+        mount -t tmpfs -o size=80g tmpfs $next_ckpt_dir
         if [ $prev_ckpt_version = 0 ]; then
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
 
             # criu dump
+            start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --leave-running --track-mem --shell-job --display-stats
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
 
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # restore gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
         else
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
-            
-            # criu dump
-            criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
 
+            # criu dump
+            start=$(date +%s.%3N)
+            criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
+
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # restore gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
         fi
         echo "ckpt to: $next_ckpt_dir"
     fi
@@ -84,22 +103,35 @@ ckpt_with_stop() {
         next_ckpt_version=$(($prev_ckpt_version + 1))
         next_ckpt_dir="$dir_path/$next_ckpt_version"
         mkdir $next_ckpt_dir
+        mount -t tmpfs -o size=80g tmpfs $next_ckpt_dir
         if [ $prev_ckpt_version = 0 ]; then
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
 
             # stop cpu
+            start=$(date +%s.%3N)
             criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
         else
+            start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
 
             # stop cpu
+            start=$(date +%s.%3N)
             criu dump --tree $pid --prev-images-dir $prev_ckpt_dir --images-dir $next_ckpt_dir --shell-job --display-stats
+            end=$(date +%s.%3N)
+            echo $(echo "$end - $start" | bc)
         fi
         echo "ckpt version: $next_ckpt_dir"
         # if [ "$?" = "0" ] ; then
