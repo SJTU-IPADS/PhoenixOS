@@ -56,7 +56,7 @@ namespace cli_migration_remote_prepare {
         int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSAgent* agent, POSOobClient* oob_clnt, void* call_data
     ){
         pos_retval_t retval = POS_SUCCESS;
-        cli_meta_t cm;
+        cli_meta_t *cm;
         oob_payload_t *payload;
 
         msg->msg_type = kPOS_OOB_Msg_CLI_Migration_RemotePrepare;

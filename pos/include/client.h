@@ -29,6 +29,7 @@ class POSClient;
 #include "pos/include/parser.h"
 #include "pos/include/handle.h"
 #include "pos/include/dag.h"
+#include "pos/include/transport.h"
 #include "pos/include/migration.h"
 #include "pos/include/utils/timestamp.h"
 
@@ -249,7 +250,12 @@ class POSClient {
      *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
      */
     virtual void init_dag(){}
-
+    
+    /*!
+     *  \brief  initialization of transport utilities for migration  
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    virtual pos_retval_t init_transport(){}
 
     /*!
      *  \brief  restore resources from checkpointed file
@@ -352,7 +358,7 @@ class POSClient {
 
     // worker thread handle
     POSWorker *worker;
-
+    
  protected:
     // api instance pc
     uint64_t _api_inst_pc;
@@ -360,6 +366,8 @@ class POSClient {
     // context to initialize this client
     pos_client_cxt_t _cxt;
 
+    // transport endpoint
+    POSTransport</* is_server */ false> *_transport;
 
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type

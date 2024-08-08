@@ -166,8 +166,8 @@ int POSWorkspace::pos_process(
     wq->push(wqe);
     
     /*!
-        *  \note   if this is a sync call, we need to block until cqe is obtained
-        */
+     *  \note   if this is a sync call, we need to block until cqe is obtained
+     */
     if(unlikely(api_meta.is_sync)){
         while(1){
             if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Parser>(&cqes, uuid))){
@@ -196,10 +196,10 @@ int POSWorkspace::pos_process(
                     retval = has_prev_error ? prev_error_code : cqe->api_cxt->return_code;
 
                     /*!
-                        *  \brief  setup return data
-                        *  \note   avoid this copy!
-                        *          then we assume only sync call would have return data
-                        */
+                     *  \brief  setup return data
+                     *  \note   avoid this copy!
+                     *          then we assume only sync call would have return data
+                     */
                     // if(unlikely(ret_data_len > 0 && ret_data != nullptr)){
                     //     memcpy(ret_data, cqe->api_cxt->ret_data, ret_data_len);
                     // }
