@@ -70,7 +70,8 @@ namespace mgnt_open_session {
     ){
         pos_retval_t retval = POS_SUCCESS;
         oob_payload_t *payload;
-        uint16_t *udp_port;
+
+        POS_CHECK_POINTER(call_data);
 
         // send request
         msg->msg_type = kPOS_OOB_Msg_Mgnt_OpenSession;
@@ -85,8 +86,7 @@ namespace mgnt_open_session {
             POS_WARN("failed to request a new OOB session from server side: retval(%u)", retval);
             goto exit;
         } else {
-            udp_port = (uint16_t*)(call_data);
-            udp_port = payload->server_port;
+            *((uint16_t*)(call_data)) = payload->server_port;
         }
         
     exit:

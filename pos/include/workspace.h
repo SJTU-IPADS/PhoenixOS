@@ -69,6 +69,7 @@ class POSWorkspace {
      *  \brief  constructor
      */
     POSWorkspace(int argc, char *argv[]) : _current_max_uuid(0) {
+        // readin commandline options
         this->parse_command_line_options(argc, argv);
 
         // create out-of-band server
@@ -82,8 +83,7 @@ class POSWorkspace {
                 {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::sv       },
             },
             /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
-            /* port */ POS_OOB_SERVER_DEFAULT_PORT,
-            /* use_daemon */ true
+            /* port */ POS_OOB_SERVER_DEFAULT_PORT
         );
         POS_CHECK_POINTER(_oob_server);
 

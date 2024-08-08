@@ -7,3 +7,10 @@
 	path = third_party/cuda-checkpoint
 	url = git@github.com:NVIDIA/cuda-checkpoint.git
 	branch = main
+
+[submodule "third_party/criu"]
+	path = third_party/criu
+	url = git@ipads.se.sjtu.edu.cn:scaleaisys/criu.git
+	branch = criu-dev
+
+
