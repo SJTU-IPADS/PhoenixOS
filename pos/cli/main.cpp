@@ -49,7 +49,7 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         kPOS_CliAction_Preserve,
         kPOS_CliMeta_Pid,
         kPOS_CliMeta_Dip,
-        kPOS_CliMeta_Dport,
+        kPOS_CliMeta_Dport
     );
 
     struct option long_opt[] = {

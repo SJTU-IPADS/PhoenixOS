@@ -46,29 +46,49 @@
 #define POS_TRANSPORT_RDMA_CQ_SIZE           128
 #define POS_TRANSPORT_RDMA_MAX_SGE_PER_WQE   16
 
-
 /*!
- * \brief   represent a RDMA-based transport endpoint
+ * \brief   transport end-point
  */
 template<bool is_server>
-class POSTransport_RDMA {
+class POSTransport {
+ public:
+  POSTransport(){}
+  ~POSTransport(){}
+
+  /*!
+   * \brief   [control-plane] listen to a TCP socket before starting connection,
+   *          this function would be invoked on the server-side
+   * \return  POS_SUCCESS for succesfully connected
+   */
+  virtual pos_retval_t handshake(){}
+
+ private:
+
+};
+
+/*!
+ * \brief   represent a RDMA-based transport end-point
+ */
+template<bool is_server>
+class POSTransport_RDMA : public POSTransport<is_server> {
+ public:
    /*!
     * \brief   constructor of RDMA transport end-point
     * \param   dev_name       name of the IB device to be used
-    * \param   local_ib_port  local IB port to be used
     */
-   POSTransport_RDMA(std::string dev_name, int local_ib_port){
+   POSTransport_RDMA(std::string dev_name){ 
       pos_retval_t tmp_retval;
 
+      // make sure ib device exist
       POS_ASSERT(POSTransport_RDMA::has_ib_device());
 
       // open and init IB device
-      tmp_retval = __open_and_init_ib_device(dev_name, local_ib_port);
+      tmp_retval = __open_and_init_ib_device(dev_name);
       if(unlikely(POS_SUCCESS != tmp_retval)){
          goto exit;
       }
 
-      // create the first Reliable & Connect-oriented (RC) QP and corresponding PD and CQ
+      // create Reliable & Connect-oriented (RC) QP and corresponding PD and CQ
       tmp_retval = this->__create_qctx(IBV_QPT_RC);
       if(unlikely(POS_SUCCESS != tmp_retval)){
          goto exit;
@@ -84,7 +104,7 @@ class POSTransport_RDMA {
     *          this function would be invoked on the server-side
     * \return  POS_SUCCESS for succesfully connected
     */
-   pos_retval_t handshake(){
+   pos_retval_t handshake() override {
       pos_retval_t retval = POS_SUCCESS;
       
       if constexpr (is_server == true) {
@@ -114,7 +134,7 @@ class POSTransport_RDMA {
     * \return  POS_SUCCESS for successfully opened;
     *          others for any failure
     */
-   pos_retval_t __open_and_init_ib_device(std::string& dev_name, int& local_ib_port){
+   pos_retval_t __open_and_init_ib_device(std::string& dev_name){
       pos_retval_t retval = POS_SUCCESS;
       struct ibv_device **dev_list = nullptr;
       struct ibv_qp_init_attr qp_init_attr;
@@ -170,11 +190,10 @@ class POSTransport_RDMA {
 
       // query port properties on the opened device
       if (unlikely(
-         0 != ibv_query_port(this->_ib_ctx, local_ib_port, &this->_port_attr)
+         0 != ibv_query_port(this->_ib_ctx, 0, &this->_port_attr)
       )){
          POS_WARN_C(
-            "failed to ibv_query_port on port %u for device %s",
-            local_ib_port, strdup(ibv_get_device_name(this->_ib_dev))
+            "failed to ibv_query_port on first port for device %s", strdup(ibv_get_device_name(this->_ib_dev))
          );
          retval = POS_FAILED;
          goto exit;
@@ -209,6 +228,7 @@ class POSTransport_RDMA {
       POS_CHECK_POINTER(this->_ib_dev);
       POS_CHECK_POINTER(this->_ib_ctx);
 
+      // allocate completion queue
       cq = ibv_create_cq(this->_ib_ctx, POS_TRANSPORT_RDMA_CQ_SIZE, NULL, NULL, 0);
       if (unlikely(cq == nullptr)){
          POS_WARN_C(
@@ -283,7 +303,7 @@ class POSTransport_RDMA {
    struct ibv_device *_ib_dev;
 
    // IB context of current process
-	struct ibv_context *_ib_ctx;
+	 struct ibv_context *_ib_ctx;
 
    // IB port attributes
    struct ibv_port_attr _port_attr;

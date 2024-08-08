@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
@@ -219,7 +220,7 @@ class POSOobServer {
         std::map<pos_oob_msg_typeid_t, oob_server_function_t> callback_handlers,
         const char *ip_str=POS_OOB_SERVER_DEFAULT_IP,
         uint16_t port=POS_OOB_SERVER_DEFAULT_PORT
-    ) : _ws(ws), _stop_flag(false), _session_used_port(POS_OOB_SERVER_DEFAULT_PORT + 1) {
+    ) : _ws(ws) {
         pos_retval_t retval;
         POSOobSession_t *session;
 
@@ -340,6 +341,7 @@ class POSOobServer {
         struct sockaddr_in spec_addr, res_addr;
         uint16_t new_session_port;
         int fd_flag;
+        uint32_t tmp_size;
 
         POS_CHECK_POINTER(new_session);
 
@@ -362,7 +364,7 @@ class POSOobServer {
         if constexpr (is_main_session == true){
             POS_ASSERT(port == POS_OOB_SERVER_DEFAULT_PORT);
             (*new_session)->sock_addr.sin_family = AF_INET;
-            (*new_session)->sock_addr.s_addr = inet_addr(ip_str);
+            (*new_session)->sock_addr.sin_addr.s_addr = inet_addr(ip_str);
             (*new_session)->sock_addr.sin_port = htons(port);
             if(bind((*new_session)->fd, (struct sockaddr*)&((*new_session)->sock_addr), sizeof((*new_session)->sock_addr)) < 0){
                 POS_WARN_C(
@@ -385,7 +387,8 @@ class POSOobServer {
                 }
                 retry_time += 1;
             }
-            if(getsockname((*new_session)->fd, &((*new_session)->sock_addr), sizeof((*new_session)->sock_addr)) < 0){
+            tmp_size = sizeof((*new_session)->sock_addr); 
+            if(getsockname((*new_session)->fd, (struct sockaddr *)(&((*new_session)->sock_addr)), &tmp_size) < 0){
                 POS_WARN_C(
                     "failed to obtain socket address for the new side session: %s", strerror(errno)
                 );
@@ -463,13 +466,13 @@ class POSOobServer {
         pos_retval_t retval = POS_SUCCESS;
         POSOobSession_t *session;
 
-        if(unlikely(this->session_map.count(port) == 0)){
+        if(unlikely(this->_session_map.count(port) == 0)){
             POS_WARN_C("failed to remove session, no session with specified UDP port exit: udp_pory(%u)", port);
             retval = POS_FAILED_NOT_EXIST;
             goto exit;
         }
 
-        session = this->session_map[port];
+        session = this->_session_map[port];
         POS_CHECK_POINTER(session);
 
         // 1. close socket
@@ -488,7 +491,7 @@ class POSOobServer {
         delete session;
 
         // 4. remove from session map
-        this->session_map.erase(port);
+        this->_session_map.erase(port);
 
     exit:
         return retval;

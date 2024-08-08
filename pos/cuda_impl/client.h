@@ -21,6 +21,7 @@
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
+#include "pos/include/transport.h"
 
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/handle/cublas.h"
@@ -55,6 +56,10 @@ class POSClient_CUDA : public POSClient {
         this->worker = new POSWorker_CUDA(/* ws */ ws, /* client */ this);
         POS_CHECK_POINTER(this->worker);
         this->worker->init();
+  
+        if(unlikely(POS_SUCCESS != this->init_transport())){
+          POS_WARN_C("failed to initialize transport for client %lu, migration would be failed", id);
+        }
     }
 
     POSClient_CUDA(){}
@@ -162,6 +167,22 @@ class POSClient_CUDA : public POSClient {
             }
         }
     }
+
+    /*
+     *  \brief  initialization of transport utilities for migration  
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    pos_retval_t init_transport() override {
+      pos_retval_t retval = POS_SUCCESS;
+      
+      // TODO: default to use RDMA here, might support other transport later
+      this->_transport = new POSTransport_RDMA</* is_server */false>(/* dev_name */ "");
+      POS_CHECK_POINTER(this->_transport);
+
+    exit:
+        return retval;
+    }
+
 
     /*!
      *  \brief      deinit handle manager for all used resources
