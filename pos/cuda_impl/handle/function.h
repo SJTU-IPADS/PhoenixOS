@@ -56,7 +56,8 @@ class POSHandle_CUDA_Function : public POSHandle {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Function(void* hm) : POSHandle(hm)
+    POSHandle_CUDA_Function(void* hm)
+        : POSHandle(hm)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Function;
     }
@@ -110,6 +111,7 @@ class POSHandle_CUDA_Function : public POSHandle {
     // name of the kernel
     std::string name;
 
+    // signature of the kernel
     std::string signature;
 
     // number of parameters within this function
