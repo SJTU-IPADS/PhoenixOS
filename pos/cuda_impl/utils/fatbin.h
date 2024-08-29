@@ -28,6 +28,9 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
+// TODO: move this file to a more elegant path
+#include "patcher.h"
+
 #define FATBIN_STRUCT_MAGIC 0x466243b1
 #define FATBIN_TEXT_MAGIC   0xBA55ED50
 
@@ -97,6 +100,33 @@ typedef struct POSCudaFunctionDesp {
     POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0), has_verified_params(false) {}
     ~POSCudaFunctionDesp(){}
 } POSCudaFunctionDesp_t;
+
+
+/*!
+ *  \brief  kernel PTX patcher
+ */
+class POSUtil_CUDA_Kernel_Patcher {
+ public:
+    static pos_retval_t patch_fatbin_binary(uint8_t *binary_ptr, std::vector<uint8_t>& patched_bianry){
+        pos_retval_t retval = POS_SUCCESS;
+
+        POS_CHECK_POINTER(binary_ptr);
+
+        std::unique_ptr<std::vector<uint8_t>> _patched_fatbin = patch_fatbin(binary_ptr);
+        if(unlikely(_patched_fatbin == nullptr || _patched_fatbin->size() == 0)){
+            POS_WARN("failed to patch fatbin: fatbin(%p)", binary_ptr);
+            retval = POS_FAILED_INCORRECT_OUTPUT;
+            goto exit;
+        }
+
+        patched_bianry = *_patched_fatbin;
+
+    exit:
+        return retval;
+    }
+
+ private:
+};
 
 
 /*！

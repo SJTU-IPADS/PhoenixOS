@@ -19,40 +19,65 @@ run_unit_test=true
 # involve third-party library to the operation
 involve_third_party=false
 
+log() {
+    echo -e "\033[37m [POS Build Log] $1 \033[0m"
+}
+
+warn() {
+    echo -e "\033[33m [POS Build Wrn] $1 \033[0m"
+}
+
+error() {
+    echo -e "\033[31m [POS Build Err] $1 \033[0m"
+    exit 1
+}
+
+check_requirement() {
+    # $1 cmd line binary name
+    # $2 installation method
+    if [[ ! -x "$(command -v $1)" ]]; then
+      error "no $1 installed, please installing via: $2"
+    fi
+}
+
 # build cuda target
 build_cuda() {
   if [ $doclean = true ]; then
-    echo "clean target: cuda"
-    echo "[1] cleaning dependencies"
+    log ">> clean target: cuda..."
+    log ">>>> [1] cleaning dependencies..."
     if [ $involve_third_party = true ]; then
-
-      echo "    [1.1] cleaning libclang"
-      cd $script_dir
-      cd third_party/libclang-static-build
-      if [ -d "./build" ] || [ -d "./include" ] || [ -d "./lib" ] || [ -d "./share" ]; then
-        rm -rf build include lib share
-      fi
+        log ">>>>>> [1.1] cleaning libclang..."
+        cd $script_dir
+        cd third_party/libclang-static-build
+        if [ -d "./build" ] || [ -d "./include" ] || [ -d "./lib" ] || [ -d "./share" ]; then
+            rm -rf build include lib share
+        fi
     else
-      echo "    SKIPED"
+        log ">>>> SKIPED"
     fi
 
-    echo "[2] cleaning POS"
+    log ">>>> [2] cleaning POS..."
+    log ">>>>>> [2.1] cleaning patcher component..."
+    cd $script_dir/pos/cuda_impl/patcher
+    rm -rf ./build
+
+    log ">>>>>> [2.2] cleaning core..."
     cd $script_dir
     if [ -d "./build" ]; then
-      rm -rf ./build
+        rm -rf ./build
     fi
     rm $script_dir/pos_build.log
     rm /lib/x86_64-linux-gnu/libpos.so
 
-    echo "[3] cleaning POS CLI"
+    log ">>>> [3] cleaning POS CLI..."
     cd $script_dir
     cd pos/cli
     if [ -d "./build" ]; then
-      rm -rf ./build
+        rm -rf ./build
     fi
     rm $script_dir/pos_cli_build.log
 
-    echo "[4] cleaning remoting framework (cricket)"
+    log ">>>> [4] cleaning remoting framework (cricket)..."
     cd $script_dir
     cd remoting/cuda/submodules/libtirpc
     make clean
@@ -63,105 +88,115 @@ build_cuda() {
     rm --force core.*
     rm $script_dir/remoting_build.log
 
-    echo "[5] cleaning unittest"
+    log ">>>> [5] cleaning unittest..."
     cd $script_dir
     cd unittest/cuda
     if [ -d "./build" ]; then
-      rm -rf build
+        rm -rf build
     fi
     if [ -d "./bin" ]; then
-      rm -rf bin
+        rm -rf bin
     fi
   else
-    echo "build target: cuda"
-    echo "[1] building dependencies"
+    log ">> build target: cuda..."
+    log ">>>> [1] building dependencies..."
     if [ $involve_third_party = true ]; then
-      echo "    [1.1] building libclang"
-      cd $script_dir
-      cd third_party/libclang-static-build
-      if [ ! -d "./build" ]; then
-        mkdir build && cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=..
-        make install -j
-      fi
-      # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
-      cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
-      cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
+        log ">>>>>> [1.1] building libclang..."
+        cd $script_dir
+        cd third_party/libclang-static-build
+        if [ ! -d "./build" ]; then
+            mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=..
+            make install -j
+        fi
+        # we need to move the dynamic libraries to the system path, or we can't execute the final executable due to loss .so
+        cp $script_dir/third_party/libclang-static-build/lib/*.so* /lib/x86_64-linux-gnu/
+        cp $script_dir/third_party/libclang-static-build/lib/*.a* /lib/x86_64-linux-gnu/
     else
-      echo "    SKIPED"
+        log ">>>>>> SKIPED"
     fi
 
-    echo "[2] building POS"
+    log ">>>> [2] building POS..."
+    log ">>>>>> [2.1] building patcher component..."
+    cd $script_dir/pos/cuda_impl/patcher
+    if [ -d "./build" ]; then
+        rm -rf build
+    fi
+    mkdir build
+    cd build
+    cmake ..
+    make -j
+    status=$?
+    if [ $status -ne 0 ]; then
+        error "failed to build patcher component"
+    fi
+
+    log ">>>>>> [2.2] building core..."
     cd $script_dir
     if [ ! -d "./build" ]; then
-      meson build
-      status=$?
-      if [ $status -ne 0 ]; then
-        echo "failed to meson POS project"
-        exit 1
-      fi
+        meson build
+        status=$?
+        if [ $status -ne 0 ]; then
+            error "failed to meson POS project"
+        fi
     fi
     cd build
     ninja clean
     ninja &>$script_dir/pos_build.log
     status=$?
     if [ $status -ne 0 ]; then
-      echo "failed to build POS project"
-      grep -n -A 5 'error' $script_dir/pos_build.log | awk '{print} NR%2==0 {print ""}'
-      exit 1
+        grep -n -A 5 'error' $script_dir/pos_build.log | awk '{print} NR%2==0 {print ""}'
+        error "failed to build POS core, error log printed"
     fi
     cp $script_dir/build/*.so /lib/x86_64-linux-gnu/
 
-    echo "[3] building POS CLI"
+    echo ">>>>>> [3] building POS CLI..."
     cd $script_dir
     cd pos/cli
     if [ ! -d "./build" ]; then
-      mkdir build
+        mkdir build
     fi
     cd build && rm -rf ./*
     cmake ..
     status=$?
     if [ $status -ne 0 ]; then
-      echo "failed to cmake POS CLI"
-      exit 1
+        error "failed to cmake POS CLI"
     fi
 
     make -j &>$script_dir/pos_cli_build.log
     status=$?
     if [ $status -ne 0 ]; then
-      echo "failed to build POS CLI project"
-      grep -n 'error' $script_dir/pos_cli_build.log | awk '{print} NR%2==0 {print ""}'
-      exit 1
+        grep -n 'error' $script_dir/pos_cli_build.log | awk '{print} NR%2==0 {print ""}'
+        error "failed to build POS CLI project, error log printed"
     fi
 
     cp ../bin/* /usr/local/bin
 
-    echo "[3] building remoting framework (cricket)"
+    log ">>>> [3] building remoting framework (cricket)"
     export POS_ENABLE=true
     cd $script_dir
     cd remoting/cuda
     make libtirpc -j
     cd cpu
     if [ $multithread_build = true ]; then
-      LOG=INFO make cricket-rpc-server cricket-client.so -j &>$script_dir/remoting_build.log
+        LOG=INFO make cricket-rpc-server cricket-client.so -j &>$script_dir/remoting_build.log
     else
-      LOG=INFO make cricket-rpc-server cricket-client.so &>$script_dir/remoting_build.log
+        LOG=INFO make cricket-rpc-server cricket-client.so &>$script_dir/remoting_build.log
     fi
     status=$?
     if [ $status -ne 0 ]; then
-      echo "failed to build remoting framework"
-      grep -n 'error' $script_dir/remoting_build.log | awk '{print} NR%2==0 {print ""}'
-      exit 1
+        grep -n 'error' $script_dir/remoting_build.log | awk '{print} NR%2==0 {print ""}'
+        error "failed to build remoting framework, error log printed"
     fi
 
-    echo "[4] building unittest"
+    log ">>>> [4] building unittest"
     cd $script_dir
     cd unittest/cuda
     if [ -d "./build" ]; then
-      rm -rf build
+        rm -rf build
     fi
     if [ -d "./bin" ]; then
-      rm -rf bin
+        rm -rf bin
     fi
     mkdir build
     cd build
@@ -169,96 +204,93 @@ build_cuda() {
     make -j
 
     if [ $run_unit_test = true ]; then
-      echo "[3.1] run per-api unittest"
-      # raise POS server
-      cd $script_dir
-      cd remoting/cuda/cpu
-      nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../build ./cricket-rpc-server -n test' &
-      server_pid=$!
-
-      # raise per-api unittest client
-      sleep 3
-      cd $script_dir
-      cd unittest/cuda/build
-      LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 ../bin/per_api_test
-      client_retval=$?
-      kill -SIGINT $server_pid
-
-      if [ $client_retval -eq 0 ]; then
-        echo "Per-API unittest passed!"
+        log ">>>>>> [4.1] run per-api unittest"
+        # raise POS server
         cd $script_dir
         cd remoting/cuda/cpu
-        rm ./nohup.out
-      else
-        cd $script_dir
-        cd remoting/cuda/cpu
-        cat ./nohup.out
-        rm ./nohup.out
-        echo "Per-API unittest failed! server log printed"
-        exit 1
-      fi
+        nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../build ./cricket-rpc-server -n test' &
+        server_pid=$!
 
-      echo "[3.2] run hidden-api unittest (TODO)"
+        # raise per-api unittest client
+        sleep 3
+        cd $script_dir
+        cd unittest/cuda/build
+        LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 ../bin/per_api_test
+        client_retval=$?
+        kill -SIGINT $server_pid
+
+        if [ $client_retval -eq 0 ]; then
+            log "Per-API unittest passed!"
+            cd $script_dir
+            cd remoting/cuda/cpu
+            rm ./nohup.out
+        else
+            cd $script_dir
+            cd remoting/cuda/cpu
+            cat ./nohup.out
+            rm ./nohup.out
+            error "Per-API unittest failed! server log printed"
+        fi
+
+        log ">>>>>> [4.2] run hidden-api unittest (TODO)..."
     fi
   fi
 }
 
 # print helping
 print_usage() {
-  echo ">>>>>>>>>> PhoenixOS build routine <<<<<<<<<<"
-  echo "usage: $0 [-t <target>] [-h]"
-  echo "  -t <target>     specified build target (options: cuda), default to be cuda"
-  echo "  -u <enable>     run unittest after building to verify correctness (options: true, false), default to be false"
-  echo "  -j              multi-threading build"
-  echo "  -c              clean previously built assets"
-  echo "  -h              help message"
-  echo "  -3              involve third-party library"
+    echo ">>>>>>>>>> PhoenixOS build routine <<<<<<<<<<"
+    echo "usage: $0 [-t <target>] [-h]"
+    echo "  -t <target>     specified build target (options: cuda), default to be cuda"
+    echo "  -u <enable>     run unittest after building to verify correctness (options: true, false), default to be false"
+    echo "  -j              multi-threading build"
+    echo "  -c              clean previously built assets"
+    echo "  -h              help message"
+    echo "  -3              involve third-party library"
 }
 
 # parse command line options
 while getopts ":t:hcju:3" opt; do
-  case $opt in
-  t)
-    target=$OPTARG
-    ;;
-  h)
-    print_usage
-    exit 0
-    ;;
-  3)
-    involve_third_party=true
-    ;;
-  u)
-    if [ "$OPTARG" = "true" ]; then
-      run_unit_test=true
-    elif [ "$OPTARG" = "false" ]; then
-      run_unit_test=false
-    else
-      echo "invalid arguments of -u, should be \"true\" or \"false\""
-      exit 1
-    fi
-    ;;
-  c)
-    doclean=true
-    ;;
-  j)
-    multithread_build=true
-    ;;
-  \?)
-    echo "invalid target: -$OPTARG" >&2
-    exit 1
-    ;;
-  :)
-    echo "option -$OPTARG require extra parameter (options: cuda)" >&2
-    exit 1
-    ;;
-  esac
+    case $opt in
+    t)
+        target=$OPTARG
+        ;;
+    h)
+        print_usage
+        exit 0
+        ;;
+    3)
+        involve_third_party=true
+        ;;
+    u)
+        if [ "$OPTARG" = "true" ]; then
+        run_unit_test=true
+        elif [ "$OPTARG" = "false" ]; then
+        run_unit_test=false
+        else
+        error "invalid arguments of -u, should be \"true\" or \"false\""
+        fi
+        ;;
+    c)
+        doclean=true
+        ;;
+    j)
+        multithread_build=true
+        ;;
+    \?)
+        error "invalid target: -$OPTARG" >&2
+        ;;
+    :)
+        error "option -$OPTARG require extra parameter (options: cuda)" >&2
+        ;;
+    esac
 done
 
 # execution
 if [ "$target" = "cuda" ]; then
-  build_cuda
+    check_requirement "git" "sudo apt-get install git"
+    check_requirement "cargo" "curl https://sh.rustup.rs -sSf | sh ; . \"$HOME/.cargo/env\""
+    build_cuda
 else
-  echo "invalid target: $target" >&2
-  exit 1
+    error "invalid target: $target" >&2
 fi

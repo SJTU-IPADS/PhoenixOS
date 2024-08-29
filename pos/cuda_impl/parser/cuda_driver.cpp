@@ -122,6 +122,22 @@ namespace cu_module_load {
             "parse(cu_module_load): found %lu functions in the fatbin",
             module_handle->function_desps.size()
         );
+        
+        // patched PTX within the fatbin
+        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+            /* patched_binary */ module_handle->patched_binary
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cu_module_load): failed to patch PTX within the fatbin with %lu functions",
+                module_handle->function_desps.size()
+            );
+        }
+        POS_LOG(
+            "parse(cu_module_load): patched %lu functions in the fatbin",
+            module_handle->function_desps.size()
+        );
 
         #if POS_PRINT_DEBUG
             for(auto desp : module_handle->function_desps){
@@ -281,6 +297,22 @@ namespace cu_module_load_data {
                 "parse(cu_module_load_data): failed to parse fatbin/cubin"
             );
         }
+
+        // patched PTX within the fatbin
+        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
+            /* patched_binary */ module_handle->patched_binary
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cu_module_load_data): failed to patch PTX within the fatbin with %lu functions",
+                module_handle->function_desps.size()
+            );
+        }
+        POS_LOG(
+            "parse(cu_module_load_data): patched %lu functions in the fatbin",
+            module_handle->function_desps.size()
+        );
 
         #if POS_PRINT_DEBUG
             for(auto desp : module_handle->function_desps){

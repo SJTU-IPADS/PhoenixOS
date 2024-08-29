@@ -357,9 +357,7 @@ class POSHandle {
     /*!
      *  \brief  reset the state preserve counter to zero, to start a new checkpoint round
      */
-    inline void reset_preserve_counter(){
-        this->_state_preserve_counter.store(0);
-    }
+    inline void reset_preserve_counter(){ this->_state_preserve_counter.store(0); }
 
 
     /*!
@@ -662,9 +660,7 @@ class POSHandle {
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
      */
-    virtual uint64_t __get_extra_serialize_size(){
-        return 0;
-    }
+    virtual uint64_t __get_extra_serialize_size(){ return 0; }
 
 
     /*!

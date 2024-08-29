@@ -218,6 +218,16 @@ inc_dirs += ['./']
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
 
+# TODO: remove this, this is not third-party component
+message('>>> Setup patcher')
+# ldl is necessary
+patcher_ld_args = ['-L' + meson_file_dir + '/pos/cuda_impl/patcher/build/release', '-ldl', '-lpatcher']
+patcher_inc_dirs = ['./pos/cuda_impl/patcher/build']
+ld_args += patcher_ld_args
+inc_dirs += patcher_inc_dirs
+message('>>> Setup patcher done\n')
+
+
 message('>>> Setup libclang')
 libclang_ld_args = ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
 libclang_inc_dirs = ['./third_party/libclang-static-build/include']

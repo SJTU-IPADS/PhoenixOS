@@ -20,6 +20,10 @@
 
 **/__pycache__
 
-tags
+**/.cargo
+**/.profile
+**/.rustup
+**/core
 
+tags
 remoting/cuda_old

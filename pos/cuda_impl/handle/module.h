@@ -121,6 +121,11 @@ class POSHandle_CUDA_Module : public POSHandle {
     // function descriptors under this module
     std::vector<POSCudaFunctionDesp*> function_desps;
 
+    // pacthed binary, only PTX included
+    std::vector<uint8_t> patched_binary;
+
+    // shadow module for the patched kernel binary
+    void *patched_server_addr;
     
  protected:
     /*!
