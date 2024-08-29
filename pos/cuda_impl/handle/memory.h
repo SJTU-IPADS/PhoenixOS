@@ -627,7 +627,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         };
 
         // no need to conduct reserving if previous hm has already done
-        if(has_finshed_reserved == true){
+        if(this->has_finshed_reserved == true){
             goto exit;
         }
     
@@ -635,20 +635,25 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         if(unlikely(cudaSuccess != cudaGetDeviceCount(&num_device))){
             POS_ERROR_C_DETAIL("failed to call cudaGetDeviceCount");
         }
+        if(unlikely(num_device == 0)){
+            POS_ERROR_C_DETAIL("no CUDA device detected");
+        }
 
         // we reserve virtual memory space on each device
-        __reserve_device_vm_space(0);
-        this->backup_base_memory = __malloc_huge_backup_memory_for_migration(1);
-
-        // setup peer access of all devices
         for(i=0; i<num_device; i++){
-            for(j=0; j<num_device; j++){
-                if(unlikely(i == j)){
-                    continue;
-                }
-                __set_peer_access(i, j);
-            }
+            __reserve_device_vm_space(i);
         }
+        
+        // TODO: to be removed, for mock migration
+        // this->backup_base_memory = __malloc_huge_backup_memory_for_migration(1);
+        // for(i=0; i<num_device; i++){
+        //     for(j=0; j<num_device; j++){
+        //         if(unlikely(i == j)){
+        //             continue;
+        //         }
+        //         __set_peer_access(i, j);
+        //     }
+        // }
 
         if(is_restoring == false){
             POS_CHECK_POINTER(device_handle);
@@ -658,7 +663,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
             }
         }    
 
-        has_finshed_reserved = true;
+        this->has_finshed_reserved = true;
 
     exit:
         ;

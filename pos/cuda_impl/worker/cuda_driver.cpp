@@ -33,26 +33,39 @@ namespace cu_module_load {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle *module_handle;
+        POSHandle_CUDA_Module *module_handle;
         CUresult res;
-        CUmodule module = NULL;
+        CUmodule module = nullptr, patched_module = nullptr;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        module_handle = pos_api_create_handle(wqe, 0);
+        module_handle = reinterpret_cast<POSHandle_CUDA_Module*>(pos_api_create_handle(wqe, 0));
         POS_CHECK_POINTER(module_handle);
 
+        // create normal module
         wqe->api_cxt->return_code = cuModuleLoadData(
             /* module */ &module,
             /* image */  pos_api_param_addr(wqe, 1)
         );
-
-        // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             module_handle->set_server_addr((void*)module);
-            module_handle->mark_status(kPOS_HandleStatus_Active);
+            // module_handle->mark_status(kPOS_HandleStatus_Active);
+        } else {
+            POS_WARN("failed to cuModuleLoadData normal module")
         }
+
+        // create patched module
+        // wqe->api_cxt->return_code = cuModuleLoadData(
+        //     /* module */ &patched_module,
+        //     /* image */ (void*)(module_handle->patched_binary.data())
+        // );
+        // if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
+        //     module_handle->patched_server_addr = (void*)(patched_module);
+        //     module_handle->mark_status(kPOS_HandleStatus_Active);
+        // } else {
+        //     POS_WARN("failed to cuModuleLoadData patched module")
+        // }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -75,26 +88,39 @@ namespace cu_module_load_data {
     // launch function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle *module_handle;
+        POSHandle_CUDA_Module *module_handle;
         CUresult res;
-        CUmodule module = NULL;
+        CUmodule module = nullptr, patched_module = nullptr;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
 
-        module_handle = pos_api_create_handle(wqe, 0);
+        module_handle = reinterpret_cast<POSHandle_CUDA_Module*>(pos_api_create_handle(wqe, 0));
         POS_CHECK_POINTER(module_handle);
 
+        // create normal module
         wqe->api_cxt->return_code = cuModuleLoadData(
             /* module */ &module,
             /* image */  pos_api_param_addr(wqe, 0)
         );
-
-        // record server address
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             module_handle->set_server_addr((void*)module);
-            module_handle->mark_status(kPOS_HandleStatus_Active);
+            // module_handle->mark_status(kPOS_HandleStatus_Active);
+        } else {
+            POS_WARN("failed to cuModuleLoadData normal module")
         }
+
+        // create patched module
+        // wqe->api_cxt->return_code = cuModuleLoadData(
+        //     /* module */ &patched_module,
+        //     /* image */ (void*)(module_handle->patched_binary.data())
+        // );
+        // if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
+        //     module_handle->patched_server_addr = (void*)(patched_module);
+        //     module_handle->mark_status(kPOS_HandleStatus_Active);
+        // } else {
+        //     POS_WARN("failed to cuModuleLoadData patched module")
+        // }
 
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
