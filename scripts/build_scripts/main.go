@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// setup global variables
-	rootDir, err := utils.ExecCommandGetOutput("git rev-parse --show-toplevel", false, logger)
+	rootDir, err := utils.BashCommandGetOutput("git rev-parse --show-toplevel", false, logger)
 	if err != nil {
 		logger.Fatalf("failed to obtain root directory")
 	}

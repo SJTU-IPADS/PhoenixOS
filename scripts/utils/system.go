@@ -33,18 +33,17 @@ func GetOS(logger *log.Logger) string {
 }
 
 func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger) error {
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+	if _, err := os.Stat(dir); err != nil {
 		if overwrite {
+			logger.Warnf("folder %s already exists, overwrite", dir)
 			if err := os.RemoveAll(dir); err != nil {
 				logger.Warnf("failed to remove old directory of %s: %s", dir, err)
 				return err
 			}
 		} else {
+			logger.Warnf("folder %s already exists, but not overwrite", dir)
 			return os.ErrExist
 		}
-	} else if err != nil {
-		logger.Warnf("failed to obtain information of old directory of %s: %s", dir, err)
-		return err
 	}
 	err := os.MkdirAll(dir, perm)
 	if err != nil {
@@ -55,11 +54,11 @@ func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger)
 	return nil
 }
 
-func ExecCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
+func BashCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
 	args := strings.Fields(command)
 	output, err := exec.Command(args[0], args[1:]...).CombinedOutput()
 	if err != nil {
-		logger.Warnf("failed to execute \"%s\"", command)
+		logger.Warnf("failed to execute \"%s\": %s", command, err)
 	}
 
 	if ignoreFailed {
@@ -69,7 +68,7 @@ func ExecCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger)
 	}
 }
 
-func ExecScriptGetOutput(script string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
+func BashScriptGetOutput(script string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
 	output, err := exec.Command("bash", "-c", script).CombinedOutput()
 	if err != nil {
 		logger.Warnf("failed to execute script\n%s\nerr: %s", script, err)

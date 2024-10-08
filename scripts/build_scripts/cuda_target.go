@@ -31,49 +31,51 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 		cd %s/%s
 		if [ ! -d "./build" ]; then
 			mkdir build && cd build
-			cmake .. -DCMAKE_INSTALL_PREFIX=.. &>%s
-			make install -j &>%s
+			cmake .. -DCMAKE_INSTALL_PREFIX=.. >%s 2>&1
+			make install -j >%s 2>&1
 		fi
-		cp ./lib/libclang.so %s &>%s
-		cp ./lib/libclang.so.13 %s &>%s
-		cp ./lib/libclang.so.VERSION %s &>%s
-		cp ./lib/libclang_static.a %s &>%s
-		cp -r ./include/* %s &>%s
+		cp ../lib/libclang.so %s
+		cp ../lib/libclang.so.13 %s
+		cp ../lib/libclang.so.VERSION %s
+		cp ../lib/libclang_static.a %s
+		cp -r ../include/* %s
 		`,
-		bo.RootDir, KLibClangPath, buildLogPath, buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath), buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath), buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath), buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath), buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath), buildLogPath,
+		bo.RootDir, KLibClangPath,
+		buildLogPath,
+		buildLogPath,
+		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath),
 	)
 
 	install_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./lib/libclang.so %s/ &>%s
-		cp ./lib/libclang.so.13 %s/ &>%s
-		cp ./lib/libclang.so.VERSION %s/ &>%s
-		cp ./lib/libclang_static.a %s/ &>%s
-		cp -r ./include/clang-c %s/clang-c &>%s
+		cp ./lib/libclang.so %s/
+		cp ./lib/libclang.so.13 %s/
+		cp ./lib/libclang.so.VERSION %s/
+		cp ./lib/libclang_static.a %s/
+		cp -r ./include/clang-c %s/clang-c
 		`,
 		bo.RootDir, KLibClangPath,
-		KInstallLibPath, buildLogPath,
-		KInstallLibPath, buildLogPath,
-		KInstallLibPath, buildLogPath,
-		KInstallLibPath, buildLogPath,
-		KInstallIncPath, buildLogPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallIncPath,
 	)
 
-	_, err := utils.ExecScriptGetOutput(build_script, false, logger)
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build libclang, please see log at %s", buildLogPath)
 	}
 	logger.Infof("built libclang")
 
 	if *bo.DoInstall {
-		_, err := utils.ExecScriptGetOutput(install_script, false, logger)
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install libclang, please see log at %s", buildLogPath)
 		}
@@ -93,22 +95,19 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 			rm -rf build
 		fi
 		mkdir build && cd build
-		cmake .. &>%s
-		make -j &>%s
-		if [ $? -ne 0 ]; then
-			exit 1
-		if
+		cmake .. >%s 2>&1
+		make -j >%s 2>&1
 		if [ ! -e "./release/libpatcher.a" ] || [ ! -e "./patcher.h" ]; then
 			exit 1
 		fi
-		cp ./release/libpatcher.a %s/%s &> %s
-		cp ./patcher.h %s/%s &> %s
+		cp ./release/libpatcher.a %s/%s
+		cp ./patcher.h %s/%s
 		`,
 		bo.RootDir, KPhOSPatcherPath,
 		buildLogPath,
 		buildLogPath,
-		bo.RootDir, KBuildLibPath, buildLogPath,
-		bo.RootDir, KBuildIncPath, buildLogPath,
+		bo.RootDir, KBuildLibPath,
+		bo.RootDir, KBuildIncPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -116,23 +115,23 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 		set -e
 		cd %s/%s
 		if [ -e "./release/libpatcher.a" ]; then
-			cp ./release/libpatcher.a %s/ &>%s
+			cp ./release/libpatcher.a %s/
 		else
 			exit 1
 		fi
 		`,
 		bo.RootDir, KLibClangPath,
-		KInstallLibPath, buildLogPath,
+		KInstallLibPath,
 	)
 
-	_, err := utils.ExecScriptGetOutput(build_script, false, logger)
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build CUDA kernel patcher, please see log at %s", buildLogPath)
 	}
 	logger.Infof("built CUDA kernel patcher")
 
 	if *bo.DoInstall {
-		_, err := utils.ExecScriptGetOutput(install_script, false, logger)
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install CUDA kernel patcher, please see log at %s", buildLogPath)
 		}
@@ -149,37 +148,37 @@ func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
 		set -e
 		cd %s
 		if [ ! -d "./build" ]; then
-			meson build &>%s
+			meson build &>%s 2>&1
 		fi
 		cd build
 		ninja clean
-		ninja &>%s
-		cp %s/build/libpos.so %s/%s &>%s
-		cp %s/build/pos/include/* %s/%s &>%s
+		ninja &>%s 2>&1
+		cp %s/build/libpos.so %s/%s
+		cp %s/build/pos/include/* %s/%s
 		`,
 		bo.RootDir,
 		buildLogPath,
 		buildLogPath,
-		bo.RootDir, bo.RootDir, KBuildLibPath, buildLogPath,
-		bo.RootDir, bo.RootDir, KBuildIncPath, buildLogPath,
+		bo.RootDir, bo.RootDir, KBuildLibPath,
+		bo.RootDir, bo.RootDir, KBuildIncPath,
 	)
 
 	install_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		cp %s/build/*.so %s &>%s
+		cp %s/build/*.so %s
 		`,
-		bo.RootDir, KInstallLibPath, buildLogPath,
+		bo.RootDir, KInstallLibPath,
 	)
 
-	_, err := utils.ExecScriptGetOutput(build_script, false, logger)
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
-		logger.Fatalf("failed to build PhOS Core for CUDA target: %s", err)
+		logger.Fatalf("failed to build PhOS Core for CUDA target, please see log at %s", buildLogPath)
 	}
 	logger.Infof("built PhOS Core for CUDA target")
 
 	if *bo.DoInstall {
-		_, err := utils.ExecScriptGetOutput(install_script, false, logger)
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install PhOS core, please see log at %s", buildLogPath)
 		}
@@ -199,8 +198,8 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 			mkdir build
 		fi
 		cd build && rm -rf ./*
-		cmake .. &>%s
-		make -j  &>%s
+		cmake .. &>%s 2>&1
+		make -j  &>%s 2>&1
 		cp ./pos-cli %s/%s
 		`,
 		bo.RootDir, KPhOSCLIPath,
@@ -219,14 +218,14 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 		KInstallBinPath, buildLogPath,
 	)
 
-	_, err := utils.ExecScriptGetOutput(build_script, false, logger)
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build PhOS CLI: %s", err)
 	}
 	logger.Infof("built PhOS CLI")
 
 	if *bo.DoInstall {
-		_, err := utils.ExecScriptGetOutput(install_script, false, logger)
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install PhOS CLI, please see log at %s", buildLogPath)
 		}
@@ -248,12 +247,14 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	utils.CheckAndInstallCommand("git", "git", nil, logger)
 	utils.CheckAndInstallCommand("gcc", "build-essential", nil, logger)
 	utils.CheckAndInstallCommand("g++", "build-essential", nil, logger)
+	utils.CheckAndInstallCommand("yes", "yes", nil, logger)
 	utils.CheckAndInstallCommand("cmake", "cmake", nil, logger)
 	utils.CheckAndInstallCommand("curl", "curl", nil, logger)
 	utils.CheckAndInstallCommand("tar", "tar", nil, logger)
+	utils.CheckAndInstallCommand("tmux", "tmux", nil, logger)
 
 	install_meson := func() error {
-		_, err := utils.ExecScriptGetOutput(`
+		_, err := utils.BashScriptGetOutput(`
 			#!/bin/bash
 			set -e
 			pip3 install meson
@@ -264,7 +265,7 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	utils.CheckAndInstallCommand("meson", "", install_meson, logger)
 
 	install_ninja := func() error {
-		_, err := utils.ExecScriptGetOutput(`
+		_, err := utils.BashScriptGetOutput(`
 			#!/bin/bash
 			set -e
 			pip3 install ninja
@@ -275,11 +276,16 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	utils.CheckAndInstallCommand("ninja", "", install_ninja, logger)
 
 	build_cargo := func() error {
-		_, err := utils.ExecScriptGetOutput(`
+		_, err := utils.BashScriptGetOutput(`
 			#!/bin/bash
 			set -e
-			curl https://sh.rustup.rs -sSf | sh ; . "$HOME/.cargo/env"
-			echo 'export PATH=$PATH:$HOME/.cargo/bin' >> /etc/profile
+			if tmux has-session -t cargo_installer 2>/dev/null; then
+				tmux kill-session -t cargo_installer
+			fi
+			tmux new -s cargo_installer -d
+			tmux send -t cargo_installer "curl https://sh.rustup.rs -sSf | sh; exit 0" ENTER
+			tmux send-keys -t cargo_installer C-m
+			echo '. "$HOME/.cargo/env"' >> $HOME/.bashrc
 			`,
 			false, logger,
 		)
@@ -326,6 +332,7 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 
 func cleanCommon(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("cleaning common directoroies...")
+	// TODO: fix, don't rm built third_parties
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		rm -rf %s/%s
@@ -338,7 +345,7 @@ func cleanCommon(bo BuildOptions, logger *log.Logger) {
 		bo.RootDir, KBuildLogPath,
 		bo.RootDir, KBuildIncPath,
 	)
-	_, err := utils.ExecScriptGetOutput(clean_script, true, logger)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Warnf("failed to clean common directoroies")
 	} else {
@@ -352,6 +359,9 @@ func cleanLibClang(bo BuildOptions, logger *log.Logger) {
 		#!/bin/bash
 		cd %s/%s
 		rm -rf build
+		rm -rf include
+		rm -rf lib
+		rm -rf share
 		rm -f %s/libclang.so
 		rm -f %s/libclang.so.13
 		rm -f %s/libclang.so.VERSION
@@ -365,7 +375,7 @@ func cleanLibClang(bo BuildOptions, logger *log.Logger) {
 		KInstallLibPath,
 		KInstallIncPath,
 	)
-	_, err := utils.ExecScriptGetOutput(clean_script, true, logger)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Warnf("failed to clean libclang")
 	}
@@ -385,7 +395,7 @@ func cleanKernelPatcher(bo BuildOptions, logger *log.Logger) {
 		KInstallIncPath,
 		KInstallLibPath,
 	)
-	_, err := utils.ExecScriptGetOutput(clean_script, true, logger)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Warnf("failed to clean libclang")
 	}
@@ -403,7 +413,7 @@ func cleanPhOSCore(bo BuildOptions, logger *log.Logger) {
 		bo.RootDir,
 		KInstallLibPath,
 	)
-	_, err := utils.ExecScriptGetOutput(clean_script, true, logger)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Fatalf("failed to clean PhOS core")
 	}
@@ -421,7 +431,7 @@ func cleanPhOSCLI(bo BuildOptions, logger *log.Logger) {
 		bo.RootDir, KPhOSCLIPath,
 		KInstallBinPath,
 	)
-	_, err := utils.ExecScriptGetOutput(clean_script, true, logger)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Fatalf("failed to clean PhOS CLI")
 	}
@@ -434,7 +444,6 @@ func CleanTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 		logger.Infof("cleaning dependencies...")
 		cleanLibClang(bo, logger)
 	}
-	fmt.Printf("root dir: %s\n", bo.RootDir)
 	cleanCommon(bo, logger)
 	cleanKernelPatcher(bo, logger)
 	cleanPhOSCore(bo, logger)
