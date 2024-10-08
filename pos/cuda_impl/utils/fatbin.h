@@ -29,8 +29,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
-// TODO: move this file to a more elegant path
-#include "pos/cuda_impl/patcher/patcher.h"
+#include "pos/include/patcher.h"
 
 #define FATBIN_STRUCT_MAGIC 0x466243b1
 #define FATBIN_TEXT_MAGIC   0xBA55ED50
