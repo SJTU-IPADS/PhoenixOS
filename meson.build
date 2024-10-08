@@ -16,17 +16,20 @@ env = environment()
 pkgconfig = find_program('pkg-config')
 bash = find_program('bash')
 
+# path of built libraries by PhOS build system
+lib_path = meson.current_source_dir() + '/lib'
+
 # compile flags
 c_args = []
 
 # load flags
-ld_args = []
+ld_args = [ '-L'+lib_path ]
 
 # dependencies
 deps = []
 
 # include directories
-inc_dirs = []
+inc_dirs = [ 'lib', 'lib/pos/include' ]
 
 # all libraries that want to be statically linked
 libraries = []
@@ -220,38 +223,20 @@ inc_dirs += ['./']
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
 
-# TODO: remove this, this is not third-party component
 message('>>> Setup patcher')
-# ldl is necessary
-patcher_ld_args = ['-L' + meson_file_dir + '/pos/cuda_impl/patcher/build/release', '-ldl', '-lpatcher']
-patcher_inc_dirs = ['./pos/cuda_impl/patcher/build']
-ld_args += patcher_ld_args
-inc_dirs += patcher_inc_dirs
-message('>>> Setup patcher done\n')
-
+ld_args += ['-ldl', '-lpatcher']
 
 message('>>> Setup libclang')
-libclang_ld_args = ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
-libclang_inc_dirs = ['./third_party/libclang-static-build/include']
-message('>>>>>> Link option:')
-message(libclang_ld_args)
-message('>>>>>> Include path:')
-message(libclang_inc_dirs)
-ld_args += libclang_ld_args
-inc_dirs += libclang_inc_dirs
-message('>>> Setup libclang done\n')
+ld_args += ['-lclang']
 
 message('>>> Setup librt') # for support shm_x
 ld_args += ['-lrt']
-message('>>> Setup librt done\n')
 
 message('>>> Setup pthread') # for support pthread_x
 ld_args += ['-pthread']
-message('>>> Setup pthread done\n')
 
 message('>>> Setup libelf') # for support elf_x
 ld_args += ['-lelf']
-message('>>> Setup libelf done\n')
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
 c_args += ['--std=c++17']
@@ -259,7 +244,8 @@ c_args += ['--std=c++17']
 
 # >>>>>>>>>>>>>> start building >>>>>>>>>>>>>>
 # libpos.so
-libpos = library(project_name_abbreviation,
+libpos = library(
+    project_name_abbreviation,
     sources,
 	dependencies : deps,
 	cpp_args: c_args,
