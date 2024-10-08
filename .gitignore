@@ -27,4 +27,10 @@
 
 tags
 remoting/cuda_old
+
+.bashrc
 go/
+build_log/
+lib/
+bin/
+tmp/
