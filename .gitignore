@@ -17,6 +17,7 @@
 **/env
 **/*.nsys-rep
 **/*.bat
+**/.gitconfig
 
 **/__pycache__
 
