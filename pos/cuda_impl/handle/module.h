@@ -111,7 +111,7 @@ class POSHandle_CUDA_Module : public POSHandle {
             this->set_server_addr((void*)module);
             this->mark_status(kPOS_HandleStatus_Active);
         } else {
-            POS_WARN_C_DETAIL("failed to restore CUDA device, cuModuleLoadData failed: %d", cuda_dv_retval);
+            POS_WARN_C_DETAIL("failed to restore CUDA module, cuModuleLoadData failed: %d", cuda_dv_retval);
             retval = POS_FAILED;
         }
 
