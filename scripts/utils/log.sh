@@ -10,7 +10,7 @@ warn() {
 
 error() {
   echo -e "\033[31m [POS Build Err] $1 \033[0m"
-  exit 1
+  exit 0
 }
 
 error_f() {

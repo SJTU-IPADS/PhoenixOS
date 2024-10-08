@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,6 +30,29 @@ func GetOS(logger *log.Logger) string {
 	logger.Fatalf("failed to detect OS version: no information recorded in /etc/os-release")
 
 	return ""
+}
+
+func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger) error {
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		if overwrite {
+			if err := os.RemoveAll(dir); err != nil {
+				logger.Warnf("failed to remove old directory of %s: %s", dir, err)
+				return err
+			}
+		} else {
+			return os.ErrExist
+		}
+	} else if err != nil {
+		logger.Warnf("failed to obtain information of old directory of %s: %s", dir, err)
+		return err
+	}
+	err := os.MkdirAll(dir, perm)
+	if err != nil {
+		logger.Warnf("failed to create directory of %s with perm %v: %s", dir, perm, err)
+		return err
+	}
+
+	return nil
 }
 
 func ExecCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
