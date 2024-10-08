@@ -50,7 +50,7 @@ namespace cu_module_load {
         );
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             module_handle->set_server_addr((void*)module);
-            // module_handle->mark_status(kPOS_HandleStatus_Active);
+            module_handle->mark_status(kPOS_HandleStatus_Active); // TODO: remove this
         } else {
             POS_WARN("failed to cuModuleLoadData normal module")
         }
@@ -105,7 +105,7 @@ namespace cu_module_load_data {
         );
         if(likely(CUDA_SUCCESS == wqe->api_cxt->return_code)){
             module_handle->set_server_addr((void*)module);
-            // module_handle->mark_status(kPOS_HandleStatus_Active);
+            module_handle->mark_status(kPOS_HandleStatus_Active); // TODO: remove this
         } else {
             POS_WARN("failed to cuModuleLoadData normal module")
         }
