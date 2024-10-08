@@ -79,7 +79,7 @@ close_server() {
 
 enter_server() {
     container_name=pos_svr_$container_id
-    $SUDO docker exec -it $container_name bash
+    $SUDO docker exec -it $container_name /bin/bash
 }
 
 
