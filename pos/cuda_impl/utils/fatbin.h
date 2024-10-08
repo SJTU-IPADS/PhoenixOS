@@ -16,6 +16,7 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <algorithm>
 #include <sstream>
@@ -29,7 +30,7 @@
 #include "pos/include/log.h"
 
 // TODO: move this file to a more elegant path
-#include "patcher.h"
+#include "pos/cuda_impl/patcher/patcher.h"
 
 #define FATBIN_STRUCT_MAGIC 0x466243b1
 #define FATBIN_TEXT_MAGIC   0xBA55ED50
@@ -243,6 +244,14 @@ class POSUtil_CUDA_Fatbin {
         fat_elf_header_t *fatbin_elf_hdr;
         fat_text_header_t *fatbin_text_hdr;
 
+    #define __POS_DUMP_FATBIN 1
+    #if __POS_DUMP_FATBIN
+        std::ofstream cubin_file("/tmp/ptx.txt", std::ios::out);
+        if(unlikely(!cubin_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/ptx.txt");
+        }
+    #endif
+
         POS_CHECK_POINTER(desps);
         POS_CHECK_POINTER(input_pos = binary_ptr);
         POS_ASSERT(binary_size > 0);
@@ -271,52 +280,65 @@ class POSUtil_CUDA_Fatbin {
                 );
 
                 // section does not cotain device code (e.g. only PTX)
-                if (fatbin_text_hdr->kind != 2) {
-                    POS_DEBUG("skip this text section as it doesn't contain any device code");
-                    input_pos += fatbin_text_hdr->size;
-                    continue;
-                }
+                if (fatbin_text_hdr->kind == 2) {
+                    /*!
+                     *  \note   contains SASS code, extract kernel information from ELF format
+                     */
+                    // this section contains debug info
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
+                        POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
+                    }
 
-                // this section contains debug info
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
-                    POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
-                }
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
+                        // the payload of this section is compressed, need to be decompressed
+                        ssize_t input_read;
+                        POS_DEBUG(
+                            "%u(th) fatbin text section contains compressed device code, decompressing...",
+                            nb_text_section
+                        );
 
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
-                    // the payload of this section is compressed, need to be decompressed
-                    ssize_t input_read;
-                    POS_DEBUG(
-                        "%u(th) fatbin text section contains compressed device code, decompressing...",
-                        nb_text_section
-                    );
+                        input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
+                            input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
+                        );
+                        if(unlikely(input_read < 0)){
+                            POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
+                            retval = POS_FAILED;
+                            goto exit;
+                        }
 
-                    input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
-                        input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
-                    );
-                    if(unlikely(input_read < 0)){
-                        POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
-                        retval = POS_FAILED;
+                        input_pos += input_read;
+                    } else {
+                        text_data = (uint8_t*)input_pos;
+                        text_data_size = fatbin_text_hdr->size;
+                        input_pos += fatbin_text_hdr->size;
+                    }
+
+                    retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
+                    if(unlikely(retval != POS_SUCCESS)){
                         goto exit;
                     }
 
-                    input_pos += input_read;
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
+                        free(text_data);
+                    }
+
+                    nb_text_section += 1;
                 } else {
-                    text_data = (uint8_t*)input_pos;
-                    text_data_size = fatbin_text_hdr->size;
+                    /*!
+                     *  \note   contains PTX code only
+                     */
+                    POS_LOG("skip this text section as it doesn't contain any device code");
+                    
+                #if __POS_DUMP_FATBIN
+                    POS_LOG("addr: %p, len: %lu", input_pos, fatbin_text_hdr->size);
+                    cubin_file.write((const char*)(input_pos), fatbin_text_hdr->size);
+                    cubin_file.flush();
+                    cubin_file.close();
+                #endif
+
                     input_pos += fatbin_text_hdr->size;
+                    continue;
                 }
-
-                retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
-                if(unlikely(retval != POS_SUCCESS)){
-                    goto exit;
-                }
-
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
-                    free(text_data);
-                }
-
-                nb_text_section += 1;
-
             } while(input_pos < (uint8_t*)fatbin_elf_hdr + fatbin_elf_hdr->header_size + fatbin_elf_hdr->size);
         } else {
             /*!
@@ -327,6 +349,8 @@ class POSUtil_CUDA_Fatbin {
                 goto exit;
             }
         }
+
+    #undef __POS_DUMP_FATBIN
 
     exit:
         return retval;

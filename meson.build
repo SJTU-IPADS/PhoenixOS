@@ -14,6 +14,7 @@ env = environment()
 
 # we use pkg-config to collect dependecies
 pkgconfig = find_program('pkg-config')
+bash = find_program('bash')
 
 # compile flags
 c_args = []
@@ -34,7 +35,7 @@ libraries = []
 sources = []
 
 # current directory of this meson file
-meson_file_dir = meson.source_root()
+meson_file_dir = meson.current_source_dir()
 
 
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
@@ -136,7 +137,8 @@ message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    cuda_version = '11.3'
+    # extract cuda version
+    cuda_version = run_command(bash, './scripts/utils/get_cuda_version.sh').stdout().strip()
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []
@@ -257,7 +259,8 @@ c_args += ['--std=c++17']
 
 # >>>>>>>>>>>>>> start building >>>>>>>>>>>>>>
 # libpos.so
-libpos = library(project_name_abbreviation, sources,
+libpos = library(project_name_abbreviation,
+    sources,
 	dependencies : deps,
 	cpp_args: c_args,
 	link_args: ld_args,
