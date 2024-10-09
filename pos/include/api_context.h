@@ -95,14 +95,14 @@ class POSApiManager {
     /*!
      *  \brief  register metadata of all API on the platform to the manager
      */
-    virtual void init();
+    virtual void init(){ POS_ERROR_C("not implemented"); };
 
     /*!
      *  \brief  translate POS retval to corresponding retval on the XPU platform
      *  \param  pos_retval  the POS retval to be translated
      *  \param  library_id  id of the destination library (e.g., cuda rt, driver, cublas)
      */
-    virtual int cast_pos_retval(pos_retval_t pos_retval, uint8_t library_id);
+    virtual int cast_pos_retval(pos_retval_t pos_retval, uint8_t library_id){ return -1; };
 
     // map: api_id -> metadata of the api
     std::map<uint64_t, POSAPIMeta_t> api_metas;

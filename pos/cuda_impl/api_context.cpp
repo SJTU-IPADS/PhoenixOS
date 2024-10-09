@@ -21,13 +21,12 @@
 
 #include "pos/include/common.h"
 #include "pos/include/api_context.h"
-
 #include "pos/cuda_impl/api_index.h"
 
 /*!
  *  \brief  all POS-hijacked should be record here, used for debug checking
  */
-static const std::vector<uint64_t> __pos_hijacked_apis({
+std::vector<uint64_t> pos_hijacked_cuda_apis({
     /* CUDA Runtime */
     CUDA_MALLOC,
     CUDA_FREE,
@@ -87,8 +86,8 @@ static const std::vector<uint64_t> __pos_hijacked_apis({
 
 bool pos_is_hijacked(uint64_t api_id){
     uint64_t i=0;
-    for(i=0; i<__pos_hijacked_apis.size(); i++){
-        if(unlikely(__pos_hijacked_apis[i] == api_id)){
+    for(i=0; i<pos_hijacked_cuda_apis.size(); i++){
+        if(unlikely(pos_hijacked_cuda_apis[i] == api_id)){
             return true;
         }
     }
