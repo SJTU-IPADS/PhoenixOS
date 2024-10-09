@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
@@ -294,23 +295,23 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	utils.CheckAndInstallCommand("cargo", "", build_cargo, logger)
 
 	buildLogPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLogPath)
-	if err := utils.CreateDir(buildLogPath, true, 0775, logger); err != nil {
-		logger.Fatalf("failed to create directory for build logs")
+	if err := utils.CreateDir(buildLogPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
 	}
 
 	libPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath)
-	if err := utils.CreateDir(libPath, true, 0775, logger); err != nil {
-		logger.Fatalf("failed to create directory for built lib")
+	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built lib at %s", libPath)
 	}
 
 	includePath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath)
-	if err := utils.CreateDir(includePath, true, 0775, logger); err != nil {
-		logger.Fatalf("failed to create directory for built headers")
+	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built headers at %s", includePath)
 	}
 
 	binPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildBinPath)
-	if err := utils.CreateDir(binPath, true, 0775, logger); err != nil {
-		logger.Fatalf("failed to create directory for built binary")
+	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built binary at %s", binPath)
 	}
 
 	// ==================== Build Dependencies ====================
@@ -332,19 +333,37 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 
 func cleanCommon(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("cleaning common directoroies...")
-	// TODO: fix, don't rm built third_parties
-	clean_script := fmt.Sprintf(`
-		#!/bin/bash
-		rm -rf %s/%s
-		rm -rf %s/%s
-		rm -rf %s/%s
-		rm -rf %s/%s
-		`,
-		bo.RootDir, KBuildBinPath,
-		bo.RootDir, KBuildLibPath,
-		bo.RootDir, KBuildLogPath,
-		bo.RootDir, KBuildIncPath,
-	)
+	clean_script := ""
+	if *bo.WithThirdParty {
+		clean_script = fmt.Sprintf(`
+			#!/bin/bash
+			rm -rf %s/%s/*
+			rm -rf %s/%s/*
+			rm -rf %s/%s/*
+			rm -rf %s/%s/*
+			`,
+			bo.RootDir, KBuildBinPath,
+			bo.RootDir, KBuildLibPath,
+			bo.RootDir, KBuildLogPath,
+			bo.RootDir, KBuildIncPath,
+		)
+	} else {
+		clean_script = fmt.Sprintf(`
+			#!/bin/bash
+			rm -rf %s/%s/*
+			rm -rf %s/%s/libpos.so
+			rm -rf %s/%s/libpatcher.a
+			rm -rf %s/%s/*.h
+			rm -rf %s/%s/*
+			`,
+			bo.RootDir, KBuildBinPath,
+			bo.RootDir, KBuildLibPath,
+			bo.RootDir, KBuildLibPath,
+			bo.RootDir, KBuildIncPath,
+			bo.RootDir, KBuildLogPath,
+		)
+	}
+
 	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Warnf("failed to clean common directoroies")

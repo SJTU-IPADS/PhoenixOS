@@ -33,7 +33,8 @@ func GetOS(logger *log.Logger) string {
 }
 
 func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger) error {
-	if _, err := os.Stat(dir); err != nil {
+	if _, err := os.Stat(dir); err == nil {
+		// has directory exists
 		if overwrite {
 			logger.Warnf("folder %s already exists, overwrite", dir)
 			if err := os.RemoveAll(dir); err != nil {
