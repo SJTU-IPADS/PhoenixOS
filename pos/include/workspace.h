@@ -123,7 +123,7 @@ class POSWorkspace {
      *          that implemented by derived class
      *  \return POS_SUCCESS for successfully initialization
      */
-    virtual pos_retval_t init();
+    virtual pos_retval_t init() { return POS_FAILED_NOT_IMPLEMENTED; };
 
     /*!
      *  \brief  shutdown the POS server

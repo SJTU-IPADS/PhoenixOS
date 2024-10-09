@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
@@ -13,6 +14,7 @@ const (
 	KPhOSPath        = "pos"
 	KPhOSCLIPath     = "pos/cli"
 	KPhOSPatcherPath = "pos/cuda_impl/patcher"
+	KRemotingPath    = "remoting/cuda"
 	KBuildLogPath    = "build_log"
 	KBuildLibPath    = "lib"
 	KBuildIncPath    = "lib/pos/include"
@@ -69,11 +71,15 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 		KInstallIncPath,
 	)
 
+	start := time.Now()
 	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build libclang, please see log at %s", buildLogPath)
 	}
-	logger.Infof("built libclang")
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built libclang: %.2fs", elapsed.Seconds())
 
 	if *bo.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
@@ -125,11 +131,15 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 		KInstallLibPath,
 	)
 
+	start := time.Now()
 	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build CUDA kernel patcher, please see log at %s", buildLogPath)
 	}
-	logger.Infof("built CUDA kernel patcher")
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built CUDA kernel patcher: %.2fs", elapsed.Seconds())
 
 	if *bo.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
@@ -172,11 +182,15 @@ func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
 		bo.RootDir, KInstallLibPath,
 	)
 
+	start := time.Now()
 	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build PhOS Core for CUDA target, please see log at %s", buildLogPath)
 	}
-	logger.Infof("built PhOS Core for CUDA target")
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built PhOS Core for CUDA target: %.2fs", elapsed.Seconds())
 
 	if *bo.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
@@ -213,17 +227,21 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./build/pos-cli %s &>%s
+		cp ./build/pos-cli %s
 		`,
 		bo.RootDir, KPhOSCLIPath,
-		KInstallBinPath, buildLogPath,
+		KInstallBinPath,
 	)
 
+	start := time.Now()
 	_, err := utils.BashScriptGetOutput(build_script, false, logger)
 	if err != nil {
 		logger.Fatalf("failed to build PhOS CLI: %s", err)
 	}
-	logger.Infof("built PhOS CLI")
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built PhOS CLI: %.2fs", elapsed.Seconds())
 
 	if *bo.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
@@ -235,100 +253,62 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 }
 
 func buildRemoting(bo BuildOptions, logger *log.Logger) {
+	logger.Infof("building remoting framework...")
 
+	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_remoting_framework.log")
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s
+		make libtirpc -j &>%s 2>&1
+		cp ./submodules/libtirpc/install/lib/libtirpc.so %s/%s
+		cd cpu
+		make clean
+		LOG=DEBUG make cricket-rpc-server cricket-client.so -j &>%s 2>&1
+		cp cricket-rpc-server %s/%s
+		cp cricket-client.so %s/%s
+		`,
+		bo.RootDir, KRemotingPath,
+		buildLogPath,
+		bo.RootDir, KBuildLibPath,
+		buildLogPath,
+		bo.RootDir, KBuildBinPath,
+		bo.RootDir, KBuildLibPath,
+	)
+
+	install_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s/cpu
+		cp cricket-rpc-server %s
+		cp cricket-client.so %s
+		`,
+		bo.RootDir, KRemotingPath,
+		KInstallBinPath,
+		KInstallLibPath,
+	)
+
+	start := time.Now()
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build remoting framework: %s", err)
+	}
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built remoting framework: %.2fs", elapsed.Seconds())
+
+	if *bo.DoInstall {
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
+		if err != nil {
+			logger.Fatalf("failed to install remoting framework, please see log at %s", buildLogPath)
+		}
+		logger.Infof("installed remoting framework")
+	}
 }
 
 func buildUnitTest(bo BuildOptions, logger *log.Logger) {
-
-}
-
-func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
-	// ==================== Prepare ====================
-	logger.Infof("pre-build check...")
-	utils.CheckAndInstallCommand("git", "git", nil, logger)
-	utils.CheckAndInstallCommand("gcc", "build-essential", nil, logger)
-	utils.CheckAndInstallCommand("g++", "build-essential", nil, logger)
-	utils.CheckAndInstallCommand("yes", "yes", nil, logger)
-	utils.CheckAndInstallCommand("cmake", "cmake", nil, logger)
-	utils.CheckAndInstallCommand("curl", "curl", nil, logger)
-	utils.CheckAndInstallCommand("tar", "tar", nil, logger)
-	utils.CheckAndInstallCommand("tmux", "tmux", nil, logger)
-
-	install_meson := func() error {
-		_, err := utils.BashScriptGetOutput(`
-			#!/bin/bash
-			set -e
-			pip3 install meson
-			`, false, logger,
-		)
-		return err
-	}
-	utils.CheckAndInstallCommand("meson", "", install_meson, logger)
-
-	install_ninja := func() error {
-		_, err := utils.BashScriptGetOutput(`
-			#!/bin/bash
-			set -e
-			pip3 install ninja
-			`, false, logger,
-		)
-		return err
-	}
-	utils.CheckAndInstallCommand("ninja", "", install_ninja, logger)
-
-	build_cargo := func() error {
-		_, err := utils.BashScriptGetOutput(`
-			#!/bin/bash
-			set -e
-			if tmux has-session -t cargo_installer 2>/dev/null; then
-				tmux kill-session -t cargo_installer
-			fi
-			tmux new -s cargo_installer -d
-			tmux send -t cargo_installer "curl https://sh.rustup.rs -sSf | sh; exit 0" ENTER
-			tmux send-keys -t cargo_installer C-m
-			echo '. "$HOME/.cargo/env"' >> $HOME/.bashrc
-			`,
-			false, logger,
-		)
-		return err
-	}
-	utils.CheckAndInstallCommand("cargo", "", build_cargo, logger)
-
-	buildLogPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLogPath)
-	if err := utils.CreateDir(buildLogPath, false, 0775, logger); err != nil && !os.IsExist(err) {
-		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
-	}
-
-	libPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath)
-	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
-		logger.Fatalf("failed to create directory for built lib at %s", libPath)
-	}
-
-	includePath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath)
-	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
-		logger.Fatalf("failed to create directory for built headers at %s", includePath)
-	}
-
-	binPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildBinPath)
-	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
-		logger.Fatalf("failed to create directory for built binary at %s", binPath)
-	}
-
-	// ==================== Build Dependencies ====================
-	if *bo.WithThirdParty {
-		logger.Infof("building dependencies...")
-		buildLibClang(bo, logger)
-	}
-
-	// ==================== Build PhOS ====================
-	buildKernelPatcher(bo, logger)
-	buildPhOSCore(bo, logger)
-	buildPhOSCLI(bo, logger)
-	buildRemoting(bo, logger)
-
-	if *bo.DoUnitTest {
-		buildUnitTest(bo, logger)
-	}
+	// logger.Infof("building uint test...")
 }
 
 func cleanCommon(bo BuildOptions, logger *log.Logger) {
@@ -352,8 +332,9 @@ func cleanCommon(bo BuildOptions, logger *log.Logger) {
 			#!/bin/bash
 			rm -rf %s/%s/*
 			rm -rf %s/%s/libpos.so
-			rm -rf %s/%s/libpatcher.a
-			rm -rf %s/%s/*.h
+			# TODO: just for fast compilation of PhOS, decomment later
+			# rm -rf %s/%s/libpatcher.a
+			# rm -rf %s/%s/*.h
 			rm -rf %s/%s/*
 			`,
 			bo.RootDir, KBuildBinPath,
@@ -457,14 +438,116 @@ func cleanPhOSCLI(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
+func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
+	// ==================== Prepare ====================
+	logger.Infof("pre-build check...")
+	utils.CheckAndInstallCommand("git", "git", nil, logger)
+	utils.CheckAndInstallCommand("gcc", "build-essential", nil, logger)
+	utils.CheckAndInstallCommand("g++", "build-essential", nil, logger)
+	utils.CheckAndInstallCommand("yes", "yes", nil, logger)
+	utils.CheckAndInstallCommand("cmake", "cmake", nil, logger)
+	utils.CheckAndInstallCommand("curl", "curl", nil, logger)
+	utils.CheckAndInstallCommand("tar", "tar", nil, logger)
+	utils.CheckAndInstallCommand("tmux", "tmux", nil, logger)
+
+	install_meson := func() error {
+		_, err := utils.BashScriptGetOutput(`
+			#!/bin/bash
+			set -e
+			pip3 install meson
+			`, false, logger,
+		)
+		return err
+	}
+	utils.CheckAndInstallCommand("meson", "", install_meson, logger)
+
+	install_ninja := func() error {
+		_, err := utils.BashScriptGetOutput(`
+			#!/bin/bash
+			set -e
+			pip3 install ninja
+			`, false, logger,
+		)
+		return err
+	}
+	utils.CheckAndInstallCommand("ninja", "", install_ninja, logger)
+
+	build_cargo := func() error {
+		_, err := utils.BashScriptGetOutput(`
+			#!/bin/bash
+			set -e
+			if tmux has-session -t cargo_installer 2>/dev/null; then
+				tmux kill-session -t cargo_installer
+			fi
+			tmux new -s cargo_installer -d
+			tmux send -t cargo_installer "curl https://sh.rustup.rs -sSf | sh; exit 0" ENTER
+			tmux send-keys -t cargo_installer C-m
+			echo '. "$HOME/.cargo/env"' >> $HOME/.bashrc
+			`,
+			false, logger,
+		)
+		return err
+	}
+	utils.CheckAndInstallCommand("cargo", "", build_cargo, logger)
+
+	buildLogPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLogPath)
+	if err := utils.CreateDir(buildLogPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
+	}
+
+	libPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath)
+	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built lib at %s", libPath)
+	}
+
+	includePath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath)
+	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built headers at %s", includePath)
+	}
+
+	binPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildBinPath)
+	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built binary at %s", binPath)
+	}
+
+	// ==================== Build Dependencies ====================
+	if *bo.WithThirdParty {
+		logger.Infof("building dependencies...")
+		buildLibClang(bo, logger)
+
+		// TODO: just for fast compilation of PhOS, remove later
+		buildKernelPatcher(bo, logger)
+	}
+
+	// ==================== Build PhOS ====================
+	// buildKernelPatcher(bo, logger)
+	buildPhOSCore(bo, logger)
+	buildPhOSCLI(bo, logger)
+	buildRemoting(bo, logger)
+
+	// ==================== Build and Run Unit Test ====================
+	if *bo.DoUnitTest {
+		BuildGoogleTest(bo, logger)
+		buildUnitTest(bo, logger)
+	}
+}
+
 func CleanTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	// ==================== Clean Dependencies ====================
 	if *bo.WithThirdParty {
 		logger.Infof("cleaning dependencies...")
 		cleanLibClang(bo, logger)
+
+		// TODO: just for fast compilation of PhOS, remove later
+		cleanKernelPatcher(bo, logger)
 	}
+
+	// ==================== Clean PhOS ====================
 	cleanCommon(bo, logger)
-	cleanKernelPatcher(bo, logger)
+	// cleanKernelPatcher(bo, logger)
 	cleanPhOSCore(bo, logger)
 	cleanPhOSCLI(bo, logger)
+
+	// ==================== Clean Unit Test ====================
+	CleanGoogleTest(bo, logger)
 }

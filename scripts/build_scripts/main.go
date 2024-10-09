@@ -17,11 +17,11 @@ func printTitle() {
 
 func printHelp() {
 	fmt.Printf("usage: phos_build [-t=<target>] [-u=<enable>] [-j/c/3]\n")
-	fmt.Printf("  -t=<target>     specified build target (options: cuda), default to be cuda\n")
-	fmt.Printf("  -u=<enable>     run unittest after building to verify correctness (options: true, false), default to be false\n")
-	fmt.Printf("  -i              install after successfully building\n")
-	fmt.Printf("  -c              clean previously built assets\n")
-	fmt.Printf("  -3              involve third-party library\n")
+	fmt.Printf("  -t=<target>	specified build target (options: cuda), default to be cuda\n")
+	fmt.Printf("  -u     		run unittest after building to verify correctness (options: true, false), default to be false\n")
+	fmt.Printf("  -i   			install after successfully building\n")
+	fmt.Printf("  -c   			clean previously built assets\n")
+	fmt.Printf("  -3          	involve third-party library\n")
 	fmt.Printf("\n")
 }
 

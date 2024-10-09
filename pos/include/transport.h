@@ -31,10 +31,11 @@
 
 #include <sys/time.h>
 #include <arpa/inet.h>
-#include <infiniband/verbs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+
+#include <infiniband/verbs.h>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
