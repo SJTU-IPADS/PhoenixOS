@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -30,6 +31,10 @@ func GetOS(logger *log.Logger) string {
 	logger.Fatalf("failed to detect OS version: no information recorded in /etc/os-release")
 
 	return ""
+}
+
+func ClearLastLine() {
+	fmt.Print("\033[F\033[K")
 }
 
 func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger) error {

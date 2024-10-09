@@ -43,7 +43,13 @@ meson_file_dir = meson.current_source_dir()
 
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
-target = 'cuda'
+target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
+if target == ''
+    target = 'cuda'
+endif
+if target != 'cuda'
+    assert(false, 'target ' + target + ' is currently not supported')
+endif
 
 # config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
 #           0: no continuous ckpt support
@@ -167,10 +173,8 @@ if target == 'cuda'
         founded_cuda_modules.length() == cuda_modules.length(),
         'Only find ' + founded_cuda_modules.length().to_string() + ' CUDA modules, expected ' + cuda_modules.length().to_string()
     )
-else
-    assert(false, 'target ' + target + ' is currently not supported')
+    message('>>> Detecting CUDA toolkit done\n')
 endif
-message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
@@ -221,22 +225,16 @@ endif
 
 inc_dirs += ['./']
 
+
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
+if target == 'cuda'
+    ld_args += ['-ldl', '-lpatcher']    # for cuda patcher
+    ld_args += ['-lclang']              # for using libclang for cuda target
+    ld_args += ['-lrt']                 # for support shm_x
+    ld_args += ['-pthread']             # for support pthread_x
+    ld_args += ['-lelf']                # for support elf_x
+endif
 
-message('>>> Setup patcher')
-ld_args += ['-ldl', '-lpatcher']
-
-message('>>> Setup libclang')
-ld_args += ['-lclang']
-
-message('>>> Setup librt') # for support shm_x
-ld_args += ['-lrt']
-
-message('>>> Setup pthread') # for support pthread_x
-ld_args += ['-pthread']
-
-message('>>> Setup libelf') # for support elf_x
-ld_args += ['-lelf']
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
 c_args += ['--std=c++17']
