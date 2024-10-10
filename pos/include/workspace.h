@@ -60,6 +60,15 @@ namespace oob_functions {
     POS_OOB_DECLARE_SVR_FUNCTIONS(utils_mock_api_call);
 }; // namespace oob_functions
 
+
+/*!
+ *  \brief  parameters for creating new client in the workspace
+ */
+typedef struct pos_create_client_param {
+    // TODO:
+} pos_create_client_param_t;
+
+
 /*!
  * \brief   base workspace of PhoenixOS
  */
@@ -341,6 +350,7 @@ class POSWorkspace {
 
         return retval;
     }
+
 
     /*!
      *  \brief  entrance of POS processing

@@ -8,6 +8,7 @@ import (
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
+	"gopkg.in/yaml.v2"
 )
 
 func printTitle() {
@@ -26,7 +27,10 @@ func printHelp() {
 }
 
 func main() {
-	bo := BuildOptions{
+	logger := log.New(os.Stdout)
+
+	// load command line options
+	cmdOpt := CmdOptions{
 		PrintHelp:      flag.Bool("h", false, "Print help message"),
 		WithThirdParty: flag.Bool("3", false, "Build/clean with 3rd parties"),
 		DoInstall:      flag.Bool("i", false, "Do installation"),
@@ -37,53 +41,41 @@ func main() {
 	flag.Usage = printHelp
 	flag.Parse()
 
-	logger := log.New(os.Stdout)
-
-	// >>>>>>>>>>>>>>>>>>>> build routine starts <<<<<<<<<<<<<<<<<<<
-	printTitle()
-	bo.print(logger)
-
-	if *bo.PrintHelp {
-		printHelp()
-		os.Exit(0)
+	// load build options
+	var buildOpt BuildOptions
+	builopt_data, err := os.ReadFile("./build_options.yaml")
+	if err != nil {
+		log.Warnf("failed to load build options, use default value")
+	}
+	err = yaml.Unmarshal(builopt_data, &buildOpt)
+	if err != nil {
+		log.Warnf("failed to parse build options from yaml, use default value")
 	}
 
+	// >>>>>>>>>>>>>>>>>>>> build routine starts <<<<<<<<<<<<<<<<<<<
 	// setup global variables
 	rootDir, err := utils.BashCommandGetOutput("git rev-parse --show-toplevel", false, logger)
 	if err != nil {
 		logger.Fatalf("failed to obtain root directory")
 	}
-	bo.RootDir = strings.TrimRight(string(rootDir), "\n")
-	logger.Infof("root directory: %s", bo.RootDir)
+	cmdOpt.RootDir = strings.TrimRight(string(rootDir), "\n")
 
-	if *bo.Target == "cuda" {
-		if *bo.DoCleaning {
-			CleanTarget_CUDA(bo, logger)
-		} else {
-			BuildTarget_CUDA(bo, logger)
-		}
-	} else {
-		log.Fatalf("Unsupported target %s", *bo.Target)
+	printTitle()
+	cmdOpt.print(logger)
+	buildOpt.print(logger)
+
+	if *cmdOpt.PrintHelp {
+		printHelp()
+		os.Exit(0)
 	}
 
-	// if len(os.Args) < 2 {
-	// 	fmt.Println("请提供要执行的命令和参数")
-	// 	return
-	// }
-
-	// // 获取命令和参数
-	// command := os.Args[1]
-	// args := os.Args[2:]
-
-	// // 执行命令
-	// cmd := exec.Command(command, args...)
-	// output, err := cmd.CombinedOutput() // 获取标准输出和标准错误
-
-	// if err != nil {
-	// 	fmt.Printf("执行命令时出错: %s\n", err)
-	// 	return
-	// }
-
-	// // 输出结果
-	// fmt.Println(string(output))
+	if *cmdOpt.Target == "cuda" {
+		if *cmdOpt.DoCleaning {
+			CleanTarget_CUDA(cmdOpt, logger)
+		} else {
+			BuildTarget_CUDA(cmdOpt, buildOpt, logger)
+		}
+	} else {
+		log.Fatalf("Unsupported target %s", *cmdOpt.Target)
+	}
 }

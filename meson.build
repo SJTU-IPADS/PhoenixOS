@@ -44,9 +44,6 @@ meson_file_dir = meson.current_source_dir()
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
 target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
-if target == ''
-    target = 'cuda'
-endif
 if target != 'cuda'
     assert(false, 'target ' + target + ' is currently not supported')
 endif
@@ -55,7 +52,10 @@ endif
 #           0: no continuous ckpt support
 #           1: naive continuous ckpt support
 #           2: pos continuous ckpt support
-ckpt_opt_level = 0
+ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CHECKPOINTER_OPT_LEVEL').stdout().strip().to_int()
+if ckpt_opt_level != 0 and ckpt_opt_level != 1 and ckpt_opt_level != 2
+    assert(false, 'ckpt_opt_level ' + ckpt_opt_level + ' is currently not supported')
+endif
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
 enable_ckpt_increamental = 0
@@ -86,30 +86,51 @@ log_file_path = '/root/dag.pos'
 
 # switch:   whether to check correctness of function parameters, return values, etc.,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_runtime_debug_check = 1
+enable_runtime_debug_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK').stdout().strip().to_int()
+if enable_runtime_debug_check != 0 and enable_runtime_debug_check != 1
+    assert(false, 'enable_runtime_debug_check get invalid value: ' + enable_runtime_debug_check)
+endif
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 1
+enable_hijack_api_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_HIJACK_API_CHECK').stdout().strip().to_int()
+if enable_hijack_api_check != 0 and enable_hijack_api_check != 1
+    assert(false, 'enable_hijack_api_check get invalid value: ' + enable_hijack_api_check)
+endif
 
 # switch:   whether to trace the statistics
 enable_trace = 0
 
 # switch:   whether to print all fatal messages
-enable_print_error = 1
+enable_print_error = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_ERROR').stdout().strip().to_int()
+if enable_print_error != 0 and enable_print_error != 1
+    assert(false, 'enable_print_error get invalid value: ' + enable_print_error)
+endif
 
 # switch:   whether to print all warning messages
-enable_print_warn = 1
+enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WARN').stdout().strip().to_int()
+if enable_print_warn != 0 and enable_print_warn != 1
+    assert(false, 'enable_print_warn get invalid value: ' + enable_print_warn)
+endif
 
 # switch:   whether to print all log messages
-enable_print_log = 1
+enable_print_log = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_LOG').stdout().strip().to_int()
+if enable_print_log != 0 and enable_print_log != 1
+    assert(false, 'enable_print_log get invalid value: ' + enable_print_log)
+endif
 
 # switch:   whether to print all debug messages
-enable_print_debug = 0
+enable_print_debug = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_DEBUG').stdout().strip().to_int()
+if enable_print_debug != 0 and enable_print_debug != 1
+    assert(false, 'enable_print_debug get invalid value: ' + enable_print_debug)
+endif
 
 # switch:   whether to print fatal/warn/debug/log with colors
 #           should be disabled when try to dump all outputs to a file
-enable_print_with_color = 1
+enable_print_with_color = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WITH_COLOR').stdout().strip().to_int()
+if enable_print_with_color != 0 and enable_print_with_color != 1
+    assert(false, 'enable_print_with_color get invalid value: ' + enable_print_with_color)
+endif
 
 # we need to hardcoded some configurations as source code
 subdir('pos/include')
