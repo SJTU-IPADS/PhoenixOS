@@ -152,12 +152,14 @@ class POSAutogener {
     /*!
      *  \brief  collect all APIs from a single vendor header file
      *  \note   this function is implemeneted by each target
-     *  \param  file_path           path to the selected file to be parsed
-     *  \param  header_file_meta    metadata of the parsed header file
+     *  \param  file_path                   path to the selected file to be parsed
+     *  \param  vendor_header_file_meta     metadata of the parsed vendor header file
+     *  \param  support_header_file_meta    metadata of the pos-supported header file
      *  \return POS_SUCCESS for successfully parsed 
      */
     pos_retval_t __collect_vendor_header_file(
         const std::string& file_path,
-        pos_vendor_header_file_meta_t *header_file_meta
+        pos_vendor_header_file_meta_t* vendor_header_file_meta,
+        pos_support_header_file_meta_t* support_header_file_meta
     );
 };

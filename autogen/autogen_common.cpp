@@ -28,13 +28,20 @@ pos_retval_t POSAutogener::collect_pos_support_header_files(){
             POS_LOG_C("parsing support file %s...", entry.path().c_str())
 
             POS_CHECK_POINTER(header_file_meta = new pos_support_header_file_meta_t);
-            this->_supported_header_file_metas_map.insert({ entry.path().filename() , header_file_meta });
 
             if(unlikely(POS_SUCCESS != (
                 retval = this->__collect_pos_support_header_files(entry.path(), header_file_meta)
             ))){
                 POS_ERROR_C("failed to parse file %s", entry.path().c_str())
             }
+
+            /// !   \note   the file_name of header_file_meta should be updated in __collect_pos_support_header_files
+            if(unlikely(header_file_meta->file_name.size() == 0)){
+                POS_WARN_C("no name header file provided in yaml file: path(%s)", entry.path().c_str());
+                retval = POS_FAILED_INVALID_INPUT;
+                goto exit;
+            }
+            this->_supported_header_file_metas_map.insert({ header_file_meta->file_name , header_file_meta });
         }
     }
 
@@ -45,7 +52,8 @@ exit:
 
 pos_retval_t POSAutogener::collect_vendor_header_files(){
     pos_retval_t retval = POS_SUCCESS;
-    pos_vendor_header_file_meta_t *header_file_meta;
+    pos_vendor_header_file_meta_t *vendor_header_file_meta;
+    pos_support_header_file_meta_t *supported_header_file_meta;
 
     if(unlikely(this->header_directory.size() == 0)){
         POS_WARN_C("failed to do autogen, no path to vender headers provided")
@@ -70,15 +78,33 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
             &&  (entry.path().extension() == ".h" || entry.path().extension() == ".hpp")
         ){
             POS_LOG_C("parsing vendor header file %s...", entry.path().c_str())
-            
-            POS_CHECK_POINTER(header_file_meta = new pos_vendor_header_file_meta_t);
-            this->_vendor_header_file_metas.push_back(header_file_meta);
+
+            // if this header file isn't supported by PhOS, we just skip analyse it
+            if( this->_supported_header_file_metas_map.count(entry.path().filename()) == 0 ){
+                POS_BACK_LINE;
+                POS_OLD_LOG_C("parsing vendor header file %s [skipped]", entry.path().c_str());
+                continue;
+            }
+            POS_CHECK_POINTER( supported_header_file_meta = this->_supported_header_file_metas_map[entry.path().filename()] );
+
+            POS_CHECK_POINTER(vendor_header_file_meta = new pos_vendor_header_file_meta_t);
+            this->_vendor_header_file_metas.push_back(vendor_header_file_meta);
 
             if(unlikely(POS_SUCCESS != (
-                retval = this->__collect_vendor_header_file(entry.path(), header_file_meta)
+                retval = this->__collect_vendor_header_file(
+                    entry.path(),
+                    vendor_header_file_meta,
+                    supported_header_file_meta
+                )
             ))){
                 POS_ERROR_C("failed to parse file %s", entry.path().c_str())
             }
+
+            POS_BACK_LINE;
+            POS_LOG_C(
+                "parsing vendor header file %s [# hijacked apis: %lu]",
+                entry.path().c_str(), vendor_header_file_meta->apis.size()
+            );
         }
     }
 
