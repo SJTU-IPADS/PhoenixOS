@@ -116,14 +116,26 @@ exit:
 
 pos_retval_t POSAutogener::__collect_vendor_header_file(
     const std::string& file_path,
-    pos_vendor_header_file_meta_t *header_file_meta
+    pos_vendor_header_file_meta_t* vendor_header_file_meta,
+    pos_support_header_file_meta_t* support_header_file_meta
 ){
     pos_retval_t retval = POS_SUCCESS;
     CXIndex index;
     CXTranslationUnit unit;
     CXCursor cursor;
     
-    POS_CHECK_POINTER(header_file_meta);
+    struct __clang_param_wrapper {
+        pos_vendor_header_file_meta_t* vendor_header_file_meta;
+        pos_support_header_file_meta_t* support_header_file_meta;
+    };
+
+    POS_CHECK_POINTER(vendor_header_file_meta);
+    POS_CHECK_POINTER(support_header_file_meta);
+
+    __clang_param_wrapper param {
+        .vendor_header_file_meta = vendor_header_file_meta,
+        .support_header_file_meta = support_header_file_meta
+    };
 
     index = clang_createIndex(0, 0);
     unit = clang_parseTranslationUnit(
@@ -143,19 +155,31 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
         /* visitor */
         [](CXCursor cursor, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
             int i, num_args;
+            std::string func_name_cppstr;
             CXString func_name;
             CXString func_ret_type;
             CXCursor arg_cursor;
-            pos_vendor_header_file_meta_t *header_file_meta = nullptr;
+            __clang_param_wrapper *param = nullptr;
+            pos_vendor_header_file_meta_t *vendor_header_file_meta = nullptr;
+            pos_support_header_file_meta_t *support_header_file_meta = nullptr;
             pos_vendor_api_meta_t *api_meta = nullptr;
             pos_vendor_param_meta_t *param_meta = nullptr;
 
             if (clang_getCursorKind(cursor) == CXCursor_FunctionDecl) {
-                header_file_meta = reinterpret_cast<pos_vendor_header_file_meta_t*>(client_data);
-                POS_CHECK_POINTER(header_file_meta);
+                param = reinterpret_cast<__clang_param_wrapper*>(client_data);
+                POS_CHECK_POINTER(param);
+                vendor_header_file_meta = reinterpret_cast<pos_vendor_header_file_meta_t*>(param->vendor_header_file_meta);
+                POS_CHECK_POINTER(vendor_header_file_meta);
+                support_header_file_meta = reinterpret_cast<pos_support_header_file_meta_t*>(param->support_header_file_meta);
+                POS_CHECK_POINTER(support_header_file_meta);
+
+                func_name_cppstr = std::string(clang_getCString(clang_getCursorSpelling(cursor)));
+                if(support_header_file_meta->api_maps.count(func_name_cppstr) == 0){
+                    goto cursor_traverse_exit;
+                }
 
                 POS_CHECK_POINTER(api_meta = new pos_vendor_api_meta_t);
-                header_file_meta->apis.push_back(api_meta);
+                vendor_header_file_meta->apis.push_back(api_meta);
                 api_meta->name = clang_getCursorSpelling(cursor);
                 api_meta->return_type = clang_getCursorResultType(cursor);
                 // returnType = clang_getTypeSpelling(clang_getCursorResultType(cursor));
@@ -169,10 +193,11 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
                     param_meta->type = clang_getCursorType(arg_cursor);
                 }
             }
-
+        
+        cursor_traverse_exit:
             return CXChildVisit_Recurse;
         },
-        /* client_data */ header_file_meta
+        /* client_data */ &param
     );
     clang_disposeTranslationUnit(unit);
 
