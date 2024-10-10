@@ -1,0 +1,12 @@
+# common options
+target: "cuda"
+enable_print_error: 1
+enable_print_warn: 1
+enable_print_log: 1
+enable_print_debug: 0
+enable_print_with_color: 1
+  
+# PhOS core options
+ckpt_opt_level: 0
+enable_hijack_api_check: 1
+enable_runtime_debug_check: 1

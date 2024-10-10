@@ -65,7 +65,7 @@ void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
         case 'k':
             _template_client_cxt.kernel_meta_path = std::string(optarg);
             break;
-        
+
         // client checkpoint file path
         case 'c':
             _template_client_cxt.checkpoint_file_path = std::string(optarg);
@@ -87,6 +87,7 @@ void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
         POS_ERROR_C("please either -c or -k, don't coexist!");
     }
 }
+
 
 /*!
  *  \brief  entrance of POS processing

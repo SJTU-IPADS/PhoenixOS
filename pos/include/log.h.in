@@ -330,3 +330,5 @@ _POS_PRINT_POSITION(stdout)     \
 #define POS_DEBUG_DETAIL(...)
 #define POS_DEBUG_C_DETAIL(...)
 #endif
+
+#define POS_BACK_LINE   fprintf(stdout, "\033[F\033[K");
