@@ -29,12 +29,12 @@ int main(int argc, char** argv) {
         goto exit;
     }
 
-    // if(unlikely(
-    //     retval = (POS_SUCCESS != autogener.collect_vendor_header_files())
-    // )){
-    //     POS_WARN("failed to parse vendor headers: path(%s)", autogener.header_directory.c_str());
-    //     goto exit;
-    // }
+    if(unlikely(
+        retval = (POS_SUCCESS != autogener.collect_vendor_header_files())
+    )){
+        POS_WARN("failed to parse vendor headers: path(%s)", autogener.header_directory.c_str());
+        goto exit;
+    }
 
 exit:
     if(unlikely(retval != POS_SUCCESS))

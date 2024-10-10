@@ -215,7 +215,7 @@ func buildKernelPatcher(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Lo
 }
 
 func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
-	logger.Infof("building PhOS core...")
+	logger.Infof("building PhOS core for CUDA target...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_phos_core.log")
 	build_script := fmt.Sprintf(`
