@@ -22,7 +22,7 @@ pos_retval_t POSAutogener::collect_pos_support_header_files(){
         retval = POS_FAILED_INVALID_INPUT;
         goto exit;
     }
-    
+
     for (const auto& entry : std::filesystem::directory_iterator(this->support_directory)){
         if(entry.is_regular_file() &&  entry.path().extension() == ".yaml"){
             POS_LOG_C("parsing support file %s...", entry.path().c_str())
