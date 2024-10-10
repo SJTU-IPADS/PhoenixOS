@@ -1,14 +1,14 @@
 # >>> project definition
-project('PhoenixOS_Test', ['CPP'],
+project('PhoenixOS_Autogen', ['CPP'],
 	# Get version number from file.
 	version: run_command(find_program('cat'),files('../VERSION'), check: true).stdout().strip(),
 )
-project_name = 'phoenix_os_test'
-project_name_abbreviation = 'pos_test'
+project_name = 'phoenix_os_autogen'
+project_name_abbreviation = 'pos_autogen'
 
 add_project_arguments('-O0',  language : 'cpp')
 
-scan_src_path = meson.current_source_dir() + '../scripts/utils/glob_src.py'
+scan_src_path = meson.current_source_dir() + '/../scripts/utils/glob_src.py'
 
 # >>>>>>>>>>>>>> build prepare >>>>>>>>>>>>>>
 # get environment variables of the build process
@@ -20,8 +20,6 @@ bash = find_program('bash')
 
 # path of built libraries by PhOS build system
 lib_path = meson.current_source_dir() + '/../lib'
-googletest_abs_path = meson.current_source_dir() + '/../third_party/googletest'
-googletest_rlt_path = '../../third_party/googletest'    # from the build directory
 
 # compile flags
 c_args = []
@@ -39,12 +37,10 @@ sources = []
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
 target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
-if target == ''
-    target = 'cuda'
-endif
 if target != 'cuda'
     assert(false, 'target ' + target + ' is currently not supported')
 endif
+
 
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
@@ -81,13 +77,12 @@ endif
 
 
 # >>>>>>>>>>>>>> setup sources, libraries and includes >>>>>>>>>>>>>>
+sources += [ 'autogen_common.cpp', 'main.cpp' ]
 inc_dirs += [ '../' ]
-inc_dirs += [ googletest_rlt_path+'/googletest/include' ]
-ld_args += [ '-L'+googletest_abs_path+'/build/lib' ]
-ld_args += [ '-lgtest', '-lgtest_main' ]
+ld_args += [ '-lclang', '-lyaml-cpp' ]
 if target == 'cuda'
-    sources += run_command('python3', files(scan_src_path), 'test_cuda', check: false).stdout().strip().split('\n')
-    ld_args += [ '-ldl', '-lpatcher', '-lclang', '-lrt', '-pthread', '-lelf', '-lpos', '-libverbs' ]
+    sources += run_command('python3', files(scan_src_path), 'autogen_cuda', check: false).stdout().strip().split('\n')
+    # ld_args += [ '-ldl', '-lpatcher', '-lrt', '-pthread', '-lelf', '-lpos', '-libverbs' ]
 endif
 
 

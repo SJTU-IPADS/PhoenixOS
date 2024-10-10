@@ -102,7 +102,7 @@ class POSClient_CUDA : public POSClient {
                 this->_cxt.is_load_kernel_from_cache = true;
             }
         }
-        
+
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = new POSHandleManager_CUDA_Function();
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
 

@@ -11,6 +11,7 @@ import (
 
 const (
 	KLibClangPath    = "third_party/libclang-static-build"
+	KLibYamlCppPath  = "third_party/yaml-cpp"
 	KPhOSPath        = "pos"
 	KPhOSCLIPath     = "pos/cli"
 	KPhOSPatcherPath = "pos/cuda_impl/patcher"
@@ -24,13 +25,77 @@ const (
 	KInstallBinPath  = "/usr/local/bin"
 )
 
-func buildLibClang(bo BuildOptions, logger *log.Logger) {
-	logger.Infof("building libclang...")
+func buildLibYamlCpp(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+	logger.Infof("building libyaml-cpp...")
 
-	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_libclang.log")
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_libyamlcpp.log")
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
+		%s
+		cd %s/%s
+		rm -rf build
+		mkdir build && cd build
+		cmake -DYAML_BUILD_SHARED_LIBS=on .. >%s 2>&1
+		make -j >%s 2>&1
+		cp ./libyaml-cpp.so %s
+		cp ./libyaml-cpp.so.0.8 %s
+		cp ./libyaml-cpp.so.0.8.0 %s
+		cp -r ../include/yaml-cpp %s/yaml-cpp
+		`,
+		buildOpt.export_string(),
+		cmdOpt.RootDir, KLibYamlCppPath,
+		buildLogPath,
+		buildLogPath,
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath),
+	)
+
+	install_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s
+		cp ./libyaml-cpp.so %s/
+		cp ./libyaml-cpp.so.0.8 %s/
+		cp ./libyaml-cpp.so.0.8.0 %s/
+		cp -r ./include %s
+		`,
+		cmdOpt.RootDir, KLibYamlCppPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallIncPath,
+	)
+
+	start := time.Now()
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build libyaml-cpp, please see log at %s", buildLogPath)
+	}
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built libyaml-cpp: %.2fs", elapsed.Seconds())
+
+	if *cmdOpt.DoInstall {
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
+		if err != nil {
+			logger.Fatalf("failed to install libyaml-cpp, please see log at %s", buildLogPath)
+		}
+		logger.Infof("installed libyaml-cpp")
+	}
+}
+
+func buildLibClang(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+	logger.Infof("building libclang...")
+
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_libclang.log")
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		%s
 		cd %s/%s
 		if [ ! -d "./build" ]; then
 			mkdir build && cd build
@@ -40,17 +105,16 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 		cp ../lib/libclang.so %s
 		cp ../lib/libclang.so.13 %s
 		cp ../lib/libclang.so.VERSION %s
-		cp ../lib/libclang_static.a %s
-		cp -r ../include/* %s
+		cp -r ../include/clang-c %s/clang-c
 		`,
-		bo.RootDir, KLibClangPath,
+		buildOpt.export_string(),
+		cmdOpt.RootDir, KLibClangPath,
 		buildLogPath,
 		buildLogPath,
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath),
-		fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath),
 	)
 
 	install_script := fmt.Sprintf(`
@@ -60,11 +124,9 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 		cp ./lib/libclang.so %s/
 		cp ./lib/libclang.so.13 %s/
 		cp ./lib/libclang.so.VERSION %s/
-		cp ./lib/libclang_static.a %s/
 		cp -r ./include/clang-c %s/clang-c
 		`,
-		bo.RootDir, KLibClangPath,
-		KInstallLibPath,
+		cmdOpt.RootDir, KLibClangPath,
 		KInstallLibPath,
 		KInstallLibPath,
 		KInstallLibPath,
@@ -81,7 +143,7 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 	utils.ClearLastLine()
 	logger.Infof("built libclang: %.2fs", elapsed.Seconds())
 
-	if *bo.DoInstall {
+	if *cmdOpt.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install libclang, please see log at %s", buildLogPath)
@@ -90,13 +152,14 @@ func buildLibClang(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
+func buildKernelPatcher(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	logger.Infof("building CUDA kernel patcher...")
 
-	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_kernel_patcher.log")
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_kernel_patcher.log")
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
+		%s
 		cd %s/%s
 		if [ -d "./build" ]; then
 			rm -rf build
@@ -110,11 +173,12 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 		cp ./release/libpatcher.a %s/%s
 		cp ./patcher.h %s/%s
 		`,
-		bo.RootDir, KPhOSPatcherPath,
+		buildOpt.export_string(),
+		cmdOpt.RootDir, KPhOSPatcherPath,
 		buildLogPath,
 		buildLogPath,
-		bo.RootDir, KBuildLibPath,
-		bo.RootDir, KBuildIncPath,
+		cmdOpt.RootDir, KBuildLibPath,
+		cmdOpt.RootDir, KBuildIncPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -127,7 +191,7 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 			exit 1
 		fi
 		`,
-		bo.RootDir, KLibClangPath,
+		cmdOpt.RootDir, KLibClangPath,
 		KInstallLibPath,
 	)
 
@@ -141,7 +205,7 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 	utils.ClearLastLine()
 	logger.Infof("built CUDA kernel patcher: %.2fs", elapsed.Seconds())
 
-	if *bo.DoInstall {
+	if *cmdOpt.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install CUDA kernel patcher, please see log at %s", buildLogPath)
@@ -150,28 +214,30 @@ func buildKernelPatcher(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
+func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	logger.Infof("building PhOS core...")
 
-	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_phos_core.log")
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_phos_core.log")
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
+		%s
 		cd %s
-		if [ ! -d "./build" ]; then
-			meson build &>%s 2>&1
-		fi
+		rm -rf ./build
+		# load build options
+		meson build &>%s 2>&1
 		cd build
 		ninja clean
 		ninja &>%s 2>&1
 		cp %s/build/libpos.so %s/%s
 		cp %s/build/pos/include/* %s/%s
 		`,
-		bo.RootDir,
+		buildOpt.export_string(),
+		cmdOpt.RootDir,
 		buildLogPath,
 		buildLogPath,
-		bo.RootDir, bo.RootDir, KBuildLibPath,
-		bo.RootDir, bo.RootDir, KBuildIncPath,
+		cmdOpt.RootDir, cmdOpt.RootDir, KBuildLibPath,
+		cmdOpt.RootDir, cmdOpt.RootDir, KBuildIncPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -179,7 +245,7 @@ func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
 		set -e
 		cp %s/build/*.so %s
 		`,
-		bo.RootDir, KInstallLibPath,
+		cmdOpt.RootDir, KInstallLibPath,
 	)
 
 	start := time.Now()
@@ -192,7 +258,7 @@ func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
 	utils.ClearLastLine()
 	logger.Infof("built PhOS Core for CUDA target: %.2fs", elapsed.Seconds())
 
-	if *bo.DoInstall {
+	if *cmdOpt.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install PhOS core, please see log at %s", buildLogPath)
@@ -201,26 +267,27 @@ func buildPhOSCore(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
+func buildPhOSCLI(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	logger.Infof("building PhOS CLI...")
 
-	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_phos_cli.log")
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_phos_cli.log")
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
+		%s
 		cd %s/%s
-		if [ ! -d "./build" ]; then
-			mkdir build
-		fi
-		cd build && rm -rf ./*
+		rm -rf build
+		mkdir build
+		cd build
 		cmake .. &>%s 2>&1
 		make -j  &>%s 2>&1
 		cp ./pos-cli %s/%s
 		`,
-		bo.RootDir, KPhOSCLIPath,
+		buildOpt.export_string(),
+		cmdOpt.RootDir, KPhOSCLIPath,
 		buildLogPath,
 		buildLogPath,
-		bo.RootDir, KBuildBinPath,
+		cmdOpt.RootDir, KBuildBinPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -229,7 +296,7 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 		cd %s/%s
 		cp ./build/pos-cli %s
 		`,
-		bo.RootDir, KPhOSCLIPath,
+		cmdOpt.RootDir, KPhOSCLIPath,
 		KInstallBinPath,
 	)
 
@@ -243,7 +310,7 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 	utils.ClearLastLine()
 	logger.Infof("built PhOS CLI: %.2fs", elapsed.Seconds())
 
-	if *bo.DoInstall {
+	if *cmdOpt.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install PhOS CLI, please see log at %s", buildLogPath)
@@ -252,13 +319,14 @@ func buildPhOSCLI(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func buildRemoting(bo BuildOptions, logger *log.Logger) {
+func buildRemoting(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	logger.Infof("building remoting framework...")
 
-	buildLogPath := fmt.Sprintf("%s/%s/%s", bo.RootDir, KBuildLogPath, "build_remoting_framework.log")
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_remoting_framework.log")
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
+		%s
 		cd %s/%s
 		make libtirpc -j &>%s 2>&1
 		cp ./submodules/libtirpc/install/lib/libtirpc.so %s/%s
@@ -268,12 +336,13 @@ func buildRemoting(bo BuildOptions, logger *log.Logger) {
 		cp cricket-rpc-server %s/%s
 		cp cricket-client.so %s/%s
 		`,
-		bo.RootDir, KRemotingPath,
+		buildOpt.export_string(),
+		cmdOpt.RootDir, KRemotingPath,
 		buildLogPath,
-		bo.RootDir, KBuildLibPath,
+		cmdOpt.RootDir, KBuildLibPath,
 		buildLogPath,
-		bo.RootDir, KBuildBinPath,
-		bo.RootDir, KBuildLibPath,
+		cmdOpt.RootDir, KBuildBinPath,
+		cmdOpt.RootDir, KBuildLibPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -283,7 +352,7 @@ func buildRemoting(bo BuildOptions, logger *log.Logger) {
 		cp cricket-rpc-server %s
 		cp cricket-client.so %s
 		`,
-		bo.RootDir, KRemotingPath,
+		cmdOpt.RootDir, KRemotingPath,
 		KInstallBinPath,
 		KInstallLibPath,
 	)
@@ -298,7 +367,7 @@ func buildRemoting(bo BuildOptions, logger *log.Logger) {
 	utils.ClearLastLine()
 	logger.Infof("built remoting framework: %.2fs", elapsed.Seconds())
 
-	if *bo.DoInstall {
+	if *cmdOpt.DoInstall {
 		_, err := utils.BashScriptGetOutput(install_script, false, logger)
 		if err != nil {
 			logger.Fatalf("failed to install remoting framework, please see log at %s", buildLogPath)
@@ -307,14 +376,14 @@ func buildRemoting(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func buildUnitTest(bo BuildOptions, logger *log.Logger) {
+func buildUnitTest(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	// logger.Infof("building uint test...")
 }
 
-func cleanCommon(bo BuildOptions, logger *log.Logger) {
+func cleanCommon(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning common directoroies...")
 	clean_script := ""
-	if *bo.WithThirdParty {
+	if *cmdOpt.WithThirdParty {
 		clean_script = fmt.Sprintf(`
 			#!/bin/bash
 			rm -rf %s/%s/*
@@ -322,10 +391,10 @@ func cleanCommon(bo BuildOptions, logger *log.Logger) {
 			rm -rf %s/%s/*
 			rm -rf %s/%s/*
 			`,
-			bo.RootDir, KBuildBinPath,
-			bo.RootDir, KBuildLibPath,
-			bo.RootDir, KBuildLogPath,
-			bo.RootDir, KBuildIncPath,
+			cmdOpt.RootDir, KBuildBinPath,
+			cmdOpt.RootDir, KBuildLibPath,
+			cmdOpt.RootDir, KBuildLogPath,
+			cmdOpt.RootDir, KBuildIncPath,
 		)
 	} else {
 		clean_script = fmt.Sprintf(`
@@ -337,11 +406,11 @@ func cleanCommon(bo BuildOptions, logger *log.Logger) {
 			# rm -rf %s/%s/*.h
 			rm -rf %s/%s/*
 			`,
-			bo.RootDir, KBuildBinPath,
-			bo.RootDir, KBuildLibPath,
-			bo.RootDir, KBuildLibPath,
-			bo.RootDir, KBuildIncPath,
-			bo.RootDir, KBuildLogPath,
+			cmdOpt.RootDir, KBuildBinPath,
+			cmdOpt.RootDir, KBuildLibPath,
+			cmdOpt.RootDir, KBuildLibPath,
+			cmdOpt.RootDir, KBuildIncPath,
+			cmdOpt.RootDir, KBuildLogPath,
 		)
 	}
 
@@ -353,7 +422,31 @@ func cleanCommon(bo BuildOptions, logger *log.Logger) {
 	}
 }
 
-func cleanLibClang(bo BuildOptions, logger *log.Logger) {
+func cleanLibYamlCpp(cmdOpt CmdOptions, logger *log.Logger) {
+	logger.Infof("cleaning libyaml-cpp...")
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+		cd %s/%s
+		rm -rf build
+		rm -f %s/libyaml-cpp.so
+		rm -f %s/libyaml-cpp.so.0.8
+		rm -f %s/libyaml-cpp.so.0.8.0
+		rm -rf %s/yaml-cpp
+		`,
+		cmdOpt.RootDir, KLibYamlCppPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallLibPath,
+		KInstallIncPath,
+	)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
+	if err != nil {
+		logger.Warnf("failed to clean libyaml-cpp")
+	}
+	logger.Infof("done")
+}
+
+func cleanLibClang(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning libclang...")
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
@@ -365,11 +458,9 @@ func cleanLibClang(bo BuildOptions, logger *log.Logger) {
 		rm -f %s/libclang.so
 		rm -f %s/libclang.so.13
 		rm -f %s/libclang.so.VERSION
-		rm -f %s/libclang_static.a
 		rm -rf %s/clang-c
 		`,
-		bo.RootDir, KLibClangPath,
-		KInstallLibPath,
+		cmdOpt.RootDir, KLibClangPath,
 		KInstallLibPath,
 		KInstallLibPath,
 		KInstallLibPath,
@@ -382,7 +473,7 @@ func cleanLibClang(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
-func cleanKernelPatcher(bo BuildOptions, logger *log.Logger) {
+func cleanKernelPatcher(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning CUDA kernel patcher...")
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
@@ -391,7 +482,7 @@ func cleanKernelPatcher(bo BuildOptions, logger *log.Logger) {
 		rm -f %s/patcher.h
 		rm -f %s/libpatcher.a
 		`,
-		bo.RootDir, KPhOSPatcherPath,
+		cmdOpt.RootDir, KPhOSPatcherPath,
 		KInstallIncPath,
 		KInstallLibPath,
 	)
@@ -402,7 +493,7 @@ func cleanKernelPatcher(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
-func cleanPhOSCore(bo BuildOptions, logger *log.Logger) {
+func cleanPhOSCore(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning PhOS core...")
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
@@ -410,7 +501,7 @@ func cleanPhOSCore(bo BuildOptions, logger *log.Logger) {
 		rm -rf build
 		rm -f %s/libpos.so
 		`,
-		bo.RootDir,
+		cmdOpt.RootDir,
 		KInstallLibPath,
 	)
 	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
@@ -420,7 +511,7 @@ func cleanPhOSCore(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
-func cleanPhOSCLI(bo BuildOptions, logger *log.Logger) {
+func cleanPhOSCLI(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning PhOS CLI...")
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
@@ -428,7 +519,7 @@ func cleanPhOSCLI(bo BuildOptions, logger *log.Logger) {
 		rm -rf build
 		rm -f %s/pos-cli
 		`,
-		bo.RootDir, KPhOSCLIPath,
+		cmdOpt.RootDir, KPhOSCLIPath,
 		KInstallBinPath,
 	)
 	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
@@ -438,7 +529,7 @@ func cleanPhOSCLI(bo BuildOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
-func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
+func BuildTarget_CUDA(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
 	// ==================== Prepare ====================
 	logger.Infof("pre-build check...")
 	utils.CheckAndInstallCommand("git", "git", nil, logger)
@@ -490,64 +581,66 @@ func BuildTarget_CUDA(bo BuildOptions, logger *log.Logger) {
 	}
 	utils.CheckAndInstallCommand("cargo", "", build_cargo, logger)
 
-	buildLogPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLogPath)
+	buildLogPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLogPath)
 	if err := utils.CreateDir(buildLogPath, false, 0775, logger); err != nil && !os.IsExist(err) {
 		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
 	}
 
-	libPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildLibPath)
+	libPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath)
 	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
 		logger.Fatalf("failed to create directory for built lib at %s", libPath)
 	}
 
-	includePath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildIncPath)
+	includePath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath)
 	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
 		logger.Fatalf("failed to create directory for built headers at %s", includePath)
 	}
 
-	binPath := fmt.Sprintf("%s/%s", bo.RootDir, KBuildBinPath)
+	binPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath)
 	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
 		logger.Fatalf("failed to create directory for built binary at %s", binPath)
 	}
 
 	// ==================== Build Dependencies ====================
-	if *bo.WithThirdParty {
+	if *cmdOpt.WithThirdParty {
 		logger.Infof("building dependencies...")
-		buildLibClang(bo, logger)
+		buildLibClang(cmdOpt, buildOpt, logger)
+		buildLibYamlCpp(cmdOpt, buildOpt, logger)
 
 		// TODO: just for fast compilation of PhOS, remove later
-		buildKernelPatcher(bo, logger)
+		buildKernelPatcher(cmdOpt, buildOpt, logger)
 	}
 
 	// ==================== Build PhOS ====================
-	// buildKernelPatcher(bo, logger)
-	buildPhOSCore(bo, logger)
-	buildPhOSCLI(bo, logger)
-	buildRemoting(bo, logger)
+	// buildKernelPatcher(cmdOpt, logger)
+	buildPhOSCore(cmdOpt, buildOpt, logger)
+	buildPhOSCLI(cmdOpt, buildOpt, logger)
+	buildRemoting(cmdOpt, buildOpt, logger)
 
 	// ==================== Build and Run Unit Test ====================
-	if *bo.DoUnitTest {
-		BuildGoogleTest(bo, logger)
-		buildUnitTest(bo, logger)
+	if *cmdOpt.DoUnitTest {
+		BuildGoogleTest(cmdOpt, buildOpt, logger)
+		buildUnitTest(cmdOpt, buildOpt, logger)
 	}
 }
 
-func CleanTarget_CUDA(bo BuildOptions, logger *log.Logger) {
+func CleanTarget_CUDA(cmdOpt CmdOptions, logger *log.Logger) {
 	// ==================== Clean Dependencies ====================
-	if *bo.WithThirdParty {
+	if *cmdOpt.WithThirdParty {
 		logger.Infof("cleaning dependencies...")
-		cleanLibClang(bo, logger)
+		cleanLibClang(cmdOpt, logger)
+		cleanLibYamlCpp(cmdOpt, logger)
 
 		// TODO: just for fast compilation of PhOS, remove later
-		cleanKernelPatcher(bo, logger)
+		cleanKernelPatcher(cmdOpt, logger)
 	}
 
 	// ==================== Clean PhOS ====================
-	cleanCommon(bo, logger)
-	// cleanKernelPatcher(bo, logger)
-	cleanPhOSCore(bo, logger)
-	cleanPhOSCLI(bo, logger)
+	cleanCommon(cmdOpt, logger)
+	// cleanKernelPatcher(cmdOpt, logger)
+	cleanPhOSCore(cmdOpt, logger)
+	cleanPhOSCLI(cmdOpt, logger)
 
 	// ==================== Clean Unit Test ====================
-	CleanGoogleTest(bo, logger)
+	CleanGoogleTest(cmdOpt, logger)
 }

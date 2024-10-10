@@ -1,0 +1,21 @@
+header_file_name: "cuda_runtime_api.h"
+apis:
+  - name: "cudaMalloc"
+    customize: false
+    type: "create_resource"
+    create_resources:
+      - index: 1
+        type: "cuda_memory"
+    delete_resources:
+    get_resources:
+    set_resource:
+
+  - name: "cudaFree"
+    customize: false
+    type: "delete_resource"
+    create_resources:
+    delete_resources:
+      - index: 1
+        type: "cuda_memory"
+    get_resources:
+    set_resource:
