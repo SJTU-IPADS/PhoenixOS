@@ -36,6 +36,10 @@ int main(int argc, char** argv) {
         goto exit;
     }
 
+    // TODO: check whether some APIs don't find their prototypes
+
+    // TODO: autogen codes for the collected APIs
+
 exit:
     if(unlikely(retval != POS_SUCCESS))
         return -1;
