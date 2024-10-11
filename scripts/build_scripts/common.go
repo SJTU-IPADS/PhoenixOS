@@ -46,6 +46,7 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 type BuildOptions struct {
 	// common options
 	Target               string `yaml:"target"`
+	TargetVersion        string `yaml:"target_version"`
 	EnablePrintError     uint8  `yaml:"enable_print_error"`
 	EnablePrintWarn      uint8  `yaml:"enable_print_warn"`
 	EnablePrintLog       uint8  `yaml:"enable_print_log"`
@@ -63,6 +64,7 @@ func (buildOpt *BuildOptions) print(logger *log.Logger) {
 		`
 		> Common Build Options:
 			- Target: %v
+			- TargetVersion: %v
 			- EnablePrintError: %v
 			- EnablePrintWarn: %v
 			- EnablePrintLog: %v
@@ -74,6 +76,7 @@ func (buildOpt *BuildOptions) print(logger *log.Logger) {
 			- EnableRuntimeDebugCheck: %v
 		`,
 		buildOpt.Target,
+		buildOpt.TargetVersion,
 		buildOpt.EnablePrintError,
 		buildOpt.EnablePrintWarn,
 		buildOpt.EnablePrintLog,
@@ -90,6 +93,7 @@ func (buildOpt *BuildOptions) export_string() string {
 	return fmt.Sprintf(
 		`# common build options
 		export POS_BUILD_TARGET=%v
+		export POS_BUILD_TARGET_VERSION=%v
 		export POS_BUILD_ENABLE_PRINT_ERROR=%v
 		export POS_BUILD_ENABLE_PRINT_WARN=%v
 		export POS_BUILD_ENABLE_PRINT_LOG=%v
@@ -101,6 +105,7 @@ func (buildOpt *BuildOptions) export_string() string {
 		export POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK=%v
 		`,
 		buildOpt.Target,
+		buildOpt.TargetVersion,
 		buildOpt.EnablePrintError,
 		buildOpt.EnablePrintWarn,
 		buildOpt.EnablePrintLog,

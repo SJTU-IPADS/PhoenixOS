@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     }
 
     if(unlikely(
-        retval = (POS_SUCCESS != autogener.collect_pos_support_header_files())
+        retval = (POS_SUCCESS != autogener.collect_pos_support_yamls())
     )){
         POS_WARN("failed to collect PhOS support metadata");
         goto exit;
@@ -36,9 +36,12 @@ int main(int argc, char** argv) {
         goto exit;
     }
 
-    // TODO: check whether some APIs don't find their prototypes
-
-    // TODO: autogen codes for the collected APIs
+    if(unlikely(
+        retval = (POS_SUCCESS != autogener.generate_pos_src())
+    )){
+        POS_WARN("failed to auto-generate source code");
+        goto exit;
+    }
 
 exit:
     if(unlikely(retval != POS_SUCCESS))

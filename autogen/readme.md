@@ -7,5 +7,6 @@ This directory contains a framework for automatically generating codes in PhOS f
 For CUDA:
 
 ```bash
-LD_LIBRARY_PATH=../../lib/ ./pos_autogen -s ../autogen_cuda/supported -d /usr/local/cuda/include
+export POS_BUILD_TARGET=cuda
+LD_LIBRARY_PATH=../../lib/ ./pos_autogen -s ../autogen_cuda/supported/11.3 -d /usr/local/cuda/include
 ```
