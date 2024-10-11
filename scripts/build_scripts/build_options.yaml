@@ -1,5 +1,6 @@
 # common options
 target: "cuda"
+target_version: "12.1"
 enable_print_error: 1
 enable_print_warn: 1
 enable_print_log: 1
