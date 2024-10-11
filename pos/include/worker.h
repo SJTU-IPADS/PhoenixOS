@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -10,12 +25,15 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/workspace.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
-#include "pos/include/client.h"
+#include "pos/include/handle.h"
 #include "pos/include/trace/base.h"
 #include "pos/include/trace/tick.h"
+
+// forward declaration
+class POSClient;
+class POSWorkspace;
 
 /*!
  *  \brief prototype for worker launch function for each API call
@@ -60,14 +78,16 @@ typedef struct checkpoint_async_cxt {
 
 #endif // POS_CKPT_OPT_LEVEL == 2
 
+// forward declaration
+class POSClient;
 
 /*!
  *  \brief  POS Worker
  */
 class POSWorker {
  public:
-    POSWorker(POSWorkspace* ws)
-        : _ws(ws), _stop_flag(false)
+    POSWorker(POSWorkspace* ws, POSClient* client)
+        : _ws(ws), _client(client), _stop_flag(false)
     {
         int rc;
 
@@ -79,8 +99,13 @@ class POSWorker {
             _ckpt_stream_id = 0;
             _cow_stream_id = 0;
         #endif
+
         #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
             _ckpt_commit_stream_id = 0;
+        #endif
+
+        #if POS_MIGRATION_OPT_LEVEL > 0
+            _migration_precopy_stream_id = 0;
         #endif
 
         // initialize trace tick list
@@ -125,17 +150,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
-        POS_ERROR_DETAIL(
-            "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
-            wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->dag_vertex_id
-        ); 
-        /*!
-         *  \todo   1. how to identify user-handmake error and hardware error?
-         *          2. mark broken handles;
-         *          3. reset the _pc of the DAG to the last sync point;
-         */
-    }
+    static void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe);
 
     /*!
      *  \brief  generic complete procedure
@@ -143,38 +158,25 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static inline void __done(POSWorkspace* ws, POSAPIContext_QE* wqe){
-        POSClient *client;
-        uint64_t i;
-
-        POS_CHECK_POINTER(wqe);
-        POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
-
-        // forward the DAG pc
-        client->dag.forward_pc();
-
-        // set the latest version of all output handles
-        for(i=0; i<wqe->output_handle_views.size(); i++){
-            POSHandleView_t &hv = wqe->output_handle_views[i];
-            hv.handle->latest_version = wqe->dag_vertex_id;
-        }
-
-        // set the latest version of all inout handles
-        for(i=0; i<wqe->inout_handle_views.size(); i++){
-            POSHandleView_t &hv = wqe->inout_handle_views[i];
-            hv.handle->latest_version = wqe->dag_vertex_id;
-        }
-    }
-
-    /*!
-     *  TODO: we only prepare one worker stream here, is this sufficient?
-     */
-    void *worker_stream;
+    static void __done(POSWorkspace* ws, POSAPIContext_QE* wqe);
 
     #if POS_CKPT_OPT_LEVEL == 2
         // overlapped checkpoint context
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
+    
+    #if POS_MIGRATION_OPT_LEVEL > 0
+        // stream for precopy
+        uint64_t _migration_precopy_stream_id;
+    #endif
+
+    /*!
+     *  \brief  make the specified stream synchronized
+     *  \param  stream_id   index of the stream to be synced, default to be 0
+     */
+    virtual pos_retval_t sync(uint64_t stream_id=0){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
  protected:
     // stop flag to indicate the daemon thread to stop
@@ -185,6 +187,9 @@ class POSWorker {
 
     // global workspace
     POSWorkspace *_ws;
+
+    // corresonding client
+    POSClient *_client;
 
     // worker function map
     std::map<uint64_t, pos_worker_launch_function_t> _launch_functions;
@@ -202,6 +207,7 @@ class POSWorker {
         uint64_t _ckpt_commit_stream_id;
     #endif
 
+    
     /*!
      *  \brief  insertion of worker functions
      *  \return POS_SUCCESS for succefully insertion
@@ -218,14 +224,6 @@ class POSWorker {
         return POS_SUCCESS; 
     }
 
-    /*!
-     *  \brief  make the specified stream synchronized
-     *  \param  stream_id   index of the stream to be synced, default to be 0
-     */
-    virtual pos_retval_t sync(uint64_t stream_id=0){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
-
  private:
     /*!
      *  \brief  processing daemon of the worker
@@ -236,12 +234,15 @@ class POSWorker {
             return;
         }
 
-        #if POS_CKPT_OPT_LEVEL <= 1
-            this->__daemon_ckpt_sync();
-        #elif POS_CKPT_OPT_LEVEL == 2
-            this->__daemon_ckpt_async();
+        #if POS_MIGRATION_OPT_LEVEL == 0
+            // case: continuous checkpoint
+            #if POS_CKPT_OPT_LEVEL <= 1
+                this->__daemon_ckpt_sync();
+            #elif POS_CKPT_OPT_LEVEL == 2
+                this->__daemon_ckpt_async();
+            #endif
         #else
-            static_assert(false, "error checkpoint level");
+            this->__daemon_migration_opt();
         #endif
     }
 
@@ -272,6 +273,13 @@ class POSWorker {
          *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
          */
         void __checkpoint_async_thread();
+    #endif
+
+    #if POS_MIGRATION_OPT_LEVEL > 0
+        /*!
+         *  \brief  worker daemon with optimized migration support (POS)
+         */
+        void __daemon_migration_opt();
     #endif
 
     /*!

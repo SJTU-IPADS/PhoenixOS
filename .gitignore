@@ -17,7 +17,21 @@
 **/env
 **/*.nsys-rep
 **/*.bat
+**/.gitconfig
 
 **/__pycache__
 
+**/.cargo
+**/.profile
+**/.rustup
+**/core
+
+tags
 remoting/cuda_old
+
+.bashrc
+go/
+build_log/
+lib/
+bin/
+tmp/

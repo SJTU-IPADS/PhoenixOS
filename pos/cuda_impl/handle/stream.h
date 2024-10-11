@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -59,13 +74,11 @@ class POSHandle_CUDA_Stream : public POSHandle {
      */
     std::string get_resource_name(){ return std::string("CUDA Stream"); }
 
-    bool is_capturing;
-
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore() override {
+    pos_retval_t __restore() override {
         cudaError_t cuda_rt_res;
         cudaStream_t stream_addr;
 
@@ -78,6 +91,8 @@ class POSHandle_CUDA_Stream : public POSHandle {
 
         return POS_SUCCESS;
     }
+
+    bool is_capturing;
 
  protected:
     /*!
@@ -120,7 +135,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
      */
     POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context* ctx_handle, bool is_restoring) : POSHandleManager() {
         POSHandle_CUDA_Stream *stream_handle;
-
+    
         /*!
          *  \note  we only create a new stream while NOT restoring
          */
@@ -147,6 +162,10 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
             // record in the manager
             this->_handles.push_back(stream_handle);
             this->latest_used_handle = this->_handles[0];
+
+        #if POS_ENABLE_CONTEXT_POOL == 1
+            this->preserve_pooled_handles(8);
+        #endif // POS_ENABLE_CONTEXT_POOL
         }
     }
 
@@ -185,7 +204,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
         ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
         POS_CHECK_POINTER(ctx_handle);
 
-        retval = this->__allocate_mocked_resource(handle, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
             goto exit;

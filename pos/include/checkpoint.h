@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -70,6 +85,12 @@ typedef struct pos_host_ckpt {
 
     // index of the parameter that stores the host-side value
     uint32_t param_index;
+
+    // offset from the base address of the handle
+    uint64_t offset;
+
+    // size of this host checkpoint
+    uint64_t size;
 } pos_host_ckpt_t;
 
 
@@ -180,7 +201,9 @@ class POSCheckpointBag {
     std::vector<pos_host_ckpt_t> get_host_checkpoint_records();
 
     // waitlist of the host-side checkpoint record, populated during restore phrase
-    std::vector<std::pair<pos_vertex_id_t, uint32_t>> host_ckpt_waitlist;
+    std::vector<std::tuple<
+        /* wqe_id */ pos_vertex_id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
+    > host_ckpt_waitlist;
 
     // indicate whether the checkpoint has been finished in the latest checkpoint round
     bool is_latest_ckpt_finished;
@@ -222,7 +245,7 @@ class POSCheckpointBag {
     // all on-device versions that this bag stored
     std::set<uint64_t> _dev_ckpt_version_set;
 
-#elif POS_CKPT_OPT_LEVEL == 1 || POS_CKPT_ENABLE_PREEMPT == 1
+#elif POS_CKPT_OPT_LEVEL == 1 || POS_MIGRATION_OPT_LEVEL > 0
     /*!
      *  \brief  indicate which checkpoint slot to use (front / back)
      */

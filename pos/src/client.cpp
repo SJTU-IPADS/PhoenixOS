@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -40,6 +55,7 @@ void POSClient::init_restore_load_resources() {
 
     pos_vertex_id_t host_ckpt_wqe_vid;
     uint32_t host_ckpt_wqe_pid;
+    uint64_t host_ckpt_offset, host_ckpt_size;
 
     uint64_t s_tick, e_tick, all_tick;
 
@@ -187,11 +203,18 @@ void POSClient::init_restore_load_resources() {
             // restore host-side checkpoint record
             if(handle->ckpt_bag != nullptr){
                 for(j=0; j<handle->ckpt_bag->host_ckpt_waitlist.size(); j++){
-                    host_ckpt_wqe_vid = handle->ckpt_bag->host_ckpt_waitlist[j].first;
-                    host_ckpt_wqe_pid = handle->ckpt_bag->host_ckpt_waitlist[j].second;
+                    host_ckpt_wqe_vid = std::get<0>(handle->ckpt_bag->host_ckpt_waitlist[j]);
+                    host_ckpt_wqe_pid = std::get<1>(handle->ckpt_bag->host_ckpt_waitlist[j]);
+                    host_ckpt_offset = std::get<2>(handle->ckpt_bag->host_ckpt_waitlist[j]);
+                    host_ckpt_size = std::get<3>(handle->ckpt_bag->host_ckpt_waitlist[j]);
 
                     POS_CHECK_POINTER(wqe = this->dag.get_api_cxt_by_dag_id(host_ckpt_wqe_vid));
-                    temp_retval = handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = host_ckpt_wqe_pid});
+                    temp_retval = handle->ckpt_bag->set_host_checkpoint_record({
+                        .wqe = wqe,
+                        .param_index = host_ckpt_wqe_pid,
+                        .offset = host_ckpt_offset,
+                        .size = host_ckpt_size
+                    });
                     POS_ASSERT(temp_retval == POS_SUCCESS);
                 }
             }

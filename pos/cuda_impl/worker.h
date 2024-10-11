@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -11,12 +26,10 @@
 
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
-#include "pos/include/client.h"
 #include "pos/include/transport.h"
 #include "pos/include/worker.h"
 #include "pos/include/checkpoint.h"
 
-#include "pos/cuda_impl/client.h"
 #include "pos/cuda_impl/api_index.h"
 #include "pos/cuda_impl/handle/memory.h"
 
@@ -73,10 +86,9 @@ namespace wk_functions {
  */
 class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace* ws) : POSWorker(ws) {}
+    POSWorker_CUDA(POSWorkspace* ws, POSClient* client) : POSWorker(ws, client) {}
     ~POSWorker_CUDA(){};
 
- protected:
     /*!
      *  \brief  make the worker thread synchronized
      *  \param  stream_id   index of the stream to be synced, default to be 0
@@ -96,7 +108,8 @@ class POSWorker_CUDA : public POSWorker {
 
         return retval;
     }
-    
+
+ protected:    
     /*!
      *  \brief      initialization of the worker daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread
@@ -126,10 +139,17 @@ class POSWorker_CUDA : public POSWorker {
             POS_ASSERT(
                 cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_commit_stream_id))
             );
-        #endif 
+        #endif
+
+        #if POS_MIGRATION_OPT_LEVEL == 2
+            POS_ASSERT(
+                cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_migration_precopy_stream_id))
+            );
+        #endif
 
         return POS_SUCCESS; 
     }
+
     
     /*!
      *  \brief  insertion of worker functions

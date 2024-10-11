@@ -90,6 +90,11 @@ def main():
     else:
         traj_lenth, total_steps = 0, 0
         duration_list = [] # ms
+
+        with_torch_ckpt = False
+        torch_ckpt_ptr = 0
+        torch_ckpt_interval = 400
+
         s_time = time.time()
         while total_steps < opt.Max_train_steps:
             s, info = env.reset(seed=env_seed) # Do not use opt.seed directly, or it can overfit to opt.seed
@@ -123,9 +128,24 @@ def main():
                     if opt.write: writer.add_scalar('ep_r', score, global_step=total_steps)
                     e_time = time.time()
                     duration_list.append(int(round((e_time-s_time) * 1000))) # ms
-                    print('EnvName:',EnvName[opt.EnvIdex],'seed:',opt.seed,'steps: {}k'.format(int(total_steps/1000)),'score:', score)
+                    print(
+                        'EnvName:',EnvName[opt.EnvIdex],
+                        'seed: ',opt.seed,
+                        'steps: {}k'.format(int(total_steps/1000)),
+                        'score: ', score,
+                        'duration: {} ms'.format(int(round((e_time-s_time) * 1000))),
+                    )
                     s_time = time.time()
 
+                # checkpoint using naive torch
+                if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+                    # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+                    # umount /root/samples/torch_ckpt
+                    torch.save(agent.actor.state_dict(), '/root/samples/torch_ckpt/model.dict')
+                    torch_ckpt_ptr = 0
+                else:
+                    torch_ckpt_ptr += 1
+                
                 '''Save model'''
                 # if total_steps % opt.save_interval==0:
                 #     agent.save(BrifEnvName[opt.EnvIdex], int(total_steps/1000))
@@ -135,19 +155,33 @@ def main():
 
         np_duration_list = np.array(duration_list)
 
-        mean = np.mean(np_duration_list)
-        std = np.std(np_duration_list)
-        cut_off = std * 1.5
-        lower, upper = mean - cut_off, mean + cut_off
-        new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
-        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+        # mean = np.mean(np_duration_list)
+        # std = np.std(np_duration_list)
+        # cut_off = std * 1.5
+        # lower, upper = mean - cut_off, mean + cut_off
+        # new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+        # print(f"drop wierd duration lower than {lower} or larger than {upper}")
 
+        throughput_list_str = "0, "
+        time_list_str = "0, "
+        time_accu = 0 #s
+        for i, duration in enumerate(np_duration_list):
+            time_accu += duration / 1000
+            if i != len(np_duration_list) - 1:
+                throughput_list_str += f"{60000/duration:.2f}, "
+                time_list_str += f"{time_accu:.2f}, "
+            else:
+                throughput_list_str += f"{60000/duration:.2f}"
+                time_list_str += f"{time_accu:.2f}"
+
+        print(f"throughput list: {throughput_list_str}")
+        print(f"time list: {time_list_str}")
         print(
             f"latency:"
-            f" p10({np.percentile(new_np_duration_list, 10)} ms), "
-            f" p50({np.percentile(new_np_duration_list, 50)} ms), "
-            f" p99({np.percentile(new_np_duration_list, 99)} ms), "
-            f" mean({np.mean(new_np_duration_list)} ms)"
+            f" p10({np.percentile(np_duration_list, 10)} ms), "
+            f" p50({np.percentile(np_duration_list, 50)} ms), "
+            f" p99({np.percentile(np_duration_list, 99)} ms), "
+            f" mean({np.mean(np_duration_list)} ms)"
         )
 
 

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -14,13 +29,16 @@
 #include "pos/include/log.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
-#include "pos/include/workspace.h"
 
+// forward declaration
+class POSClient;
+class POSWorkspace;
 
 /*!
  *  \brief prototype for parser function for each API call
  */
 using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
+
 
 /*!
  *  \brief  macro for the definition of the runtime parser functions
@@ -32,16 +50,16 @@ namespace ps_functions {
 #define POS_PS_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
 };  // namespace ps_functions
 
+
 /*!
  *  \brief  POS Parser
  */
 class POSParser {
  public:
-    POSParser(POSWorkspace* ws) : _ws(ws), _stop_flag(false) {   
-        int rc;
-
-        this->checkpoint_interval_tick = ((double)POS_CKPT_INTERVAL / 1000.f) * (double)(POS_TSC_FREQ);
-
+    POSParser(POSWorkspace* ws, POSClient* client) : _ws(ws), _client(client), _stop_flag(false) {   
+        POS_CHECK_POINTER(ws);
+        POS_CHECK_POINTER(client);
+        
         // start daemon thread
         _daemon_thread = new std::thread(&POSParser::__daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
@@ -88,13 +106,13 @@ class POSParser {
 
     // global workspace
     POSWorkspace *_ws;
+    
+    // the coressponding client
+    POSClient *_client;
 
     // parser function map
     std::map<uint64_t, pos_runtime_parser_function_t> _parser_functions;
     
-    // intervals between two checkpoint ops
-    uint64_t checkpoint_interval_tick;
-
     /*!
      *  \brief  insertion of parse and dag functions
      *  \return POS_SUCCESS for succefully insertion
@@ -116,10 +134,9 @@ class POSParser {
     /*!
      *  \brief  insert checkpoint op to the DAG based on certain conditions
      *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
-     *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion(POSClient* client);
+    pos_retval_t __checkpoint_insertion();
 
     /*!
      *  \brief  naive implementation of checkpoint insertion procedure
@@ -128,14 +145,13 @@ class POSParser {
      *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_naive(POSClient* client);
+    pos_retval_t __checkpoint_insertion_naive();
 
     /*!
      *  \brief  level-1/2 optimization of checkpoint insertion procedure
      *  \note   this implementation give hints of those memory handles that
      *          been modified (INOUT/OUT) since last checkpoint
-     *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
-    pos_retval_t __checkpoint_insertion_incremental(POSClient* client);
+    pos_retval_t __checkpoint_insertion_incremental();
 };

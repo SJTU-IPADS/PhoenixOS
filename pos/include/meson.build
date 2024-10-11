@@ -16,17 +16,18 @@ configure_file(input : 'log.h.in', output : 'log.h', configuration : log_conf)
 
 config_conf.set('pos_tsc_freq', tsc_reg_freq)
 
-config_conf.set('pos_ckpt_opt_level', ckpt_opt_level)
-
 # for continuous checkpoint
+config_conf.set('pos_ckpt_opt_level', ckpt_opt_level)
 config_conf.set('pos_enable_ckpt_increamental', enable_ckpt_increamental)
 config_conf.set('pos_enable_ckpt_pipeline', enable_ckpt_pipeline)
 config_conf.set('pos_enable_ckpt_orchestration', enable_ckpt_orchestration)
 config_conf.set('pos_ckpt_interval_ms', ckpt_interval_ms)
 
 # for migration
-config_conf.set('pos_enable_ckpt_preempt', enable_ckpt_preempt)
-config_conf.set('pos_ckpt_preempt_trigger_time_s', ckpt_preempt_trigger_time_s)
+config_conf.set('pos_migration_opt_level', migration_opt_level)
+
+# others
+config_conf.set('pos_enable_context_pool', enable_context_pool)
 
 config_conf.set('pos_log_file_path', log_file_path)
 configure_file(input : 'config.h.in', output : 'config.h', configuration : config_conf)
