@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <iostream>
 
 #include "pos/include/common.h"
@@ -34,10 +49,10 @@ namespace cuda_malloc {
 
     #if POS_ENABLE_DEBUG_CHECK
         // check whether given parameter is valid
-        if(unlikely(wqe->api_cxt->params.size() != 1)){
+        if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cuda_malloc): failed to parse cuda_malloc, given %lu params, %lu expected",
-                wqe->api_cxt->params.size(), 1
+                wqe->api_cxt->params.size(), 2
             );
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
@@ -657,14 +672,20 @@ namespace cuda_memcpy_h2d {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 1,
+            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
+            .size = pos_api_param_size(wqe, 1)
+        });
     #endif
+        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;
@@ -915,14 +936,20 @@ namespace cuda_memcpy_h2d_async {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 1,
+            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
+            .size = pos_api_param_size(wqe, 1)
+        });
     #endif
+        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;

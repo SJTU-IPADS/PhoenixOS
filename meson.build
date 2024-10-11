@@ -14,18 +14,22 @@ env = environment()
 
 # we use pkg-config to collect dependecies
 pkgconfig = find_program('pkg-config')
+bash = find_program('bash')
+
+# path of built libraries by PhOS build system
+lib_path = meson.current_source_dir() + '/lib'
 
 # compile flags
 c_args = []
 
 # load flags
-ld_args = []
+ld_args = [ '-L'+lib_path ]
 
 # dependencies
 deps = []
 
 # include directories
-inc_dirs = []
+inc_dirs = [ 'lib', 'lib/pos/include' ]
 
 # all libraries that want to be statically linked
 libraries = []
@@ -34,15 +38,30 @@ libraries = []
 sources = []
 
 # current directory of this meson file
-meson_file_dir = meson.source_root()
+meson_file_dir = meson.current_source_dir()
 
 
 # >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
-target = 'cuda'
+target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
+if target != 'cuda'
+    assert(false, 'target ' + target + ' is currently not supported')
+endif
+
+# config:   target version (example: "11.3" for CUDA 11.3)
+target_version = run_command('sh', '-c', 'echo $POS_BUILD_TARGET_VERSION').stdout().strip()
+if target_version == ''
+    assert(false, 'no target version was provided')
+endif
 
 # config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
-ckpt_opt_level = 2
+#           0: no continuous ckpt support
+#           1: naive continuous ckpt support
+#           2: pos continuous ckpt support
+ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CHECKPOINTER_OPT_LEVEL').stdout().strip().to_int()
+if ckpt_opt_level != 0 and ckpt_opt_level != 1 and ckpt_opt_level != 2
+    assert(false, 'ckpt_opt_level ' + ckpt_opt_level.to_string() + ' is currently not supported')
+endif
 
 # config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
 enable_ckpt_increamental = 0
@@ -53,48 +72,92 @@ enable_ckpt_pipeline = 1
 # config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
 enable_ckpt_orchestration = 0
 
-# config:   enable preempt checkpoint 
-#           (NOTE: must set ckpt_opt_level as 0 while enable this option)
-enable_ckpt_preempt = 0
+# config:   checkpoint interval (unit in ms)
+ckpt_interval_ms = 6000
 
-# config:   time to trigger preempt checkpoint
-ckpt_preempt_trigger_time_s = 40
+# config:   migration optimization level
+#           0: no migration support
+#           1: naive migration support
+#           2: pos migration support
+migration_opt_level = 0
+
+# config:   whether to enable context pool
+enable_context_pool = 0
 
 # config:   TSC register frequency
 tsc_reg_freq = 2200000000
-
-# config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 6000
 
 # config:   log file output path
 log_file_path = '/root/dag.pos'
 
 # switch:   whether to check correctness of function parameters, return values, etc.,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_runtime_debug_check = 0
+enable_runtime_debug_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK').stdout().strip().to_int()
+if enable_runtime_debug_check != 0 and enable_runtime_debug_check != 1
+    assert(
+        false, 
+        'enable_runtime_debug_check get invalid value: ' + enable_runtime_debug_check.to_string()
+    )
+endif
 
 # switch:   whether to check whether POS finish the hijacking logic of called APIs,
 #           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = 0
+enable_hijack_api_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_HIJACK_API_CHECK').stdout().strip().to_int()
+if enable_hijack_api_check != 0 and enable_hijack_api_check != 1
+    assert(
+        false, 
+        'enable_hijack_api_check get invalid value: ' + enable_hijack_api_check.to_string()
+    )
+endif
 
 # switch:   whether to trace the statistics
 enable_trace = 0
 
 # switch:   whether to print all fatal messages
-enable_print_error = 1
+enable_print_error = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_ERROR').stdout().strip().to_int()
+if enable_print_error != 0 and enable_print_error != 1
+    assert(
+        false, 
+        'enable_print_error get invalid value: ' + enable_print_error.to_string()
+    )
+endif
 
 # switch:   whether to print all warning messages
-enable_print_warn = 1
+enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WARN').stdout().strip().to_int()
+if enable_print_warn != 0 and enable_print_warn != 1
+    assert(
+        false, 
+        'enable_print_warn get invalid value: ' + enable_print_warn.to_string()
+    )
+endif
 
 # switch:   whether to print all log messages
-enable_print_log = 1
+enable_print_log = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_LOG').stdout().strip().to_int()
+if enable_print_log != 0 and enable_print_log != 1
+    assert(
+        false, 
+        'enable_print_log get invalid value: ' + enable_print_log.to_string()
+    )
+endif
 
 # switch:   whether to print all debug messages
-enable_print_debug = 0
+enable_print_debug = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_DEBUG').stdout().strip().to_int()
+if enable_print_debug != 0 and enable_print_debug != 1
+    assert(
+        false, 
+        'enable_print_debug get invalid value: ' + enable_print_debug.to_string()
+    )
+endif
 
 # switch:   whether to print fatal/warn/debug/log with colors
 #           should be disabled when try to dump all outputs to a file
-enable_print_with_color = 1
+enable_print_with_color = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WITH_COLOR').stdout().strip().to_int()
+if enable_print_with_color != 0 and enable_print_with_color != 1
+    assert(
+        false, 
+        'enable_print_with_color get invalid value: ' + enable_print_with_color.to_string()
+    )
+endif
 
 # we need to hardcoded some configurations as source code
 subdir('pos/include')
@@ -104,13 +167,7 @@ message('>>> Build configurations:')
 message('>>>>>> [Config] target:                                    ' + target)
 message('>>>>>> [Config] TSC register frequency:                    ' + tsc_reg_freq.to_string())
 message('>>>>>> [Config] checkpoint optimization level:             ' + ckpt_opt_level.to_string())
-if ckpt_opt_level == 0
-    message('       >>>>>> [Config] enable_ckpt_preempt:            ' + enable_ckpt_preempt.to_string())
-    message('       >>>>>> [Config] ckpt_preempt_trigger_time_s:    ' + ckpt_preempt_trigger_time_s.to_string())
-else
-    message('       >>>>>> [Config] enable_ckpt_preempt:            N/A')
-    message('       >>>>>> [Config] ckpt_preempt_trigger_time:      N/A')
-endif
+message('>>>>>> [Config] migration optimization level:              ' + migration_opt_level.to_string())
 if ckpt_opt_level >= 1
     message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())
 else
@@ -124,6 +181,7 @@ else
     message('       >>>>>> [Config] enable_ckpt_orchestration:      N/A')
 endif
 message('>>>>>> [Config] checkpoint interval (ms):                  ' + ckpt_interval_ms.to_string())
+message('>>>>>> [Config] enable_context_pool:                       ' + enable_context_pool.to_string())
 message('>>>>>> [Config] log file output path:                      ' + log_file_path)
 message('>>>>>> [Switch] enable_runtime_debug_check:                ' + enable_runtime_debug_check.to_string())
 message('>>>>>> [Switch] enable_hijack_api_check:                   ' + enable_hijack_api_check.to_string())
@@ -136,7 +194,9 @@ message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    cuda_version = '11.3'
+    # extract cuda version
+    # cuda_version = run_command(bash, './scripts/utils/get_cuda_version.sh').stdout().strip()
+    cuda_version = target_version
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []
@@ -162,27 +222,33 @@ if target == 'cuda'
         founded_cuda_modules.length() == cuda_modules.length(),
         'Only find ' + founded_cuda_modules.length().to_string() + ' CUDA modules, expected ' + cuda_modules.length().to_string()
     )
-else
-    assert(false, 'target ' + target + ' is currently not supported')
+    message('>>> Detecting CUDA toolkit done\n')
 endif
-message('>>> Detecting CUDA toolkit done\n')
 
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
 sources += [
     'pos/src/handle.cpp',
-    'pos/src/oob.cpp',
     'pos/src/api_context.cpp',
     'pos/src/client.cpp',
     'pos/src/trace.cpp',
     'pos/src/worker.cpp',
-    'pos/src/parser.cpp'
+    'pos/src/parser.cpp',
+    'pos/src/workspace.cpp',
+    'pos/src/migration.cpp',
+    'pos/src/oob/agent.cpp',
+    'pos/src/oob/cli.cpp',
+    'pos/src/oob/utils.cpp',
+    'pos/src/oob/migration.cpp',
+    'pos/src/oob/mgnt.cpp'
 ]
 
-if ckpt_opt_level == 0 and enable_ckpt_preempt == 0
-    sources += ['pos/src/checkpoint_o0.cpp']
-elif ckpt_opt_level == 0 and enable_ckpt_preempt == 1
-    sources += ['pos/src/checkpoint_o1.cpp']
+if ckpt_opt_level == 0
+    if migration_opt_level == 0
+        sources += ['pos/src/checkpoint_o0.cpp']
+    else
+        sources += ['pos/src/checkpoint_o1.cpp']
+    endif
 elif ckpt_opt_level == 1
     sources += ['pos/src/checkpoint_o1.cpp']
 elif ckpt_opt_level == 2
@@ -208,59 +274,15 @@ endif
 
 inc_dirs += ['./']
 
+
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
-
-message('>>> Setup libclang')
-libclang_ld_args = ['-L' + meson_file_dir + '/third_party/libclang-static-build/lib', '-lclang']
-libclang_inc_dirs = ['./third_party/libclang-static-build/include']
-message('>>>>>> Link option:')
-message(libclang_ld_args)
-message('>>>>>> Include path:')
-message(libclang_inc_dirs)
-ld_args += libclang_ld_args
-inc_dirs += libclang_inc_dirs
-message('>>> Setup libclang done\n')
-
-# message('>>> Setup hiredis')
-# hiredis_ld_args = ['-lhiredis']
-# hiredis_inc_dirs = ['./third_party/hiredis']
-# message('>>>>>> Link option:')
-# message(hiredis_ld_args)
-# message('>>>>>> Include path:')
-# message(hiredis_inc_dirs)
-# ld_args += hiredis_ld_args
-# inc_dirs += hiredis_inc_dirs
-# message('>>> Setup hiredis done\n')
-
-# message('>>> Setup libevent')
-# libevent_ld_args = ['-levent']
-# libevent_inc_dirs = ['./third_party/libevent/include']
-# message('>>>>>> Link option:')
-# message(libevent_ld_args)
-# message('>>>>>> Include path:')
-# message(libevent_inc_dirs)
-# ld_args += libevent_ld_args
-# inc_dirs += libevent_inc_dirs
-# message('>>> Setup libevent done\n')
-
-message('>>> Setup librt') # for support shm_x
-ld_args += ['-lrt']
-message('>>> Setup librt done\n')
-
-message('>>> Setup pthread') # for support pthread_x
-ld_args += ['-pthread']
-message('>>> Setup pthread done\n')
-
-message('>>> Setup libelf') # for support elf_x
-ld_args += ['-lelf']
-message('>>> Setup libelf done\n')
-
-# message('>>> Setup boost')
-# boost_dep = dependency('boost')
-# deps += boost_dep
-# message('>>> Setup boost done\n')
-
-
+if target == 'cuda'
+    ld_args += ['-ldl', '-lpatcher']    # for cuda patcher
+    ld_args += ['-lclang']              # for using libclang for cuda target
+    ld_args += ['-lrt']                 # for support shm_x
+    ld_args += ['-pthread']             # for support pthread_x
+    ld_args += ['-lelf']                # for support elf_x
+endif
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
@@ -268,7 +290,10 @@ c_args += ['--std=c++17']
 
 
 # >>>>>>>>>>>>>> start building >>>>>>>>>>>>>>
-library(project_name_abbreviation, sources,
+# libpos.so
+libpos = library(
+    project_name_abbreviation,
+    sources,
 	dependencies : deps,
 	cpp_args: c_args,
 	link_args: ld_args,

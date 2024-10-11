@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -52,6 +67,133 @@ void POSHandle::mark_status(pos_handle_status_t status){
     POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
     POS_CHECK_POINTER(hm_cast);
     hm_cast->mark_handle_status(this, status);
+}
+
+
+/*!
+ *  \brief  restore the current handle when it becomes broken status
+ *  \return POS_SUCCESS for successfully restore
+ */
+pos_retval_t POSHandle::restore() {
+    using handle_type = typename std::decay<decltype(*this)>::type;
+
+    pos_retval_t retval;
+    POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
+
+    #if POS_ENABLE_CONTEXT_POOL == 1
+        retval = hm_cast->try_restore_from_pool(this);
+        if(likely(retval == POS_SUCCESS)){
+            goto exit;
+        }
+    #endif // POS_ENABLE_CONTEXT_POOL
+
+    retval = this->__restore(); 
+
+exit:
+    return retval;
+}
+
+
+/*!
+ *  \brief  reload the state behind current handle to the device
+ *  \param  stream_id   stream for reloading the state
+ *  \return POS_SUCCESS for successfully restore
+ */
+pos_retval_t POSHandle::reload_state(uint64_t stream_id){
+    pos_retval_t retval = POS_FAILED_NOT_EXIST;
+    uint64_t on_device_dumped_version = 0, host_dumped_version = 0, final_dumped_version = 0;
+    std::set<uint64_t> ckpt_set;
+    POSCheckpointSlot *ckpt_slot = nullptr;
+
+    uint64_t i;
+    std::vector<pos_host_ckpt_t> records;
+    void *data;
+
+    POS_ASSERT(this->state_size > 0);
+    POS_CHECK_POINTER(this->ckpt_bag);
+    
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){
+        POS_WARN(
+            "failed to reload handle state as the handle isn't active yet: server_addr(%p), status(%d)",
+            this->server_addr, this->status
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // compare on-device-dumped and host-dumped version
+    ckpt_set = this->ckpt_bag->get_checkpoint_version_set</* on_device */false>();
+    if(ckpt_set.size() > 0){
+        host_dumped_version = ( *(ckpt_set.rbegin()) );
+    }
+    ckpt_set = this->ckpt_bag->get_checkpoint_version_set</* on_device */true>();
+    if(ckpt_set.size() > 0){
+        on_device_dumped_version = ( *(ckpt_set.rbegin()) );
+    }
+    
+    if(host_dumped_version == 0 && on_device_dumped_version == 0){
+        /*!
+         *  \note   [option 1]  nothing have been dumped, reload from host origin,
+                                try reload from origin host value in order
+         */
+        records = this->ckpt_bag->get_host_checkpoint_records();
+        for(i=0; i<records.size(); i++){
+            pos_host_ckpt_t &record = records[i];
+            POS_CHECK_POINTER(record.wqe);
+            if(unlikely(POS_SUCCESS != this->__reload_state(
+                    /* data */ pos_api_param_addr(record.wqe, record.param_index),
+                    /* offset */ record.offset,
+                    /* size */ record.size,
+                    /* stream_id */ stream_id,
+                    /* on_device */ false
+            ))){
+                POS_WARN_DETAIL(
+                    "failed to reload state from origin host value: "
+                    "server_addr(%p), host_record_id(%lu), offset(%lu), size(%lu)",
+                    this->server_addr, i, record.offset, record.size
+                );
+                retval = POS_FAILED;
+            } else {
+                retval = POS_SUCCESS;
+            }
+        }
+    } else {
+        /*!
+         *  \note   [option 2]  reload from dumped result
+         */
+        final_dumped_version = host_dumped_version > on_device_dumped_version ? host_dumped_version : on_device_dumped_version;
+        if(host_dumped_version > on_device_dumped_version){
+            if(unlikely(POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */false>(&ckpt_slot, final_dumped_version))){
+                POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
+            }
+            POS_CHECK_POINTER(ckpt_slot);
+        } else {
+            if(unlikely(POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot</* on_device */true>(&ckpt_slot, final_dumped_version))){
+                POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
+            }
+            POS_CHECK_POINTER(ckpt_slot);
+        }
+
+        if(unlikely(POS_SUCCESS != this->__reload_state(
+            /* data */ ckpt_slot->expose_pointer(),
+            /* offset */ 0,
+            /* size */ this->state_size,
+            /* stream_id */ stream_id,
+            /* on_device */ on_device_dumped_version >= host_dumped_version
+        ))){
+            POS_WARN_DETAIL(
+                "failed to reload state from dumpped value: "
+                "server_addr(%p), version_id(%lu)",
+                this->server_addr, final_dumped_version
+            );
+            retval = POS_FAILED;
+        } else {
+            retval = POS_SUCCESS;
+        }
+    }
+
+exit:
+    return retval;
 }
 
 
@@ -192,7 +334,7 @@ uint64_t POSHandle::__get_basic_serialize_size(){
         ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
 
         host_ckpt_records = this->ckpt_bag->get_host_checkpoint_records();
-        host_ckpt_serialization_size = host_ckpt_records.size() * (sizeof(pos_vertex_id_t) + sizeof(uint32_t));
+        host_ckpt_serialization_size = host_ckpt_records.size() * (sizeof(pos_vertex_id_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint64_t));
 
         return (
             /* resource_type_id */          sizeof(pos_resource_typeid_t)
@@ -290,6 +432,8 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
         for(i=0; i<nb_host_ckpt; i++){
             POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].wqe->dag_vertex_id), sizeof(pos_vertex_id_t));
             POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].param_index), sizeof(uint32_t));
+            POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].offset), sizeof(uint64_t));
+            POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].size), sizeof(uint64_t));
         }
     }
 
@@ -311,7 +455,8 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
     pos_resource_typeid_t parent_resource_id;
     pos_vertex_id_t parent_handle_dag_id;
     uint64_t nb_ckpt_version, ckpt_version;
-    uint64_t nb_host_ckpt, param_id;
+    uint64_t nb_host_ckpt, host_ckpt_offset, host_ckpt_size;
+    uint32_t param_id;
     pos_vertex_id_t wqe_dag_id;
 
     void *ptr = raw_data;
@@ -362,7 +507,11 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
         for(i=0; i<nb_host_ckpt; i++){
             POSUtil_Deserializer::read_field(&wqe_dag_id, &ptr, sizeof(pos_vertex_id_t));
             POSUtil_Deserializer::read_field(&param_id, &ptr, sizeof(uint32_t));
-            this->ckpt_bag->host_ckpt_waitlist.push_back(std::pair<pos_vertex_id_t, uint32_t>(wqe_dag_id, param_id));
+            POSUtil_Deserializer::read_field(&host_ckpt_offset, &ptr, sizeof(uint64_t));
+            POSUtil_Deserializer::read_field(&host_ckpt_size, &ptr, sizeof(uint64_t));
+            this->ckpt_bag->host_ckpt_waitlist.push_back(
+                std::tuple<pos_vertex_id_t, uint32_t, uint64_t, uint64_t>(wqe_dag_id, param_id, host_ckpt_offset, host_ckpt_size)
+            );
         }
     }
 

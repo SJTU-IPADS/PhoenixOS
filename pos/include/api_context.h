@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -80,14 +95,14 @@ class POSApiManager {
     /*!
      *  \brief  register metadata of all API on the platform to the manager
      */
-    virtual void init();
+    virtual void init(){ POS_ERROR_C("not implemented"); };
 
     /*!
      *  \brief  translate POS retval to corresponding retval on the XPU platform
      *  \param  pos_retval  the POS retval to be translated
      *  \param  library_id  id of the destination library (e.g., cuda rt, driver, cublas)
      */
-    virtual int cast_pos_retval(pos_retval_t pos_retval, uint8_t library_id);
+    virtual int cast_pos_retval(pos_retval_t pos_retval, uint8_t library_id){ return -1; };
 
     // map: api_id -> metadata of the api
     std::map<uint64_t, POSAPIMeta_t> api_metas;
@@ -323,6 +338,7 @@ typedef struct POSHandleView {
 /*!
  *  \brief  work queue element, as the element within work 
  *          queue between frontend and runtime
+ *  TODO:   add type field to wqe
  */
 typedef struct POSAPIContext_QE {
     // uuid of the remote client
@@ -330,9 +346,6 @@ typedef struct POSAPIContext_QE {
 
     // pointer to the POSClient instance
     void *client;
-
-    // pointer to the POSTransport instance
-    void *transport;
 
     // uuid of this API call instance within the client
     uint64_t api_inst_id;
@@ -395,12 +408,11 @@ typedef struct POSAPIContext_QE {
      *  \param  retval_data     pointer to the memory area that store the returned value
      *  \param  retval_size     size of the return value
      *  \param  pos_client      pointer to the POSClient instance
-     *  \param  pos_transport   pointer to the POSTransport instance
      */
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
-        uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client, void* pos_transport
-    ) : client_id(uuid), client(pos_client), transport(pos_transport), execution_stream_id(0),
+        uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client
+    ) : client_id(uuid), client(pos_client), execution_stream_id(0),
         status(kPOS_API_Execute_Status_Init), dag_vertex_id(0), api_inst_id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);

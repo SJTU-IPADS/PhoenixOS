@@ -10,7 +10,7 @@ execute_process( COMMAND ${CMAKE_COMMAND} -E make_directory ../${PATH_EXECUTABLE
 SET(EXECUTABLE_OUTPUT_PATH ../${PATH_EXECUTABLE})
 
 # find CUDA Toolkit Extension library
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-11.3)
+set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
 find_library(CUDA_NVTX_LIBRARY
   NAMES nvToolsExt nvTools nvtoolsext nvtools nvtx NVTX
   PATHS "${CUDA_CUDART_LIBRARY_DIR}" "${CUDA_TOOLKIT_ROOT_DIR}" ENV LD_LIBRARY_PATH
@@ -62,6 +62,9 @@ foreach( test_target ${TEST_TARGETS} )
     target_compile_features(${test_target} PUBLIC cxx_std_17)
     target_compile_options(
         ${test_target} PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_80,code=sm_80>
+        # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_70,code=sm_70> # v100
+        # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_80,code=sm_80> # a100
+        # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_89,code=sm_89> # 4060
+        $<$<COMPILE_LANGUAGE:CUDA>:SHELL: --gpu-architecture=compute_89> # 4060
     )
 endforeach( test_target ${TEST_TARGETS} )

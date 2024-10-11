@@ -2,11 +2,17 @@
 	path = remoting/cuda
 	url = git@ipads.se.sjtu.edu.cn:scaleaisys/cricket.git
 	branch = pos/add_stub
-
-[submodule "third_party/hiredis"]
-	path = third_party/hiredis
-	url = git@github.com:redis/hiredis.git
-
-[submodule "third_party/libevent"]
-	path = third_party/libevent
-	url = git@github.com:libevent/libevent.git
+[submodule "third_party/cuda-checkpoint"]
+	path = third_party/cuda-checkpoint
+	url = git@github.com:NVIDIA/cuda-checkpoint.git
+	branch = main
+[submodule "third_party/criu"]
+	path = third_party/criu
+	url = git@ipads.se.sjtu.edu.cn:scaleaisys/criu.git
+	branch = criu-dev
+[submodule "third_party/googletest"]
+	path = third_party/googletest
+	url = git@github.com:google/googletest.git
+[submodule "third_party/yaml-cpp"]
+	path = third_party/yaml-cpp
+	url = git@github.com:jbeder/yaml-cpp.git
