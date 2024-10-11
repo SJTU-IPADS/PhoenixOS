@@ -1,6 +1,7 @@
 model_id = 'meta-llama/Llama-2-7b-chat-hf'
 
 import time
+import os
 import numpy as np
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
@@ -16,8 +17,19 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 # exit(0)
 
-model = AutoModelForCausalLM.from_pretrained('./model').to('cuda:0')
-tokenizer = AutoTokenizer.from_pretrained('./tokenizer')
+print(f"process id: {os.getpid()}")
+
+model_path = '/root/samples/model/llama2'
+tokenizer_path = '/root/samples/tokenizer/llama2'
+
+model = AutoModelForCausalLM.from_pretrained(model_path).to('cuda:0')
+# model_cpu = AutoModelForCausalLM.from_pretrained(model_path).to('cpu')
+
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+
+mock_coldstart = True
+if mock_coldstart:
+    exit(0)
 
 # pip install accelerate
 # pip install -i https://pypi.org/simple/ bitsandbytes
@@ -37,7 +49,7 @@ def stream(user_prompt, batch_size=1):
 
     s_time = time.time()
     # Despite returning the usual output, the streamer will also print the generated text to stdout.
-    reply = model.generate(**inputs, max_new_tokens=500)
+    reply = model.generate(**inputs, max_new_tokens=20)
     e_time = time.time()
 
     num_tokens = 0
@@ -55,10 +67,11 @@ def test_lat_bw():
     duration_list = [] # s
     thpr_list = [] # token / min
 
-    for _ in range(0, 16):
+    for i in range(0, 32):
         duration, thpr, _ = stream('Count to 128', batch_size=1)
         duration_list.append(duration)
         thpr_list.append(thpr)
+        print(f'loop {i}, duration({duration} ms)')
 
     np_duration_list = np.array(duration_list)
     print(
@@ -69,7 +82,20 @@ def test_lat_bw():
         f" mean({np.mean(np_duration_list)} ms)"
     )
 
-    print(f"thpr list: {thpr_list}")
+    time_accu = 0 #s
+    time_list_str = "0, "
+    throughput_list_str = "0, "
+    for i, duration in enumerate(duration_list):
+        time_accu += duration / 1000
+        if i != len(duration_list) - 1:
+            time_list_str += f"{time_accu:.2f}, "
+            throughput_list_str += f"{thpr_list[i]:.2f}, "
+        else:
+            time_list_str += f"{time_accu:.2f}"
+            throughput_list_str += f"{thpr_list[i]:.2f}"
+
+    print(f"thpr list: {throughput_list_str}")
+    print(f"time list: {time_list_str}")
 
 
 def test_restore():

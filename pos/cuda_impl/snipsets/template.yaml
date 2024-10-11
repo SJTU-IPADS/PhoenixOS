@@ -1,0 +1,6 @@
+apis:
+  - name: ApiName
+    parent_name: ParentApiName
+    id: CUDA_MALLOC
+    is_sync: true
+    api_type: create_resource # delete resource, 

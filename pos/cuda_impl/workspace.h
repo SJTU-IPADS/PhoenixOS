@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -27,16 +42,6 @@ class POSWorkspace_CUDA : public POSWorkspace{
      *  \return POS_SUCCESS for successfully initialization
      */
     pos_retval_t init() override {
-        // create runtime
-        this->runtime = new POSParser_CUDA(/* ws */ this);
-        POS_CHECK_POINTER(this->runtime);
-        this->runtime->init();
-
-        // create worker
-        this->worker = new POSWorker_CUDA( /* ws */ this );
-        POS_CHECK_POINTER(this->worker);
-        this->worker->init();
-
         // create the api manager
         this->api_mgnr = new POSApiManager_CUDA();
         POS_CHECK_POINTER(this->api_mgnr);
@@ -62,7 +67,7 @@ class POSWorkspace_CUDA : public POSWorkspace{
         client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
         client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
 
-        POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* id */ _current_max_uuid, /* cxt */ client_cxt));
+        POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* ws */ this, /* id */ _current_max_uuid, /* cxt */ client_cxt));
         (*clnt)->init();
         
         *uuid = _current_max_uuid;
@@ -72,4 +77,34 @@ class POSWorkspace_CUDA : public POSWorkspace{
         POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), *uuid);
         return POS_SUCCESS;
     }
+
+    /*!
+     *  \brief  preserve resource on posd
+     *  \param  rid     the resource type to preserve
+     *  \param  data    source data for preserving
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_resource(pos_resource_typeid_t rid, void *data) override {
+        pos_retval_t retval = POS_SUCCESS;
+
+        switch (rid)
+        {
+        case kPOS_ResourceTypeId_CUDA_Context:
+            // no need to preserve context
+            goto exit;
+        
+        case kPOS_ResourceTypeId_CUDA_Module:
+            goto exit;
+
+        default:
+            retval = POS_FAILED_NOT_IMPLEMENTED;
+            goto exit;
+        }
+
+    exit:
+        return retval;
+    }
+
+ protected:
+
 };

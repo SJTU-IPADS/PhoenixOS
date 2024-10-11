@@ -97,12 +97,17 @@ def train(model, train_data, val_data, learning_rate, epochs):
 
         duration_list = [] # ms
 
+        with_torch_ckpt = False
+        torch_ckpt_ptr = 0
+        torch_ckpt_interval = 10
+
         # 进度条函数tqdm
         for batch_idx, (train_input, train_label) in enumerate(tqdm(train_dataloader)):
             s_time = time.time()
             train_label = train_label.to(device)
             mask = train_input['attention_mask'].to(device)
             input_id = train_input['input_ids'].squeeze(1).to(device)
+
             # 通过模型得到输出
             output = model(input_id, mask)
             # 计算损失
@@ -116,28 +121,57 @@ def train(model, train_data, val_data, learning_rate, epochs):
             batch_loss.backward()
             optimizer.step()
 
+            # checkpoint using naive torch
+            if with_torch_ckpt and (torch_ckpt_ptr == torch_ckpt_interval):
+                # mount -t tmpfs -o size=80g tmpfs /root/samples/torch_ckpt
+                # umount /root/samples/torch_ckpt
+                torch.save(model.state_dict(), '/root/samples/torch_ckpt/model.dict')
+                torch_ckpt_ptr = 0
+            else:
+                torch_ckpt_ptr += 1
+
             e_time = time.time()
             duration_list.append(int(round((e_time-s_time) * 1000))) # ms
-            
-            if batch_idx == 128:
+
+            print(f"{int(round((e_time-s_time) * 1000))} ms")
+
+            if batch_idx == 16:
                 break
         
         np_duration_list = np.array(duration_list)
     
         mean = np.mean(np_duration_list)
         std = np.std(np_duration_list)
-        cut_off = std * 3
-        lower, upper = mean - cut_off, mean + cut_off
-        new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
-        print(f"drop wierd duration lower than {lower} or larger than {upper}")
+
+        # cut_off = std * 3
+        # lower, upper = mean - cut_off, mean + cut_off
+        # new_np_duration_list = np_duration_list[(np_duration_list > lower) & (np_duration_list < upper)]
+        # print(f"drop wierd duration lower than {lower} or larger than {upper}")
+
+        new_np_iter_durations = np_duration_list
+
+        throughput_list_str = "0, "
+        time_list_str = "0, "
+        time_accu = 0 #s
+        for i, duration in enumerate(new_np_iter_durations):
+            time_accu += duration / 1000
+            if i != len(new_np_iter_durations) - 1:
+                throughput_list_str += f"{60000/duration:.2f}, "
+                time_list_str += f"{time_accu:.2f}, "
+            else:
+                throughput_list_str += f"{60000/duration:.2f}"
+                time_list_str += f"{time_accu:.2f}"
         
         print(
             f"latency:"
-            f" p10({np.percentile(new_np_duration_list, 10)} ms), "
-            f" p50({np.percentile(new_np_duration_list, 50)} ms), "
-            f" p99({np.percentile(new_np_duration_list, 99)} ms), "
-            f" mean({np.mean(new_np_duration_list)} ms)"
+            f" p10({np.percentile(new_np_iter_durations, 10)} ms), "
+            f" p50({np.percentile(new_np_iter_durations, 50)} ms), "
+            f" p99({np.percentile(new_np_iter_durations, 99)} ms), "
+            f" mean({np.mean(new_np_iter_durations)} ms)"
         )
+
+        print(f"throughput list: {throughput_list_str}")
+        print(f"time list: {time_list_str}")
 
         exit(0)
 

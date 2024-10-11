@@ -1,6 +1,22 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <algorithm>
 #include <sstream>
@@ -12,6 +28,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+
+#include "pos/include/patcher.h"
 
 #define FATBIN_STRUCT_MAGIC 0x466243b1
 #define FATBIN_TEXT_MAGIC   0xBA55ED50
@@ -82,6 +100,33 @@ typedef struct POSCudaFunctionDesp {
     POSCudaFunctionDesp() : nb_params(0), cbank_param_size(0), has_verified_params(false) {}
     ~POSCudaFunctionDesp(){}
 } POSCudaFunctionDesp_t;
+
+
+/*!
+ *  \brief  kernel PTX patcher
+ */
+class POSUtil_CUDA_Kernel_Patcher {
+ public:
+    static pos_retval_t patch_fatbin_binary(uint8_t *binary_ptr, std::vector<uint8_t>& patched_bianry){
+        pos_retval_t retval = POS_SUCCESS;
+
+        POS_CHECK_POINTER(binary_ptr);
+
+        std::unique_ptr<std::vector<uint8_t>> _patched_fatbin = patch_fatbin(binary_ptr);
+        if(unlikely(_patched_fatbin == nullptr || _patched_fatbin->size() == 0)){
+            POS_WARN("failed to patch fatbin: fatbin(%p)", binary_ptr);
+            retval = POS_FAILED_INCORRECT_OUTPUT;
+            goto exit;
+        }
+
+        patched_bianry = *_patched_fatbin;
+
+    exit:
+        return retval;
+    }
+
+ private:
+};
 
 
 /*！
@@ -198,6 +243,14 @@ class POSUtil_CUDA_Fatbin {
         fat_elf_header_t *fatbin_elf_hdr;
         fat_text_header_t *fatbin_text_hdr;
 
+    #define __POS_DUMP_FATBIN 1
+    #if __POS_DUMP_FATBIN
+        std::ofstream cubin_file("/tmp/ptx.txt", std::ios::out);
+        if(unlikely(!cubin_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/ptx.txt");
+        }
+    #endif
+
         POS_CHECK_POINTER(desps);
         POS_CHECK_POINTER(input_pos = binary_ptr);
         POS_ASSERT(binary_size > 0);
@@ -226,52 +279,65 @@ class POSUtil_CUDA_Fatbin {
                 );
 
                 // section does not cotain device code (e.g. only PTX)
-                if (fatbin_text_hdr->kind != 2) {
-                    POS_DEBUG("skip this text section as it doesn't contain any device code");
-                    input_pos += fatbin_text_hdr->size;
-                    continue;
-                }
+                if (fatbin_text_hdr->kind == 2) {
+                    /*!
+                     *  \note   contains SASS code, extract kernel information from ELF format
+                     */
+                    // this section contains debug info
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
+                        POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
+                    }
 
-                // this section contains debug info
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_DEBUG){
-                    POS_DEBUG("%u(th) fatbin text section contains debug information", nb_text_section);
-                }
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
+                        // the payload of this section is compressed, need to be decompressed
+                        ssize_t input_read;
+                        POS_DEBUG(
+                            "%u(th) fatbin text section contains compressed device code, decompressing...",
+                            nb_text_section
+                        );
 
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS){
-                    // the payload of this section is compressed, need to be decompressed
-                    ssize_t input_read;
-                    POS_DEBUG(
-                        "%u(th) fatbin text section contains compressed device code, decompressing...",
-                        nb_text_section
-                    );
+                        input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
+                            input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
+                        );
+                        if(unlikely(input_read < 0)){
+                            POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
+                            retval = POS_FAILED;
+                            goto exit;
+                        }
 
-                    input_read = POSUtil_CUDA_Fatbin::__decompress_single_text_section(
-                        input_pos, &text_data, &text_data_size, fatbin_elf_hdr, fatbin_text_hdr
-                    );
-                    if(unlikely(input_read < 0)){
-                        POS_WARN("failed to decompress %u(th) fatbin text section", nb_text_section);
-                        retval = POS_FAILED;
+                        input_pos += input_read;
+                    } else {
+                        text_data = (uint8_t*)input_pos;
+                        text_data_size = fatbin_text_hdr->size;
+                        input_pos += fatbin_text_hdr->size;
+                    }
+
+                    retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
+                    if(unlikely(retval != POS_SUCCESS)){
                         goto exit;
                     }
 
-                    input_pos += input_read;
+                    if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
+                        free(text_data);
+                    }
+
+                    nb_text_section += 1;
                 } else {
-                    text_data = (uint8_t*)input_pos;
-                    text_data_size = fatbin_text_hdr->size;
+                    /*!
+                     *  \note   contains PTX code only
+                     */
+                    POS_LOG("skip this text section as it doesn't contain any device code");
+                    
+                #if __POS_DUMP_FATBIN
+                    POS_LOG("addr: %p, len: %lu", input_pos, fatbin_text_hdr->size);
+                    cubin_file.write((const char*)(input_pos), fatbin_text_hdr->size);
+                    cubin_file.flush();
+                    cubin_file.close();
+                #endif
+
                     input_pos += fatbin_text_hdr->size;
+                    continue;
                 }
-
-                retval = POSUtil_CUDA_Fatbin::__extract_kernel_infos(text_data, text_data_size, desps, cached_desp_map);
-                if(unlikely(retval != POS_SUCCESS)){
-                    goto exit;
-                }
-
-                if (fatbin_text_hdr->flags & FATBIN_FLAG_COMPRESS) {
-                    free(text_data);
-                }
-
-                nb_text_section += 1;
-
             } while(input_pos < (uint8_t*)fatbin_elf_hdr + fatbin_elf_hdr->header_size + fatbin_elf_hdr->size);
         } else {
             /*!
@@ -282,6 +348,8 @@ class POSUtil_CUDA_Fatbin {
                 goto exit;
             }
         }
+
+    #undef __POS_DUMP_FATBIN
 
     exit:
         return retval;

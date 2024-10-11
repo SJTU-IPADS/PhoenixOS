@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <iostream>
 
 #include "pos/include/common.h"
@@ -25,18 +40,6 @@ namespace remoting_deinit {
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
-
-    #if POS_CKPT_ENABLE_PREEMPT
-        POS_LOG("RPC deinitialization signal received, start preemption checkpoint")
-        client = (POSClient_CUDA*)(wqe->client);
-        POS_CHECK_POINTER(client);
-        ckpt_wqe = new POSAPIContext_QE_t(
-            /* api_id*/ ws->checkpoint_api_id,
-            /* client */ client
-        );
-        POS_CHECK_POINTER(ckpt_wqe);
-        retval = client->dag.launch_op(ckpt_wqe);
-    #endif
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #pragma once
 
 #include <iostream>
@@ -21,6 +36,7 @@ enum pos_retval {
     POS_WARN_DUPLICATED,
     POS_WARN_NOT_READY,
     POS_WARN_ABANDONED,
+    POS_WARN_BLOCKED,
     POS_FAILED,
     POS_FAILED_NOT_EXIST,
     POS_FAILED_ALREADY_EXIST,
@@ -29,7 +45,8 @@ enum pos_retval {
     POS_FAILED_NOT_READY,
     POS_FAILED_TIMEOUT,
     POS_FAILED_NOT_IMPLEMENTED,
-    POS_FAILED_INCORRECT_OUTPUT
+    POS_FAILED_INCORRECT_OUTPUT,
+    POS_FAILED_NETWORK,
 };
 
 #define UINT_64_MAX (1<<64 -1)
@@ -38,14 +55,18 @@ enum pos_retval {
     #define POS_ASSERT(x)           assert(x);
     #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 #else
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wunused-variable"
     #define POS_ASSERT(x)           (x);
     #define POS_CHECK_POINTER(ptr)  (ptr);
+  #pragma GCC diagnostic pop
 #endif
 
 #define POS_STATIC_ASSERT(x)    static_assert(x);
 
 #define KB(x)   ((size_t) (x) << 10)
 #define MB(x)   ((size_t) (x) << 20)
+#define GB(x)   ((size_t) (x) << 30)
 
 /*!
  *  \brief  type for resource typeid

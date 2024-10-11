@@ -1,4 +1,20 @@
+/*
+ * Copyright 2024 The PhoenixOS Authors. All rights reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <iostream>
+#include <fstream>
 
 #include "pos/include/common.h"
 #include "pos/include/utils/bipartite_graph.h"
@@ -31,6 +47,25 @@ namespace cu_module_load {
         POSHandleManager_CUDA_Context *hm_context;
         POSHandleManager_CUDA_Module *hm_module;
         POSHandleManager_CUDA_Function *hm_function;
+
+    #define __POS_DUMP_FATBIN 1
+    #if __POS_DUMP_FATBIN
+        std::ofstream fatbin_file("/tmp/fatbin.bin", std::ios::binary);
+        if(unlikely(!fatbin_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/fatbin.bin");
+        }
+
+        std::ofstream fatbin_patch_file("/tmp/fatbin_patch.bin", std::ios::binary);
+        if(unlikely(!fatbin_patch_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/fatbin_patch.bin");
+        }
+
+        // POS_LOG("addr: %p, len: %lu", pos_api_param_addr(wqe, 1), pos_api_param_size(wqe, 1));
+
+        fatbin_file.write((const char*)(pos_api_param_addr(wqe, 1)), pos_api_param_size(wqe, 1));
+        fatbin_file.flush();
+        fatbin_file.close();
+    #endif
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -107,26 +142,48 @@ namespace cu_module_load {
             "parse(cu_module_load): found %lu functions in the fatbin",
             module_handle->function_desps.size()
         );
+        
+        // patched PTX within the fatbin
+        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+            /* patched_binary */ module_handle->patched_binary
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cu_module_load): failed to patch PTX within the fatbin with %lu functions",
+                module_handle->function_desps.size()
+            );
+        }
+        POS_LOG(
+            "parse(cu_module_load): patched %lu functions in the fatbin",
+            module_handle->function_desps.size()
+        );
 
-        #if POS_PRINT_DEBUG
-            for(auto desp : module_handle->function_desps){
-                char *offsets_info = (char*)malloc(1024); POS_CHECK_POINTER(offsets_info);
-                char *sizes_info = (char*)malloc(1024); POS_CHECK_POINTER(sizes_info);
-                memset(offsets_info, 0, 1024);
-                memset(sizes_info, 0, 1024);
+    #if __POS_DUMP_FATBIN
+        fatbin_patch_file.write((const char*)(module_handle->patched_binary.data()), module_handle->patched_binary.size());
+        fatbin_patch_file.flush();
+        fatbin_patch_file.close();
+    #endif
 
-                for(auto offset : desp->param_offsets){ sprintf(offsets_info, "%s, %u", offsets_info, offset); }
-                for(auto size : desp->param_sizes){ sprintf(sizes_info, "%s, %u", sizes_info, size); }
+    #if POS_PRINT_DEBUG
+        for(auto desp : module_handle->function_desps){
+            char *offsets_info = (char*)malloc(1024); POS_CHECK_POINTER(offsets_info);
+            char *sizes_info = (char*)malloc(1024); POS_CHECK_POINTER(sizes_info);
+            memset(offsets_info, 0, 1024);
+            memset(sizes_info, 0, 1024);
 
-                POS_DEBUG(
-                    "function_name(%s), offsets(%s), param_sizes(%s)",
-                    desp->name.c_str(), offsets_info, sizes_info
-                );
+            for(auto offset : desp->param_offsets){ sprintf(offsets_info, "%s, %u", offsets_info, offset); }
+            for(auto size : desp->param_sizes){ sprintf(sizes_info, "%s, %u", sizes_info, size); }
 
-                free(offsets_info);
-                free(sizes_info);
-            }
-        #endif
+            POS_DEBUG(
+                "function_name(%s), offsets(%s), param_sizes(%s)",
+                desp->name.c_str(), offsets_info, sizes_info
+            );
+
+            free(offsets_info);
+            free(sizes_info);
+        }
+    #endif
 
         // allocate the module handle in the dag
         retval = client->dag.allocate_handle(module_handle);
@@ -141,17 +198,24 @@ namespace cu_module_load {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(module_handle->ckpt_bag);
-        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 1});
+        retval = module_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 1,
+            .offset = 0,
+            .size = pos_api_param_size(wqe, 1)
+        });
     #endif
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+
+    #undef __POS_DUMP_FATBIN
 
     exit:
         return retval;
@@ -177,11 +241,22 @@ namespace cu_module_load_data {
         POSHandleManager_CUDA_Module *hm_module;
         POSHandleManager_CUDA_Function *hm_function;
 
-        // for debug
-        std::ofstream gpt2_elf_stream;
-        gpt2_elf_stream.open("/root/samples/gpt2.elf", std::ofstream::binary);
-        gpt2_elf_stream.write((const char*)(pos_api_param_addr(wqe, 0)), pos_api_param_size(wqe, 0));
-        gpt2_elf_stream.close();
+    #define __POS_DUMP_FATBIN 1
+    #if __POS_DUMP_FATBIN 
+        std::ofstream fatbin_file("/tmp/fatbin.bin", std::ios::binary);
+        if(unlikely(!fatbin_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/fatbin.bin");
+        }
+
+        std::ofstream fatbin_patch_file("/tmp/fatbin_patch.bin", std::ios::binary);
+        if(unlikely(!fatbin_patch_file)){
+            POS_ERROR_DETAIL("failed to open /tmp/fatbin_patch.bin");
+        }
+
+        fatbin_file.write((const char*)(pos_api_param_addr(wqe, 0)), pos_api_param_size(wqe, 0));
+        fatbin_file.flush();
+        fatbin_file.close();
+    #endif
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -262,6 +337,28 @@ namespace cu_module_load_data {
             );
         }
 
+        // patched PTX within the fatbin
+        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
+            /* patched_binary */ module_handle->patched_binary
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "parse(cu_module_load_data): failed to patch PTX within the fatbin with %lu functions",
+                module_handle->function_desps.size()
+            );
+        }
+        POS_LOG(
+            "parse(cu_module_load_data): patched %lu functions in the fatbin",
+            module_handle->function_desps.size()
+        );
+
+    #if __POS_DUMP_FATBIN
+        fatbin_patch_file.write((const char*)(module_handle->patched_binary.data()), module_handle->patched_binary.size());
+        fatbin_patch_file.flush();
+        fatbin_patch_file.close();
+    #endif
+
         #if POS_PRINT_DEBUG
             for(auto desp : module_handle->function_desps){
                 char *offsets_info = (char*)malloc(1024); POS_CHECK_POINTER(offsets_info);
@@ -295,17 +392,24 @@ namespace cu_module_load_data {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_CKPT_ENABLE_PREEMPT == 1
+    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
          */
         POS_CHECK_POINTER(module_handle->ckpt_bag);
-        retval = module_handle->ckpt_bag->set_host_checkpoint_record({.wqe = wqe, .param_index = 0});
+        retval = module_handle->ckpt_bag->set_host_checkpoint_record({
+            .wqe = wqe,
+            .param_index = 0,
+            .offset = 0,
+            .size = pos_api_param_size(wqe, 0)
+        });
     #endif
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+
+    #undef __POS_DUMP_FATBIN
 
     exit:
         return retval;
@@ -855,7 +959,7 @@ namespace cu_get_error_string {
     #if POS_ENABLE_DEBUG_CHECK
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
-                "parse(cuda_get_error_string): failed to parse, given %lu params, %lu expected",
+                "parse(cuda_get_error_string): failed to parse, given %lu params, %u expected",
                 wqe->api_cxt->params.size(), 1
             );
             retval = POS_FAILED_INVALID_INPUT;
