@@ -52,11 +52,11 @@ typedef struct pos_support_api_meta {
  */
 typedef struct pos_support_header_file_meta {
     std::string file_name;
-    std::map<std::string, pos_support_api_meta_t*> api_maps;
+    std::map<std::string, pos_support_api_meta_t*> api_map;
 
     ~pos_support_header_file_meta(){
         std::map<std::string, pos_support_api_meta_t*>::iterator map_iter;
-        for(map_iter=api_maps.begin(); map_iter!=api_maps.end(); map_iter++){
+        for(map_iter=api_map.begin(); map_iter!=api_map.end(); map_iter++){
             delete map_iter->second;
         }
     }
@@ -95,9 +95,12 @@ typedef struct pos_vendor_api_meta {
  */
 typedef struct pos_vendor_header_file_meta {
     std::string file_name;
-    std::vector<pos_vendor_api_meta_t*> apis;
+    std::map<std::string, pos_vendor_api_meta_t*> api_map;
     ~pos_vendor_header_file_meta(){
-        for(auto& api : apis){ if(!api){ delete api; }}
+        typename std::map<std::string, pos_vendor_api_meta_t*>::iterator map_iter;
+        for(map_iter = this->api_map.begin(); map_iter != this->api_map.end(); map_iter++){
+            if(map_iter->second){ delete map_iter->second; }
+        }
     }
 } pos_vendor_header_file_meta_t;
 
@@ -120,7 +123,7 @@ class POSAutogener {
      *  \brief  collect PhOS supporting information
      *  \return POS_SUCCESS for succesfully collecting
      */
-    pos_retval_t collect_pos_support_header_files();
+    pos_retval_t collect_pos_support_yamls();
 
     /*!
      *  \brief  parse vendor headers to generate IRs for autogen
@@ -128,13 +131,20 @@ class POSAutogener {
      */
     pos_retval_t collect_vendor_header_files();
 
+    /*!
+     *  \brief  generate source code of PhOS parser and worker for each APIs
+     *  \return POS_SUCCESS for successfully generate
+     */
+    pos_retval_t generate_pos_src();
+
  private:
     // metadata of all vendor provided header files
-    std::vector<pos_vendor_header_file_meta_t*> _vendor_header_file_metas;
+    // file name -> metadata
+    std::map<std::string, pos_vendor_header_file_meta_t*> _vendor_header_file_meta_map;
 
     // map of metadata of all pos supported header
     // file name -> metadata
-    std::map<std::string, pos_support_header_file_meta_t*> _supported_header_file_metas_map;
+    std::map<std::string, pos_support_header_file_meta_t*> _supported_header_file_meta_map;
 
     /*!
      *  \brief  collect all APIs from a yaml file that records pos-supported information
@@ -143,7 +153,7 @@ class POSAutogener {
      *  \param  header_file_meta    metadata of the parsed yaml file
      *  \return POS_SUCCESS for successfully parsed 
      */
-    pos_retval_t __collect_pos_support_header_files(
+    pos_retval_t __collect_pos_support_yaml(
         const std::string& file_path,
         pos_support_header_file_meta_t *header_file_meta
     );

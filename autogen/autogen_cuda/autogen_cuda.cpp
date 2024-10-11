@@ -1,7 +1,7 @@
 #include "autogen_cuda.h"
 
 
-pos_retval_t POSAutogener::__collect_pos_support_header_files(
+pos_retval_t POSAutogener::__collect_pos_support_yaml(
     const std::string& file_path,
     pos_support_header_file_meta_t *header_file_meta
 ){
@@ -101,7 +101,7 @@ pos_retval_t POSAutogener::__collect_pos_support_header_files(
                 retval = __parse_resources("set_resources", &api_meta->set_resources)
             ))){ goto exit; }
 
-            header_file_meta->api_maps.insert({ api_meta->name, api_meta });
+            header_file_meta->api_map.insert({ api_meta->name, api_meta });
         }
     } catch (const YAML::Exception& e) {
         POS_WARN_C("failed to parse yaml file: path(%s), error(%s)", file_path.c_str(), e.what());
@@ -174,12 +174,12 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
                 POS_CHECK_POINTER(support_header_file_meta);
 
                 func_name_cppstr = std::string(clang_getCString(clang_getCursorSpelling(cursor)));
-                if(support_header_file_meta->api_maps.count(func_name_cppstr) == 0){
+                if(support_header_file_meta->api_map.count(func_name_cppstr) == 0){
                     goto cursor_traverse_exit;
                 }
 
                 POS_CHECK_POINTER(api_meta = new pos_vendor_api_meta_t);
-                vendor_header_file_meta->apis.push_back(api_meta);
+                vendor_header_file_meta->api_map.insert({ func_name_cppstr, api_meta });
                 api_meta->name = clang_getCursorSpelling(cursor);
                 api_meta->return_type = clang_getCursorResultType(cursor);
                 // returnType = clang_getTypeSpelling(clang_getCursorResultType(cursor));
