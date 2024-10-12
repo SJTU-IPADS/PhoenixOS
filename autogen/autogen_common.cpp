@@ -157,6 +157,7 @@ pos_retval_t POSAutogener::generate_pos_src(){
     typename std::map<std::string, pos_support_header_file_meta_t*>::iterator header_map_iter;
     typename std::map<std::string, pos_support_api_meta_t*>::iterator api_map_iter;
 
+    // recreate generate folders
     this->parser_directory = this->gen_directory + std::string("/parser");
     this->worker_directory = this->gen_directory + std::string("/worker");
     try {
@@ -180,6 +181,7 @@ pos_retval_t POSAutogener::generate_pos_src(){
         goto exit;
     }
 
+    // iterate through all APIs
     for(header_map_iter = this->_supported_header_file_meta_map.begin();
         header_map_iter != this->_supported_header_file_meta_map.end();
         header_map_iter++
@@ -212,6 +214,103 @@ pos_retval_t POSAutogener::generate_pos_src(){
             POS_LOG_C("generating parser logic for API %s: [done]", api_name.c_str());
         }
     }
+
+exit:
+    return retval;
+}
+
+pos_retval_t POSAutogener::__generate_api_parser(
+    pos_vendor_api_meta_t* vendor_api_meta,
+    pos_support_api_meta_t* support_api_meta
+){
+    pos_retval_t retval = POS_SUCCESS;
+    uint64_t i;
+    POSCodeGen_CppSourceFile *parser_file;
+    POSCodeGen_CppBlock *ps_function_namespace, *api_namespace, *parser_function;
+    std::string api_snake_name;
+
+    // for those APIs to be customized logic, we just omit
+    if(support_api_meta->customize == true){
+        goto exit;
+    }
+
+    api_snake_name = posautogen_utils_camel2snake(support_api_meta->name);
+
+    // create parser file
+    parser_file = new POSCodeGen_CppSourceFile(
+        this->parser_directory 
+        + std::string("/")
+        + support_api_meta->name
+        + std::string(".cpp")
+    );
+    POS_CHECK_POINTER(parser_file);
+    
+    // add basic headers to the parser file
+    parser_file->add_include("#include <iostream>");
+    parser_file->add_include("#include \"pos/include/common.h\"");
+    parser_file->add_include("#include \"pos/include/dag.h\"");
+    for(i=0; i<support_api_meta->dependent_headers.size(); i++){
+        parser_file->add_include(std::format("#include <{}>", support_api_meta->dependent_headers[i]));
+    }
+
+    // create ps_function namespace
+    ps_function_namespace = new POSCodeGen_CppBlock(
+        /* field name */ "namespace ps_functions",
+        /* need_braces */ true,
+        /* need_foot_comment */ true
+    );
+    POS_CHECK_POINTER(ps_function_namespace);
+    parser_file->add_block(ps_function_namespace);
+
+    // create api namespace
+    retval = ps_function_namespace->allocate_block(
+        /* field name */ std::string("namespace ") + api_snake_name,
+        /* new_block */ &api_namespace,
+        /* need_braces */ true,
+        /* need_foot_comment */ true,
+        /* level_offset */ 0
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for api namespace while generating parser function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(api_namespace);
+
+    // create function POS_RT_FUNC_PARSER
+    retval = api_namespace->allocate_block(
+        /* field name */ std::string("POS_RT_FUNC_PARSER()"),
+        /* new_block */ &parser_function,
+        /* need_braces */ true,
+        /* need_foot_comment */ false,
+        /* level_offset */ 1
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for POS_RT_FUNC_PARSER while generating parser function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(parser_function);
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->__insert_target_parser_code(
+            vendor_api_meta,
+            support_api_meta,
+            parser_file,
+            ps_function_namespace,
+            api_namespace,
+            parser_function
+        )
+    ))){
+        POS_WARN_C("failed to generate parser when inserted target-specific code");
+        goto exit;
+    }
+
+    parser_file->archive();
 
 exit:
     return retval;
