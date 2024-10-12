@@ -124,7 +124,7 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
         if(unlikely(this->_vendor_header_file_meta_map.count(supported_file_name) == 0)){
             POS_WARN_C(
                 "PhOS registered to support header file %s, but no vendor header file was found",
-                supported_file_name
+                supported_file_name.c_str()
             );
             retval = POS_FAILED_NOT_EXIST;
             goto exit;
@@ -144,7 +144,7 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
             if(unlikely(vendor_header_file_meta->api_map.count(api_name) == 0)){
                 POS_WARN_C(
                     "PhOS registered to support API %s in file %s, but no vendor API was found",
-                    api_name, supported_file_name
+                    api_name.c_str(), supported_file_name.c_str()
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
@@ -164,7 +164,30 @@ pos_retval_t POSAutogener::generate_pos_src(){
     pos_support_api_meta_t *support_api_meta = nullptr;
     typename std::map<std::string, pos_support_header_file_meta_t*>::iterator header_map_iter;
     typename std::map<std::string, pos_support_api_meta_t*>::iterator api_map_iter;
-    
+
+    this->parser_directory = this->gen_directory + std::string("/parser");
+    this->worker_directory = this->gen_directory + std::string("/worker");
+    try {
+        if (std::filesystem::exists(this->parser_directory)) { std::filesystem::remove_all(this->parser_directory); }
+        if (std::filesystem::exists(this->worker_directory)) { std::filesystem::remove_all(this->worker_directory); }
+        std::filesystem::create_directory(this->parser_directory);
+        std::filesystem::create_directory(this->worker_directory);
+    } catch (const std::filesystem::filesystem_error& e) {
+        POS_WARN_C(
+            "failed to create new directory for the generated codes: parser_directory(%s), worker_directory(%s)",
+            this->parser_directory.c_str(), this->worker_directory.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    } catch (const std::exception& e) {
+        POS_WARN_C(
+            "failed to create new directory for the generated codes: parser_directory(%s), worker_directory(%s)",
+            this->parser_directory.c_str(), this->worker_directory.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
     for(header_map_iter = this->_supported_header_file_meta_map.begin();
         header_map_iter != this->_supported_header_file_meta_map.end();
         header_map_iter++
@@ -186,7 +209,9 @@ pos_retval_t POSAutogener::generate_pos_src(){
             support_api_meta = api_map_iter->second;
             POS_CHECK_POINTER(support_api_meta);
 
-            // TODO: how to gen?
+            // generate parser and worker logic
+            
+            
         }
     }
 
