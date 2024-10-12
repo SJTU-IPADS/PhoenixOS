@@ -185,7 +185,6 @@ class POSAutogener {
 
     /*!
      *  \brief  generate the parser logic of an API
-     *  \note   this function is implemeneted by each target
      *  \param  vendor_api_meta     metadata of the parsed vendor API
      *  \param  support_api_meta    metadata of the pos-supported API
      *  \return POS_SUCCESS for successfully generated
@@ -193,5 +192,25 @@ class POSAutogener {
     pos_retval_t __generate_api_parser(
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta
+    );
+
+    /*!
+     *  \brief  insert target-specific parser code of the API
+     *  \note   this function is implemeneted by each target
+     *  \param  vendor_api_meta         metadata of the parsed vendor API
+     *  \param  support_api_meta        metadata of the pos-supported API
+     *  \param  parser_file             source file
+     *  \param  ps_function_namespace   code block of the outer namespace
+     *  \param  api_namespace           code block of the API's namespace
+     *  \param  parser_function         code block of the parser function
+     *  \return POS_SUCCESS for successfully generated
+     */
+    pos_retval_t __insert_target_parser_code(
+        pos_vendor_api_meta_t* vendor_api_meta,
+        pos_support_api_meta_t* support_api_meta,
+        POSCodeGen_CppSourceFile* parser_file,
+        POSCodeGen_CppBlock *ps_function_namespace,
+        POSCodeGen_CppBlock *api_namespace,
+        POSCodeGen_CppBlock *parser_function
     );
 };
