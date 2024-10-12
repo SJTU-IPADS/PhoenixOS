@@ -2,7 +2,7 @@
 
 int main(int argc, char** argv) {
     int opt;
-    const char *op_string = "d:s:";
+    const char *op_string = "d:s:g:";
     pos_retval_t retval = POS_SUCCESS;
 
     POSAutogener autogener;
@@ -16,6 +16,10 @@ int main(int argc, char** argv) {
         case 's':
             // path to the support files
             autogener.support_directory = std::string(optarg);
+            break;
+        case 'g':
+            // path to generate the parser and worker logic
+            autogener.gen_directory = std::string(optarg);
             break;
         default:
             POS_ERROR("unknown command line parameter: %s", op_string);

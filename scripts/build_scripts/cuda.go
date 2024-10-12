@@ -12,6 +12,7 @@ import (
 const (
 	KLibClangPath    = "third_party/libclang-static-build"
 	KLibYamlCppPath  = "third_party/yaml-cpp"
+	KLibPaniniPath   = "third_party/Panini"
 	KPhOSPath        = "pos"
 	KPhOSCLIPath     = "pos/cli"
 	KPhOSPatcherPath = "pos/cuda_impl/patcher"
