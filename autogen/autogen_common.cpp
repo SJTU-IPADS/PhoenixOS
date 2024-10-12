@@ -5,11 +5,7 @@ pos_retval_t POSAutogener::collect_pos_support_yamls(){
     pos_retval_t retval = POS_SUCCESS;
     pos_support_header_file_meta_t *header_file_meta;
 
-    if(unlikely(this->support_directory.size() == 0)){
-        POS_WARN_C("failed to do autogen, no path to support files provided")
-        retval = POS_FAILED_INVALID_INPUT;
-        goto exit;
-    }
+    POS_ASSERT(this->support_directory.size() > 0);
 
     if(unlikely(
             !std::filesystem::exists(this->support_directory)
@@ -57,11 +53,7 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
     typename std::map<std::string, pos_support_header_file_meta_t*>::iterator header_map_iter;
     typename std::map<std::string, pos_support_api_meta_t*>::iterator api_map_iter;
 
-    if(unlikely(this->header_directory.size() == 0)){
-        POS_WARN_C("failed to do autogen, no path to vender headers provided")
-        retval = POS_FAILED_INVALID_INPUT;
-        goto exit;
-    }
+    POS_ASSERT(this->header_directory.size() > 0);
 
     if(unlikely(
             !std::filesystem::exists(this->header_directory)
@@ -168,8 +160,8 @@ pos_retval_t POSAutogener::generate_pos_src(){
     this->parser_directory = this->gen_directory + std::string("/parser");
     this->worker_directory = this->gen_directory + std::string("/worker");
     try {
-        if (std::filesystem::exists(this->parser_directory)) { std::filesystem::remove_all(this->parser_directory); }
-        if (std::filesystem::exists(this->worker_directory)) { std::filesystem::remove_all(this->worker_directory); }
+        if (std::filesystem::exists(this->gen_directory)) { std::filesystem::remove_all(this->gen_directory); }
+        std::filesystem::create_directory(this->gen_directory);
         std::filesystem::create_directory(this->parser_directory);
         std::filesystem::create_directory(this->worker_directory);
     } catch (const std::filesystem::filesystem_error& e) {
@@ -210,8 +202,14 @@ pos_retval_t POSAutogener::generate_pos_src(){
             POS_CHECK_POINTER(support_api_meta);
 
             // generate parser and worker logic
-            
-            
+            POS_LOG_C("generating parser logic for API %s...", api_name.c_str());
+            if(unlikely(POS_SUCCESS != (
+                retval = this->__generate_api_parser(vendor_api_meta, support_api_meta)
+            ))){
+                POS_ERROR_C("generating parser logic for API %s..., failed", api_name.c_str());
+            }
+            POS_BACK_LINE;
+            POS_LOG_C("generating parser logic for API %s: [done]", api_name.c_str());
         }
     }
 
