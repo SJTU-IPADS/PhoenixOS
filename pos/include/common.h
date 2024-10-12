@@ -30,6 +30,7 @@ using pos_retval_t = uint8_t;
     #define likely(x)       (x)
     #define unlikely(x)     (x)
 #endif
+#define _unused(x) ((void)(x))  // make production build happy
 
 enum pos_retval {
     POS_SUCCESS = 0,
@@ -55,11 +56,8 @@ enum pos_retval {
     #define POS_ASSERT(x)           assert(x);
     #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 #else
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wunused-variable"
-    #define POS_ASSERT(x)           (x);
-    #define POS_CHECK_POINTER(ptr)  (ptr);
-  #pragma GCC diagnostic pop
+    #define POS_ASSERT(x)           _unused (x);
+    #define POS_CHECK_POINTER(ptr)  _unused (ptr);
 #endif
 
 #define POS_STATIC_ASSERT(x)    static_assert(x);
