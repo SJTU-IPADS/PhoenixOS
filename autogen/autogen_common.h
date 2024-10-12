@@ -2,12 +2,15 @@
 
 #include <iostream>
 #include <filesystem>
-#include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <cstring>
 
 #include <unistd.h>
+
+#include "utils.h"
+#include "autogen_cpp.h"
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
@@ -119,6 +122,11 @@ class POSAutogener {
     // path to supported file to be parsed
     std::string support_directory;
 
+    // path to generate the source code
+    std::string gen_directory;
+    std::string parser_directory;
+    std::string worker_directory;
+
     /*!
      *  \brief  collect PhOS supporting information
      *  \return POS_SUCCESS for succesfully collecting
@@ -145,7 +153,7 @@ class POSAutogener {
     // map of metadata of all pos supported header
     // file name -> metadata
     std::map<std::string, pos_support_header_file_meta_t*> _supported_header_file_meta_map;
-
+    
     /*!
      *  \brief  collect all APIs from a yaml file that records pos-supported information
      *  \note   this function is implemeneted by each target
@@ -171,5 +179,17 @@ class POSAutogener {
         const std::string& file_path,
         pos_vendor_header_file_meta_t* vendor_header_file_meta,
         pos_support_header_file_meta_t* support_header_file_meta
+    );
+
+    /*!
+     *  \brief  generate the parser logic of an API
+     *  \note   this function is implemeneted by each target
+     *  \param  vendor_api_meta     metadata of the parsed vendor API
+     *  \param  support_api_meta    metadata of the pos-supported API
+     *  \return POS_SUCCESS for successfully generated
+     */
+    pos_retval_t __generate_api_parser(
+        pos_vendor_api_meta_t* vendor_api_meta,
+        pos_support_api_meta_t* support_api_meta
     );
 };
