@@ -26,6 +26,17 @@ int main(int argc, char** argv) {
         }
     }
 
+    // check whether all necessary parameters are provided
+    if(unlikely(autogener.header_directory.size() == 0)){
+        POS_ERROR("no header_directory provided with -s");
+    }
+    if(unlikely(autogener.support_directory.size() == 0)){
+        POS_ERROR("no support_directory provided with -s");
+    }
+    if(unlikely(autogener.gen_directory.size() == 0)){
+        POS_ERROR("no gen_directory provided with -g");
+    }
+
     if(unlikely(
         retval = (POS_SUCCESS != autogener.collect_pos_support_yamls())
     )){

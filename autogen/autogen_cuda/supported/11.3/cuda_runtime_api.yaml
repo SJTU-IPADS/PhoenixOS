@@ -1,6 +1,6 @@
 header_file_name: "cuda_runtime_api.h"
 dependent_headers:
-  - name: "cuda_runtime_api.h"
+  - "cuda_runtime_api.h"
 apis:
   - name: "cudaMalloc"
     customize: false
