@@ -19,12 +19,13 @@ class POSCodeGen_CppBlock {
  public:
     /*!
      *  \brief  constructor
-     *  \param  block_name      name of this block
-     *  \param  need_braces     whether it needs braces to wrap this block
-     *  \param  level           level of this block
+     *  \param  block_name          name of this block
+     *  \param  need_braces         whether it needs braces to wrap this block
+     *  \param  need_foot_comment   whether the block need footnote comment
+     *  \param  level               level of this block
      */
-    POSCodeGen_CppBlock(std::string block_name, bool need_braces, uint8_t level=0) 
-        : _block_name(block_name), _need_braces(need_braces), _level(level), archived("")
+    POSCodeGen_CppBlock(std::string block_name, bool need_braces=true, bool need_foot_comment=false, uint8_t level=0) 
+        : _block_name(block_name), _need_braces(need_braces), _need_foot_comment(need_foot_comment), _level(level), archived("")
     {
         if(unlikely(this->_need_braces == false and this->_block_name.size() > 0)){
             POS_WARN_C("uncorrect cpp block configuration: declare named block without braces, refine as brace needed");
@@ -49,12 +50,16 @@ class POSCodeGen_CppBlock {
 
     /*!
      *  \brief  allocate new inner block of this block
-     *  \param  block_name      name of the new block
-     *  \param  need_braces     whether it needs braces to wrap this block
-     *  \param  new_block       pointer to the newly created block
+     *  \param  block_name          name of the new block
+     *  \param  new_block           pointer to the newly created block
+     *  \param  need_braces         whether it needs braces to wrap this block
+     *  \param  need_foot_comment   whether the new block need footnote comment
+     *  \param  level_offset        offset of the new block based on current block's level
      *  \return POS_SUCCESS for succesfully generation
      */
-    pos_retval_t allocate_block(std::string block_name, bool need_braces, POSCodeGen_CppBlock** new_block);
+    pos_retval_t allocate_block(
+        std::string block_name, POSCodeGen_CppBlock** new_block, bool need_braces=true, bool need_foot_comment=false, int level_offset=1
+    );
     
     /*!
      *  \brief  append content to this block
@@ -80,6 +85,9 @@ class POSCodeGen_CppBlock {
     // mark whetehr this block need braces to wrap
     bool _need_braces;
 
+    // mark whether this block need footnote comment
+    bool _need_foot_comment;
+
     uint8_t _level;
 };
 
@@ -99,7 +107,11 @@ class POSCodeGen_CppSourceFile {
             POS_WARN_C("failed to create new file: path(%s)", file_path.c_str());
         }
     }
-    ~POSCodeGen_CppSourceFile() = default;
+    ~POSCodeGen_CppSourceFile(){
+        if(likely(this->_file_stream)){
+            this->_file_stream.close();
+        }
+    }
 
     // archived this file after all content generated
     std::string archived;
@@ -117,7 +129,7 @@ class POSCodeGen_CppSourceFile {
     void add_block(POSCodeGen_CppBlock* block);
     
     /*!
-     *  \brief  archive this file (after all blocks are inserted)
+     *  \brief  archive and write to the file (after all blocks are inserted)
      */
     void archive();
 

@@ -87,7 +87,7 @@ endif
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
-c_args += ['--std=c++17']
+c_args += ['--std=c++20']
 
 executable(
     project_name_abbreviation,

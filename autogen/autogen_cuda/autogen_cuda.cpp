@@ -8,6 +8,7 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, j;
     std::string api_type, param_type;
+    std::vector<std::string> dependent_headers;
     pos_support_api_meta_t *api_meta;
     pos_support_resource_meta_t *resource_meta;
     YAML::Node config, api, resources;
@@ -56,6 +57,13 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
     try {
         config = YAML::LoadFile(file_path);
         header_file_meta->file_name = config["header_file_name"].as<std::string>();
+
+        if(config["dependent_headers"]){
+            for(j=0; j<config["dependent_headers"].size(); j++){
+                dependent_headers.push_back(config["dependent_headers"][j].as<std::string>());
+            }
+        }
+
         for(i=0; i<config["apis"].size(); i++){
             api = config["apis"][i];
 
@@ -66,6 +74,9 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
 
             // whether to customize the parser and worker logic of API
             api_meta->customize = api["customize"].as<bool>();
+
+            // dependent headers to support hijacking this API
+            api_meta->dependent_headers = dependent_headers;
 
             // API type
             api_type = api["type"].as<std::string>();
@@ -209,6 +220,7 @@ pos_retval_t POSAutogener::__generate_api_parser(
     pos_vendor_api_meta_t* vendor_api_meta, pos_support_api_meta_t* support_api_meta
 ){
     pos_retval_t retval = POS_SUCCESS;
+    uint64_t i;
     POSCodeGen_CppSourceFile *parser_file;
     POSCodeGen_CppBlock *ps_function_namespace, *api_namespace, *parser_function;
     std::string api_snake_name;
@@ -238,13 +250,15 @@ pos_retval_t POSAutogener::__generate_api_parser(
     parser_file->add_include("#include \"pos/cuda_impl/parser.h\"");
     parser_file->add_include("#include \"pos/cuda_impl/client.h\"");
     parser_file->add_include("#include \"pos/cuda_impl/api_context.h\"");
-
-    // TODO: add dependecies for each header
+    for(i=0; i<support_api_meta->dependent_headers.size(); i++){
+        parser_file->add_include(std::format("#include <{}>", support_api_meta->dependent_headers[i]));
+    }
 
     // create ps_function namespace
     ps_function_namespace = new POSCodeGen_CppBlock(
         /* field name */ "namespace ps_functions",
-        /* need_braces */ true
+        /* need_braces */ true,
+        /* need_foot_comment */ true
     );
     POS_CHECK_POINTER(ps_function_namespace);
     parser_file->add_block(ps_function_namespace);
@@ -252,8 +266,10 @@ pos_retval_t POSAutogener::__generate_api_parser(
     // create api namespace
     retval = ps_function_namespace->allocate_block(
         /* field name */ std::string("namespace ") + api_snake_name,
+        /* new_block */ &api_namespace,
         /* need_braces */ true,
-        /* new_block */ &api_namespace
+        /* need_foot_comment */ true,
+        /* level_offset */ 0
     );
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C(
@@ -267,8 +283,10 @@ pos_retval_t POSAutogener::__generate_api_parser(
     // create function POS_RT_FUNC_PARSER
     retval = api_namespace->allocate_block(
         /* field name */ std::string("POS_RT_FUNC_PARSER()"),
+        /* new_block */ &parser_function,
         /* need_braces */ true,
-        /* new_block */ &parser_function
+        /* need_foot_comment */ false,
+        /* level_offset */ 1
     );
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C(
@@ -283,7 +301,41 @@ pos_retval_t POSAutogener::__generate_api_parser(
     parser_function->declare_var("pos_retval_t retval = POS_SUCCESS;");
     parser_function->declare_var("POSClient_CUDA *client;");
 
+    // check input pointers for wqe and ws
+    parser_function->append_content(
+        "POS_CHECK_POINTER(wqe);\n"
+        "POS_CHECK_POINTER(ws);"
+    );
+
+    // obtain client
+    parser_function->append_content(
+        "client = (POSClient_CUDA*)(wqe->client);\n"
+        "POS_CHECK_POINTER(client);"
+    );
+
+    // do runtime debug check
+    parser_function->append_content(std::format(
+        "#if POS_ENABLE_DEBUG_CHECK\n"
+        "    // check whether given parameter is valid\n"
+        "   if(unlikely(wqe->api_cxt->params.size() != {})) {{\n"
+        "       POS_WARN(\n"
+        "           \"parse({}): failed to parse, given %lu params, {} expected\",\n"
+        "           wqe->api_cxt->params.size()\n"
+        "       );\n"
+        "       retval = POS_FAILED_INVALID_INPUT;\n"
+        "       goto exit;\n"
+        "   }}\n"
+        "#endif\n"
+        ,
+        vendor_api_meta->params.size(),
+        api_snake_name,
+        vendor_api_meta->params.size()
+    ));
+
+    // obtain resources
     
+
+    parser_file->archive();
 
 exit:
     return retval;

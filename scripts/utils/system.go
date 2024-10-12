@@ -77,12 +77,10 @@ func BashCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger)
 func BashScriptGetOutput(script string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {
 	output, err := exec.Command("bash", "-c", script).CombinedOutput()
 	if err != nil {
-		logger.Warnf("failed to execute script\n%s\nerr: %s", script, err)
-	}
-
-	if ignoreFailed {
-		return output, nil
-	} else {
+		if !ignoreFailed {
+			logger.Fatalf("failed to execute script\n%s\nerr: %s", script, err)
+		}
 		return output, err
 	}
+	return output, nil
 }

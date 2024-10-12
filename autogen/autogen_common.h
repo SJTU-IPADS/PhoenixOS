@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <format>
 
 #include <unistd.h>
 
@@ -36,6 +37,7 @@ typedef struct pos_support_api_meta {
     std::string name;
     bool customize;
     pos_api_type_t api_type;
+    std::vector<std::string> dependent_headers;
     std::vector<pos_support_resource_meta_t*> create_resources;
     std::vector<pos_support_resource_meta_t*> delete_resources;
     std::vector<pos_support_resource_meta_t*> set_resources;

@@ -536,11 +536,16 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logg
 	utils.CheckAndInstallCommand("git", "git", nil, logger)
 	utils.CheckAndInstallCommand("gcc", "build-essential", nil, logger)
 	utils.CheckAndInstallCommand("g++", "build-essential", nil, logger)
+	utils.CheckAndInstallCommand("add-apt-repository", "software-properties-common", nil, logger)
 	utils.CheckAndInstallCommand("yes", "yes", nil, logger)
 	utils.CheckAndInstallCommand("cmake", "cmake", nil, logger)
 	utils.CheckAndInstallCommand("curl", "curl", nil, logger)
 	utils.CheckAndInstallCommand("tar", "tar", nil, logger)
 	utils.CheckAndInstallCommand("tmux", "tmux", nil, logger)
+
+	// we require g++-13 to use C++20 format for auto-generation
+	utils.SwitchGppVersion(13, logger)
+	utils.SwitchGppVersion(9, logger)
 
 	install_meson := func() error {
 		_, err := utils.BashScriptGetOutput(`
@@ -617,6 +622,9 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logg
 	buildPhOSCore(cmdOpt, buildOpt, logger)
 	buildPhOSCLI(cmdOpt, buildOpt, logger)
 	buildRemoting(cmdOpt, buildOpt, logger)
+
+	utils.SwitchGppVersion(13, logger)
+	// TODO: run autogen
 
 	// ==================== Build and Run Unit Test ====================
 	if *cmdOpt.DoUnitTest {
