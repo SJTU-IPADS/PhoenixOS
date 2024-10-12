@@ -77,7 +77,7 @@ endif
 
 
 # >>>>>>>>>>>>>> setup sources, libraries and includes >>>>>>>>>>>>>>
-sources += [ 'autogen_common.cpp', 'main.cpp' ]
+sources += [ 'autogen_common.cpp', 'autogen_cpp.cpp', 'main.cpp', 'utils.cpp' ]
 inc_dirs += [ '../' ]
 ld_args += [ '-lclang', '-lyaml-cpp' ]
 if target == 'cuda'

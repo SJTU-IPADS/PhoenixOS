@@ -53,7 +53,6 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
         return retval;
     };
 
-
     try {
         config = YAML::LoadFile(file_path);
         header_file_meta->file_name = config["header_file_name"].as<std::string>();
@@ -200,6 +199,91 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
         /* client_data */ &param
     );
     clang_disposeTranslationUnit(unit);
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSAutogener::__generate_api_parser(
+    pos_vendor_api_meta_t* vendor_api_meta, pos_support_api_meta_t* support_api_meta
+){
+    pos_retval_t retval = POS_SUCCESS;
+    POSCodeGen_CppSourceFile *parser_file;
+    POSCodeGen_CppBlock *ps_function_namespace, *api_namespace, *parser_function;
+    std::string api_snake_name;
+
+    POS_CHECK_POINTER(vendor_api_meta);
+    POS_CHECK_POINTER(support_api_meta);
+
+    if(support_api_meta->customize == true){
+        goto exit;
+    }
+
+    api_snake_name = posautogen_utils_camel2snake(support_api_meta->name);
+
+    parser_file = new POSCodeGen_CppSourceFile(
+        this->parser_directory 
+        + std::string("/")
+        + support_api_meta->name
+        + std::string(".cpp")
+    );
+    POS_CHECK_POINTER(parser_file);
+    
+    // add headers
+    parser_file->add_include("#include <iostream>");
+    parser_file->add_include("#include \"pos/include/common.h\"");
+    parser_file->add_include("#include \"pos/include/dag.h\"");
+    parser_file->add_include("#include \"pos/cuda_impl/handle.h\"");
+    parser_file->add_include("#include \"pos/cuda_impl/parser.h\"");
+    parser_file->add_include("#include \"pos/cuda_impl/client.h\"");
+    parser_file->add_include("#include \"pos/cuda_impl/api_context.h\"");
+
+    // TODO: add dependecies for each header
+
+    // create ps_function namespace
+    ps_function_namespace = new POSCodeGen_CppBlock(
+        /* field name */ "namespace ps_functions",
+        /* need_braces */ true
+    );
+    POS_CHECK_POINTER(ps_function_namespace);
+    parser_file->add_block(ps_function_namespace);
+
+    // create api namespace
+    retval = ps_function_namespace->allocate_block(
+        /* field name */ std::string("namespace ") + api_snake_name,
+        /* need_braces */ true,
+        /* new_block */ &api_namespace
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for api namespace while generating parser function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(api_namespace);
+
+    // create function POS_RT_FUNC_PARSER
+    retval = api_namespace->allocate_block(
+        /* field name */ std::string("POS_RT_FUNC_PARSER()"),
+        /* need_braces */ true,
+        /* new_block */ &parser_function
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for POS_RT_FUNC_PARSER while generating parser function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(parser_function);
+
+    // declare variables in the parser
+    parser_function->declare_var("pos_retval_t retval = POS_SUCCESS;");
+    parser_function->declare_var("POSClient_CUDA *client;");
+
+    
 
 exit:
     return retval;
