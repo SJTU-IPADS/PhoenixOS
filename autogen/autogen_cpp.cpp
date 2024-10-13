@@ -80,8 +80,13 @@ exit:
 }
 
 
-void POSCodeGen_CppBlock::declare_var(std::string var){ 
-    this->_vars.push_back(var); 
+bool POSCodeGen_CppBlock::declare_var(std::string var){ 
+    // avoid duplication
+    for(std::string& _var : this->_vars){
+        if(unlikely(_var == var)){ return true; }
+    }
+    this->_vars.push_back(var);
+    return false;
 }
 
 

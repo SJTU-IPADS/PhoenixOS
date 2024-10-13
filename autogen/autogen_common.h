@@ -22,12 +22,33 @@
 
 
 /*!
+ *  \brief mark whether a handle's value come from
+ */
+enum pos_handle_source_typeid_t : uint8_t {
+    kPOS_HandleSource_FromParam = 0,
+    kPOS_HandleSource_ToParam,
+    kPOS_HandleSource_FromLastUsed
+};
+
+
+/*!
  *  \brief  metadata of a parameter of an supported API
  */
-typedef struct pos_support_resource_meta {
+typedef struct pos_support_edge_meta {
+    // index of the handle in parameter list involved in this edge
     uint16_t index;
-    uint16_t type;
-} pos_support_resource_meta_t;
+
+    // type of the handle involved in this edge
+    uint32_t type;
+
+    // source of the handle value involved in this edge
+    pos_handle_source_typeid_t source;
+
+    // other related handles involved in this edge
+    // this field is only for create edges
+    // map: typeid -> edge lists
+    std::map<uint32_t, std::vector<struct pos_support_edge_meta*>> related;
+} pos_support_edge_meta_t;
 
 
 /*!
@@ -38,16 +59,18 @@ typedef struct pos_support_api_meta {
     bool customize;
     pos_api_type_t api_type;
     std::vector<std::string> dependent_headers;
-    std::vector<pos_support_resource_meta_t*> create_resources;
-    std::vector<pos_support_resource_meta_t*> delete_resources;
-    std::vector<pos_support_resource_meta_t*> set_resources;
-    std::vector<pos_support_resource_meta_t*> get_resources;
+    std::vector<pos_support_edge_meta_t*> create_edges;
+    std::vector<pos_support_edge_meta_t*> delete_edges;
+    std::vector<pos_support_edge_meta_t*> in_edges;
+    std::vector<pos_support_edge_meta_t*> out_edges;
+    std::vector<pos_support_edge_meta_t*> inout_edges;
 
     ~pos_support_api_meta(){
-        for(auto& ptr : create_resources){ delete ptr; }
-        for(auto& ptr : delete_resources){ delete ptr; }
-        for(auto& ptr : set_resources){ delete ptr; }
-        for(auto& ptr : get_resources){ delete ptr; }
+        for(auto& ptr : create_edges){ delete ptr; }
+        for(auto& ptr : delete_edges){ delete ptr; }
+        for(auto& ptr : in_edges){ delete ptr; }
+        for(auto& ptr : out_edges){ delete ptr; }
+        for(auto& ptr : inout_edges){ delete ptr; }
     }
 } pos_support_api_meta_t;
 
@@ -205,7 +228,7 @@ class POSAutogener {
      *  \param  parser_function         code block of the parser function
      *  \return POS_SUCCESS for successfully generated
      */
-    pos_retval_t __insert_target_parser_code(
+    pos_retval_t __insert_code_parser_for_target(
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta,
         POSCodeGen_CppSourceFile* parser_file,
