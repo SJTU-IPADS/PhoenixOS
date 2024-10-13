@@ -297,7 +297,7 @@ pos_retval_t POSAutogener::__generate_api_parser(
     POS_CHECK_POINTER(parser_function);
 
     if(unlikely(POS_SUCCESS != (
-        retval = this->__insert_target_parser_code(
+        retval = this->__insert_code_parser_for_target(
             vendor_api_meta,
             support_api_meta,
             parser_file,

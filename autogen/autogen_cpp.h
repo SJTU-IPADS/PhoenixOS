@@ -45,8 +45,9 @@ class POSCodeGen_CppBlock {
     /*!
      *  \brief  declare new variable in this block
      *  \param  var the newly add variable
+     *  \return bool mark whether the variable to be registered is duplicated
      */
-    void declare_var(std::string var);
+    bool declare_var(std::string var);
 
     /*!
      *  \brief  allocate new inner block of this block
