@@ -91,6 +91,12 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             // name of the API
             api_meta->name = api["name"].as<std::string>();
 
+            // parent name of the API
+            api_meta->parent_name = api["parent_name"].as<std::string>();
+
+            // whether the API is synchronous
+            api_meta->is_sync = api["is_sync"].as<bool>();
+
             // whether to customize the parser and worker logic of API
             api_meta->customize_parser = api["customize_parser"].as<bool>();
             api_meta->customize_worker = api["customize_worker"].as<bool>();
@@ -227,9 +233,9 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
                 POS_CHECK_POINTER(support_header_file_meta);
 
                 func_name_cppstr = std::string(clang_getCString(clang_getCursorSpelling(cursor)));
-                if(support_header_file_meta->api_map.count(func_name_cppstr) == 0){
-                    goto cursor_traverse_exit;
-                }
+                // if(support_header_file_meta->api_map.count(func_name_cppstr) == 0){
+                //     goto cursor_traverse_exit;
+                // }
 
                 POS_CHECK_POINTER(api_meta = new pos_vendor_api_meta_t);
                 vendor_header_file_meta->api_map.insert({ func_name_cppstr, api_meta });
