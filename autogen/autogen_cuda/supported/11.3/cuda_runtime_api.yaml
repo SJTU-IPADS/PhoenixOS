@@ -26,6 +26,7 @@ apis:
     inout_edges:
     customize_worker: true
     involve_membus: false
+    need_stream_sync: false
     constant_params:
 
   # ========== ​cudaError_t cudaFree ( void* devPtr ) ==========
@@ -48,4 +49,5 @@ apis:
     inout_edges:
     customize_worker: true
     involve_membus: false
+    need_stream_sync: false
     constant_params:

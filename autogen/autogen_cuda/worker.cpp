@@ -12,7 +12,10 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     POSCodeGen_CppBlock *worker_function
 ){
     pos_retval_t retval = POS_SUCCESS;
-    std::string create_resource_precheck, delete_resource_precheck;
+    uint64_t k;
+    pos_handle_source_typeid_t stream_source;
+    uint16_t stream_param_index;
+    std::string create_precheck, delete_precheck, in_precheck, out_precheck, inout_precheck;
     
     /*!
      *  \brief  form the parameter list to call the actual function
@@ -131,6 +134,23 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     POS_CHECK_POINTER(api_namespace);
     POS_CHECK_POINTER(worker_function);
 
+    // find out which stream this worker is using
+    if(support_api_meta->involve_membus || support_api_meta->need_stream_sync){
+        for(k=0; k<support_api_meta->inout_edges.size(); k++){
+            POS_CHECK_POINTER(support_api_meta->inout_edges[k]);
+            if(support_api_meta->inout_edges[k]->handle_type == kPOS_ResourceTypeId_CUDA_Stream){
+                stream_source = support_api_meta->inout_edges[k]->handle_source;
+                stream_param_index = support_api_meta->inout_edges[k]->index;
+                break;
+            }
+        }
+        POS_ERROR_C(
+            "failed to generate worker code, "
+            "no stream provided when the API need stream support: api(%s)",
+            clang_getCString(vendor_api_meta->name)
+        );
+    }
+
     // add POS CUDA headers
     worker_file->add_include("#include \"pos/cuda_impl/worker.h\"");
 
@@ -145,24 +165,56 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
     // step 3: runtime debug check of handles passed from parser
     if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
-        create_resource_precheck = std::string("POS_CHECK_POINTER(pos_api_create_handle(wqe, 0));");
+        create_precheck = std::string("POS_CHECK_POINTER(pos_api_create_handle(wqe, 0));");
     }
     if(support_api_meta->api_type == kPOS_API_Type_Delete_Resource){
-        delete_resource_precheck = std::string("POS_CHECK_POINTER(pos_api_delete_handle(wqe, 0));");
+        delete_precheck = std::string("POS_CHECK_POINTER(pos_api_delete_handle(wqe, 0));");
     }
+    in_precheck = std::format(
+        "POS_ASSERT(wqe->input_handle_views.size() == {})",
+        support_api_meta->in_edges.size()
+    );
+    out_precheck = std::format(
+        "POS_ASSERT(wqe->output_handle_views.size() == {})",
+        support_api_meta->out_edges.size()
+    );
+    inout_precheck = std::format(
+        "POS_ASSERT(wqe->inout_handle_views.size() == {})",
+        support_api_meta->inout_edges.size()
+    );
     worker_function->append_content(std::format(
         "#if POS_ENABLE_DEBUG_CHECK\n"
         "{}{}\n"
+        "{}\n"
+        "{}\n"
+        "{}\n"
         "#endif"
         ,
-        create_resource_precheck,
-        delete_resource_precheck
+        create_precheck,
+        delete_precheck,
+        in_precheck,
+        out_precheck,
+        inout_precheck
     ));
-    // TODO: check in/out/inout
 
-
-    // step 4: membus lock
-
+    // step 4: membus lock if needed
+    if(support_api_meta->involve_membus == true){
+        worker_function->append_content(std::format(
+            "#if POS_CKPT_OPT_LEVEL == 2\n"
+            "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
+            "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
+            "           (cudaStream_t)({})\n"
+            "       );\n"
+            "       if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){{\n"
+            "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\")\n"
+            "       }}\n"
+            "       ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = true;\n"
+            "   }}\n"
+            "#endif"
+            ,
+            std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+        ));
+    }
 
     // step 5:
     worker_function->append_content(std::format(
@@ -174,10 +226,45 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         __form_parameter_list()
     ));
 
-    // step 6: membus unlock
+    // step 6: sync the stream if needed
+    if(support_api_meta->need_stream_sync == true){
+        worker_function->append_content(std::format(
+            "wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
+            "   (cudaStream_t)({})"
+            ");"
+            ,
+            std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+        ));
+    }
 
+    // step 7: membus unlock if needed
+    if(support_api_meta->involve_membus == true){
+        if(support_api_meta->need_stream_sync == true){
+            worker_function->append_content(std::string(
+                "#if POS_CKPT_OPT_LEVEL == 2\n"
+                "   ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;\n"
+                "#endif"
+            ));
+        } else {
+            worker_function->append_content(std::format(
+                "#if POS_CKPT_OPT_LEVEL == 2\n"
+                "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
+                "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
+                "           (cudaStream_t)({})"
+                "       );\n"
+                "       if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){{\n"
+                "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\")\n"
+                "       }}\n"
+                "       ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;\n"
+                "   }}\n"
+                "#endif"
+                ,
+                std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+            ));
+        }
+    }
     
-    // step 7: change handle state for newly created handle / deleted handle
+    // step 8: change handle state for newly created handle / deleted handle
     if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
         worker_function->append_content(std::format(
             "if(likely({} == wqe->api_cxt->return_code)){{\n"
@@ -198,7 +285,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         ));
     }
 
-    // step 8: check retval
+    // step 9: check retval
     worker_function->append_content(std::format(
         "if(unlikely({} != wqe->api_cxt->return_code)){{\n"
         "   POSWorker::__restore(ws, wqe);\n"
@@ -209,7 +296,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         support_header_file_meta->successful_retval
     ));
 
-    // step 9: exit pointer
+    // step 10: exit pointer
     worker_function->append_content(
         "exit:\n"
         "return retval;"
