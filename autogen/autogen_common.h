@@ -27,7 +27,8 @@
 enum pos_handle_source_typeid_t : uint8_t {
     kPOS_HandleSource_FromParam = 0,
     kPOS_HandleSource_ToParam,
-    kPOS_HandleSource_FromLastUsed
+    kPOS_HandleSource_FromLastUsed,
+    kPOS_HandleSource_FromDefault
 };
 
 
@@ -59,14 +60,20 @@ typedef struct pos_support_edge_meta {
  */
 typedef struct pos_support_api_meta {
     std::string name;
-    bool customize;
     pos_api_type_t api_type;
     std::vector<std::string> dependent_headers;
+
+    // ========== fields for parser ==========
+    bool customize_parser;
     std::vector<pos_support_edge_meta_t*> create_edges;
     std::vector<pos_support_edge_meta_t*> delete_edges;
     std::vector<pos_support_edge_meta_t*> in_edges;
     std::vector<pos_support_edge_meta_t*> out_edges;
     std::vector<pos_support_edge_meta_t*> inout_edges;
+
+    // ========== fields for worker ==========
+    bool customize_worker;
+    
 
     ~pos_support_api_meta(){
         for(auto& ptr : create_edges){ delete ptr; }

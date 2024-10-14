@@ -4,8 +4,9 @@ dependent_headers:
   - "cuda.h"
 apis:
   - name: "cudaMalloc"
-    customize: false
     type: "create_resource"
+    # ========== fields for parser ==========
+    customize_parser: false
     create_edges:
       - param_index: 1
         handle_type: "cuda_memory"
@@ -19,10 +20,14 @@ apis:
         handle_source: "from_last_used"
     out_edges:
     inout_edges:
+    # ========== fields for worker ==========
+    customize_worker: true
+    involve_membus: false
 
   - name: "cudaFree"
     customize: false
     type: "delete_resource"
+    # ========== fields for parser ==========
     create_edges:
     delete_edges:
       - param_index: 1
@@ -34,3 +39,6 @@ apis:
         handle_source: "from_last_used"
     out_edges:
     inout_edges:
+    # ========== fields for worker ==========
+    customize_worker: true
+    involve_membus: false
