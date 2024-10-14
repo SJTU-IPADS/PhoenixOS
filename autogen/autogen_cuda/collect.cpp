@@ -6,11 +6,11 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
     pos_support_header_file_meta_t *header_file_meta
 ){
     pos_retval_t retval = POS_SUCCESS;
-    uint64_t i;
+    uint64_t i, k;
     std::string api_type;
     std::vector<std::string> dependent_headers;
     pos_support_api_meta_t *api_meta;
-    YAML::Node config, api, edge, related_edge;
+    YAML::Node config, api, edge, related_edge, constant_param;
 
     POS_CHECK_POINTER(header_file_meta);
 
@@ -28,6 +28,11 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
         POS_CHECK_POINTER(api_meta);
         POS_CHECK_POINTER(edge_list);
 
+        // one API should only create at most one handle at most
+        if(std::string(edge_list_name) == std::string("create_edges")){
+            POS_ASSERT(api[edge_list_name].size() == 1);
+        }
+
         for(j=0; j<api[edge_list_name].size(); j++){
             edge = api[edge_list_name][j];
 
@@ -39,11 +44,11 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
 
             // [2] type of the handle involved in this edge
             handle_type = edge["handle_type"].as<std::string>();
-            edge_meta->handle_type = __get_handle_type_by_name(handle_type);
+            edge_meta->handle_type = get_handle_type_by_name(handle_type);
 
             // [3] source of the handle value involved in this edge
             handle_source = edge["handle_source"].as<std::string>();
-            edge_meta->handle_source = __get_handle_source_by_name(handle_source);
+            edge_meta->handle_source = get_handle_source_by_name(handle_source);
 
             // [4] state_size and expected_addr involved in this edge
             // this field is only for create edge
@@ -52,7 +57,7 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
                     edge_meta->state_size_param_index = edge["state_size_param_index"].as<uint16_t>();
                 } else {
                     POS_WARN_C(
-                        "api %s create edge is provided without state_size_param_index",
+                        "api %s's create edge is provided without state_size_param_index",
                         api_meta->name.c_str()
                     );
                 }
@@ -70,6 +75,7 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
     try {
         config = YAML::LoadFile(file_path);
         header_file_meta->file_name = config["header_file_name"].as<std::string>();
+        header_file_meta->successful_retval = config["successful_retval"].as<std::string>();
 
         if(config["dependent_headers"]){
             for(i=0; i<config["dependent_headers"].size(); i++){
@@ -127,6 +133,23 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             if(unlikely(POS_SUCCESS != (
                 retval = __parse_edges(api_meta, "inout_edges", &api_meta->inout_edges)
             ))){ goto exit; }
+
+            // whether this API involve operating on memory bus
+            api_meta->involve_membus = api["involve_membus"].as<bool>();
+
+            // record all constant parameter values of this API
+            for(k=0; k<api["constant_params"].size(); k++){
+                constant_param = api["constant_params"][k];
+                if(unlikely(api_meta->constant_params.count(constant_param["index"].as<uint16_t>()-1) > 0)){
+                    POS_WARN_C(
+                        "duplicated constant parameter value detected, overwrite: api_name(%s), param_index(%u)",
+                        api_meta->name.c_str(), constant_param["index"].as<uint16_t>()
+                    );
+                }
+                api_meta->constant_params.insert(
+                    { constant_param["index"].as<uint16_t>()-1, constant_param["value"].as<std::string>() }
+                );
+            }
 
             header_file_meta->api_map.insert({ api_meta->name, api_meta });
         }
@@ -218,9 +241,10 @@ pos_retval_t POSAutogener::__collect_vendor_header_file(
                     arg_cursor = clang_Cursor_getArgument(cursor, i);
                     param_meta->name = clang_getCursorSpelling(arg_cursor);
                     param_meta->type = clang_getCursorType(arg_cursor);
+                    param_meta->is_pointer = param_meta->type.kind == CXType_Pointer;
                 }
             }
-        
+
         cursor_traverse_exit:
             return CXChildVisit_Recurse;
         },
