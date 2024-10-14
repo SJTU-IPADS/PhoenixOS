@@ -80,8 +80,17 @@ typedef struct pos_support_api_meta {
     std::vector<pos_support_edge_meta_t*> inout_edges;
 
     // ========== fields for worker ==========
+    // whether to customize worker function's logic
     bool customize_worker;
+
+    // whether the worker function involves operation on memory bus
     bool involve_membus;
+
+    // whether it needs to sync the stream after execute the worker function
+    bool need_stream_sync;
+
+    // map of parameters with constant values
+    // index of the parameter -> constant value
     std::map<uint16_t, std::string> constant_params;
 
     ~pos_support_api_meta(){
