@@ -239,3 +239,57 @@ apis:
     constant_params:
       - index: 4
         value: "cudaMemcpyDeviceToDevice"
+
+  # cudaError_t cudaMemset ( void* devPtr, int  value, size_t count )
+  - name: "cudaMemset"
+    parent_name: "cudaMemset"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "set_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 0
+        handle_type: "cuda_device"
+        handle_source: "from_last_used"
+      - param_index: 0
+        handle_type: "cuda_stream"
+        handle_source: "from_default"
+    out_edges:
+      - param_index: 1
+        handle_type: "cuda_memory"
+        handle_source: "from_param"
+    inout_edges:
+    # worker
+    involve_membus: true
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaMemsetAsync ( void* devPtr, int  value, size_t count, cudaStream_t stream = 0 )
+  - name: "cudaMemsetAsync"
+    parent_name: "cudaMemsetAsync"
+    customize_parser: false
+    customize_worker: false
+    is_sync: false
+    # parser
+    type: "set_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 0
+        handle_type: "cuda_device"
+        handle_source: "from_last_used"
+      - param_index: 4
+        handle_type: "cuda_stream"
+        handle_source: "from_param"
+    out_edges:
+      - param_index: 1
+        handle_type: "cuda_memory"
+        handle_source: "from_param"
+    inout_edges:
+    # worker
+    involve_membus: true
+    need_stream_sync: false
+    constant_params:
