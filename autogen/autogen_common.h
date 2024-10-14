@@ -73,7 +73,7 @@ typedef struct pos_support_api_meta {
 
     // ========== fields for worker ==========
     bool customize_worker;
-    
+
 
     ~pos_support_api_meta(){
         for(auto& ptr : create_edges){ delete ptr; }
@@ -189,6 +189,7 @@ class POSAutogener {
     // file name -> metadata
     std::map<std::string, pos_support_header_file_meta_t*> _supported_header_file_meta_map;
     
+
     /*!
      *  \brief  collect all APIs from a yaml file that records pos-supported information
      *  \note   this function is implemeneted by each target
@@ -200,7 +201,6 @@ class POSAutogener {
         const std::string& file_path,
         pos_support_header_file_meta_t *header_file_meta
     );
-
 
     /*!
      *  \brief  collect all APIs from a single vendor header file
@@ -228,6 +228,17 @@ class POSAutogener {
     );
 
     /*!
+     *  \brief  generate the worker logic of an API
+     *  \param  vendor_api_meta     metadata of the parsed vendor API
+     *  \param  support_api_meta    metadata of the pos-supported API
+     *  \return POS_SUCCESS for successfully generated
+     */
+    pos_retval_t __generate_api_worker(
+        pos_vendor_api_meta_t* vendor_api_meta,
+        pos_support_api_meta_t* support_api_meta
+    );
+
+    /*!
      *  \brief  insert target-specific parser code of the API
      *  \note   this function is implemeneted by each target
      *  \param  vendor_api_meta         metadata of the parsed vendor API
@@ -245,5 +256,25 @@ class POSAutogener {
         POSCodeGen_CppBlock *ps_function_namespace,
         POSCodeGen_CppBlock *api_namespace,
         POSCodeGen_CppBlock *parser_function
+    );
+
+    /*!
+     *  \brief  insert target-specific worker code of the API
+     *  \note   this function is implemeneted by each target
+     *  \param  vendor_api_meta         metadata of the parsed vendor API
+     *  \param  support_api_meta        metadata of the pos-supported API
+     *  \param  worker_file             source file
+     *  \param  wk_function_namespace   code block of the outer namespace
+     *  \param  api_namespace           code block of the API's namespace
+     *  \param  worker_function         code block of the worker function
+     *  \return POS_SUCCESS for successfully generated
+     */
+    pos_retval_t __insert_code_worker_for_target(
+        pos_vendor_api_meta_t* vendor_api_meta,
+        pos_support_api_meta_t* support_api_meta,
+        POSCodeGen_CppSourceFile* worker_file,
+        POSCodeGen_CppBlock *wk_function_namespace,
+        POSCodeGen_CppBlock *api_namespace,
+        POSCodeGen_CppBlock *worker_function
     );
 };
