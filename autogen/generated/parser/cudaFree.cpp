@@ -16,10 +16,10 @@ namespace cuda_free
 	{
 		pos_retval_t retval = POS_SUCCESS;
 		POSClient_CUDA *client;
-		POSHandleManager_CUDA_Device *hm_device
-		POSHandle_CUDA_Device *device_handle_0
-		POSHandleManager_CUDA_Memory *hm_memory
-		POSHandle_CUDA_Memory *memory_handle_0
+		POSHandleManager_CUDA_Device *hm_device;
+		POSHandle_CUDA_Device *device_handle_0;
+		POSHandleManager_CUDA_Memory *hm_memory;
+		POSHandle_CUDA_Memory *memory_handle_0;
 
 		POS_CHECK_POINTER(wqe);
 		POS_CHECK_POINTER(ws);
@@ -69,6 +69,7 @@ namespace cuda_free
 		// launch the op to the dag
 		retval = client->dag.launch_op(wqe);
 
+		// parser exit
 		exit:
 
 		return retval;
