@@ -39,15 +39,18 @@ typedef struct pos_support_edge_meta {
     uint16_t index;
 
     // type of the handle involved in this edge
-    uint32_t type;
+    uint32_t handle_type;
 
     // source of the handle value involved in this edge
-    pos_handle_source_typeid_t source;
+    pos_handle_source_typeid_t handle_source;
 
-    // other related handles involved in this edge
-    // this field is only for create edges
-    // map: typeid -> edge lists
-    std::map<uint32_t, std::vector<struct pos_support_edge_meta*>> related;
+    // index of the parameter that indicate the expected handle address
+    // this field is only used by create edge
+    uint16_t expected_addr_param_index;
+
+    // index of the parameter that indicate the resource state size behind this handle
+    // this field is only used by create edge
+    uint16_t state_size_param_index;
 } pos_support_edge_meta_t;
 
 

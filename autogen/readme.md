@@ -8,5 +8,5 @@ For CUDA:
 
 ```bash
 export POS_BUILD_TARGET=cuda
-LD_LIBRARY_PATH=../../lib/ ./pos_autogen -s ../autogen_cuda/supported/11.3 -d /usr/local/cuda/include
+LD_LIBRARY_PATH=../../lib/ ./pos_autogen -s ../autogen_cuda/supported/11.3 -d /usr/local/cuda/include -g ../generated
 ```
