@@ -203,7 +203,7 @@ pos_retval_t POSAutogener::generate_pos_src(){
             support_api_meta = api_map_iter->second;
             POS_CHECK_POINTER(support_api_meta);
 
-            // generate parser and worker logic
+            // generate parser logic
             POS_LOG_C("generating parser logic for API %s...", api_name.c_str());
             if(unlikely(POS_SUCCESS != (
                 retval = this->__generate_api_parser(vendor_api_meta, support_api_meta)
@@ -212,6 +212,16 @@ pos_retval_t POSAutogener::generate_pos_src(){
             }
             POS_BACK_LINE;
             POS_LOG_C("generating parser logic for API %s: [done]", api_name.c_str());
+
+            // generate worker logic
+            POS_LOG_C("generating worker logic for API %s...", api_name.c_str());
+            if(unlikely(POS_SUCCESS != (
+                retval = this->__generate_api_worker(vendor_api_meta, support_api_meta)
+            ))){
+                POS_ERROR_C("generating worker logic for API %s..., failed", api_name.c_str());
+            }
+            POS_BACK_LINE;
+            POS_LOG_C("generating worker logic for API %s: [done]", api_name.c_str());
         }
     }
 
@@ -229,8 +239,11 @@ pos_retval_t POSAutogener::__generate_api_parser(
     POSCodeGen_CppBlock *ps_function_namespace, *api_namespace, *parser_function;
     std::string api_snake_name;
 
+    POS_CHECK_POINTER(vendor_api_meta);
+    POS_CHECK_POINTER(support_api_meta);
+
     // for those APIs to be customized logic, we just omit
-    if(support_api_meta->customize == true){
+    if(support_api_meta->customize_parser == true){
         goto exit;
     }
 
@@ -311,6 +324,107 @@ pos_retval_t POSAutogener::__generate_api_parser(
     }
 
     parser_file->archive();
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSAutogener::__generate_api_worker(
+    pos_vendor_api_meta_t* vendor_api_meta,
+    pos_support_api_meta_t* support_api_meta
+){
+    pos_retval_t retval = POS_SUCCESS;
+    uint64_t i;
+    std::string api_snake_name;
+    POSCodeGen_CppSourceFile *worker_file;
+    POSCodeGen_CppBlock *wk_function_namespace, *api_namespace, *worker_function;
+
+    POS_CHECK_POINTER(vendor_api_meta);
+    POS_CHECK_POINTER(support_api_meta);
+
+    // for those APIs to be customized logic, we just omit
+    if(support_api_meta->customize_worker == true){
+        goto exit;
+    }
+
+    api_snake_name = posautogen_utils_camel2snake(support_api_meta->name);
+
+    // create worker file
+    worker_file = new POSCodeGen_CppSourceFile(
+        this->worker_directory 
+        + std::string("/")
+        + support_api_meta->name
+        + std::string(".cpp")
+    );
+    POS_CHECK_POINTER(worker_file);
+    
+    // add basic headers to the worker file
+    worker_file->add_include("#include <iostream>");
+    worker_file->add_include("#include \"pos/include/common.h\"");
+    worker_file->add_include("#include \"pos/include/client.h\"");
+    for(i=0; i<support_api_meta->dependent_headers.size(); i++){
+        worker_file->add_include(std::format("#include <{}>", support_api_meta->dependent_headers[i]));
+    }
+
+    // create wk_function namespace
+    wk_function_namespace = new POSCodeGen_CppBlock(
+        /* field name */ "namespace wk_functions",
+        /* need_braces */ true,
+        /* need_foot_comment */ true
+    );
+    POS_CHECK_POINTER(wk_function_namespace);
+    worker_file->add_block(wk_function_namespace);
+
+    // create api namespace
+    retval = wk_function_namespace->allocate_block(
+        /* field name */ std::string("namespace ") + api_snake_name,
+        /* new_block */ &api_namespace,
+        /* need_braces */ true,
+        /* need_foot_comment */ true,
+        /* level_offset */ 0
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for api namespace while generating worker function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(api_namespace);
+
+    // create function POS_RT_FUNC_PARSER
+    retval = api_namespace->allocate_block(
+        /* field name */ std::string("POS_WK_FUNC_LAUNCH()"),
+        /* new_block */ &worker_function,
+        /* need_braces */ true,
+        /* need_foot_comment */ false,
+        /* level_offset */ 1
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to allocate cpp block for POS_WK_FUNC_LAUNCH while generating worker function: "
+            "api_name(%s)",
+            api_snake_name
+        );
+    }
+    POS_CHECK_POINTER(worker_function);
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->__insert_code_worker_for_target(
+            vendor_api_meta,
+            support_api_meta,
+            worker_file,
+            wk_function_namespace,
+            api_namespace,
+            worker_function
+        )
+    ))){
+        POS_WARN_C("failed to generate worker when inserted target-specific code");
+        goto exit;
+    }
+
+    worker_file->archive();
 
 exit:
     return retval;
