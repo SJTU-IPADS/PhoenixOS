@@ -55,7 +55,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                 // this parameter is the handle to be created
                 param_str = std::string("&__create_handle__");
             } else {
-                // this parameter is other in/out/inout/delete handles / values / address / constant value
+                // this parameter is other in/out/inout/delete handles / values / constant value
                 is_param_formed = false;
                 
                 // try form as constant value
@@ -68,21 +68,21 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                 for(j=0; j<support_api_meta->in_edges.size() && !is_param_formed; j++){
                     POS_CHECK_POINTER(other_edge = support_api_meta->in_edges[j]);
                     if(other_edge->index - 1 == i){
-                        param_str = std::format("pos_api_input_handle_offset_server_addr(wqe, {})", i);
+                        param_str = std::format("pos_api_input_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
                     }
                 }
                 for(j=0; j<support_api_meta->out_edges.size() && !is_param_formed; j++){
                     POS_CHECK_POINTER(other_edge = support_api_meta->out_edges[j]);
                     if(other_edge->index - 1 == i){
-                        param_str = std::format("pos_api_output_handle_offset_server_addr(wqe, {})", i);
+                        param_str = std::format("pos_api_output_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
                     }
                 }
                 for(j=0; j<support_api_meta->inout_edges.size() && !is_param_formed; j++){
                     POS_CHECK_POINTER(other_edge = support_api_meta->inout_edges[j]);
                     if(other_edge->index - 1 == i){
-                        param_str = std::format("pos_api_inout_handle_offset_server_addr(wqe, {})", i);
+                        param_str = std::format("pos_api_inout_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
                     }
                 }
@@ -95,18 +95,26 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                     }
                 }
 
-                // try form as values / address
-                if(api_param->is_pointer && !is_param_formed){
-                    param_str = std::format("pos_api_param_addr(wqe, {})", i);
-                    is_param_formed = true;
-                }
-                if (!api_param->is_pointer && !is_param_formed){
+                // try form as values
+                if (!is_param_formed){
                     param_str = std::format(
                         "pos_api_param_value(wqe, {}, {})",
                         i, clang_getCString(clang_getTypeSpelling(api_param->type))
                     );
                     is_param_formed = true;
                 }
+
+                // if(api_param->is_pointer && !is_param_formed){
+                //     param_str = std::format("pos_api_param_addr(wqe, {})", i);
+                //     is_param_formed = true;
+                // }
+                // if (!api_param->is_pointer && !is_param_formed){
+                //     param_str = std::format(
+                //         "pos_api_param_value(wqe, {}, {})",
+                //         i, clang_getCString(clang_getTypeSpelling(api_param->type))
+                //     );
+                //     is_param_formed = true;
+                // }
             }
             POS_ASSERT(param_str.size() > 0);
 
@@ -140,7 +148,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
             POS_CHECK_POINTER(support_api_meta->in_edges[k]);
             if(support_api_meta->in_edges[k]->handle_type == kPOS_ResourceTypeId_CUDA_Stream){
                 stream_source = support_api_meta->in_edges[k]->handle_source;
-                stream_param_index = support_api_meta->in_edges[k]->index;
+                stream_param_index = k;
                 break;
             }
             if(k == support_api_meta->in_edges.size()-1){
