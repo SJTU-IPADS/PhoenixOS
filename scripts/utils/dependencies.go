@@ -4,9 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -41,59 +38,24 @@ func CheckCommandExists(command string, logger *log.Logger) error {
 	return err
 }
 
-func CheckGppVersion(desiredVersion int, logger *log.Logger) (int, error) {
-	versionOutput, err := exec.Command("g++", "--version").Output()
+func CheckGppVersion(desiredVersion int, logger *log.Logger) error {
+	// anyway, try register the desired version to the system
+	register_script := fmt.Sprintf(`
+		#!/bin/bash
+		update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-%v %v
+		`,
+		desiredVersion, desiredVersion,
+	)
+	_, err := BashScriptGetOutput(register_script, true, logger)
 	if err != nil {
-		logger.Fatalf("failed to obtain g++ version: %s", err)
+		return errors.New("no desired g++ version was founded")
 	}
 
-	re := regexp.MustCompile(`\d+\.\d+`)
-	match := re.FindString(string(versionOutput))
-	if match == "" {
-		logger.Fatalf("failed to extract g++ version")
-	}
-
-	majorVersion, err := strconv.Atoi(strings.Split(match, ".")[0])
-	if err != nil {
-		logger.Fatalf("failed to major g++ version")
-	}
-
-	if majorVersion < desiredVersion {
-		// try to switch to higher version
-		switch_script := fmt.Sprintf(`
-				#!/bin/bash
-				update-alternatives --set g++ /usr/bin/g++-%v
-			`,
-			desiredVersion,
-		)
-		_, err := BashScriptGetOutput(switch_script, true, logger)
-		if err != nil {
-			return majorVersion, errors.New("no desired g++ version was founded")
-		} else {
-			// switch back
-			switch_script = fmt.Sprintf(`
-					#!/bin/bash
-					update-alternatives --set g++ /usr/bin/g++-%v
-				`,
-				majorVersion,
-			)
-			_, err := BashScriptGetOutput(switch_script, true, logger)
-			if err != nil {
-				logger.Fatalf(
-					"failed to switch back to old g++ version after finishing checking: old(%v), desired(%v)",
-					majorVersion, desiredVersion,
-				)
-			}
-			return desiredVersion, nil
-		}
-
-	}
-
-	return majorVersion, nil
+	return nil
 }
 
 func SwitchGppVersion(desiredVersion int, logger *log.Logger) {
-	if _, err := CheckGppVersion(desiredVersion, logger); err != nil {
+	if err := CheckGppVersion(desiredVersion, logger); err != nil {
 		logger.Infof("no g++-%v installed, installing...", desiredVersion)
 		install_script := fmt.Sprintf(`
 				#!/bin/bash
@@ -122,7 +84,7 @@ func SwitchGppVersion(desiredVersion int, logger *log.Logger) {
 	)
 	_, err := BashScriptGetOutput(switch_script, true, logger)
 	if err != nil {
-		logger.Fatalf("failed to switch g++ to g++-%v: %v", switch_script, err)
+		logger.Fatalf("failed to switch g++ to g++-%v: %v", desiredVersion, err)
 	}
 	logger.Infof("switch g++ version to g++-%v", desiredVersion)
 }

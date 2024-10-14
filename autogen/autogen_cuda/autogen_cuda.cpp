@@ -1,79 +1,108 @@
 #include "autogen_cuda.h"
 
 
+const uint32_t __get_handle_type_by_name(std::string& handle_type){
+    if(handle_type == std::string("cuda_context")){
+        return kPOS_ResourceTypeId_CUDA_Context;
+    } else if(handle_type == std::string("cuda_module")){
+        return kPOS_ResourceTypeId_CUDA_Module;
+    } else if(handle_type == std::string("cuda_function")){
+        return kPOS_ResourceTypeId_CUDA_Function;
+    } else if(handle_type == std::string("cuda_var")){
+        return kPOS_ResourceTypeId_CUDA_Var;
+    } else if(handle_type == std::string("cuda_device")){
+        return kPOS_ResourceTypeId_CUDA_Device;
+    } else if(handle_type == std::string("cuda_memory")){
+        return kPOS_ResourceTypeId_CUDA_Memory;
+    } else if(handle_type == std::string("cuda_stream")){
+        return kPOS_ResourceTypeId_CUDA_Stream;
+    } else if(handle_type == std::string("cuda_event")){
+        return kPOS_ResourceTypeId_CUDA_Event;
+    } else {
+        POS_ERROR_DETAIL(
+            "invalid parameter type detected: given_type(%s)", handle_type.c_str()
+        );
+    }
+}
+
+
+const pos_handle_source_typeid_t __get_handle_source_by_name(std::string& handle_source){
+    if(handle_source == std::string("from_param")){
+        return kPOS_HandleSource_FromParam;
+    } else if(handle_source == std::string("to_param")){
+        return kPOS_HandleSource_ToParam;
+    } else if(handle_source == std::string("from_last_used")){
+        return kPOS_HandleSource_FromLastUsed;
+    } else {
+        POS_ERROR_DETAIL(
+            "invalid handle source detected: given_handle_source(%s)", handle_source.c_str()
+        );
+    }
+}
+
+
 pos_retval_t POSAutogener::__collect_pos_support_yaml(
     const std::string& file_path,
     pos_support_header_file_meta_t *header_file_meta
 ){
     pos_retval_t retval = POS_SUCCESS;
-    uint64_t i, j, k;
-    std::string api_type, param_type, handle_source;
+    uint64_t i;
+    std::string api_type;
     std::vector<std::string> dependent_headers;
     pos_support_api_meta_t *api_meta;
-    pos_support_edge_meta_t *resource_meta;
-    YAML::Node config, api, edges, related_edges;
+    YAML::Node config, api, edge, related_edge;
 
     POS_CHECK_POINTER(header_file_meta);
 
     auto __parse_edges = [&](
+        pos_support_api_meta_t* api_meta,
         const char* edge_list_name,
         std::vector<pos_support_edge_meta_t*>* edge_list
     ) -> pos_retval_t {
         pos_retval_t retval = POS_SUCCESS;
+        uint64_t j, k;
+        pos_support_edge_meta_t *edge_meta, *related_edge_meta;
+        std::string handle_type, handle_source, related_handle_type, related_handle_source;
         std::vector<pos_support_edge_meta_t*>* related_handles;
 
-        for(j=0; j<api[edge_list_name].size(); j++){
-            edges = api[edge_list_name][j];
+        POS_CHECK_POINTER(api_meta);
+        POS_CHECK_POINTER(edge_list);
 
-            POS_CHECK_POINTER(edge_list);
-            POS_CHECK_POINTER(resource_meta = new pos_support_edge_meta_t);
-            edge_list->push_back(resource_meta);
+        for(j=0; j<api[edge_list_name].size(); j++){
+            edge = api[edge_list_name][j];
+
+            POS_CHECK_POINTER(edge_meta = new pos_support_edge_meta_t);
+            edge_list->push_back(edge_meta);
             
             // [1] index of the handle in parameter list involved in this edge
-            resource_meta->index = edges["param_index"].as<uint32_t>();
+            edge_meta->index = edge["param_index"].as<uint32_t>();
 
             // [2] type of the handle involved in this edge
-            param_type = edges["resource_type"].as<std::string>();
-            if(param_type == std::string("cuda_memory")){
-                resource_meta->type = kPOS_ResourceTypeId_CUDA_Memory;
-            } else if(param_type == std::string("cuda_stream")){
-                resource_meta->type = kPOS_ResourceTypeId_CUDA_Stream;
-            } else if(param_type == std::string("cuda_event")){
-                resource_meta->type = kPOS_ResourceTypeId_CUDA_Event;
-            } else if(param_type == std::string("cuda_module")){
-                resource_meta->type = kPOS_ResourceTypeId_CUDA_Module;
-            } else if(param_type == std::string("cuda_function")){
-                resource_meta->type = kPOS_ResourceTypeId_CUDA_Function;
-            } else {
-                POS_ERROR_C_DETAIL(
-                    "invalid parameter type detected: api_name(%s), given_type(%s)",
-                    api_meta->name.c_str(), param_type.c_str()
-                );
-            }
+            handle_type = edge["handle_type"].as<std::string>();
+            edge_meta->handle_type = __get_handle_type_by_name(handle_type);
 
             // [3] source of the handle value involved in this edge
-            handle_source = edges["source"].as<std::string>();
-            if(handle_source == std::string("from_param")){
-                resource_meta->source = kPOS_HandleSource_FromParam;
-            } else if(handle_source == std::string("to_param")){
-                resource_meta->source = kPOS_HandleSource_ToParam;
-            } else if(handle_source == std::string("from_last_used")){
-                resource_meta->source = kPOS_HandleSource_FromLastUsed;
-            } else {
-                POS_ERROR_C_DETAIL(
-                    "invalid handle source detected: api_name(%s), edge_list(%s), param_id(%u), given_handle_source(%s)",
-                    api_meta->name.c_str(), edge_list_name, resource_meta->index, param_type.c_str()
-                );
-            }
+            handle_source = edge["handle_source"].as<std::string>();
+            edge_meta->handle_source = __get_handle_source_by_name(handle_source);
 
-            // [4] other related handles involved in this edge
-            // this field is only for create edges
-            if(std::string(edge_list_name) == std::string("create_edges") && edges["related_edges"]){
-                for(k=0; k<edges["related_edges"].size(); k++){
-                    // TODO: how to handle related?
+            // [4] state_size and expected_addr involved in this edge
+            // this field is only for create edge
+            if(std::string(edge_list_name) == std::string("create_edges")){
+                if(edge["state_size_param_index"]){
+                    edge_meta->state_size_param_index = edge["state_size_param_index"].as<uint16_t>();
+                } else {
+                    POS_WARN_C(
+                        "api %s create edge is provided without state_size_param_index",
+                        api_meta->name.c_str()
+                    );
+                }
+
+                if(edge["expected_addr_param_index"]){
+                    edge_meta->expected_addr_param_index = edge["expected_addr_param_index"].as<uint16_t>();
                 }
             }
         }
+
     exit:
         return retval;
     };
@@ -83,8 +112,8 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
         header_file_meta->file_name = config["header_file_name"].as<std::string>();
 
         if(config["dependent_headers"]){
-            for(j=0; j<config["dependent_headers"].size(); j++){
-                dependent_headers.push_back(config["dependent_headers"][j].as<std::string>());
+            for(i=0; i<config["dependent_headers"].size(); i++){
+                dependent_headers.push_back(config["dependent_headers"][i].as<std::string>());
             }
         }
 
@@ -123,19 +152,19 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
 
             // edges to be created by this API
             if(unlikely(POS_SUCCESS != (
-                retval = __parse_edges("create_edges", &api_meta->create_edges)
+                retval = __parse_edges(api_meta, "create_edges", &api_meta->create_edges)
             ))){ goto exit; }
             if(unlikely(POS_SUCCESS != (
-                retval = __parse_edges("delete_edges", &api_meta->delete_edges)
+                retval = __parse_edges(api_meta, "delete_edges", &api_meta->delete_edges)
             ))){ goto exit; }
             if(unlikely(POS_SUCCESS != (
-                retval = __parse_edges("in_edges", &api_meta->in_edges)
+                retval = __parse_edges(api_meta, "in_edges", &api_meta->in_edges)
             ))){ goto exit; }
             if(unlikely(POS_SUCCESS != (
-                retval = __parse_edges("out_edges", &api_meta->out_edges)
+                retval = __parse_edges(api_meta, "out_edges", &api_meta->out_edges)
             ))){ goto exit; }
             if(unlikely(POS_SUCCESS != (
-                retval = __parse_edges("inout_edges", &api_meta->inout_edges)
+                retval = __parse_edges(api_meta, "inout_edges", &api_meta->inout_edges)
             ))){ goto exit; }
 
             header_file_meta->api_map.insert({ api_meta->name, api_meta });
@@ -255,9 +284,9 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
     pos_retval_t retval = POS_SUCCESS;
     std::string api_snake_name;
     std::map<uint32_t, uint32_t> handle_var_map;
+    std::map<std::string, std::vector<std::string>> in_edge_map;
     
     api_snake_name = posautogen_utils_camel2snake(support_api_meta->name);
-
 
     /*!
      *  \brief  insert parser code for processing a single handle involved in the API
@@ -270,18 +299,22 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
      *  \param  handle_typeid   string of the handle type id of the processing handle
      *  \param  handle_type     string of the handle type of the processing handle
      *  \param  handle_name     string of the handle variable name
+     *  \param  in_edge_map     all in edges invole by current API (resource type name -> handles)
+     *                          this field is used by create edge to record all related
+     *                          parent handles of the handle to be created
      */
     auto __insert_code_parse_handle = [&](
         std::string api_snake_name,
         pos_edge_direction_t edge_direction,
         pos_support_edge_meta_t* edge_meta,
-        std::string&& hm_type,
-        std::string&& hm_name,
-        std::string&& handle_typeid,
-        std::string&& handle_type,
-        std::string&& handle_name
+        std::string hm_type,
+        std::string hm_name,
+        std::string handle_typeid,
+        std::string handle_type,
+        std::string handle_name,
+        std::map<std::string, std::vector<std::string>>* in_edge_map = nullptr
     ){
-        std::string edge_direction_str;
+        std::string edge_direction_str, related_handles_str;
         bool is_hm_duplicated, is_handle_duplicated;
         POS_CHECK_POINTER(edge_meta);
 
@@ -323,7 +356,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
             ||  edge_direction == kPOS_Edge_Direction_InOut
         ){
             // case: for in/out/inout edge, obtain handle from handle manager
-            if(edge_meta->source == kPOS_HandleSource_FromLastUsed){
+            if(edge_meta->handle_source == kPOS_HandleSource_FromLastUsed){
                 parser_function->append_content(std::format(
                     "// obtain handle from hm\n"
                     "POS_CHECK_POINTER({} = {}->latest_used_handle);",
@@ -355,94 +388,289 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
             }
         } else if (edge_direction == kPOS_Edge_Direction_Create){
             // case: for create edge, create handle from handle manager
+            POS_CHECK_POINTER(in_edge_map);
+            
+            // the created handle must be returned to a parameter
+            POS_ASSERT(edge_meta->index != 0);
+
+            auto __cast_in_edges_to_related_handle_map = [&]() -> std::string {
+                uint64_t i;
+                std::string retstr, handle_type_name;
+                typename std::map<std::string, std::vector<std::string>>::iterator map_iter;
+
+                for(map_iter = in_edge_map->begin(); map_iter != in_edge_map->end(); map_iter++){
+                    handle_type_name = map_iter->first;
+                    std::vector<std::string> &handle_list = map_iter->second;
+                    if(unlikely(handle_list.size() == 0)) continue;
+                    
+                    // begin of the pair
+                    retstr += std::string("        {\n");
+                    retstr += std::format("            /* id */ {},\n", handle_type_name);
+                    
+                    // begin of the handle list
+                    retstr += std::string("            /* handles */ std::vector<POSHandle*>({\n");
+                    for(i=0; i<handle_list.size(); i++){
+                        retstr += std::format("                 {}", handle_list[i]);
+                        if(i != handle_list.size() - 1){ 
+                            retstr += std::string(", "); 
+                        } else {
+                            retstr += std::string("\n"); 
+                        }
+                    }
+
+                    // end of the handle list
+                    retstr += std::string("            })\n");
+
+                    // end of the pair
+                    if (std::next(map_iter) != in_edge_map->end()) { 
+                        retstr += std::string("        },\n");
+                    } else {
+                        retstr += std::string("        }");
+                    }
+                }
+
+                return retstr;
+            };
+
             parser_function->append_content(std::format(
                 "// create handle in the hm\n"
-                "retval = hm_memory->allocate_mocked_resource(\n"
+                "retval = {}->allocate_mocked_resource(\n"
                 "   /* handle */ &{},\n"
-                "   /* related_handles */"
-                "   /* size */ pos_api_param_value(wqe, {}, size_t)\n",
-                "   /* expected_addr */ 0\n",
-                "   /* state_size */ (uint64_t)pos_api_param_value(wqe, 0, size_t)\n"
+                "   /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{\n"
+                "{}\n"
+                "   }}),\n" 
+                "   /* size */ kPOS_HandleDefaultSize,\n"
+                "   /* expected_addr */ {},\n"
+                "   /* state_size */ {}\n"
+                ");\n"
+                "if(unlikely(retval != POS_SUCCESS)){{\n"
+                "   POS_WARN(\"parse({}): failed to allocate mocked {} resource within the handler manager\");\n"
+                "   memset(pos_api_param_addr(wqe, {}), 0, sizeof(uint64_t));\n"
+                "   goto exit;\n"
+                "}} else {{\n"
+                "   memcpy(pos_api_param_addr(wqe, {}), &({}->client_addr), sizeof(uint64_t));\n"
+                "}}"
                 ,
-                
+                hm_name,
+                handle_name,
+                __cast_in_edges_to_related_handle_map(),
+                edge_meta->expected_addr_param_index != 0
+                    ? std::format("pos_api_param_value(wqe, {}, uint64_t)", edge_meta->expected_addr_param_index - 1)
+                    : std::string("0"),
+                edge_meta->state_size_param_index != 0
+                    ? std::format("pos_api_param_value(wqe, {}, uint64_t)", edge_meta->state_size_param_index - 1)
+                    : std::string("0"),
+                api_snake_name,
+                handle_type,
+                edge_meta->index - 1,
+                edge_meta->index - 1,
+                handle_name
             ));
         } else if (edge_direction == kPOS_Edge_Direction_Delete){
             // case: for delete edge, create handle from handle manager
+            // TODO
         } else {
             POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
         }
 
-
         // step 4: record edge info in the wqe
-        if(edge_meta->source == kPOS_HandleSource_FromLastUsed){
-            //! \note   if the value of the handle comes from latest used
-            //          we need to check the latest used handle recorded 
-            //          in the handle manager
-            parser_function->append_content(std::format(
-                "POS_CHECK_POINTER({}->latest_used_handle);",
-                hm_name
-            ));
-
+        if(edge_meta->index == 0){
+            // the handle isn't occur in the parameter list,
+            // hence no param_index and offset
             parser_function->append_content(std::format(
                 "// record the related handle to QE\n"
                 "wqe->record_handle<{}>({{\n"
-                "   /* handle */ {}->latest_used_handle\n"
+                "   /* handle */ {}\n"
                 "}});"
                 ,
                 edge_direction_str,
-                hm_name
+                handle_name
             ));
-        } else if(edge_meta->source == kPOS_HandleSource_FromParam){
+        } else {
             parser_function->append_content(std::format(
                 "// record the related handle to QE\n"
                 "wqe->record_handle<{}>({{\n"
-                "   /* handle */ {},\n",
-                "   /* param_index */ {},\n",
-                "   /* offset */ pos_api_param_value(wqe, {}, uint64_t) - (uint64_t)({}->client_addr)\n",
+                "   /* handle */ {},\n"
+                "   /* param_index */ {},\n"
+                "   /* offset */ pos_api_param_value(wqe, {}, uint64_t) - (uint64_t)({}->client_addr)\n"
                 "}});"
                 ,
+                edge_direction_str,
                 handle_name,
                 edge_meta->index - 1,
                 edge_meta->index - 1,
                 handle_name
             ));
         }
+        
+
+        // step 5: allocate the handle in the dag
+        if (edge_direction == kPOS_Edge_Direction_Create){
+            parser_function->append_content(std::format(
+                "retval = client->dag.allocate_handle({});\n"
+                "if(unlikely(retval != POS_SUCCESS)){{ goto exit; }}\n",
+                handle_name
+            ));
+        }
     };
+
 
     /*!
      *  \brief  insert parser code for a specific edge list
-     *  \param  edge_list   the edge list to be processed
+     *  \param  edge_direction  direction of the edge
+     *  \param  edge_list       the edge list to be processed
+     *  \param  in_edge_map     record all in/inout handles involved in this API
+     *                          in order to record the related parent handle
+     *                          of the created handle
+     *                          this field is only enabled under API with create_resource type
      */
     auto __insert_code_parse_edge_list = [&](
+        pos_edge_direction_t edge_direction,
         std::vector<pos_support_edge_meta_t*> *edge_list,
+        std::map<std::string, std::vector<std::string>> *in_edge_map = nullptr
     ){
         POS_CHECK_POINTER(edge_list);
-        for(pos_support_edge_meta_t* edge_meta : edge_list){
+        std::string handle_name, handle_typeid;
+
+        for(pos_support_edge_meta_t* edge_meta : *edge_list){
             //! \note   we maintain a handle variable map to
             //          avoid confliction of handle variable name
-            if(handle_var_map.count(edge_meta->type) == 0){
-                handle_var_map[edge_meta->type] = 0;
+            if(handle_var_map.count(edge_meta->handle_type) == 0){
+                handle_var_map[edge_meta->handle_type] = 0;
             } else {
-                handle_var_map[edge_meta->type] = 1;
+                handle_var_map[edge_meta->handle_type] = 1;
             }
 
-            switch(edge_meta->type){
-            case kPOS_ResourceTypeId_CUDA_Memory:
+            switch(edge_meta->handle_type){
+            case kPOS_ResourceTypeId_CUDA_Context:
+                handle_name = std::string("context_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Context");
                 __insert_code_parse_handle(
                     /* api_snake_name */ api_snake_name,
-                    /* edge_direction */ kPOS_Edge_Direction_Create,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Context",
+                    /* hm_name */ "hm_context",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Context",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Module:
+                handle_name = std::string("module_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Module");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Module",
+                    /* hm_name */ "hm_module",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Module",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Function:
+                handle_name = std::string("function_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Function");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Function",
+                    /* hm_name */ "hm_function",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Function",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Var:
+                handle_name = std::string("var_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Var");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Var",
+                    /* hm_name */ "hm_var",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Var",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Device:
+                handle_name = std::string("device_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Device");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Device",
+                    /* hm_name */ "hm_device",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Device",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Memory:
+                handle_name = std::string("memory_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Memory");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
                     /* edge_meta */ edge_meta,
                     /* hm_type */ "POSHandleManager_CUDA_Memory",
                     /* hm_name */ "hm_memory",
-                    /* handle_typeid */ "kPOS_ResourceTypeId_CUDA_Memory",
+                    /* handle_typeid */ handle_typeid,
                     /* handle_type */ "POSHandle_CUDA_Memory",
-                    /* handle_name */ std::string("memory_handle_") 
-                        + std::to_string(handle_var_map[edge_meta->type])
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
                 );
                 break;
-            
+            case kPOS_ResourceTypeId_CUDA_Stream:
+                handle_name = std::string("stream_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Stream");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Stream",
+                    /* hm_name */ "hm_stream",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Stream",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
+            case kPOS_ResourceTypeId_CUDA_Event:
+                handle_name = std::string("event_handle_") + std::to_string(handle_var_map[edge_meta->handle_type]);
+                handle_typeid = std::string("kPOS_ResourceTypeId_CUDA_Event");
+                __insert_code_parse_handle(
+                    /* api_snake_name */ api_snake_name,
+                    /* edge_direction */ edge_direction,
+                    /* edge_meta */ edge_meta,
+                    /* hm_type */ "POSHandleManager_CUDA_Event",
+                    /* hm_name */ "hm_event",
+                    /* handle_typeid */ handle_typeid,
+                    /* handle_type */ "POSHandle_CUDA_Event",
+                    /* handle_name */ handle_name,
+                    /* in_edge_map */ in_edge_map
+                );
+                break;
             default:
                 POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
+            }
+
+            // record the related parent handle of the created handle
+            if(edge_direction == kPOS_Edge_Direction_In || edge_direction == kPOS_Edge_Direction_InOut){
+                if(in_edge_map != nullptr){ // in_edge_map should be provided when this API is of type create_resource
+                    (*in_edge_map)[handle_typeid].push_back(handle_name);
+                }
             }
         }
     };
@@ -496,28 +724,45 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
     ));
 
     // step 5: processing handles
-    for(pos_support_edge_meta_t* edge_meta : support_api_meta->create_edges){
-        switch(edge_meta->type){
-        case kPOS_ResourceTypeId_CUDA_Memory:
-            __insert_code_parse_handle(
-                /* api_snake_name */ api_snake_name,
-                /* edge_direction */ kPOS_Edge_Direction_Create,
-                /* edge_meta */ edge_meta,
-                /* hm_type */ "POSHandleManager_CUDA_Memory",
-                /* hm_name */ "hm_memory",
-                /* handle_typeid */ "kPOS_ResourceTypeId_CUDA_Memory",
-                /* handle_type */ "POSHandle_CUDA_Memory",
-                /* handle_name */ "memory_handle"
-            );
-            break;
-        default:
-            POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
-        }
+    __insert_code_parse_edge_list(
+        /* edge_direction */ kPOS_Edge_Direction_In,
+        /* edge_list */ &support_api_meta->in_edges,
+        /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
+    );
+    __insert_code_parse_edge_list(
+        /* edge_direction */ kPOS_Edge_Direction_Out,
+        /* edge_list */ &support_api_meta->out_edges,
+        /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
+    );
+    __insert_code_parse_edge_list(
+        /* edge_direction */ kPOS_Edge_Direction_InOut,
+        /* edge_list */ &support_api_meta->inout_edges,
+        /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
+    );
+    __insert_code_parse_edge_list(
+        /* edge_direction */ kPOS_Edge_Direction_Delete,
+        /* edge_list */ &support_api_meta->delete_edges,
+        /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
+    );
+    __insert_code_parse_edge_list(
+        /* edge_direction */ kPOS_Edge_Direction_Create,
+        /* edge_list */ &support_api_meta->create_edges,
+        /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
+    );
+
+    // step 6: launch the wqe to the queue to worker
+    parser_function->append_content(std::string(
+        "// launch the op to the dag\n"
+        "retval = client->dag.launch_op(wqe);"
+    ));
+
+    // step 7: exit processing
+    parser_function->append_content("exit:");
+    if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
+        parser_function->append_content("wqe->status = kPOS_API_Execute_Status_Return_After_Parse;");
     }
-
-    // step 5: launch the wqe to the queue to worker
-    parser_function->append_content(std::string("retval = client->dag.launch_op(wqe);"));
-
+    parser_function->append_content("return retval;");
+    
 exit:
     return retval;
 }

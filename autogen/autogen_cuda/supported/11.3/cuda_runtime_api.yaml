@@ -1,23 +1,22 @@
 header_file_name: "cuda_runtime_api.h"
 dependent_headers:
   - "cuda_runtime_api.h"
+  - "cuda.h"
 apis:
   - name: "cudaMalloc"
     customize: false
     type: "create_resource"
     create_edges:
       - param_index: 1
-        resource_type: "cuda_memory"
-        source: "to_param"
-        related_edges:
-          - param_index: 0
-            resource_type: "cuda_device"
-            source: "from_last_used"
+        handle_type: "cuda_memory"
+        handle_source: "to_param"
+        state_size_param_index: 2
+        expected_addr_param_index: 0
     delete_edges:
     in_edges:
       - param_index: 0
-        resource_type: "cuda_device"
-        source: "from_last_used"
+        handle_type: "cuda_device"
+        handle_source: "from_last_used"
     out_edges:
     inout_edges:
 
@@ -27,11 +26,11 @@ apis:
     create_edges:
     delete_edges:
       - param_index: 1
-        resource_type: "cuda_memory"
-        source: "from_param"
+        handle_type: "cuda_memory"
+        handle_source: "from_param"
     in_edges:
       - param_index: 0
-        resource_type: "cuda_device"
-        source: "from_last_used"
+        handle_type: "cuda_device"
+        handle_source: "from_last_used"
     out_edges:
     inout_edges:
