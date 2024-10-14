@@ -2,10 +2,11 @@ header_file_name: "cuda_runtime_api.h"
 dependent_headers:
   - "cuda_runtime_api.h"
   - "cuda.h"
+successful_retval: "cudaSuccess"
 apis:
+  # ========== ​cudaError_t cudaMalloc ( void** devPtr, size_t size ) ==========
   - name: "cudaMalloc"
     type: "create_resource"
-    # ========== fields for parser ==========
     customize_parser: false
     create_edges:
       - param_index: 1
@@ -18,16 +19,19 @@ apis:
       - param_index: 0
         handle_type: "cuda_device"
         handle_source: "from_last_used"
+      - param_index: 0
+        handle_type: "cuda_stream"
+        handle_source: "from_default"
     out_edges:
     inout_edges:
-    # ========== fields for worker ==========
     customize_worker: true
     involve_membus: false
+    constant_params:
 
+  # ========== ​cudaError_t cudaFree ( void* devPtr ) ==========
   - name: "cudaFree"
-    customize: false
+    customize_parser: false
     type: "delete_resource"
-    # ========== fields for parser ==========
     create_edges:
     delete_edges:
       - param_index: 1
@@ -37,8 +41,11 @@ apis:
       - param_index: 0
         handle_type: "cuda_device"
         handle_source: "from_last_used"
+      - param_index: 0
+        handle_type: "cuda_stream"
+        handle_source: "from_default"
     out_edges:
     inout_edges:
-    # ========== fields for worker ==========
     customize_worker: true
     involve_membus: false
+    constant_params:

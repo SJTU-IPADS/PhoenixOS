@@ -1,6 +1,23 @@
 #include "autogen_common.h"
 
 
+pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source){
+    if(handle_source == std::string("from_param")){
+        return kPOS_HandleSource_FromParam;
+    } else if(handle_source == std::string("to_param")){
+        return kPOS_HandleSource_ToParam;
+    } else if(handle_source == std::string("from_last_used")){
+        return kPOS_HandleSource_FromLastUsed;
+    } else if(handle_source == std::string("from_default")){
+        return kPOS_HandleSource_FromDefault;
+    } else {
+        POS_ERROR_DETAIL(
+            "invalid handle source detected: given_handle_source(%s)", handle_source.c_str()
+        );
+    }
+}
+
+
 pos_retval_t POSAutogener::collect_pos_support_yamls(){
     pos_retval_t retval = POS_SUCCESS;
     pos_support_header_file_meta_t *header_file_meta;
@@ -216,7 +233,12 @@ pos_retval_t POSAutogener::generate_pos_src(){
             // generate worker logic
             POS_LOG_C("generating worker logic for API %s...", api_name.c_str());
             if(unlikely(POS_SUCCESS != (
-                retval = this->__generate_api_worker(vendor_api_meta, support_api_meta)
+                retval = this->__generate_api_worker(
+                    vendor_header_file_meta,
+                    supported_header_file_meta,
+                    vendor_api_meta,
+                    support_api_meta
+                )
             ))){
                 POS_ERROR_C("generating worker logic for API %s..., failed", api_name.c_str());
             }
@@ -331,6 +353,8 @@ exit:
 
 
 pos_retval_t POSAutogener::__generate_api_worker(
+    pos_vendor_header_file_meta_t* vender_header_file_meta,
+    pos_support_header_file_meta_t* support_header_file_meta,
     pos_vendor_api_meta_t* vendor_api_meta,
     pos_support_api_meta_t* support_api_meta
 ){
@@ -412,6 +436,8 @@ pos_retval_t POSAutogener::__generate_api_worker(
 
     if(unlikely(POS_SUCCESS != (
         retval = this->__insert_code_worker_for_target(
+            vender_header_file_meta,
+            support_header_file_meta,
             vendor_api_meta,
             support_api_meta,
             worker_file,

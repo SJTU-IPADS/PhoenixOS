@@ -33,6 +33,14 @@ enum pos_handle_source_typeid_t : uint8_t {
 
 
 /*!
+ *  \brief  obtain handle source type according to given string from yaml file
+ *  \param  handle_source   given string
+ *  \return the corresponding handle source type
+ */
+pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source);
+
+
+/*!
  *  \brief  metadata of a parameter of an supported API
  */
 typedef struct pos_support_edge_meta {
@@ -73,7 +81,8 @@ typedef struct pos_support_api_meta {
 
     // ========== fields for worker ==========
     bool customize_worker;
-
+    bool involve_membus;
+    std::map<uint16_t, std::string> constant_params;
 
     ~pos_support_api_meta(){
         for(auto& ptr : create_edges){ delete ptr; }
@@ -92,6 +101,9 @@ typedef struct pos_support_header_file_meta {
     std::string file_name;
     std::map<std::string, pos_support_api_meta_t*> api_map;
 
+    // retval value under current processed vendor header file
+    std::string successful_retval;
+
     ~pos_support_header_file_meta(){
         std::map<std::string, pos_support_api_meta_t*>::iterator map_iter;
         for(map_iter=api_map.begin(); map_iter!=api_map.end(); map_iter++){
@@ -107,6 +119,7 @@ typedef struct pos_support_header_file_meta {
 typedef struct pos_vendor_param_meta {
     CXString name;
     CXType type;
+    bool is_pointer;
 
     ~pos_vendor_param_meta(){
         clang_disposeString(name);
@@ -229,11 +242,15 @@ class POSAutogener {
 
     /*!
      *  \brief  generate the worker logic of an API
-     *  \param  vendor_api_meta     metadata of the parsed vendor API
-     *  \param  support_api_meta    metadata of the pos-supported API
+     *  \param  vender_header_file_meta     metadata of the parsed vender header file
+     *  \param  support_header_file_meta    metadata of the pos-supported header file
+     *  \param  vendor_api_meta             metadata of the parsed vendor API
+     *  \param  support_api_meta            metadata of the pos-supported API
      *  \return POS_SUCCESS for successfully generated
      */
     pos_retval_t __generate_api_worker(
+        pos_vendor_header_file_meta_t* vender_header_file_meta,
+        pos_support_header_file_meta_t* support_header_file_meta,
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta
     );
@@ -261,15 +278,19 @@ class POSAutogener {
     /*!
      *  \brief  insert target-specific worker code of the API
      *  \note   this function is implemeneted by each target
-     *  \param  vendor_api_meta         metadata of the parsed vendor API
-     *  \param  support_api_meta        metadata of the pos-supported API
-     *  \param  worker_file             source file
-     *  \param  wk_function_namespace   code block of the outer namespace
-     *  \param  api_namespace           code block of the API's namespace
-     *  \param  worker_function         code block of the worker function
+     *  \param  vender_header_file_meta     metadata of the parsed vender header file
+     *  \param  support_header_file_meta    metadata of the pos-supported header file
+     *  \param  vendor_api_meta             metadata of the parsed vendor API
+     *  \param  support_api_meta            metadata of the pos-supported API
+     *  \param  worker_file                 source file
+     *  \param  wk_function_namespace       code block of the outer namespace
+     *  \param  api_namespace               code block of the API's namespace
+     *  \param  worker_function             code block of the worker function
      *  \return POS_SUCCESS for successfully generated
      */
     pos_retval_t __insert_code_worker_for_target(
+        pos_vendor_header_file_meta_t* vender_header_file_meta,
+        pos_support_header_file_meta_t* support_header_file_meta,
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta,
         POSCodeGen_CppSourceFile* worker_file,

@@ -87,20 +87,41 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
             // case: for in/out/inout edge, obtain handle from handle manager
             if(edge_meta->handle_source == kPOS_HandleSource_FromLastUsed){
                 parser_function->append_content(std::format(
-                    "// obtain handle from hm\n"
+                    "// obtain handle from hm (use latest used handle)\n"
                     "POS_CHECK_POINTER({} = {}->latest_used_handle);",
                     handle_name, hm_name
                 ));
+            } else if(edge_meta->handle_source == kPOS_HandleSource_FromDefault){
+                parser_function->append_content(std::format(
+                    "// obtain handle from hm (use default handle)\n"
+                    "retval = {}->get_handle_by_client_addr(\n"
+                    "   /* client_addr */ 0,\n"
+                    "   /* handle */ &{}\n"
+                    ");"
+                    "if(unlikely(retval != POS_SUCCESS)){{\n"
+                    "   POS_WARN(\n"
+                    "       \"parse({}): no {} was founded: client_addr(0)\"\n"
+                    "   );\n"
+                    "   goto exit;\n"
+                    "}}\n"
+                    "POS_CHECK_POINTER({});"
+                    ,
+                    hm_name,
+                    handle_name,
+                    api_snake_name,
+                    hm_type,
+                    handle_name
+                ));
             } else {
                 parser_function->append_content(std::format(
-                    "// obtain handle from hm\n"
+                    "// obtain handle from hm (use handle specified by parameter)\n"
                     "retval = {}->get_handle_by_client_addr(\n"
                     "   /* client_addr */ (void*)pos_api_param_value(wqe, {}, uint64_t),"
                     "   /* handle */ &{}\n"
                     ");"
                     "if(unlikely(retval != POS_SUCCESS)){{\n"
                     "   POS_WARN(\n"
-                    "       \"parse({}): no memory was founded: client_addr(%p)\"\n",
+                    "       \"parse({}): no {} was founded: client_addr(%p)\"\n",
                     "       (void*)pos_api_param_value(wqe, {}, uint64_t)\n"
                     "   );\n"
                     "   goto exit;\n"
@@ -111,6 +132,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                     edge_meta->index - 1,
                     handle_name,
                     api_snake_name,
+                    hm_type,
                     edge_meta->index - 1,
                     handle_name
                 ));
@@ -121,6 +143,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
             
             // the created handle must be returned to a parameter
             POS_ASSERT(edge_meta->index != 0);
+            POS_ASSERT(edge_meta->handle_source == kPOS_HandleSource_ToParam);
 
             auto __cast_in_edges_to_related_handle_map = [&]() -> std::string {
                 uint64_t i;

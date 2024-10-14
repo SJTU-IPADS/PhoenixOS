@@ -2,6 +2,8 @@
 
 
 pos_retval_t POSAutogener::__insert_code_worker_for_target(
+    pos_vendor_header_file_meta_t* vendor_header_file_meta,
+    pos_support_header_file_meta_t* support_header_file_meta,
     pos_vendor_api_meta_t* vendor_api_meta,
     pos_support_api_meta_t* support_api_meta,
     POSCodeGen_CppSourceFile* worker_file,
@@ -10,7 +12,118 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     POSCodeGen_CppBlock *worker_function
 ){
     pos_retval_t retval = POS_SUCCESS;
+    std::string create_resource_precheck, delete_resource_precheck;
+    
+    /*!
+     *  \brief  form the parameter list to call the actual function
+     *  \return the string of the parameter list
+     */
+    auto __form_parameter_list = [&]() -> std::string {
+        uint64_t i, j;
+        uint16_t create_handle_param_index;
+        pos_vendor_param_meta_t *api_param;
+        pos_support_edge_meta_t *other_edge;
+        std::string param_list_str, param_str;
+        bool is_var_duplicated, is_param_formed;
+        
+        // if this API is for creating new resource, we need to declare the corresponding
+        // handle var at the begining
+        if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
+            POS_CHECK_POINTER(support_api_meta->create_edges[0]);
+            POS_ASSERT(support_api_meta->create_edges[0]->index > 0);
+            create_handle_param_index = support_api_meta->create_edges[0]->index - 1;
+            POS_ASSERT(create_handle_param_index <= vendor_api_meta->params.size() - 1);
+            POS_CHECK_POINTER(api_param = vendor_api_meta->params[create_handle_param_index]);
 
+            is_var_duplicated = worker_function->declare_var(std::format(
+                "{} __create_handle__ = NULL;",
+                clang_getCString(clang_getTypeSpelling(api_param->type))
+            ));
+            POS_ASSERT(is_var_duplicated == false);
+        }
+
+        param_list_str.clear();
+        for(i=0; i<vendor_api_meta->params.size(); i++){
+            param_str.clear();
+            POS_CHECK_POINTER(api_param = vendor_api_meta->params[i]);
+
+            // find out what is the kind of current parameter
+            if (support_api_meta->api_type == kPOS_API_Type_Create_Resource &&  i == create_handle_param_index){
+                // this parameter is the handle to be created
+                param_str = std::string("&__create_handle__");
+            } else {
+                // this parameter is other in/out/inout/delete handles / values / address / constant value
+                is_param_formed = false;
+                
+                // try form as constant value
+                if(support_api_meta->constant_params.count((uint16_t)(i)) == 1 && !is_param_formed){
+                    param_str = support_api_meta->constant_params[(uint16_t)(i)];
+                    is_param_formed = true;
+                }
+
+                // try form as other handles
+                for(j=0; j<support_api_meta->in_edges.size() && !is_param_formed; j++){
+                    POS_CHECK_POINTER(other_edge = support_api_meta->in_edges[j]);
+                    if(other_edge->index - 1 == i){
+                        param_str = std::format("pos_api_input_handle_offset_server_addr(wqe, {})", i);
+                        is_param_formed = true;
+                    }
+                }
+                for(j=0; j<support_api_meta->out_edges.size() && !is_param_formed; j++){
+                    POS_CHECK_POINTER(other_edge = support_api_meta->out_edges[j]);
+                    if(other_edge->index - 1 == i){
+                        param_str = std::format("pos_api_output_handle_offset_server_addr(wqe, {})", i);
+                        is_param_formed = true;
+                    }
+                }
+                for(j=0; j<support_api_meta->inout_edges.size() && !is_param_formed; j++){
+                    POS_CHECK_POINTER(other_edge = support_api_meta->inout_edges[j]);
+                    if(other_edge->index - 1 == i){
+                        param_str = std::format("pos_api_inout_handle_offset_server_addr(wqe, {})", i);
+                        is_param_formed = true;
+                    }
+                }
+                if (support_api_meta->api_type == kPOS_API_Type_Delete_Resource && !is_param_formed) {
+                    POS_CHECK_POINTER(other_edge = support_api_meta->delete_edges[0]);
+                    POS_ASSERT(other_edge->index > 0);
+                    if(other_edge->index - 1 == i){
+                        param_str = std::format("pos_api_delete_handle(wqe, 0)->server_addr");
+                        is_param_formed = true;
+                    }
+                }
+
+                // try form as values / address
+                if(api_param->is_pointer && !is_param_formed){
+                    param_str = std::format("pos_api_param_addr(wqe, {})", i);
+                    is_param_formed = true;
+                }
+                if (!api_param->is_pointer && !is_param_formed){
+                    param_str = std::format(
+                        "pos_api_param_value(wqe, {}, {})",
+                        i, clang_getCString(clang_getTypeSpelling(api_param->type))
+                    );
+                    is_param_formed = true;
+                }
+            }
+            POS_ASSERT(param_str.size() > 0);
+
+            param_list_str += std::format(
+                "    /* {} */ ({})({})",
+                clang_getCString(api_param->name),
+                clang_getCString(clang_getTypeSpelling(api_param->type)),
+                param_str
+            );
+            if(i != vendor_api_meta->params.size()-1){
+                param_list_str += std::string(",\n");
+            } else {
+                param_list_str += std::string("\n");
+            }
+        }
+        return param_list_str;
+    };
+
+    POS_CHECK_POINTER(vendor_header_file_meta);
+    POS_CHECK_POINTER(support_header_file_meta);
     POS_CHECK_POINTER(vendor_api_meta);
     POS_CHECK_POINTER(support_api_meta);
     POS_CHECK_POINTER(worker_file);
@@ -19,7 +132,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     POS_CHECK_POINTER(worker_function);
 
     // add POS CUDA headers
-    parser_file->add_include("#include \"pos/cuda_impl/worker.h\"");
+    worker_file->add_include("#include \"pos/cuda_impl/worker.h\"");
 
     // step 1: declare variables in the worker
     worker_function->declare_var("pos_retval_t retval = POS_SUCCESS;");
@@ -30,7 +143,77 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         "POS_CHECK_POINTER(ws);"
     );
 
-    // TODO: what to do next?
+    // step 3: runtime debug check of handles passed from parser
+    if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
+        create_resource_precheck = std::string("POS_CHECK_POINTER(pos_api_create_handle(wqe, 0));");
+    }
+    if(support_api_meta->api_type == kPOS_API_Type_Delete_Resource){
+        delete_resource_precheck = std::string("POS_CHECK_POINTER(pos_api_delete_handle(wqe, 0));");
+    }
+    worker_function->append_content(std::format(
+        "#if POS_ENABLE_DEBUG_CHECK\n"
+        "{}{}\n"
+        "#endif"
+        ,
+        create_resource_precheck,
+        delete_resource_precheck
+    ));
+    // TODO: check in/out/inout
+
+
+    // step 4: membus lock
+
+
+    // step 5:
+    worker_function->append_content(std::format(
+        "wqe->api_cxt->return_code = {}(\n"
+        "{}"
+        ");"
+        ,
+        clang_getCString(vendor_api_meta->name),
+        __form_parameter_list()
+    ));
+
+    // step 6: membus unlock
+
+    
+    // step 7: change handle state for newly created handle / deleted handle
+    if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
+        worker_function->append_content(std::format(
+            "if(likely({} == wqe->api_cxt->return_code)){{\n"
+            "   pos_api_create_handle(wqe, 0)->set_server_addr(__create_handle__);\n"
+            "   pos_api_create_handle(wqe, 0)->mark_status(kPOS_HandleStatus_Active);\n"
+            "}}"
+            ,
+            support_header_file_meta->successful_retval
+        ));
+    }
+    if(support_api_meta->api_type == kPOS_API_Type_Delete_Resource){
+        worker_function->append_content(std::format(
+            "if(likely({} == wqe->api_cxt->return_code)){{\n"
+            "   pos_api_delete_handle(wqe, 0)->mark_status(kPOS_HandleStatus_Deleted);\n"
+            "}}"
+            ,
+            support_header_file_meta->successful_retval
+        ));
+    }
+
+    // step 8: check retval
+    worker_function->append_content(std::format(
+        "if(unlikely({} != wqe->api_cxt->return_code)){{\n"
+        "   POSWorker::__restore(ws, wqe);\n"
+        "}} else {{\n"
+        "   POSWorker::__done(ws, wqe);\n"
+        "}}"
+        ,
+        support_header_file_meta->successful_retval
+    ));
+
+    // step 9: exit pointer
+    worker_function->append_content(
+        "exit:\n"
+        "return retval;"
+    );
 
 exit:
     return retval;
