@@ -137,6 +137,9 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             // whether this API involve operating on memory bus
             api_meta->involve_membus = api["involve_membus"].as<bool>();
 
+            // whether it needs to sync the stream after the worker is executed
+            api_meta->need_stream_sync = api["need_stream_sync"].as<bool>();
+
             // record all constant parameter values of this API
             for(k=0; k<api["constant_params"].size(); k++){
                 constant_param = api["constant_params"][k];
