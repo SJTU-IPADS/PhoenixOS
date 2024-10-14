@@ -136,19 +136,21 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
     // find out which stream this worker is using
     if(support_api_meta->involve_membus || support_api_meta->need_stream_sync){
-        for(k=0; k<support_api_meta->inout_edges.size(); k++){
-            POS_CHECK_POINTER(support_api_meta->inout_edges[k]);
-            if(support_api_meta->inout_edges[k]->handle_type == kPOS_ResourceTypeId_CUDA_Stream){
-                stream_source = support_api_meta->inout_edges[k]->handle_source;
-                stream_param_index = support_api_meta->inout_edges[k]->index;
+        for(k=0; k<support_api_meta->in_edges.size(); k++){
+            POS_CHECK_POINTER(support_api_meta->in_edges[k]);
+            if(support_api_meta->in_edges[k]->handle_type == kPOS_ResourceTypeId_CUDA_Stream){
+                stream_source = support_api_meta->in_edges[k]->handle_source;
+                stream_param_index = support_api_meta->in_edges[k]->index;
                 break;
             }
+            if(k == support_api_meta->in_edges.size()-1){
+                POS_ERROR_C(
+                    "failed to generate worker code, "
+                    "no stream provided when the API need stream support: api(%s)",
+                    support_api_meta->name.c_str()
+                );
+            }
         }
-        POS_ERROR_C(
-            "failed to generate worker code, "
-            "no stream provided when the API need stream support: api(%s)",
-            clang_getCString(vendor_api_meta->name)
-        );
     }
 
     // add POS CUDA headers
@@ -165,29 +167,30 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
     // step 3: runtime debug check of handles passed from parser
     if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
-        create_precheck = std::string("POS_CHECK_POINTER(pos_api_create_handle(wqe, 0));");
+        create_precheck = std::string("    POS_CHECK_POINTER(pos_api_create_handle(wqe, 0));\n");
     }
     if(support_api_meta->api_type == kPOS_API_Type_Delete_Resource){
-        delete_precheck = std::string("POS_CHECK_POINTER(pos_api_delete_handle(wqe, 0));");
+        delete_precheck = std::string("    POS_CHECK_POINTER(pos_api_delete_handle(wqe, 0));\n");
     }
     in_precheck = std::format(
-        "POS_ASSERT(wqe->input_handle_views.size() == {})",
+        "    POS_ASSERT(wqe->input_handle_views.size() == {});\n",
         support_api_meta->in_edges.size()
     );
     out_precheck = std::format(
-        "POS_ASSERT(wqe->output_handle_views.size() == {})",
+        "    POS_ASSERT(wqe->output_handle_views.size() == {});\n",
         support_api_meta->out_edges.size()
     );
     inout_precheck = std::format(
-        "POS_ASSERT(wqe->inout_handle_views.size() == {})",
+        "    POS_ASSERT(wqe->inout_handle_views.size() == {});\n",
         support_api_meta->inout_edges.size()
     );
     worker_function->append_content(std::format(
         "#if POS_ENABLE_DEBUG_CHECK\n"
-        "{}{}\n"
-        "{}\n"
-        "{}\n"
-        "{}\n"
+        "{}"
+        "{}"
+        "{}"
+        "{}"
+        "{}"
         "#endif"
         ,
         create_precheck,
@@ -206,13 +209,15 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
             "           (cudaStream_t)({})\n"
             "       );\n"
             "       if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){{\n"
-            "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\")\n"
+            "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\");\n"
             "       }}\n"
             "       ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = true;\n"
             "   }}\n"
             "#endif"
             ,
-            std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+            stream_source == kPOS_HandleSource_FromParam 
+                ? std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index) 
+                : "0"
         ));
     }
 
@@ -230,10 +235,12 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     if(support_api_meta->need_stream_sync == true){
         worker_function->append_content(std::format(
             "wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
-            "   (cudaStream_t)({})"
+            "   (cudaStream_t)({})\n"
             ");"
             ,
-            std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+            stream_source == kPOS_HandleSource_FromParam 
+                ? std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index) 
+                : "0"
         ));
     }
 
@@ -250,16 +257,18 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                 "#if POS_CKPT_OPT_LEVEL == 2\n"
                 "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
                 "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
-                "           (cudaStream_t)({})"
+                "           (cudaStream_t)({})\n"
                 "       );\n"
                 "       if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){{\n"
-                "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\")\n"
+                "           POS_WARN_DETAIL(\"failed to sync stream to avoid ckpt conflict\");\n"
                 "       }}\n"
                 "       ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;\n"
                 "   }}\n"
                 "#endif"
                 ,
-                std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index)
+                stream_source == kPOS_HandleSource_FromParam 
+                    ? std::format("pos_api_input_handle_offset_server_addr(wqe, {})", stream_param_index) 
+                    : "0"
             ));
         }
     }

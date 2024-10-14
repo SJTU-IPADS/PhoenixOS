@@ -67,9 +67,23 @@ typedef struct pos_support_edge_meta {
  *  \brief  metadata of an supported API
  */
 typedef struct pos_support_api_meta {
+    // ========== common fields ==========
+    // name of the API
     std::string name;
+
+    // parent name of the API
+    // e.g.,    API of cudaMemcpy would be cudaMemcpyH2D,
+    //          cudaMemcpyD2H and cudaMemcpyD2D's parent
+    std::string parent_name;
+
+    // type of the API
     pos_api_type_t api_type;
+
+    // TODO: move this out
     std::vector<std::string> dependent_headers;
+
+    // whether this API is a synchronous API
+    bool is_sync;
 
     // ========== fields for parser ==========
     bool customize_parser;

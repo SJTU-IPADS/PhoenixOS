@@ -69,6 +69,7 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
     pos_support_header_file_meta_t *supported_header_file_meta;
     typename std::map<std::string, pos_support_header_file_meta_t*>::iterator header_map_iter;
     typename std::map<std::string, pos_support_api_meta_t*>::iterator api_map_iter;
+    pos_support_api_meta_t *support_api_meta;
 
     POS_ASSERT(this->header_directory.size() > 0);
 
@@ -149,11 +150,13 @@ pos_retval_t POSAutogener::collect_vendor_header_files(){
             api_map_iter != supported_header_file_meta->api_map.end();
             api_map_iter++
         ){
-            const std::string &api_name = api_map_iter->first;
-            if(unlikely(vendor_header_file_meta->api_map.count(api_name) == 0)){
+            POS_CHECK_POINTER(support_api_meta = api_map_iter->second);
+            if(unlikely(
+                vendor_header_file_meta->api_map.count(support_api_meta->parent_name) == 0
+            )){
                 POS_WARN_C(
                     "PhOS registered to support API %s in file %s, but no vendor API was found",
-                    api_name.c_str(), supported_file_name.c_str()
+                    support_api_meta->parent_name.c_str(), supported_file_name.c_str()
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
@@ -214,11 +217,11 @@ pos_retval_t POSAutogener::generate_pos_src(){
             api_map_iter++
         ){
             const std::string &api_name = api_map_iter->first;
-
-            vendor_api_meta = vendor_header_file_meta->api_map[api_name];
-            POS_CHECK_POINTER(vendor_api_meta);
             support_api_meta = api_map_iter->second;
             POS_CHECK_POINTER(support_api_meta);
+
+            vendor_api_meta = vendor_header_file_meta->api_map[support_api_meta->parent_name];
+            POS_CHECK_POINTER(vendor_api_meta);
 
             // generate parser logic
             POS_LOG_C("generating parser logic for API %s...", api_name.c_str());

@@ -6,8 +6,12 @@ successful_retval: "cudaSuccess"
 apis:
   # ========== ​cudaError_t cudaMalloc ( void** devPtr, size_t size ) ==========
   - name: "cudaMalloc"
+    parent_name: "cudaMalloc"
     type: "create_resource"
     customize_parser: false
+    customize_worker: true
+    is_sync: true
+    # parser
     create_edges:
       - param_index: 1
         handle_type: "cuda_memory"
@@ -24,14 +28,18 @@ apis:
         handle_source: "from_default"
     out_edges:
     inout_edges:
-    customize_worker: true
+    # worker
     involve_membus: false
     need_stream_sync: false
     constant_params:
 
   # ========== ​cudaError_t cudaFree ( void* devPtr ) ==========
   - name: "cudaFree"
+    parent_name: "cudaFree"
     customize_parser: false
+    customize_worker: true
+    is_sync: true
+    # parser
     type: "delete_resource"
     create_edges:
     delete_edges:
@@ -47,7 +55,39 @@ apis:
         handle_source: "from_default"
     out_edges:
     inout_edges:
-    customize_worker: true
+    # worker
     involve_membus: false
     need_stream_sync: false
     constant_params:
+
+  # ========== ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind ) ==========
+  - name: "cudaMemcpyHtod"
+    parent_name: "cudaMemcpy"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "set_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 0
+        handle_type: "cuda_device"
+        handle_source: "from_last_used"
+      - param_index: 0
+        handle_type: "cuda_stream"
+        handle_source: "from_default"
+      - param_index: 2
+        handle_type: "cuda_memory"
+        handle_source: "from_param"
+    out_edges:
+      - param_index: 1
+        handle_type: "cuda_memory"
+        handle_source: "from_param"
+    inout_edges:
+    # worker
+    involve_membus: true
+    need_stream_sync: false
+    constant_params:
+      - index: 4
+        value: "cudaMemcpyHostToDevice"
