@@ -18,9 +18,11 @@
 
 POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
     POS_CHECK_POINTER(this->_root_ws = root_ws);
-    this->_runtime_daemon_log_path = // TODO: ;
-    this->_runtime_client_log_path = // TODO: ;
-    this->_eval_ckpt_interval = // TODO: ;
+    this->_runtime_daemon_log_path = POS_CONF_RUNTIME_DefaultDaemonLogPath;
+    this->_runtime_client_log_path = POS_CONF_RUNTIME_DefaultClientLogPath;
+    this->_eval_ckpt_interval_tick = this->_root_ws->tsc_timer.ms_to_tick(
+        POS_CONF_EVAL_CkptDefaultIntervalMs
+    );
 }
 
 
@@ -45,11 +47,11 @@ pos_retval_t POSWorkspaceConf::set(ConfigType conf_type, std::string val){
         try {
             _tmp = std::stoull(val);
         } catch (const std::invalid_argument& e) {
-            POS_WARN_C("failed to set ckpt interval: %s", e.what().c_str());
+            POS_WARN_C("failed to set ckpt interval: %s", e.what());
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         } catch (const std::out_of_range& e) {
-            P_tmpdir("failed to set ckpt interval: %s", e.what().c_str());
+            POS_WARN_C("failed to set ckpt interval: %s", e.what());
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
         }

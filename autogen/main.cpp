@@ -38,21 +38,21 @@ int main(int argc, char** argv) {
     }
 
     if(unlikely(
-        retval = (POS_SUCCESS != autogener.collect_pos_support_yamls())
+        POS_SUCCESS != (retval = autogener.collect_pos_support_yamls())
     )){
         POS_WARN("failed to collect PhOS support metadata");
         goto exit;
     }
 
     if(unlikely(
-        retval = (POS_SUCCESS != autogener.collect_vendor_header_files())
+        POS_SUCCESS != (retval = autogener.collect_vendor_header_files())
     )){
         POS_WARN("failed to parse vendor headers: path(%s)", autogener.header_directory.c_str());
         goto exit;
     }
 
     if(unlikely(
-        retval = (POS_SUCCESS != autogener.generate_pos_src())
+        POS_SUCCESS != (retval = autogener.generate_pos_src())
     )){
         POS_WARN("failed to auto-generate source code");
         goto exit;
@@ -62,5 +62,5 @@ exit:
     if(unlikely(retval != POS_SUCCESS))
         return -1;
     else
-        return 1;
+        return 0;
 }

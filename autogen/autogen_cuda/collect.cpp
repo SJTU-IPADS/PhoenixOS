@@ -28,9 +28,12 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
         POS_CHECK_POINTER(api_meta);
         POS_CHECK_POINTER(edge_list);
 
-        // one API should only create at most one handle at most
+        // one API should only create/delete at most one handle at most
         if(std::string(edge_list_name) == std::string("create_edges")){
-            POS_ASSERT(api[edge_list_name].size() == 1);
+            POS_ASSERT(api[edge_list_name].size() <= 1);
+        }
+        if(std::string(edge_list_name) == std::string("delete_edges")){
+            POS_ASSERT(api[edge_list_name].size() <= 1);
         }
 
         for(j=0; j<api[edge_list_name].size(); j++){

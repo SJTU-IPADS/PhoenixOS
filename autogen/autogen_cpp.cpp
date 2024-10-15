@@ -103,8 +103,11 @@ pos_retval_t POSCodeGen_CppBlock::allocate_block(
     uint8_t new_level;
 
     POS_CHECK_POINTER(new_block);
-    POS_ASSERT(std::abs(level_offset) <= static_cast<int>(this->_level));
 
+    if(level_offset < 0){
+        POS_ASSERT(std::abs(level_offset) <= static_cast<int>(this->_level));
+    }
+    
     if(level_offset >= 0){
         new_level = static_cast<uint8_t>(level_offset) + this->_level;
     } else {
