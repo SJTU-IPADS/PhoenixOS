@@ -202,8 +202,6 @@ namespace cuda_launch_kernel {
         POSHandleManager_CUDA_Function *hm_function;
         POSHandleManager_CUDA_Stream *hm_stream;
         POSHandleManager_CUDA_Memory *hm_memory;
-        
-        uint64_t all_tick, s_tick, e_tick;
 
         /*!
          *  \brief  obtain a potential pointer from a struct by given offset within the struct
@@ -341,8 +339,6 @@ namespace cuda_launch_kernel {
 
         // [Cricket Adapt] skip the metadata used by cricket
         args += (sizeof(size_t) + sizeof(uint16_t) * function_handle->nb_params);
-
-        all_tick = 0;
         
         /*!
          *  \note   record all input memory areas
@@ -376,14 +372,11 @@ namespace cuda_launch_kernel {
                 continue;
             }
 
-            // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ memory_handle,
                 /* param_index */ param_index,
                 /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
             });
-            // e_tick = POSUtilTimestamp::get_tsc();
-            // all_tick += (e_tick - s_tick);
         }
         
         /*!
@@ -459,14 +452,11 @@ namespace cuda_launch_kernel {
                 continue;
             }
 
-            // s_tick = POSUtilTimestamp::get_tsc();
             wqe->record_handle<kPOS_Edge_Direction_Out>({
                 /* handle */ memory_handle,
                 /* param_index */ param_index,
                 /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
             });
-            // e_tick = POSUtilTimestamp::get_tsc();
-            // all_tick += (e_tick - s_tick);
 
             hm_memory->record_modified_handle(memory_handle);
         }
@@ -563,27 +553,17 @@ namespace cuda_launch_kernel {
                     continue;
                 }
 
-                 // s_tick = POSUtilTimestamp::get_tsc();
                 wqe->record_handle<kPOS_Edge_Direction_InOut>({
                     /* handle */ memory_handle,
                     /* param_index */ param_index,
                     /* offset */ (uint64_t)(arg_value) - (uint64_t)(memory_handle->client_addr)
                 });
-                // e_tick = POSUtilTimestamp::get_tsc();
-                // all_tick += (e_tick - s_tick);
 
                 hm_memory->record_modified_handle(memory_handle);
             }
         }
 
-        // POS_LOG("record handle duration: %lf us", POS_TSC_TO_USEC(all_tick));
-
-        // launch the op to the dag
-        // s_tick = POSUtilTimestamp::get_tsc();
         retval = client->dag.launch_op(wqe);
-        // e_tick = POSUtilTimestamp::get_tsc();
-
-        // POS_LOG("launch_op duration: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
