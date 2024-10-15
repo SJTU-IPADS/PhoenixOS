@@ -8,7 +8,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 static inline void
 checkRtError(cudaError_t res, const char *tok, const char *file, unsigned line)

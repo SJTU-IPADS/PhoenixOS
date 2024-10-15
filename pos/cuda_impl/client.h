@@ -192,7 +192,7 @@ class POSClient_CUDA : public POSClient {
         this->__dump_hm_cuda_functions();
     }
 
-    #if POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_MigrOptLevel > 0
 
     /*! 
      *  \brief  remote malloc memories during migration
@@ -589,7 +589,7 @@ class POSClient_CUDA : public POSClient {
         );
     }
 
-    #endif // POS_MIGRATION_OPT_LEVEL > 0
+    #endif // POS_CONF_EVAL_MigrOptLevel > 0
 
  protected:
     /*!

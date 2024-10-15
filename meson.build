@@ -40,9 +40,6 @@ sources = []
 # current directory of this meson file
 meson_file_dir = meson.current_source_dir()
 
-# we are building daemon here, need to add macro to compile daemon-specific code
-add_global_arguments('-DPOS_DAEMON', language: ['c', 'cpp'])
-
 
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
@@ -61,142 +58,10 @@ endif
 #           0: no continuous ckpt support
 #           1: naive continuous ckpt support
 #           2: pos continuous ckpt support
-ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CHECKPOINTER_OPT_LEVEL').stdout().strip().to_int()
+ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CKPT_OPT_LEVEL').stdout().strip().to_int()
 if ckpt_opt_level != 0 and ckpt_opt_level != 1 and ckpt_opt_level != 2
     assert(false, 'ckpt_opt_level ' + ckpt_opt_level.to_string() + ' is currently not supported')
 endif
-
-# config:   sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
-enable_ckpt_increamental = 0
-
-# config:   async checkpoint (level 2) optimization -> flag to control checkpoint pipeline
-enable_ckpt_pipeline = 1
-
-# config:   async checkpoint (level 2) optimization -> flag to control checkpoint orchestration
-enable_ckpt_orchestration = 0
-
-# config:   checkpoint interval (unit in ms)
-ckpt_interval_ms = 6000
-
-# config:   migration optimization level
-#           0: no migration support
-#           1: naive migration support
-#           2: pos migration support
-migration_opt_level = 0
-
-# config:   whether to enable context pool
-enable_context_pool = 0
-
-# config:   TSC register frequency
-tsc_reg_freq = 2200000000
-
-# config:   log file output path
-log_file_path = '/root/dag.pos'
-
-# switch:   whether to check correctness of function parameters, return values, etc.,
-#           which might cause extra runtime burden, should only be enabled while debuging
-enable_runtime_debug_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK').stdout().strip().to_int()
-if enable_runtime_debug_check != 0 and enable_runtime_debug_check != 1
-    assert(
-        false, 
-        'enable_runtime_debug_check get invalid value: ' + enable_runtime_debug_check.to_string()
-    )
-endif
-
-# switch:   whether to check whether POS finish the hijacking logic of called APIs,
-#           which might cause extra runtime burden, should only be enabled while debuging
-enable_hijack_api_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_HIJACK_API_CHECK').stdout().strip().to_int()
-if enable_hijack_api_check != 0 and enable_hijack_api_check != 1
-    assert(
-        false, 
-        'enable_hijack_api_check get invalid value: ' + enable_hijack_api_check.to_string()
-    )
-endif
-
-# switch:   whether to trace the statistics
-enable_trace = 0
-
-# switch:   whether to print all fatal messages
-enable_print_error = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_ERROR').stdout().strip().to_int()
-if enable_print_error != 0 and enable_print_error != 1
-    assert(
-        false, 
-        'enable_print_error get invalid value: ' + enable_print_error.to_string()
-    )
-endif
-
-# switch:   whether to print all warning messages
-enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WARN').stdout().strip().to_int()
-if enable_print_warn != 0 and enable_print_warn != 1
-    assert(
-        false, 
-        'enable_print_warn get invalid value: ' + enable_print_warn.to_string()
-    )
-endif
-
-# switch:   whether to print all log messages
-enable_print_log = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_LOG').stdout().strip().to_int()
-if enable_print_log != 0 and enable_print_log != 1
-    assert(
-        false, 
-        'enable_print_log get invalid value: ' + enable_print_log.to_string()
-    )
-endif
-
-# switch:   whether to print all debug messages
-enable_print_debug = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_DEBUG').stdout().strip().to_int()
-if enable_print_debug != 0 and enable_print_debug != 1
-    assert(
-        false, 
-        'enable_print_debug get invalid value: ' + enable_print_debug.to_string()
-    )
-endif
-
-# switch:   whether to print fatal/warn/debug/log with colors
-#           should be disabled when try to dump all outputs to a file
-enable_print_with_color = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WITH_COLOR').stdout().strip().to_int()
-if enable_print_with_color != 0 and enable_print_with_color != 1
-    assert(
-        false, 
-        'enable_print_with_color get invalid value: ' + enable_print_with_color.to_string()
-    )
-endif
-
-# add pos/include/log.h support
-subdir('pos/include')
-
-# we need to hardcoded some configurations as source code
-subdir('pos/include/_daemon_options')
-
-# print configurations
-message('>>> Build configurations:')
-message('>>>>>> [Config] target:                                    ' + target)
-message('>>>>>> [Config] TSC register frequency:                    ' + tsc_reg_freq.to_string())
-message('>>>>>> [Config] checkpoint optimization level:             ' + ckpt_opt_level.to_string())
-message('>>>>>> [Config] migration optimization level:              ' + migration_opt_level.to_string())
-if ckpt_opt_level >= 1
-    message('       >>>>>> [Config] enable_ckpt_increamental:       ' + enable_ckpt_increamental.to_string())
-else
-    message('       >>>>>> [Config] enable_ckpt_increamental:       N/A')
-endif
-if ckpt_opt_level >= 2
-    message('       >>>>>> [Config] enable_ckpt_pipeline:           ' + enable_ckpt_pipeline.to_string())
-    message('       >>>>>> [Config] enable_ckpt_orchestration:      ' + enable_ckpt_orchestration.to_string())
-else
-    message('       >>>>>> [Config] enable_ckpt_pipeline:           N/A')
-    message('       >>>>>> [Config] enable_ckpt_orchestration:      N/A')
-endif
-message('>>>>>> [Config] checkpoint interval (ms):                  ' + ckpt_interval_ms.to_string())
-message('>>>>>> [Config] enable_context_pool:                       ' + enable_context_pool.to_string())
-message('>>>>>> [Config] log file output path:                      ' + log_file_path)
-message('>>>>>> [Switch] enable_runtime_debug_check:                ' + enable_runtime_debug_check.to_string())
-message('>>>>>> [Switch] enable_hijack_api_check:                   ' + enable_hijack_api_check.to_string())
-message('>>>>>> [Switch] enable_trace:                              ' + enable_trace.to_string())
-message('>>>>>> [Switch] enable_print_error:                        ' + enable_print_error.to_string())
-message('>>>>>> [Switch] enable_print_warn:                         ' + enable_print_warn.to_string())
-message('>>>>>> [Switch] enable_print_log:                          ' + enable_print_log.to_string())
-message('>>>>>> [Switch] enable_print_debug:                        ' + enable_print_debug.to_string())
-message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'

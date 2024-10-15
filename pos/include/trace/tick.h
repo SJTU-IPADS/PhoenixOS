@@ -20,7 +20,7 @@
 #include "string.h"
 
 #include "pos/include/common.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 // define a new list of tracing tikcs
 #define POS_TRACE_TICK_LIST_DEF(list_name, collect_interval_us, ...)            \

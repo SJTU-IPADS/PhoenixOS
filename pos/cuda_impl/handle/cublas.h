@@ -134,9 +134,9 @@ class POSHandle_cuBLAS_Context : public POSHandle {
 class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS_Context> {
  public:
     POSHandleManager_cuBLAS_Context() : POSHandleManager() {
-    #if POS_ENABLE_CONTEXT_POOL == 1
+    #if POS_CONF_EVAL_RstEnableContextPool == 1
         this->preserve_pooled_handles(8);
-    #endif // POS_ENABLE_CONTEXT_POOL
+    #endif // POS_CONF_EVAL_RstEnableContextPool
     }
 
     /*!
@@ -162,7 +162,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA module");
             retval = POS_FAILED_INVALID_INPUT;

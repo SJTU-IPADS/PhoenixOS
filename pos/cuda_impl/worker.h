@@ -125,7 +125,7 @@ class POSWorker_CUDA : public POSWorker {
         }
         cudaDeviceSynchronize();
 
-        #if POS_CKPT_OPT_LEVEL == 2
+        #if POS_CONF_EVAL_CkptOptLevel == 2
             POS_ASSERT(
                 cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_stream_id))
             );
@@ -135,13 +135,13 @@ class POSWorker_CUDA : public POSWorker {
             );
         #endif
 
-        #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
+        #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
             POS_ASSERT(
                 cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_commit_stream_id))
             );
         #endif
 
-        #if POS_MIGRATION_OPT_LEVEL == 2
+        #if POS_CONF_EVAL_MigrOptLevel == 2
             POS_ASSERT(
                 cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_migration_precopy_stream_id))
             );

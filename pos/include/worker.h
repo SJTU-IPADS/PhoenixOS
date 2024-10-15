@@ -51,7 +51,7 @@ namespace wk_functions {
 };  // namespace ps_functions
 
 
-#if POS_CKPT_OPT_LEVEL == 2
+#if POS_CONF_EVAL_CkptOptLevel == 2
 
 /*!
  *  \brief  context of the overlapped checkpoint thread
@@ -76,7 +76,7 @@ typedef struct checkpoint_async_cxt {
     checkpoint_async_cxt() : is_active(false) {}
 } checkpoint_async_cxt_t;
 
-#endif // POS_CKPT_OPT_LEVEL == 2
+#endif // POS_CONF_EVAL_CkptOptLevel == 2
 
 // forward declaration
 class POSClient;
@@ -95,16 +95,16 @@ class POSWorker {
         _daemon_thread = new std::thread(&POSWorker::__daemon, this);
         POS_CHECK_POINTER(_daemon_thread);
         
-        #if POS_CKPT_OPT_LEVEL == 2
+        #if POS_CONF_EVAL_CkptOptLevel == 2
             _ckpt_stream_id = 0;
             _cow_stream_id = 0;
         #endif
 
-        #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
+        #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
             _ckpt_commit_stream_id = 0;
         #endif
 
-        #if POS_MIGRATION_OPT_LEVEL > 0
+        #if POS_CONF_EVAL_MigrOptLevel > 0
             _migration_precopy_stream_id = 0;
         #endif
 
@@ -160,12 +160,12 @@ class POSWorker {
      */
     static void __done(POSWorkspace* ws, POSAPIContext_QE* wqe);
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         // overlapped checkpoint context
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
     
-    #if POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_MigrOptLevel > 0
         // stream for precopy
         uint64_t _migration_precopy_stream_id;
     #endif
@@ -194,7 +194,7 @@ class POSWorker {
     // worker function map
     std::map<uint64_t, pos_worker_launch_function_t> _launch_functions;
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         // stream for overlapped memcpy while computing happens
         uint64_t _ckpt_stream_id;
 
@@ -202,7 +202,7 @@ class POSWorker {
         uint64_t _cow_stream_id;
     #endif
 
-    #if POS_CKPT_OPT_LEVEL == 2 && POS_CKPT_ENABLE_PIPELINE == 1
+    #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
         // stream for commiting checkpoint from device
         uint64_t _ckpt_commit_stream_id;
     #endif
@@ -234,11 +234,11 @@ class POSWorker {
             return;
         }
 
-        #if POS_MIGRATION_OPT_LEVEL == 0
+        #if POS_CONF_EVAL_MigrOptLevel == 0
             // case: continuous checkpoint
-            #if POS_CKPT_OPT_LEVEL <= 1
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
                 this->__daemon_ckpt_sync();
-            #elif POS_CKPT_OPT_LEVEL == 2
+            #elif POS_CONF_EVAL_CkptOptLevel == 2
                 this->__daemon_ckpt_async();
             #endif
         #else
@@ -246,7 +246,7 @@ class POSWorker {
         #endif
     }
 
-    #if POS_CKPT_OPT_LEVEL == 0 || POS_CKPT_OPT_LEVEL == 1
+    #if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1
         /*!
          *  \brief  worker daemon with / without SYNC checkpoint support 
          *          (checkpoint optimization level 0 and 1)
@@ -260,7 +260,7 @@ class POSWorker {
          *  \return POS_SUCCESS for successfully checkpointing
          */
         pos_retval_t __checkpoint_sync(POSAPIContext_QE* wqe);
-    #elif POS_CKPT_OPT_LEVEL == 2
+    #elif POS_CONF_EVAL_CkptOptLevel == 2
         /*!
          *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)
          */
@@ -269,13 +269,13 @@ class POSWorker {
         /*!
          *  \brief  overlapped checkpoint procedure, should be implemented by each platform
          *  \note   this thread will be raised by level-2 ckpt
-         *  \note   aware of the macro POS_CKPT_ENABLE_PIPELINE
+         *  \note   aware of the macro POS_CONF_EVAL_CkptEnablePipeline
          *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
          */
         void __checkpoint_async_thread();
     #endif
 
-    #if POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  worker daemon with optimized migration support (POS)
          */

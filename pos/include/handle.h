@@ -370,7 +370,7 @@ class POSHandle {
     pos_retval_t checkpoint_commit(uint64_t version_id, uint64_t stream_id=0) { 
         pos_retval_t retval = POS_SUCCESS;
         
-        #if POS_CKPT_ENABLE_PIPELINE == 1
+        #if POS_CONF_EVAL_CkptEnablePipeline == 1
             //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
             //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
             retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
@@ -401,7 +401,7 @@ class POSHandle {
                 */
                 retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
             }
-        #endif  // POS_CKPT_ENABLE_PIPELINE        
+        #endif  // POS_CONF_EVAL_CkptEnablePipeline        
         
         return retval;
     }

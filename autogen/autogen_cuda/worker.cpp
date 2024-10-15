@@ -193,7 +193,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         support_api_meta->inout_edges.size()
     );
     worker_function->append_content(std::format(
-        "#if POS_ENABLE_DEBUG_CHECK\n"
+        "#if POS_CONF_RUNTIME_EnableDebugCheck\n"
         "{}"
         "{}"
         "{}"
@@ -211,7 +211,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     // step 4: membus lock if needed
     if(support_api_meta->involve_membus == true){
         worker_function->append_content(std::format(
-            "#if POS_CKPT_OPT_LEVEL == 2\n"
+            "#if POS_CONF_EVAL_CkptOptLevel == 2\n"
             "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
             "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
             "           (cudaStream_t)({})\n"
@@ -256,13 +256,13 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     if(support_api_meta->involve_membus == true){
         if(support_api_meta->need_stream_sync == true){
             worker_function->append_content(std::string(
-                "#if POS_CKPT_OPT_LEVEL == 2\n"
+                "#if POS_CONF_EVAL_CkptOptLevel == 2\n"
                 "   ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;\n"
                 "#endif"
             ));
         } else {
             worker_function->append_content(std::format(
-                "#if POS_CKPT_OPT_LEVEL == 2\n"
+                "#if POS_CONF_EVAL_CkptOptLevel == 2\n"
                 "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
                 "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
                 "           (cudaStream_t)({})\n"

@@ -28,7 +28,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 #include "pos/include/utils/serializer.h"
 #include "pos/include/utils/bipartite_graph.h"
 

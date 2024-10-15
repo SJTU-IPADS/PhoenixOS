@@ -29,7 +29,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 #include "pos/include/utils/serializer.h"
 
 using pos_vertex_id_t = uint64_t;
@@ -93,11 +93,11 @@ class POSBipartiteGraph {
         /*!
          *  \brief  prefill is important, otherwise the runtime performance will significantly decrease
          */
-        _t1s.reserve(POS_NB_PREFILL_DAG_VERTEX);
-        _t2s.reserve(POS_NB_PREFILL_DAG_VERTEX);
-        _topo_t2.reserve(POS_NB_PREFILL_DAG_VERTEX);
+        _t1s.reserve(65536);
+        _t2s.reserve(65536);
+        _topo_t2.reserve(65536);
 
-        for(i=0; i<POS_NB_PREFILL_DAG_VERTEX; i++){
+        for(i=0; i<65536; i++){
             reserved_vertex_t1 = new POSBgVertex_t<T1>();
             POS_CHECK_POINTER(reserved_vertex_t1);
             _t1s.push_back(reserved_vertex_t1);
@@ -108,7 +108,7 @@ class POSBipartiteGraph {
 
             reserved_neighbor_list = new POSNeighborList_t();
             POS_CHECK_POINTER(reserved_neighbor_list);
-            reserved_neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
+            reserved_neighbor_list->reserve(65536);
             _topo_t2.push_back(reserved_neighbor_list);
         }
         POS_DEBUG("pos bipartite graph prefill done");
@@ -155,7 +155,7 @@ class POSBipartiteGraph {
         POS_CHECK_POINTER(id);
 
         // make sure all provided neighbor idx are valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
 
         for(i=0; i<neighbors.size(); i++){
             POSBgEdge_t &edge = neighbors[i];
@@ -189,7 +189,7 @@ class POSBipartiteGraph {
         }
 
         // obtain / create vertex instance
-        if(unlikely(*id >= POS_NB_PREFILL_DAG_VERTEX)){
+        if(unlikely(*id >= 65536)){
             POS_CHECK_POINTER(new_vertex = new POSBgVertex_t<T>());
             if constexpr (std::is_same_v<T, T1>){
                 _t1s.push_back(new_vertex);
@@ -200,7 +200,7 @@ class POSBipartiteGraph {
                 // add neighbor list
                 new_neighbor_list = new POSNeighborList_t();
                 POS_CHECK_POINTER(new_neighbor_list);
-                new_neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
+                new_neighbor_list->reserve(65536);
                 _topo_t2.push_back(new_neighbor_list);
             }
         } else {
@@ -283,7 +283,7 @@ class POSBipartiteGraph {
         output_file.open(file_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
 
         // first line: nb_t1s, nb_t2s, tsc_freq
-        output_file << max_t1_id << ", " << max_t2_id << ", " << POS_TSC_FREQ << std::endl;
+        output_file << max_t1_id << ", " << max_t2_id << ", " << "POS_TSC_FREQ" << std::endl;
 
         // next nb_t1s line: info of t1s
         for(i=0;i<max_t1_id; i++){
@@ -424,7 +424,7 @@ class POSBipartiteGraph {
         if(unlikely(fill_size > 0)){
             neighbor_list = new POSNeighborList_t();
             POS_CHECK_POINTER(neighbor_list);
-            neighbor_list->reserve(POS_NB_PREFILL_DAG_VERTEX_NEIGHBOR);
+            neighbor_list->reserve(65536);
             _topo_t2.push_back(neighbor_list);
         }
 

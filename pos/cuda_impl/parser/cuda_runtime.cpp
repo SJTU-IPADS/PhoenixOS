@@ -47,7 +47,7 @@ namespace cuda_malloc {
         client = (POSClient_CUDA*)(wqe->client);
         POS_CHECK_POINTER(client);
 
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         // check whether given parameter is valid
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
@@ -136,7 +136,7 @@ namespace cuda_free {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_free): failed to parse, given %lu params, %lu expected",
@@ -275,7 +275,7 @@ namespace cuda_launch_kernel {
         POS_CHECK_POINTER(client);
         
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 6)){
             POS_WARN(
                 "parse(cuda_launch_kernel): failed to parse, given %lu params, %lu expected",
@@ -629,7 +629,7 @@ namespace cuda_memcpy_h2d {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cuda_memcpy_h2d): failed to parse, given %lu params, %lu expected",
@@ -672,7 +672,7 @@ namespace cuda_memcpy_h2d {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -715,7 +715,7 @@ namespace cuda_memcpy_d2h {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cuda_memcpy_d2h): failed to parse, given %lu params, %lu expected",
@@ -781,7 +781,7 @@ namespace cuda_memcpy_d2d {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 3)){
             POS_WARN(
                 "parse(cuda_memcpy_d2d): failed to parse, given %lu params, %lu expected",
@@ -870,7 +870,7 @@ namespace cuda_memcpy_h2d_async {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 3)){
             POS_WARN(
                 "parse(cuda_memcpy_h2d_async): failed to parse, given %lu params, %lu expected",
@@ -936,7 +936,7 @@ namespace cuda_memcpy_h2d_async {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -982,7 +982,7 @@ namespace cuda_memcpy_d2h_async {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 3)){
             POS_WARN(
                 "parse(cuda_memcpy_d2h_async): failed to parse, given %lu params, %lu expected",
@@ -1072,7 +1072,7 @@ namespace cuda_memcpy_d2d_async {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 4)){
             POS_WARN(
                 "parse(cuda_memcpy_d2d_async): failed to parse, given %lu params, %lu expected",
@@ -1183,7 +1183,7 @@ namespace cuda_memset_async {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 4)){
             POS_WARN(
                 "parse(cuda_memset_async): failed to parse, given %lu params, %lu expected",
@@ -1273,7 +1273,7 @@ namespace cuda_set_device {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_set_device): failed to parse, given %lu params, %lu expected",
@@ -1345,7 +1345,7 @@ namespace cuda_get_error_string {
         client = (POSClient_CUDA*)(wqe->client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_get_error_string): failed to parse, given %lu params, %lu expected",
@@ -1443,7 +1443,7 @@ namespace cuda_get_device_properties {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_memcpy_d2d_async): failed to parse, given %lu params, %lu expected",
@@ -1506,7 +1506,7 @@ namespace cuda_device_get_attribute {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cuda_device_get_attribute): failed to parse, given %lu params, %lu expected",
@@ -1605,7 +1605,7 @@ namespace cuda_func_get_attributes {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_func_get_attributes): failed to parse, given %lu params, %lu expected",
@@ -1666,7 +1666,7 @@ namespace cuda_occupancy_max_active_bpm_with_flags {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 4)){
             POS_WARN(
                 "parse(cuda_occupancy_max_active_bpm_with_flags): failed to parse, given %lu params, %lu expected",
@@ -1727,7 +1727,7 @@ namespace cuda_stream_synchronize {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_stream_synchronize): failed to parse, given %lu params, %lu expected",
@@ -1792,7 +1792,7 @@ namespace cuda_stream_is_capturing {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_stream_is_capturing): failed to parse, given %lu params, %lu expected",
@@ -1865,7 +1865,7 @@ namespace cuda_event_create_with_flags {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_event_create_with_flags): failed to parse, given %lu params, %lu expected",
@@ -1940,7 +1940,7 @@ namespace cuda_event_destory {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cublas_set_math_mode): failed to parse, given %lu params, %lu expected",
@@ -2008,7 +2008,7 @@ namespace cuda_event_record {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cublas_set_math_mode): failed to parse, given %lu params, %lu expected",
@@ -2093,7 +2093,7 @@ namespace cuda_event_query {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cublas_set_math_mode): failed to parse, given %lu params, %lu expected",
