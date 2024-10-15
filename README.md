@@ -21,11 +21,11 @@
                 <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
                 <ul>
                     <li>
-                        <p>
-                        <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉
-                        <p>
+                        <p style="margin:0px; margin-bottom:5px;">
+                        <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉&nbsp;&nbsp;[<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>]&nbsp;&nbsp;[<a href="http://phoenixos.readthedocs.io/">Documentations</a>]&nbsp;&nbsp;[<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                        <p style="margin:0px; margin-bottom:5px;">
                         👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
-                        <p>
+                        <p style="margin:0px; margin-bottom:5px;">
                         👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
                     </li>
                 </ul>
@@ -34,7 +34,9 @@
     </tr>
 </table>
 
-## I. Build *PhOS* From Source
+## I. What *PhOS* Does?
+
+## II. Build *PhOS* From Source
 
 1. **[Start Container]**
     *PhOS* can be built and installed on official image from different vendors.
@@ -54,7 +56,7 @@
 2. **[Build]**
     Building *PhOS* is simple!
 
-    *PhOS* provides a convinient build system as it contains multiple components 
+    *PhOS* provides a convinient build system as *PhOS* contains multiple dependent components 
     (e.g., autogen, daemon, client-side hijacker, unit-testing, CLI etc.),
     simply run the build script in the container would works:
 
@@ -64,17 +66,17 @@
     bash build.sh
     ```
 
-## II. Running *PhOS* Samples
+## III. Running *PhOS* Samples
 
 **TODO**
 
-## III. How *PhOS* Works?
+## IV. How *PhOS* Works?
 
 <div align="center">
     <img src="./docs/docs/source/_static/images/pos_mechanism.jpg" width="80%" />
 </div>
 
-### Paper
+### V. Paper
 
 If you use *PhOS* in your research, please cite our paper:
 
