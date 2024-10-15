@@ -1,7 +1,7 @@
-# PhoenixOS
+# PhoenixOS (PhOS)
 
 ![build passing](https://img.shields.io/badge/build-passed-green)
-![build passing](https://img.shields.io/badge/supported-nVIDIA-blue)
+![build passing](https://img.shields.io/badge/supported-CUDA-blue)
 ![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)
 ![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)
 ![doc](https://img.shields.io/badge/docs-green)
@@ -15,8 +15,8 @@
         </td>
         <td >
             <p>
-            <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU C/R system. It can transparently checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can concurrently execute C/R with the application execution.
-            <div style="background:lightgrey; padding: 0px 5px;">
+            <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU C/R system. It can <b>transparently</b> checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
+            <div style="padding: 0px 5px;">
                 <p>
                 <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
                 <ul>
