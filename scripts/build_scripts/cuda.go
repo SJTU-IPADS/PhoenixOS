@@ -222,6 +222,7 @@ func buildKernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 
 func buildAndRunAutoGen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_autogen.log")
+	runLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "run_autogen.log")
 
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
@@ -229,10 +230,10 @@ func buildAndRunAutoGen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 		%s
 		cd %s/%s
 		rm -rf ./build
-		meson build &>%s 2>&1
+		meson build >%s 2>&1
 		cd build
 		ninja clean
-		ninja &>%s 2>&1
+		ninja >%s 2>&1
 		cp -r ./pos/include/* %s/%s
 		`,
 		buildConf.export_string(),
@@ -245,17 +246,13 @@ func buildAndRunAutoGen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	run_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		%s
 		cd %s/%s/build
-		LD_LIBRARY_PATH=../../lib/ ./pos_autogen 	\
-			-s ../autogen_cuda/supported/%s 		\
-			-d /usr/local/cuda-%s/include 			\
-			-g ../generated
+		LD_LIBRARY_PATH=../../lib/ ./pos_autogen -s ../autogen_cuda/supported/%s -d /usr/local/cuda-%s/include -g ../generated >%s 2&>1
 		`,
-		buildConf.export_string(),
 		cmdOpt.RootDir, kPhOSAutoGenPath,
 		buildConf.RuntimeTargetVersion,
 		buildConf.RuntimeTargetVersion,
+		runLogPath,
 	)
 
 	// build
@@ -296,14 +293,12 @@ func buildPhOSCore(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		ninja clean
 		ninja &>%s 2>&1
 		cp %s/build/libpos.so %s/%s
-		cp -r %s/build/pos/include/* %s/%s
 		`,
 		buildConf.export_string(),
 		cmdOpt.RootDir,
 		buildLogPath,
 		buildLogPath,
 		cmdOpt.RootDir, cmdOpt.RootDir, KBuildLibPath,
-		cmdOpt.RootDir, cmdOpt.RootDir, KBuildIncPath,
 	)
 
 	install_script := fmt.Sprintf(`
@@ -701,13 +696,13 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 
 	// ==================== Build PhOS ====================
 	// buildKernelPatcher(cmdOpt, logger)
+	utils.SwitchGppVersion(13, logger)
 	buildAndRunAutoGen(cmdOpt, buildConf, logger)
+
+	utils.SwitchGppVersion(9, logger)
 	buildPhOSCore(cmdOpt, buildConf, logger)
 	buildPhOSCLI(cmdOpt, buildConf, logger)
 	buildRemoting(cmdOpt, buildConf, logger)
-
-	utils.SwitchGppVersion(13, logger)
-	// TODO: run autogen
 
 	// ==================== Build and Run Unit Test ====================
 	if *cmdOpt.DoUnitTest {

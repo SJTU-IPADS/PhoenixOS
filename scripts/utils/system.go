@@ -65,10 +65,11 @@ func BashCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger)
 	output, err := exec.Command(args[0], args[1:]...).CombinedOutput()
 	if err != nil {
 		if !ignoreFailed {
-			logger.Warnf("failed to execute \"%s\": %s", command, err)
+			logger.Fatalf("failed to execute \"%s\": %s", command, err)
 		}
 		return output, err
 	}
+	output = []byte(strings.TrimSpace(string(output)))
 	return output, nil
 }
 
@@ -80,5 +81,6 @@ func BashScriptGetOutput(script string, ignoreFailed bool, logger *log.Logger) (
 		}
 		return output, err
 	}
+	output = []byte(strings.TrimSpace(string(output)))
 	return output, nil
 }

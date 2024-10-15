@@ -21,6 +21,8 @@
 
 #include "pos/include/common.h"
 
+#define POS_TSC_FREQ 0 // mock, delete later
+
 #define POS_TSC_RANGE_TO_MSEC(e_tick, s_tick) \
     (double)(e_tick - s_tick) / (double) POS_TSC_FREQ * (double)1000.0f
 
