@@ -22,11 +22,17 @@
                 <ul>
                     <li>
                         <p style="margin:0px; margin-bottom:5px;">
-                        <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉&nbsp;&nbsp;[<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>]&nbsp;&nbsp;[<a href="http://phoenixos.readthedocs.io/">Documentations</a>]&nbsp;&nbsp;[<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                            <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉
+                            &nbsp;&nbsp;[<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>]
+                            &nbsp;&nbsp;[<a href="http://phoenixos.readthedocs.io/">Documentations</a>]
+                            &nbsp;&nbsp;[<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                        </p>
                         <p style="margin:0px; margin-bottom:5px;">
-                        👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
+                            👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
+                        </p>
                         <p style="margin:0px; margin-bottom:5px;">
-                        👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
+                            👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
+                        </p>
                     </li>
                 </ul>
             </div>
