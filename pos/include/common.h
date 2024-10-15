@@ -81,17 +81,9 @@ using pos_client_uuid_t = uint64_t;
  */
 using pos_transport_id_t = uint64_t;
 
-/*!
- *  \brief  memory area which is dynamically allocated
- */
-using POSMem_ptr = std::shared_ptr<uint8_t[]>;
-
-/*!
- *  \brief  switch group
- */
-#include "pos/include/switches.h"
-
-/*!
- *  \brief  common configuration
- */
-#include "pos/include/config.h"
+#ifdef POS_DAEMON
+    // switch group (for evaludation)
+    #include "pos/include/_daemon_options/switches.h"
+    // static compilation options
+    #include "pos/include/_daemon_options/config.h"
+#endif

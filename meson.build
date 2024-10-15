@@ -40,8 +40,11 @@ sources = []
 # current directory of this meson file
 meson_file_dir = meson.current_source_dir()
 
+# we are building daemon here, need to add macro to compile daemon-specific code
+add_global_arguments('-DPOS_DAEMON', language: ['c', 'cpp'])
 
-# >>>>>>>>>>>>>> setup configurations (please modified here) >>>>>>>>>>>>>>
+
+# >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
 # config:   target selection (options: cuda, todos: rocm/ascend)
 target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
 if target != 'cuda'
@@ -159,8 +162,11 @@ if enable_print_with_color != 0 and enable_print_with_color != 1
     )
 endif
 
-# we need to hardcoded some configurations as source code
+# add pos/include/log.h support
 subdir('pos/include')
+
+# we need to hardcoded some configurations as source code
+subdir('pos/include/_daemon_options')
 
 # print configurations
 message('>>> Build configurations:')
@@ -194,7 +200,6 @@ message('>>> Build configurations done\n')
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    # extract cuda version
     # cuda_version = run_command(bash, './scripts/utils/get_cuda_version.sh').stdout().strip()
     cuda_version = target_version
     cuda_pc_path = '/usr/lib/pkgconfig'

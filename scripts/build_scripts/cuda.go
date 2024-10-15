@@ -231,7 +231,7 @@ func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 		ninja clean
 		ninja &>%s 2>&1
 		cp %s/build/libpos.so %s/%s
-		cp %s/build/pos/include/* %s/%s
+		cp -r %s/build/pos/include/* %s/%s
 		`,
 		buildOpt.export_string(),
 		cmdOpt.RootDir,
