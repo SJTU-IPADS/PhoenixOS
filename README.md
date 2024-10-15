@@ -9,25 +9,27 @@
 <table style="border:none;">
     <tr>
         <td>
-            <div align="center">
-                <img src="./docs/docs/source/_static/images/home/pos_logo.gif" style="margin:0px" />
+            <div align="center" style="margin:0px; padding:0px;">
+                <img src="./docs/docs/source/_static/images/home/pos_logo.gif" style="margin:0px; padding:0px;" />
             </div>
         </td>
-        <td>
+        <td >
             <p>
             <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU C/R system. It can transparently checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can concurrently execute C/R with the application execution.
-            <p>
-            <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
-            <ul>
-                <li>
-                    <p>
-                    <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉
-                    <p>
-                    👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
-                    <p>
-                    👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
-                </li>
-            </ul>
+            <div style="background:lightgrey; padding: 0px 5px;">
+                <p>
+                <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
+                <ul>
+                    <li>
+                        <p>
+                        <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉
+                        <p>
+                        👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
+                        <p>
+                        👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
+                    </li>
+                </ul>
+            </div>
         </td>
     </tr>
 </table>
