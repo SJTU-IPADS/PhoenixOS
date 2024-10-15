@@ -44,7 +44,7 @@ void POSParser::__daemon(){
             api_id = wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
-        #if POS_ENABLE_DEBUG_CHECK
+        #if POS_CONF_RUNTIME_EnableDebugCheck
             if(unlikely(_parser_functions.count(api_id) == 0)){
                 POS_ERROR_C_DETAIL(
                     "runtime has no parser function for api %lu, need to implement", api_id
@@ -101,7 +101,7 @@ void POSParser::__daemon(){
         *  \brief  ================== phrase 2 - checkpoint insertion ==================
         *  \note   we need to do again as there might no wqe polled
         */
-        #if POS_CKPT_OPT_LEVEL > 0
+        #if POS_CONF_EVAL_CkptOptLevel > 0
             if(this->_client->is_time_for_ckpt()){
                 if(unlikely(POS_SUCCESS != this->__checkpoint_insertion())){
                     POS_WARN_C("failed to insert checkpointing op");
@@ -116,11 +116,11 @@ void POSParser::__daemon(){
 
 /*!
  *  \brief  insert checkpoint op to the DAG based on certain conditions
- *  \note   aware of the macro POS_CKPT_ENABLE_INCREMENTAL
+ *  \note   aware of the macro POS_CONF_EVAL_CkptEnableIncremental
  *  \return POS_SUCCESS for successfully checkpoint insertion
  */
 pos_retval_t POSParser::__checkpoint_insertion() {
-    #if POS_CKPT_ENABLE_INCREMENTAL == 1
+    #if POS_CONF_EVAL_CkptEnableIncremental == 1
         return this->__checkpoint_insertion_incremental();
     #else
         return this->__checkpoint_insertion_naive();

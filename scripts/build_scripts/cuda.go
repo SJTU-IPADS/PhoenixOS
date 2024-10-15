@@ -10,23 +10,28 @@ import (
 )
 
 const (
-	KLibClangPath    = "third_party/libclang-static-build"
-	KLibYamlCppPath  = "third_party/yaml-cpp"
-	KLibPaniniPath   = "third_party/Panini"
+	// third parties
+	KLibClangPath   = "third_party/libclang-static-build"
+	KLibYamlCppPath = "third_party/yaml-cpp"
+
+	// PhOS repo
 	KPhOSPath        = "pos"
 	KPhOSCLIPath     = "pos/cli"
 	KPhOSPatcherPath = "pos/cuda_impl/patcher"
+	kPhOSAutoGenPath = "autogen"
 	KRemotingPath    = "remoting/cuda"
 	KBuildLogPath    = "build_log"
 	KBuildLibPath    = "lib"
 	KBuildIncPath    = "lib/pos/include"
 	KBuildBinPath    = "bin"
-	KInstallLibPath  = "/lib/x86_64-linux-gnu"
-	KInstallIncPath  = "/usr/local/include"
-	KInstallBinPath  = "/usr/local/bin"
+
+	// system
+	KInstallLibPath = "/lib/x86_64-linux-gnu"
+	KInstallIncPath = "/usr/local/include"
+	KInstallBinPath = "/usr/local/bin"
 )
 
-func buildLibYamlCpp(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildLibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building libyaml-cpp...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_libyamlcpp.log")
@@ -44,7 +49,7 @@ func buildLibYamlCpp(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logge
 		cp ./libyaml-cpp.so.0.8.0 %s
 		cp -r ../include/yaml-cpp %s/yaml-cpp
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir, KLibYamlCppPath,
 		buildLogPath,
 		buildLogPath,
@@ -89,7 +94,7 @@ func buildLibYamlCpp(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logge
 	}
 }
 
-func buildLibClang(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildLibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building libclang...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_libclang.log")
@@ -108,7 +113,7 @@ func buildLibClang(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 		cp ../lib/libclang.so.VERSION %s
 		cp -r ../include/clang-c %s/clang-c
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir, KLibClangPath,
 		buildLogPath,
 		buildLogPath,
@@ -153,7 +158,7 @@ func buildLibClang(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 	}
 }
 
-func buildKernelPatcher(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildKernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building CUDA kernel patcher...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_kernel_patcher.log")
@@ -174,7 +179,7 @@ func buildKernelPatcher(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Lo
 		cp ./release/libpatcher.a %s/%s
 		cp ./patcher.h %s/%s
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir, KPhOSPatcherPath,
 		buildLogPath,
 		buildLogPath,
@@ -215,7 +220,68 @@ func buildKernelPatcher(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Lo
 	}
 }
 
-func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildAndRunAutoGen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_autogen.log")
+
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		%s
+		cd %s/%s
+		rm -rf ./build
+		meson build &>%s 2>&1
+		cd build
+		ninja clean
+		ninja &>%s 2>&1
+		cp -r ./pos/include/* %s/%s
+		`,
+		buildConf.export_string(),
+		cmdOpt.RootDir, kPhOSAutoGenPath,
+		buildLogPath,
+		buildLogPath,
+		cmdOpt.RootDir, KBuildIncPath,
+	)
+
+	run_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		%s
+		cd %s/%s/build
+		LD_LIBRARY_PATH=../../lib/ ./pos_autogen 	\
+			-s ../autogen_cuda/supported/%s 		\
+			-d /usr/local/cuda-%s/include 			\
+			-g ../generated
+		`,
+		buildConf.export_string(),
+		cmdOpt.RootDir, kPhOSAutoGenPath,
+		buildConf.RuntimeTargetVersion,
+		buildConf.RuntimeTargetVersion,
+	)
+
+	// build
+	logger.Infof("building AutoGen for CUDA target...")
+	start := time.Now()
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build PhOS Core for CUDA target, please see log at %s", buildLogPath)
+	}
+	elapsed := time.Since(start)
+	utils.ClearLastLine()
+	logger.Infof("built AutoGen for CUDA target: %.2fs", elapsed.Seconds())
+
+	// autogen
+	logger.Infof("generating parser and worker code for CUDA target...")
+	start = time.Now()
+	_, err = utils.BashScriptGetOutput(run_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build PhOS Core for CUDA target, please see log at %s", buildLogPath)
+	}
+	elapsed = time.Since(start)
+	utils.ClearLastLine()
+	logger.Infof("generated parser and worker code for CUDA target: %.2fs", elapsed.Seconds())
+}
+
+func buildPhOSCore(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building PhOS core for CUDA target...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_phos_core.log")
@@ -225,7 +291,6 @@ func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 		%s
 		cd %s
 		rm -rf ./build
-		# load build options
 		meson build &>%s 2>&1
 		cd build
 		ninja clean
@@ -233,7 +298,7 @@ func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 		cp %s/build/libpos.so %s/%s
 		cp -r %s/build/pos/include/* %s/%s
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir,
 		buildLogPath,
 		buildLogPath,
@@ -268,7 +333,7 @@ func buildPhOSCore(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 	}
 }
 
-func buildPhOSCLI(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildPhOSCLI(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building PhOS CLI...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_phos_cli.log")
@@ -284,7 +349,7 @@ func buildPhOSCLI(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) 
 		make -j  &>%s 2>&1
 		cp ./pos-cli %s/%s
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir, KPhOSCLIPath,
 		buildLogPath,
 		buildLogPath,
@@ -320,7 +385,7 @@ func buildPhOSCLI(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) 
 	}
 }
 
-func buildRemoting(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildRemoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building remoting framework...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_remoting_framework.log")
@@ -337,7 +402,7 @@ func buildRemoting(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 		cp cricket-rpc-server %s/%s
 		cp cricket-client.so %s/%s
 		`,
-		buildOpt.export_string(),
+		buildConf.export_string(),
 		cmdOpt.RootDir, KRemotingPath,
 		buildLogPath,
 		cmdOpt.RootDir, KBuildLibPath,
@@ -377,7 +442,7 @@ func buildRemoting(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger)
 	}
 }
 
-func buildUnitTest(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func buildUnitTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	// logger.Infof("building uint test...")
 }
 
@@ -494,6 +559,23 @@ func cleanKernelPatcher(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
+func clearAutoGen(cmdOpt CmdOptions, logger *log.Logger) {
+	logger.Infof("cleaning AutoGen...")
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+		cd %s/%s
+		rm -rf build
+		rm -rf generated
+		`,
+		cmdOpt.RootDir, kPhOSAutoGenPath,
+	)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
+	if err != nil {
+		logger.Warnf("failed to clean AutoGen")
+	}
+	logger.Infof("done")
+}
+
 func cleanPhOSCore(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("cleaning PhOS core...")
 	clean_script := fmt.Sprintf(`
@@ -530,7 +612,7 @@ func cleanPhOSCLI(cmdOpt CmdOptions, logger *log.Logger) {
 	logger.Infof("done")
 }
 
-func BuildTarget_CUDA(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func BuildTarget_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	// ==================== Prepare ====================
 	logger.Infof("pre-build check...")
 	utils.CheckAndInstallCommand("git", "git", nil, logger)
@@ -610,26 +692,27 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logg
 	// ==================== Build Dependencies ====================
 	if *cmdOpt.WithThirdParty {
 		logger.Infof("building dependencies...")
-		buildLibClang(cmdOpt, buildOpt, logger)
-		buildLibYamlCpp(cmdOpt, buildOpt, logger)
+		buildLibClang(cmdOpt, buildConf, logger)
+		buildLibYamlCpp(cmdOpt, buildConf, logger)
 
 		// TODO: just for fast compilation of PhOS, remove later
-		buildKernelPatcher(cmdOpt, buildOpt, logger)
+		buildKernelPatcher(cmdOpt, buildConf, logger)
 	}
 
 	// ==================== Build PhOS ====================
 	// buildKernelPatcher(cmdOpt, logger)
-	buildPhOSCore(cmdOpt, buildOpt, logger)
-	buildPhOSCLI(cmdOpt, buildOpt, logger)
-	buildRemoting(cmdOpt, buildOpt, logger)
+	buildAndRunAutoGen(cmdOpt, buildConf, logger)
+	buildPhOSCore(cmdOpt, buildConf, logger)
+	buildPhOSCLI(cmdOpt, buildConf, logger)
+	buildRemoting(cmdOpt, buildConf, logger)
 
 	utils.SwitchGppVersion(13, logger)
 	// TODO: run autogen
 
 	// ==================== Build and Run Unit Test ====================
 	if *cmdOpt.DoUnitTest {
-		BuildGoogleTest(cmdOpt, buildOpt, logger)
-		buildUnitTest(cmdOpt, buildOpt, logger)
+		BuildGoogleTest(cmdOpt, buildConf, logger)
+		buildUnitTest(cmdOpt, buildConf, logger)
 	}
 }
 
@@ -647,6 +730,7 @@ func CleanTarget_CUDA(cmdOpt CmdOptions, logger *log.Logger) {
 	// ==================== Clean PhOS ====================
 	cleanCommon(cmdOpt, logger)
 	// cleanKernelPatcher(cmdOpt, logger)
+	clearAutoGen(cmdOpt, logger)
 	cleanPhOSCore(cmdOpt, logger)
 	cleanPhOSCLI(cmdOpt, logger)
 

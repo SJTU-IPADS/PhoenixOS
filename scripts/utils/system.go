@@ -64,14 +64,12 @@ func BashCommandGetOutput(command string, ignoreFailed bool, logger *log.Logger)
 	args := strings.Fields(command)
 	output, err := exec.Command(args[0], args[1:]...).CombinedOutput()
 	if err != nil {
-		logger.Warnf("failed to execute \"%s\": %s", command, err)
-	}
-
-	if ignoreFailed {
-		return output, nil
-	} else {
+		if !ignoreFailed {
+			logger.Warnf("failed to execute \"%s\": %s", command, err)
+		}
 		return output, err
 	}
+	return output, nil
 }
 
 func BashScriptGetOutput(script string, ignoreFailed bool, logger *log.Logger) ([]byte, error) {

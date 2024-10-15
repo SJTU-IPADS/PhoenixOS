@@ -6,7 +6,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 #include "pos/cuda_impl/api_index.h"
 

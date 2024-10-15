@@ -78,7 +78,7 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
 
 
 
-#if POS_CKPT_OPT_LEVEL == 0 || POS_CKPT_OPT_LEVEL == 1
+#if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1
 
 /*!
  *  \brief  worker daemon with / without SYNC checkpoint support (checkpoint optimization level 0 and 1)
@@ -123,7 +123,7 @@ void POSWorker::__daemon_ckpt_sync(){
                 continue;
             }
 
-        #if POS_ENABLE_DEBUG_CHECK
+        #if POS_CONF_RUNTIME_EnableDebugCheck
             if(unlikely(_launch_functions.count(api_id) == 0)){
                 POS_ERROR_C_DETAIL(
                     "runtime has no worker launch function for api %lu, need to implement", api_id
@@ -220,7 +220,7 @@ exit:
     return retval;
 }
 
-#elif POS_CKPT_OPT_LEVEL == 2
+#elif POS_CONF_EVAL_CkptOptLevel == 2
 
 /*!
  *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)
@@ -353,7 +353,7 @@ void POSWorker::__daemon_ckpt_async(){
                 continue;
             }
 
-            #if POS_ENABLE_DEBUG_CHECK
+            #if POS_CONF_RUNTIME_EnableDebugCheck
                 if(unlikely(_launch_functions.count(api_id) == 0)){
                     POS_ERROR_C_DETAIL(
                         "runtime has no worker launch function for api %lu, need to implement", api_id
@@ -451,7 +451,7 @@ void POSWorker::__daemon_ckpt_async(){
 /*!
  *  \brief  overlapped checkpoint procedure, should be implemented by each platform
  *  \note   this thread will be raised by level-2 ckpt
- *  \note   aware of the macro POS_CKPT_ENABLE_PIPELINE
+ *  \note   aware of the macro POS_CONF_EVAL_CkptEnablePipeline
  *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
  *  \param  cxt     the context of this checkpointing
  */
@@ -463,7 +463,7 @@ void POSWorker::__checkpoint_async_thread() {
     POSHandle *handle;
     uint64_t s_tick = 0, e_tick = 0;
 
-#if POS_CKPT_ENABLE_PIPELINE == 1
+#if POS_CONF_EVAL_CkptEnablePipeline == 1
     std::vector<std::shared_future<pos_retval_t>> _commit_threads;
     std::shared_future<pos_retval_t> _new_commit_thread;
 #endif
@@ -473,7 +473,7 @@ void POSWorker::__checkpoint_async_thread() {
 
     POS_CHECK_POINTER(wqe = this->async_ckpt_cxt.wqe);
     POS_ASSERT(this->_ckpt_stream_id != 0);
-    #if POS_CKPT_ENABLE_PIPELINE == 1
+    #if POS_CONF_EVAL_CkptEnablePipeline == 1
         POS_ASSERT(this->_ckpt_commit_stream_id != 0);
     #endif
 
@@ -501,7 +501,7 @@ void POSWorker::__checkpoint_async_thread() {
 
         checkpoint_version = this->async_ckpt_cxt.checkpoint_version_map[handle];
 
-    #if POS_CKPT_ENABLE_PIPELINE == 1
+    #if POS_CONF_EVAL_CkptEnablePipeline == 1
         /*!
          *  \brief  [phrase 1]  add the state of this handle from its origin buffer
          *  \note   the adding process is sync as it might disturbed by CoW
@@ -581,7 +581,7 @@ void POSWorker::__checkpoint_async_thread() {
     //     /* cond */ true,
     //     /* trace_workload */ POS_TRACE_TICK_START(worker, ckpt_commit)
     // );
-    // #if POS_CKPT_ENABLE_PIPELINE == 1
+    // #if POS_CONF_EVAL_CkptEnablePipeline == 1
     //     /*!
     //      *  \note   [phrase 3]  synchronize all commits
     //      *                      this phrase is only enabled when checkpoint pipeline is enabled
@@ -617,10 +617,10 @@ exit:
     this->async_ckpt_cxt.is_active = false;
 }
 
-#endif // POS_CKPT_OPT_LEVEL
+#endif // POS_CONF_EVAL_CkptOptLevel
 
 
-#if POS_MIGRATION_OPT_LEVEL > 0
+#if POS_CONF_EVAL_MigrOptLevel > 0
     /*!
      *  \brief  worker daemon with optimized migration support (POS)
      */
@@ -667,7 +667,7 @@ exit:
                     continue;
                 }
 
-                #if POS_ENABLE_DEBUG_CHECK
+                #if POS_CONF_RUNTIME_EnableDebugCheck
                     if(unlikely(_launch_functions.count(api_id) == 0)){
                         POS_ERROR_C_DETAIL(
                             "runtime has no worker launch function for api %lu, need to implement", api_id
@@ -725,7 +725,7 @@ exit:
         } // stop_flag
     }
 
-#endif // POS_MIGRATION_OPT_LEVEL
+#endif // POS_CONF_EVAL_MigrOptLevel
 
 
 /*!

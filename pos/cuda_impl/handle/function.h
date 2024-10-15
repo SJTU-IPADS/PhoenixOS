@@ -344,7 +344,7 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Module) == 0)){
             POS_WARN_C("no binded module provided to created the CUDA function");
             retval = POS_FAILED_INVALID_INPUT;

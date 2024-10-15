@@ -19,7 +19,7 @@
 #include "pos/include/log.h"
 #include "pos/include/client.h"
 #include "pos/include/migration.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 
 /*!
@@ -54,7 +54,7 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
          *  \note   [case]  the migration just start
          */
         case kPOS_MigrationStage_Init: {
-        #if POS_MIGRATION_OPT_LEVEL == 1
+        #if POS_CONF_EVAL_MigrOptLevel == 1
             // drain
             if(unlikely( (retval = this->_client->worker->sync()) != POS_SUCCESS )){
                 POS_WARN_C_DETAIL("failed to synchornize before pre-copy");
@@ -69,7 +69,7 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
             // mark all handles to be broken
             this->_client->__TMP__migration_tear_context(__TMP__context_pool_include_module);
             POS_LOG("[migration] tear context, and lock worker thread");
-        #elif POS_MIGRATION_OPT_LEVEL == 2
+        #elif POS_CONF_EVAL_MigrOptLevel == 2
             // generate the copy plan, and remote malloc
             this->_client->__TMP__migration_remote_malloc();
 
@@ -181,9 +181,9 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
 
             POS_LOG("restore context: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
-        #if POS_MIGRATION_OPT_LEVEL == 1
+        #if POS_CONF_EVAL_MigrOptLevel == 1
             this->_client->__TMP__migration_allreload();
-        #elif POS_MIGRATION_OPT_LEVEL == 2
+        #elif POS_CONF_EVAL_MigrOptLevel == 2
             // raise on-demand reload thread (no need, we duplicate on the CPU-side)
             // this->_ondemand_reload_thread = new std::thread(&POSMigrationCtx::__ondemand_reload_async_thread, this);
             // POS_CHECK_POINTER(this->_ondemand_reload_thread);

@@ -163,9 +163,9 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
             this->_handles.push_back(stream_handle);
             this->latest_used_handle = this->_handles[0];
 
-        #if POS_ENABLE_CONTEXT_POOL == 1
+        #if POS_CONF_EVAL_RstEnableContextPool == 1
             this->preserve_pooled_handles(8);
-        #endif // POS_ENABLE_CONTEXT_POOL
+        #endif // POS_CONF_EVAL_RstEnableContextPool
         }
     }
 
@@ -193,7 +193,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate buffer
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA stream");
             retval = POS_FAILED_INVALID_INPUT;

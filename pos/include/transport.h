@@ -40,7 +40,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/oob.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 
 #define POS_TRANSPORT_RDMA_MAX_WQE_PER_WQ    128
