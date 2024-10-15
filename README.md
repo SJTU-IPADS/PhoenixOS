@@ -14,9 +14,20 @@
             </div>
         </td>
         <td>
-            <p style="margin:0px">
-                **PhoenixOS** (*PhOS*) is an OS-level GPU C/R system. It can transparently checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, *PhOS* is the first OS-level C/R system that can concurrently execute C/R with the application execution. *PhOS* is now supporting CUDA platform.
-            </p>
+            <p>
+            <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU C/R system. It can transparently checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can concurrently execute C/R with the application execution.
+            <p>
+            <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
+            <ul>
+                <li>
+                    <p>
+                    <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉
+                    <p>
+                    👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
+                    <p>
+                    👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
+                </li>
+            </ul>
         </td>
     </tr>
 </table>
