@@ -39,6 +39,10 @@
 
 ## I. What *PhOS* Does?
 
+> [!NOTE]  
+> Contributions from community are very welcomed!<br />
+> See all potential cool features could be implemented on *PhOS* at <a href="">Contribute to <i>PhOS</i></a>
+
 ## II. Build *PhOS* From Source
 
 1. **[Start Container]**
@@ -91,4 +95,3 @@ If you use *PhOS* in your research, please cite our paper:
   year={2024}
 }
 ```
-
