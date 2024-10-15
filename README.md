@@ -37,11 +37,13 @@
     </tr>
 </table>
 
+
 ## I. What *PhOS* Does?
 
 > [!NOTE]  
 > Contributions from community are very welcomed!<br />
 > See all potential cool features could be implemented on *PhOS* at <a href="">Contribute to <i>PhOS</i></a>
+
 
 ## II. Build *PhOS* From Source
 
@@ -73,15 +75,18 @@
     bash build.sh
     ```
 
+
 ## III. Running *PhOS* Samples
 
 **TODO**
+
 
 ## IV. How *PhOS* Works?
 
 <div align="center">
     <img src="./docs/docs/source/_static/images/pos_mechanism.jpg" width="80%" />
 </div>
+
 
 ## V. Paper
 
