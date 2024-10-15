@@ -37,6 +37,12 @@ sources = []
 
 
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
+# build config: root directory of the project
+project_root_dir = run_command('sh', '-c', 'echo $POS_BUILD_ROOT').stdout().strip()
+if project_root_dir != ''
+    assert(false, 'no project root directory was set')
+endif
+
 # config:   target selection (options: cuda, todos: rocm/ascend)
 target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
 if target == ''
@@ -46,11 +52,76 @@ if target != 'cuda'
     assert(false, 'target ' + target + ' is currently not supported')
 endif
 
+# config:   target version (example: "11.3" for CUDA 11.3)
+target_version = run_command('sh', '-c', 'echo $POS_BUILD_TARGET_VERSION').stdout().strip()
+if target_version == ''
+    assert(false, 'no target version was provided')
+endif
+
+# switch:   whether to check correctness of function parameters, return values, etc.,
+#           which might cause extra runtime burden, should only be enabled while debuging
+enable_runtime_debug_check = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK').stdout().strip().to_int()
+if enable_runtime_debug_check != 0 and enable_runtime_debug_check != 1
+    assert(
+        false, 
+        'enable_runtime_debug_check get invalid value: ' + enable_runtime_debug_check.to_string()
+    )
+endif
+
+# switch:   whether to print all fatal messages
+enable_print_error = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_ERROR').stdout().strip().to_int()
+if enable_print_error != 0 and enable_print_error != 1
+    assert(
+        false, 
+        'enable_print_error get invalid value: ' + enable_print_error.to_string()
+    )
+endif
+
+# switch:   whether to print all warning messages
+enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WARN').stdout().strip().to_int()
+if enable_print_warn != 0 and enable_print_warn != 1
+    assert(
+        false, 
+        'enable_print_warn get invalid value: ' + enable_print_warn.to_string()
+    )
+endif
+
+# switch:   whether to print all log messages
+enable_print_log = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_LOG').stdout().strip().to_int()
+if enable_print_log != 0 and enable_print_log != 1
+    assert(
+        false, 
+        'enable_print_log get invalid value: ' + enable_print_log.to_string()
+    )
+endif
+
+# switch:   whether to print all debug messages
+enable_print_debug = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_DEBUG').stdout().strip().to_int()
+if enable_print_debug != 0 and enable_print_debug != 1
+    assert(
+        false, 
+        'enable_print_debug get invalid value: ' + enable_print_debug.to_string()
+    )
+endif
+
+# switch:   whether to print fatal/warn/debug/log with colors
+#           should be disabled when try to dump all outputs to a file
+enable_print_with_color = run_command('sh', '-c', 'echo $POS_BUILD_ENABLE_PRINT_WITH_COLOR').stdout().strip().to_int()
+if enable_print_with_color != 0 and enable_print_with_color != 1
+    assert(
+        false, 
+        'enable_print_with_color get invalid value: ' + enable_print_with_color.to_string()
+    )
+endif
+
+# add pos/include/log.h support
+subdir(project_root_dir + '/pos/include')
+
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'
-    # extract cuda version
-    cuda_version = run_command(bash, '../scripts/utils/get_cuda_version.sh').stdout().strip()
+    # cuda_version = run_command(bash, '../scripts/utils/get_cuda_version.sh').stdout().strip()
+    cuda_version = target_version
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []
