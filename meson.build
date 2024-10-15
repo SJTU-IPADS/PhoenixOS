@@ -42,31 +42,40 @@ meson_file_dir = meson.current_source_dir()
 
 
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
-# config:   target selection (options: cuda, todos: rocm/ascend)
-target = run_command('sh', '-c', 'echo $POS_BUILD_TARGET').stdout().strip()
-if target != 'cuda'
-    assert(false, 'target ' + target + ' is currently not supported')
+# target selection (options: cuda, todos: rocm/ascend)
+conf_runtime_target = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeTarget').stdout().strip()
+if conf_runtime_target != 'cuda'
+    assert(false, 'runtime target ' + conf_runtime_target + ' is currently not supported')
 endif
 
-# config:   target version (example: "11.3" for CUDA 11.3)
-target_version = run_command('sh', '-c', 'echo $POS_BUILD_TARGET_VERSION').stdout().strip()
-if target_version == ''
-    assert(false, 'no target version was provided')
+# target version (example: "11.3" for CUDA 11.3)
+conf_runtime_target_version = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeTargetVersion').stdout().strip()
+if conf_runtime_target_version == ''
+    assert(false, 'no runtime target version was provided')
 endif
 
-# config:   checkpoint optimization level (p.s., 0 is no continuous-checkpoint)
-#           0: no continuous ckpt support
-#           1: naive continuous ckpt support
-#           2: pos continuous ckpt support
-ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CKPT_OPT_LEVEL').stdout().strip().to_int()
-if ckpt_opt_level != 0 and ckpt_opt_level != 1 and ckpt_opt_level != 2
-    assert(false, 'ckpt_opt_level ' + ckpt_opt_level.to_string() + ' is currently not supported')
+# checkpoint optimization level
+#   - 0: no ckpt support
+#   - 1: naive ckpt support
+#   - 2: pos ckpt support
+conf_eval_ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalCkptOptLevel').stdout().strip().to_int()
+if conf_eval_ckpt_opt_level != 0 and conf_eval_ckpt_opt_level != 1 and conf_eval_ckpt_opt_level != 2
+    assert(false, 'conf_eval_ckpt_opt_level with level ' + conf_eval_ckpt_opt_level.to_string() + ' is currently not supported')
+endif
+
+# migration optimization level
+#   - 0: no migration support
+#   - 1: naive migration support
+#   - 2: pos migration support
+conf_eval_migr_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalMigrOptLevel').stdout().strip().to_int()
+if conf_eval_migr_opt_level != 0 and conf_eval_migr_opt_level != 1 and conf_eval_migr_opt_level != 2
+    assert(false, 'conf_eval_migr_opt_level with level ' + conf_eval_migr_opt_level.to_string() + ' is currently not supported')
 endif
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
-if target == 'cuda'
+if conf_runtime_target == 'cuda'
     # cuda_version = run_command(bash, './scripts/utils/get_cuda_version.sh').stdout().strip()
-    cuda_version = target_version
+    cuda_version = conf_runtime_target_version
     cuda_pc_path = '/usr/lib/pkgconfig'
     cuda_modules = ['cublas', 'cuda', 'cudart', 'cufft', 'cufftw', 'cuinj64', 'curand', 'cusolver', 'cusparse']
     founded_cuda_modules = []
@@ -113,19 +122,19 @@ sources += [
     'pos/src/oob/mgnt.cpp'
 ]
 
-if ckpt_opt_level == 0
-    if migration_opt_level == 0
+if conf_eval_ckpt_opt_level == 0
+    if conf_eval_migr_opt_level == 0
         sources += ['pos/src/checkpoint_o0.cpp']
     else
         sources += ['pos/src/checkpoint_o1.cpp']
     endif
-elif ckpt_opt_level == 1
+elif conf_eval_ckpt_opt_level == 1
     sources += ['pos/src/checkpoint_o1.cpp']
-elif ckpt_opt_level == 2
+elif conf_eval_ckpt_opt_level == 2
     sources += ['pos/src/checkpoint_o2.cpp']
 endif
 
-if target == 'cuda'
+if conf_runtime_target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',
         'pos/cuda_impl/utils/fatbin.cpp',
@@ -138,15 +147,13 @@ if target == 'cuda'
         'pos/cuda_impl/worker/cuda_runtime.cpp',
         'pos/cuda_impl/handle/memory.cpp'
     ]
-else
-    assert(false, 'target ' + target + ' is currently not supported')
 endif
 
 inc_dirs += ['./']
 
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
-if target == 'cuda'
+if conf_runtime_target == 'cuda'
     ld_args += ['-ldl', '-lpatcher']    # for cuda patcher
     ld_args += ['-lclang']              # for using libclang for cuda target
     ld_args += ['-lrt']                 # for support shm_x
