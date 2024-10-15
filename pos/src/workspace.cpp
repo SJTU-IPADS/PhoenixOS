@@ -13,23 +13,61 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <iostream>
-#include <vector>
-#include <map>
-#include <string>
-
-#include <stdint.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "pos/include/common.h"
-#include "pos/include/log.h"
 #include "pos/include/workspace.h"
 
-/*!
- *  \brief  shutdown the POS server
- */
+
+POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
+    POS_CHECK_POINTER(this->_root_ws = root_ws);
+    this->_runtime_daemon_log_path = // TODO: ;
+    this->_runtime_client_log_path = // TODO: ;
+    this->_eval_ckpt_interval = // TODO: ;
+}
+
+
+pos_retval_t POSWorkspaceConf::set(ConfigType conf_type, std::string val){
+    pos_retval_t retval = POS_SUCCESS;
+    std::lock_guard<std::mutex> lock(this->_mutex);
+    uint64_t _tmp;
+
+    POS_ASSERT(conf_type < ConfigType::kUnknown);
+
+    switch (conf_type)
+    {
+    case kRuntimeDaemonLogPath:
+        // TODO:
+        break;
+
+    case kRuntimeClientLogPath:
+        // TODO:
+        break;
+    
+    case kEvalCkptIntervfalMs:
+        try {
+            _tmp = std::stoull(val);
+        } catch (const std::invalid_argument& e) {
+            POS_WARN_C("failed to set ckpt interval: %s", e.what().c_str());
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        } catch (const std::out_of_range& e) {
+            P_tmpdir("failed to set ckpt interval: %s", e.what().c_str());
+            retval = POS_FAILED_INVALID_INPUT;
+            goto exit;
+        }
+        this->_eval_ckpt_interval_tick = static_cast<uint64_t>(
+            this->_root_ws->tsc_timer.ms_to_tick(_tmp)
+        );
+        break;
+
+    default:
+        break;
+    }
+
+exit:
+    return retval;
+}
+
+
+
 void POSWorkspace::clear(){
     typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
 
@@ -48,6 +86,7 @@ void POSWorkspace::clear(){
         }
     }
 }
+
 
 void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
     int opt;
@@ -89,16 +128,6 @@ void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
 }
 
 
-/*!
- *  \brief  entrance of POS processing
- *  \param  api_id          index of the called API
- *  \param  uuid            uuid of the remote client
- *  \param  is_sync         indicate whether the api is a sync one
- *  \param  param_desps     description of all parameters of the call
- *  \param  ret_data        pointer to the data to be returned
- *  \param  ret_data_len    length of the data to be returned
- *  \return return code on specific XPU platform
- */
 int POSWorkspace::pos_process(
     uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t> param_desps, void* ret_data, uint64_t ret_data_len
 ){
@@ -115,35 +144,35 @@ int POSWorkspace::pos_process(
     // TODO: we assume always be client 0 here, for debugging under cricket
     uuid = 0;
 
-#if POS_ENABLE_DEBUG_CHECK
+#if POS_CONF_RUNTIME_EnableDebugCheck
     // check whether the client exists
     if(unlikely(_client_map.count(uuid) == 0)){
         POS_WARN_C_DETAIL("no client with uuid(%lu) was recorded", uuid);
         return POS_FAILED_NOT_EXIST;
     }
-#endif // POS_ENABLE_DEBUG_CHECK
+#endif // POS_CONF_RUNTIME_EnableDebugCheck
 
     POS_CHECK_POINTER(client = _client_map[uuid]);
 
     // check whether the work queue exists
-#if POS_ENABLE_DEBUG_CHECK
+#if POS_CONF_RUNTIME_EnableDebugCheck
     if(unlikely(_parser_wqs.count(uuid) == 0)){
         POS_WARN_C_DETAIL("no work queue with client uuid(%lu) was created", uuid);
         return POS_FAILED_NOT_EXIST;
     }
-#endif // POS_ENABLE_DEBUG_CHECK
+#endif // POS_CONF_RUNTIME_EnableDebugCheck
 
     POS_CHECK_POINTER(wq = _parser_wqs[uuid]);
 
     // check whether the metadata of the API was recorded
-#if POS_ENABLE_DEBUG_CHECK
+#if POS_CONF_RUNTIME_EnableDebugCheck
     if(unlikely(api_mgnr->api_metas.count(api_id) == 0)){
         POS_WARN_C_DETAIL(
             "no api metadata was recorded in the api manager: api_id(%lu)", api_id
         );
         return POS_FAILED_NOT_EXIST;
     }
-#endif // POS_ENABLE_DEBUG_CHECK
+#endif // POS_CONF_RUNTIME_EnableDebugCheck
 
     api_meta = api_mgnr->api_metas[api_id];
 
@@ -179,7 +208,7 @@ int POSWorkspace::pos_process(
                 POS_ERROR_C_DETAIL("failed to poll worker cq");
             }
 
-        #if POS_ENABLE_DEBUG_CHECK
+        #if POS_CONF_RUNTIME_EnableDebugCheck
             if(cqes.size() > 0){
                 POS_DEBUG_C("polling completion queue, obtain %lu elements: uuid(%lu)", cqes.size(), uuid);
             }

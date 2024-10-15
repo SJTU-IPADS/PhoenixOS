@@ -1,0 +1,28 @@
+# ========= Platform configs =========
+# Not defined in this file, dynamically detected
+# platform_project_root
+
+# ========= Runtime configs =========
+runtime_target: "cuda"
+runtime_target_version: "12.1"
+runtime_enable_print_error: 1
+runtime_enable_print_warn: 1
+runtime_enable_print_log: 1
+runtime_enable_print_debug: 0
+runtime_enable_print_with_color: 1
+runtime_enable_debug_check: 1
+runtime_enable_hijack_api_check: 1
+runtime_enable_trace: 1
+runtime_default_daemon_log_path: "/var/log/phos/daemon.log"
+runtime_default_client_log_path: "/var/log/phos/client.log"
+
+# ========= Evaluation configs =========
+# checkpoint options
+eval_ckpt_opt_level: 2
+eval_ckpt_enable_increamental: 1
+eval_ckpt_enable_pipeline: 1
+eval_ckpt_default_interval_ms: 6000
+# migration options
+eval_migr_opt_level: 2
+# restore options
+eval_rst_enable_context_pool: 1

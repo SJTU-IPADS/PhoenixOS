@@ -80,12 +80,12 @@ pos_retval_t POSHandle::restore() {
     pos_retval_t retval;
     POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
 
-    #if POS_ENABLE_CONTEXT_POOL == 1
+    #if POS_CONF_EVAL_RstEnableContextPool == 1
         retval = hm_cast->try_restore_from_pool(this);
         if(likely(retval == POS_SUCCESS)){
             goto exit;
         }
-    #endif // POS_ENABLE_CONTEXT_POOL
+    #endif // POS_CONF_EVAL_RstEnableContextPool
 
     retval = this->__restore(); 
 

@@ -19,6 +19,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <mutex>
 
 #include <stdint.h>
 #include <unistd.h>
@@ -34,6 +35,7 @@ class POSWorkspace;
 #include "pos/include/transport.h"
 #include "pos/include/oob.h"
 #include "pos/include/api_context.h"
+#include "pos/include/utils/timer.h"
 #include "pos/include/utils/lockfree_queue.h"
 
 enum pos_queue_position_t : uint8_t {
@@ -48,6 +50,7 @@ enum pos_queue_type_t : uint8_t {
 
 class POSWorker;
 class POSParser;
+class POSWorkspace;
 
 /*!
  *  \brief  function prototypes for cli oob server
@@ -62,11 +65,59 @@ namespace oob_functions {
 
 
 /*!
- *  \brief  parameters for creating new client in the workspace
+ *  \brief  runtime workspace configuration
+ *  \note   these configurations can be updated via CLI or workspace internal programs
  */
-typedef struct pos_create_client_param {
-    // TODO:
-} pos_create_client_param_t;
+class POSWorkspaceConf {
+ public:
+    POSWorkspaceConf(POSWorkspace *root_ws);
+    ~POSWorkspaceConf() = default;
+
+    // configuration index in this container
+    enum ConfigType : uint16_t {
+        kRuntimeDaemonLogPath = 0,
+        kRuntimeClientLogPath,
+        kEvalCkptIntervfalMs,
+        kUnknown
+    }; 
+
+    /*!
+     *  \brief  set sepecific configuration in the workspace
+     *  \note   should be thread-safe
+     *  \param  conf_type   type of the configuration
+     *  \param  val         value to set
+     *  \return POS_SUCCESS for successfully setting
+     */
+    pos_retval_t set(ConfigType conf_type, std::string val);
+
+    /*!
+     *  \brief  obtain sepecific configuration in the workspace
+     *  \note   should be thread-safe
+     *  \param  conf_type   type of the configuration
+     *  \param  val         value to get
+     *  \return POS_SUCCESS for successfully getting
+     */
+    pos_retval_t get(ConfigType conf_type, std::string& val);
+
+ private:
+    friend class POSWorkspace;
+
+    // ====== runtime configurations ======
+    // path of the daemon's log
+    std::string _runtime_daemon_log_path;
+    // path of the client's log
+    std::string _runtime_client_log_path;
+
+    // ====== evaluation configurations ======
+    // continuous checkpoint interval (ticks)
+    uint64_t _eval_ckpt_interval_tick;
+
+    // workspace that this configuration container attached to
+    POSWorkspace *_root_ws;
+
+    // mutex to avoid contension
+    std::mutex _mutex;
+};
 
 
 /*!
@@ -77,7 +128,9 @@ class POSWorkspace {
     /*!
      *  \brief  constructor
      */
-    POSWorkspace(int argc, char *argv[]) : _current_max_uuid(0) {
+    POSWorkspace(int argc, char *argv[]) 
+        : _current_max_uuid(0), ws_conf(this)
+    {
         // readin commandline options
         this->parse_command_line_options(argc, argv);
 
@@ -108,23 +161,21 @@ class POSWorkspace {
             "   migration configurations:                   \n"
             "       =>  migration_opt_level(%d, %s)         \n"
             ,
-            POS_ENABLE_CONTEXT_POOL == 1 ? "true" : "false",
-            POS_CKPT_OPT_LEVEL,
-            POS_CKPT_OPT_LEVEL == 0 ? "no ckpt" : POS_CKPT_OPT_LEVEL == 1 ? "sync ckpt" : "async ckpt",
-            POS_CKPT_INTERVAL,
-            POS_CKPT_OPT_LEVEL == 0 ? "N/A" : POS_CKPT_ENABLE_INCREMENTAL == 1 ? "true" : "false",
-            POS_CKPT_OPT_LEVEL <= 1 ? "N/A" : POS_CKPT_ENABLE_PIPELINE == 1 ? "true" : "false",
-            POS_MIGRATION_OPT_LEVEL,
-            POS_MIGRATION_OPT_LEVEL == 0 ? "no migration" : POS_MIGRATION_OPT_LEVEL == 1 ? "naive" : "pre-copy"
+            POS_CONF_EVAL_RstEnableContextPool == 1 ? "true" : "false",
+            POS_CONF_EVAL_CkptOptLevel,
+            POS_CONF_EVAL_CkptOptLevel == 0 ? "no ckpt" : POS_CONF_EVAL_CkptOptLevel == 1 ? "sync ckpt" : "async ckpt",
+            POS_CONF_EVAL_CkptDefaultIntervalMs,
+            POS_CONF_EVAL_CkptOptLevel == 0 ? "N/A" : POS_CONF_EVAL_CkptEnableIncremental == 1 ? "true" : "false",
+            POS_CONF_EVAL_CkptOptLevel <= 1 ? "N/A" : POS_CONF_EVAL_CkptEnablePipeline == 1 ? "true" : "false",
+            POS_CONF_EVAL_MigrOptLevel,
+            POS_CONF_EVAL_MigrOptLevel == 0 ? "no migration" : POS_CONF_EVAL_MigrOptLevel == 1 ? "naive" : "pre-copy"
         );
     }
     
     /*!
      *  \brief  deconstructor
      */
-    ~POSWorkspace(){ 
-        clear(); 
-    }
+    ~POSWorkspace(){ clear(); }
 
     /*!
      *  \brief  initialize the workspace, including raise the runtime and worker threads
@@ -246,9 +297,7 @@ class POSWorkspace {
     }
 
     template<pos_queue_position_t qt>
-    inline pos_retval_t poll_cq(
-        std::vector<POSAPIContext_QE*>* cqes, pos_client_uuid_t uuid
-    ){
+    inline pos_retval_t poll_cq(std::vector<POSAPIContext_QE*>* cqes, pos_client_uuid_t uuid){
         POSAPIContext_QE *cqe;
         POSLockFreeQueue<POSAPIContext_QE_t*> *cq;
 
@@ -353,7 +402,7 @@ class POSWorkspace {
 
 
     /*!
-     *  \brief  entrance of POS processing
+     *  \brief  entrance of POS :)
      *  \param  api_id          index of the called API
      *  \param  uuid            uuid of the remote client
      *  \param  is_sync         indicate whether the api is a sync one
@@ -375,6 +424,12 @@ class POSWorkspace {
 
     // idx of all stateful resources (handles)
     std::vector<uint64_t> stateful_handle_type_idx;
+
+    // dynamic configuration of this workspace
+    POSWorkspaceConf ws_conf;
+
+    // TSC timer of the workspace
+    POSUtilTscTimer tsc_timer;
 
  protected:
     /*!

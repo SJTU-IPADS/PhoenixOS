@@ -25,7 +25,7 @@
 #include "pos/include/log.h"
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 
 POSCheckpointBag::POSCheckpointBag(

@@ -458,7 +458,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
 
     // step 4: do runtime debug check
     parser_function->append_content(std::format(
-        "#if POS_ENABLE_DEBUG_CHECK\n"
+        "#if POS_CONF_RUNTIME_EnableDebugCheck\n"
         "    // check whether given parameter is valid\n"
         "   if(unlikely(wqe->api_cxt->params.size() != {})) {{\n"
         "       POS_WARN(\n"

@@ -49,7 +49,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         // initialize checkpoint bag
         if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
@@ -695,7 +695,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
         POS_CHECK_POINTER(handle);
 
         // obtain the device to allocate buffer
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Device) == 0)){
             POS_WARN_C("no binded device provided to create the CUDA memory");
             retval = POS_FAILED_INVALID_INPUT;

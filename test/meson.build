@@ -114,9 +114,6 @@ if enable_print_with_color != 0 and enable_print_with_color != 1
     )
 endif
 
-# add pos/include/log.h support
-subdir(project_root_dir + '/pos/include')
-
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>
 if target == 'cuda'

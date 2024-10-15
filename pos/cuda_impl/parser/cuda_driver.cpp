@@ -74,7 +74,7 @@ namespace cu_module_load {
         POS_CHECK_POINTER(client);
     
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cu_module_load): failed to parse, given %lu params, %lu expected",
@@ -198,7 +198,7 @@ namespace cu_module_load {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -265,7 +265,7 @@ namespace cu_module_load_data {
         POS_CHECK_POINTER(client);
     
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cu_module_load_data): failed to parse, given %lu params, %lu expected",
@@ -392,7 +392,7 @@ namespace cu_module_load_data {
             goto exit;
         }
 
-    #if POS_CKPT_OPT_LEVEL > 0 || POS_MIGRATION_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
          *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
@@ -444,7 +444,7 @@ namespace __register_function {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 5)){
             POS_WARN(
                 "parse(__register_function): failed to parse, given %lu params, %lu expected",
@@ -598,7 +598,7 @@ namespace cu_module_get_function {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cu_module_get_function): failed to parse, given %lu params, %lu expected",
@@ -749,7 +749,7 @@ namespace cu_module_get_global {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 8)){
             POS_WARN(
                 "parse(cu_module_get_function): failed to parse, given %lu params, %lu expected",
@@ -860,7 +860,7 @@ namespace cu_device_primary_ctx_get_state {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cu_module_load_data): failed to parse, given %lu params, %lu expected",
@@ -956,7 +956,7 @@ namespace cu_get_error_string {
         client = (POSClient_CUDA*)(wqe->client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_get_error_string): failed to parse, given %lu params, %u expected",

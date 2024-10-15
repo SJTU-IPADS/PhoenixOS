@@ -19,7 +19,7 @@
 #include "pos/include/trace/base.h"
 #include "pos/include/trace/tick.h"
 
-#if POS_ENABLE_TRACE
+#if POS_CONF_RUNTIME_EnableTrace
 
 /* ========== tick traces ========== */
 POS_TRACE_TICK_LIST_DECLARE(worker);
@@ -27,4 +27,4 @@ POS_TRACE_TICK_LIST_DECLARE(worker);
 /* ========== counter traces ========== */
 POS_TRACE_COUNTER_LIST_DECLARE(worker);
 
-#endif // POS_ENABLE_TRACE
+#endif // POS_CONF_RUNTIME_EnableTrace

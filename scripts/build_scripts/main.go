@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
@@ -42,27 +41,24 @@ func main() {
 	flag.Parse()
 
 	// load build options
-	var buildOpt BuildOptions
-	builopt_data, err := os.ReadFile("./build_options.yaml")
+	var buildConf BuildConfigs
+	builopt_data, err := os.ReadFile("./build_configs.yaml")
 	if err != nil {
 		log.Warnf("failed to load build options, use default value")
 	}
-	err = yaml.Unmarshal(builopt_data, &buildOpt)
+	err = yaml.Unmarshal(builopt_data, &buildConf)
 	if err != nil {
 		log.Warnf("failed to parse build options from yaml, use default value")
 	}
+	buildConf.init(logger)
 
 	// >>>>>>>>>>>>>>>>>>>> build routine starts <<<<<<<<<<<<<<<<<<<
 	// setup global variables
-	rootDir, err := utils.BashCommandGetOutput("git rev-parse --show-toplevel", false, logger)
-	if err != nil {
-		logger.Fatalf("failed to obtain root directory")
-	}
-	cmdOpt.RootDir = strings.TrimRight(string(rootDir), "\n")
+	cmdOpt.RootDir = buildConf.PlatformProjectRoot
 
 	printTitle()
 	cmdOpt.print(logger)
-	buildOpt.print(logger)
+	buildConf.print(logger)
 
 	if *cmdOpt.PrintHelp {
 		printHelp()
@@ -73,7 +69,7 @@ func main() {
 		if *cmdOpt.DoCleaning {
 			CleanTarget_CUDA(cmdOpt, logger)
 		} else {
-			BuildTarget_CUDA(cmdOpt, buildOpt, logger)
+			BuildTarget_CUDA(cmdOpt, buildConf, logger)
 		}
 	} else {
 		log.Fatalf("Unsupported target %s", *cmdOpt.Target)

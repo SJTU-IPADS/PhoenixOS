@@ -55,7 +55,7 @@ typedef struct pos_dag_cxt {
 class POSDag {
  public:
     POSDag(pos_dag_cxt cxt) : _cxt(cxt), _pc(0), _end_pc(0) {
-        _api_cxts.reserve(POS_NB_PREFILL_DAG_VERTEX);
+        _api_cxts.reserve(65536);
     }
     
     ~POSDag(){

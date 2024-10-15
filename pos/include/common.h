@@ -50,9 +50,14 @@ enum pos_retval {
     POS_FAILED_NETWORK,
 };
 
+
+#include "pos/include/eval_configs.h"
+#include "pos/include/runtime_configs.h"
+
+
 #define UINT_64_MAX (1<<64 -1)
 
-#if POS_ENABLE_DEBUG_CHECK
+#if POS_CONF_RUNTIME_EnableDebugCheck
     #define POS_ASSERT(x)           assert(x);
     #define POS_CHECK_POINTER(ptr)  assert((ptr) != nullptr);
 #else
@@ -80,10 +85,3 @@ using pos_client_uuid_t = uint64_t;
  *  \brief  type for uniquely identify a transport
  */
 using pos_transport_id_t = uint64_t;
-
-#ifdef POS_DAEMON
-    // switch group (for evaludation)
-    #include "pos/include/_daemon_options/switches.h"
-    // static compilation options
-    #include "pos/include/_daemon_options/config.h"
-#endif

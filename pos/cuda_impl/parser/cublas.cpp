@@ -136,7 +136,7 @@ namespace cublas_set_stream {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cuda_malloc): failed to parse cuda_malloc, given %lu params, %lu expected",
@@ -222,7 +222,7 @@ namespace cublas_set_math_mode {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 2)){
             POS_WARN(
                 "parse(cublas_set_math_mode): failed to parse, given %lu params, %lu expected",
@@ -287,7 +287,7 @@ namespace cublas_sgemm {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 14)){
             POS_WARN(
                 "parse(cublas_sgemm): failed to parse, given %lu params, %lu expected",
@@ -414,7 +414,7 @@ namespace cublas_sgemm_strided_batched {
         POS_CHECK_POINTER(client);
 
         // check whether given parameter is valid
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(wqe->api_cxt->params.size() != 18)){
             POS_WARN(
                 "parse(cublas_sgemm_strided_batched): failed to parse, given %lu params, %lu expected",

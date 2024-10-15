@@ -20,12 +20,12 @@
 #include "string.h"
 
 #include "pos/include/common.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 #include "pos/include/trace/tick.h"
 #include "pos/include/trace/counter.h"
 
-#if POS_ENABLE_TRACE
+#if POS_CONF_RUNTIME_EnableTrace
 
 #define POS_TRACE(cond, trace_workload) if(cond){ {trace_workload} }
 
@@ -62,6 +62,6 @@ POS_TRACE_COUNTER_LIST_EXTERN_DECLARE(worker);
 
 #define POS_TRACE(cond, trace_workload)
 
-#endif // POS_ENABLE_TRACE
+#endif // POS_CONF_RUNTIME_EnableTrace
 
 

@@ -213,7 +213,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
         POS_CHECK_POINTER(handle);
 
         // obtain the context to allocate device
-    #if POS_ENABLE_DEBUG_CHECK
+    #if POS_CONF_RUNTIME_EnableDebugCheck
         if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
             POS_WARN_C("no binded context provided to created the CUDA stream");
             retval = POS_FAILED_INVALID_INPUT;

@@ -279,7 +279,7 @@ namespace cuda_memcpy_h2d {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -296,7 +296,7 @@ namespace cuda_memcpy_h2d {
             /* kind */ cudaMemcpyHostToDevice
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
     #endif
 
@@ -335,7 +335,7 @@ namespace cuda_memcpy_d2h {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -352,7 +352,7 @@ namespace cuda_memcpy_d2h {
             /* kind */ cudaMemcpyDeviceToHost
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
         }
@@ -397,7 +397,7 @@ namespace cuda_memcpy_d2d {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -414,7 +414,7 @@ namespace cuda_memcpy_d2d {
             /* kind */ cudaMemcpyDeviceToDevice
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
         }
@@ -459,7 +459,7 @@ namespace cuda_memcpy_h2d_async {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -477,7 +477,7 @@ namespace cuda_memcpy_h2d_async {
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -526,7 +526,7 @@ namespace cuda_memcpy_d2h_async {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -549,7 +549,7 @@ namespace cuda_memcpy_d2h_async {
             (cudaStream_t)(stream_handle->server_addr)
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
     #endif
 
@@ -595,7 +595,7 @@ namespace cuda_memcpy_d2d_async {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -613,7 +613,7 @@ namespace cuda_memcpy_d2d_async {
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -660,7 +660,7 @@ namespace cuda_memset_async {
          *          so we raise the flag to notify overlapped checkpoint to
          *          provisionally stop
          */
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -677,7 +677,7 @@ namespace cuda_memset_async {
             /* stream */ (cudaStream_t)(stream_handle->server_addr)
         );
 
-    #if POS_CKPT_OPT_LEVEL == 2
+    #if POS_CONF_EVAL_CkptOptLevel == 2
         if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 

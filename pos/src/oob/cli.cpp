@@ -47,7 +47,7 @@ namespace cli_migration_signal {
 
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
-        #if POS_MIGRATION_OPT_LEVEL > 0
+        #if POS_CONF_EVAL_MigrOptLevel > 0
             oob_payload_t *payload;
             POSClient *client;
             // pos_migration_job_t *mjob;
@@ -113,7 +113,7 @@ namespace cli_restore_signal {
 
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
-        #if POS_MIGRATION_OPT_LEVEL > 0
+        #if POS_CONF_EVAL_MigrOptLevel > 0
             oob_payload_t *payload;
             POSClient *client;
 

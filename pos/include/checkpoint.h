@@ -210,7 +210,7 @@ class POSCheckpointBag {
 
  private:
 
-#if POS_CKPT_OPT_LEVEL == 2
+#if POS_CONF_EVAL_CkptOptLevel == 2
     /*!
      *  \brief  checkpoint version map
      *          key: version
@@ -245,7 +245,7 @@ class POSCheckpointBag {
     // all on-device versions that this bag stored
     std::set<uint64_t> _dev_ckpt_version_set;
 
-#elif POS_CKPT_OPT_LEVEL == 1 || POS_MIGRATION_OPT_LEVEL > 0
+#elif POS_CONF_EVAL_CkptOptLevel == 1 || POS_CONF_EVAL_MigrOptLevel > 0
     /*!
      *  \brief  indicate which checkpoint slot to use (front / back)
      */

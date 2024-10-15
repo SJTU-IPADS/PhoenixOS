@@ -43,81 +43,144 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 	logger.Infof("Commandline options: %s", print_str)
 }
 
-type BuildOptions struct {
-	// common options
-	Target               string `yaml:"target"`
-	TargetVersion        string `yaml:"target_version"`
-	EnablePrintError     uint8  `yaml:"enable_print_error"`
-	EnablePrintWarn      uint8  `yaml:"enable_print_warn"`
-	EnablePrintLog       uint8  `yaml:"enable_print_log"`
-	EnablePrintDebug     uint8  `yaml:"enable_print_debug"`
-	EnablePrintWithColor uint8  `yaml:"enable_print_with_color"`
+type BuildConfigs struct {
+	// Platform Options
+	PlatformProjectRoot string
 
-	// options for PhOS core
-	CkptOptLevel            uint8 `yaml:"ckpt_opt_level"`
-	EnableHijackApiCheck    uint8 `yaml:"enable_hijack_api_check"`
-	EnableRuntimeDebugCheck uint8 `yaml:"enable_runtime_debug_check"`
+	// Runtime Options
+	RuntimeTarget               string `yaml:"runtime_target"`
+	RuntimeTargetVersion        string `yaml:"runtime_target_version"`
+	RuntimeEnablePrintError     uint8  `yaml:"runtime_enable_print_error"`
+	RuntimeEnablePrintWarn      uint8  `yaml:"runtime_enable_print_warn"`
+	RuntimeEnablePrintLog       uint8  `yaml:"runtime_enable_print_log"`
+	RuntimeEnablePrintDebug     uint8  `yaml:"runtime_enable_print_debug"`
+	RuntimeEnablePrintWithColor uint8  `yaml:"runtime_enable_print_with_color"`
+	RuntimeEnableDebugCheck     uint8  `yaml:"runtime_enable_debug_check"`
+	RuntimeEnableHijackApiCheck uint8  `yaml:"runtime_enable_hijack_api_check"`
+	RuntimeEnableTrace          uint8  `yaml:"runtime_enable_trace"`
+	RuntimeDefaultDaemonLogPath string `yaml:"runtime_default_daemon_log_path"`
+	RuntimeDefaultClientLogPath string `yaml:"runtime_default_client_log_path"`
+
+	// Evaluation Options
+	// checkpoint
+	EvalCkptOptLevel          uint8  `yaml:"eval_ckpt_opt_level"`
+	EvalCkptEnableIncremental uint8  `yaml:"eval_ckpt_enable_incremental"`
+	EvalCkptEnablePipeline    uint8  `yaml:"eval_ckpt_enable_pipeline"`
+	EvalCkptDefaultIntervalMs uint32 `yaml:"eval_ckpt_interval_ms"`
+	// migration
+	EvalMigrOptLevel uint8 `yaml:"migr_interval_ms"`
+	// restore
+	EvalRstEnableContextPool uint8 `yaml:"eval_rst_enable_context_pool"`
 }
 
-func (buildOpt *BuildOptions) print(logger *log.Logger) {
+func (buildConf *BuildConfigs) init(logger *log.Logger) {
+	// obtain project root
+	project_root, _ := utils.BashCommandGetOutput("bash ../utils/get_root_dir.sh", false, logger)
+	buildConf.PlatformProjectRoot = string(project_root)
+}
+
+func (buildConf *BuildConfigs) print(logger *log.Logger) {
 	print_str := fmt.Sprintf(
 		`
-		> Common Build Options:
-			- Target: %v
-			- TargetVersion: %v
-			- EnablePrintError: %v
-			- EnablePrintWarn: %v
-			- EnablePrintLog: %v
-			- EnablePrintDebug: %v
-			- EnablePrintWithColor: %v
-		> PhOS Core Build Options:
-			- CkptOptLevel: %v
-			- EnableHijackApiCheck: %v
-			- EnableRuntimeDebugCheck: %v
+		> Platform Configs:
+			- PlatformProjectRoot: %v
+		> Runtime Configs:
+			- RuntimeTarget: %v
+			- RuntimeTargetVersion: %v
+			- RuntimeDaemonLogPath: %v
+			- RuntimeClientLogPath: %v
+			- RuntimeEnablePrintError: %v
+			- RuntimeEnablePrintWarn: %v
+			- RuntimeEnablePrintLog: %v
+			- RuntimeEnablePrintDebug: %v
+			- RuntimeEnablePrintWithColor: %v
+			- RuntimeEnableDebugCheck: %v
+			- RuntimeEnableHijackApiCheck: %v
+			- RuntimeEnableTrace: %v
+		> Evaluation Configs:
+			- EvalCkptOptLevel: %v
+			- EvalCkptEnableIncremental: %v
+			- EvalCkptEnablePipeline: %v
+			- EvalCkptInteralMs: %v
+			- EvalMigrOptLevel: %v
+			- EvalRstEnableContextPool: %v
 		`,
-		buildOpt.Target,
-		buildOpt.TargetVersion,
-		buildOpt.EnablePrintError,
-		buildOpt.EnablePrintWarn,
-		buildOpt.EnablePrintLog,
-		buildOpt.EnablePrintDebug,
-		buildOpt.EnablePrintWithColor,
-		buildOpt.CkptOptLevel,
-		buildOpt.EnableHijackApiCheck,
-		buildOpt.EnableRuntimeDebugCheck,
+		buildConf.PlatformProjectRoot,
+		buildConf.RuntimeTarget,
+		buildConf.RuntimeTargetVersion,
+		buildConf.RuntimeEnablePrintError,
+		buildConf.RuntimeEnablePrintWarn,
+		buildConf.RuntimeEnablePrintLog,
+		buildConf.RuntimeEnablePrintDebug,
+		buildConf.RuntimeEnablePrintWithColor,
+		buildConf.RuntimeEnableDebugCheck,
+		buildConf.RuntimeEnableHijackApiCheck,
+		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeDefaultDaemonLogPath,
+		buildConf.RuntimeDefaultClientLogPath,
+		buildConf.EvalCkptOptLevel,
+		buildConf.EvalCkptEnableIncremental,
+		buildConf.EvalCkptEnablePipeline,
+		buildConf.EvalCkptDefaultIntervalMs,
+		buildConf.EvalMigrOptLevel,
+		buildConf.EvalRstEnableContextPool,
 	)
-	logger.Infof("Build options: %s", print_str)
+	logger.Infof("Build Configs: %s", print_str)
 }
 
-func (buildOpt *BuildOptions) export_string() string {
+func (buildConf *BuildConfigs) export_string() string {
 	return fmt.Sprintf(
-		`# common build options
-		export POS_BUILD_TARGET=%v
-		export POS_BUILD_TARGET_VERSION=%v
-		export POS_BUILD_ENABLE_PRINT_ERROR=%v
-		export POS_BUILD_ENABLE_PRINT_WARN=%v
-		export POS_BUILD_ENABLE_PRINT_LOG=%v
-		export POS_BUILD_ENABLE_PRINT_DEBUG=%v
-		export POS_BUILD_ENABLE_PRINT_WITH_COLOR=%v
-		# PhOS core build options
-		export POS_BUILD_CHECKPOINTER_OPT_LEVEL=%v
-		export POS_BUILD_ENABLE_HIJACK_API_CHECK=%v
-		export POS_BUILD_ENABLE_RUNTIME_DEBUG_CHECK=%v
+		`
+		# platform configs
+		export POS_BUILD_CONF_PlatformProjectRoot=%v
+		
+		# runtime build configs
+		export POS_BUILD_CONF_RuntimeTarget=%v
+		export POS_BUILD_CONF_RuntimeTargetVersion=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintError=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintWarn=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintLog=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintDebug=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintWithColor=%v
+		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableTrace=%v
+		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
+		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
+
+		# PhOS core build configs
+		export POS_BUILD_CONF_EvalCkptOptLevel=%v
+		export POS_BUILD_CONF_EvalCkptEnableIncremental=%v
+		export POS_BUILD_CONF_EvalCkptEnablePipeline=%v
+		export POS_BUILD_CONF_EvalCkptDefaultIntervalMs=%v
+		export POS_BUILD_CONF_EvalMigrOptLevel=%v
+		export POS_BUILD_CONF_EvalRstEnableContextPool=%v
 		`,
-		buildOpt.Target,
-		buildOpt.TargetVersion,
-		buildOpt.EnablePrintError,
-		buildOpt.EnablePrintWarn,
-		buildOpt.EnablePrintLog,
-		buildOpt.EnablePrintDebug,
-		buildOpt.EnablePrintWithColor,
-		buildOpt.CkptOptLevel,
-		buildOpt.EnableHijackApiCheck,
-		buildOpt.EnableRuntimeDebugCheck,
+		buildConf.PlatformProjectRoot,
+
+		buildConf.RuntimeTarget,
+		buildConf.RuntimeTargetVersion,
+		buildConf.RuntimeEnablePrintError,
+		buildConf.RuntimeEnablePrintWarn,
+		buildConf.RuntimeEnablePrintLog,
+		buildConf.RuntimeEnablePrintDebug,
+		buildConf.RuntimeEnablePrintWithColor,
+		buildConf.RuntimeEnableDebugCheck,
+		buildConf.RuntimeEnableHijackApiCheck,
+		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeDefaultDaemonLogPath,
+		buildConf.RuntimeDefaultClientLogPath,
+
+		buildConf.EvalCkptOptLevel,
+		buildConf.EvalCkptEnableIncremental,
+		buildConf.EvalCkptEnablePipeline,
+		buildConf.EvalCkptDefaultIntervalMs,
+		buildConf.EvalMigrOptLevel,
+		buildConf.EvalRstEnableContextPool,
 	)
 }
 
-func BuildGoogleTest(cmdOpt CmdOptions, buildOpt BuildOptions, logger *log.Logger) {
+func BuildGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building googletest...")
 
 	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_googletest.log")

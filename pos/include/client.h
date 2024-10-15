@@ -31,7 +31,7 @@ class POSClient;
 #include "pos/include/dag.h"
 #include "pos/include/transport.h"
 #include "pos/include/migration.h"
-#include "pos/include/utils/timestamp.h"
+#include "pos/include/utils/timer.h"
 
 #define pos_get_client_typed_hm(client, resource_id, hm_type)  \
     (hm_type*)(client->handle_managers[resource_id])
@@ -214,7 +214,7 @@ class POSClient {
         POSAPIContext_QE *ckpt_wqe;
         uint64_t s_tick, e_tick;
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0
         // drain out both the parser and worker
         // TODO: the way to drain is not correct!
         // s_tick = POSUtilTimestamp::get_tsc();
@@ -223,7 +223,7 @@ class POSClient {
         // POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
     #endif
 
-    #if POS_CKPT_OPT_LEVEL > 0
+    #if POS_CONF_EVAL_CkptOptLevel > 0
         // dump checkpoint to file
         // TODO: remember to decomment this!
         // if(this->_cxt.checkpoint_file_path.size() == 0){
@@ -313,7 +313,7 @@ class POSClient {
         bool retval = false;
         uint64_t current_tick = POSUtilTimestamp::get_tsc();
 
-        if(unlikely(current_tick - this->_last_ckpt_tick >= POS_MESC_TO_TSC(POS_CKPT_INTERVAL))){
+        if(unlikely(current_tick - this->_last_ckpt_tick >= POS_MESC_TO_TSC(POS_CONF_EVAL_CkptDefaultIntervalMs))){
             retval = true;
             this->_last_ckpt_tick = current_tick;
         }
