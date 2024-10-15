@@ -57,8 +57,6 @@ void POSClient::init_restore_load_resources() {
     uint32_t host_ckpt_wqe_pid;
     uint64_t host_ckpt_offset, host_ckpt_size;
 
-    uint64_t s_tick, e_tick, all_tick;
-
     auto __get_binary_file_size = [](std::ifstream& file) -> uint64_t {
         file.seekg(0, std::ios::end);
         return file.tellg();
@@ -91,11 +89,9 @@ void POSClient::init_restore_load_resources() {
     bin_ptr = checkpoint_bin;
 
     /* --------- step 1: read handles --------- */
-    all_tick = 0;
     // field: # resource type
     __READ_TYPED_BINARY_AND_FWD(nb_resource_types, uint64_t, bin_ptr);
     for(i=0; i<nb_resource_types; i++){
-        s_tick = POSUtilTimestamp::get_tsc();
         // field: # resource type id
         __READ_TYPED_BINARY_AND_FWD(resource_type_id, pos_resource_typeid_t, bin_ptr);
 
@@ -112,16 +108,9 @@ void POSClient::init_restore_load_resources() {
                 bin_ptr += serialize_area_size;
             }
         }
-        e_tick = POSUtilTimestamp::get_tsc();
-        POS_LOG("    => deserialized state of %lu handles for resource type %u: %lf us", nb_handles, resource_type_id, POS_TSC_TO_USEC(e_tick - s_tick));
-
-        all_tick += e_tick - s_tick;
     }
-    
-    POS_LOG("[Restore]: (step 1) reload handles finished: %lf us", POS_TSC_TO_USEC(all_tick));
 
     /* --------- step 2: read api context --------- */
-    s_tick = POSUtilTimestamp::get_tsc();
     // field: # api context
     __READ_TYPED_BINARY_AND_FWD(nb_api_cxt, uint64_t, bin_ptr);
 
@@ -161,24 +150,13 @@ void POSClient::init_restore_load_resources() {
         __restore_handle_view_pointers(wqe->delete_handle_views);
     }
 
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG(
-        "[Restore]: (step 2) reload %lu of api context finished: %lf us",
-        nb_api_cxt,
-        POS_TSC_TO_USEC(e_tick - s_tick)
-    );
-
     /* --------- step 3: read DAG --------- */
-    s_tick = POSUtilTimestamp::get_tsc();
     // field: size of the serialized area of this dag topo
     __READ_TYPED_BINARY_AND_FWD(serialize_area_size, uint64_t, bin_ptr);
     this->dag.deserialize(bin_ptr);
     bin_ptr += serialize_area_size;
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("[Restore]: (step 3) reload DAG finished: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
 
     /* --------- step 4: restore handle tree --------- */
-    s_tick = POSUtilTimestamp::get_tsc();
     rid_set = this->__get_resource_idx();
     for(rid_set_iter = rid_set.begin(); rid_set_iter != rid_set.end(); rid_set_iter++){
         rid = *rid_set_iter;
@@ -222,8 +200,6 @@ void POSClient::init_restore_load_resources() {
 
         POS_LOG("    => restored handle tree of %lu handles for resource type %u", nb_handles, rid);
     }
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("[Restore]: (step 4) restore handle tree: %lf us", POS_TSC_TO_USEC(e_tick - s_tick));
     
     /* --------- step 5: recompute missing checkpoints --------- */
     // check init_restore_generate_recompute_scheme
@@ -466,7 +442,6 @@ void POSClient::init_restore_recreate_handles(
     std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
 ){ 
     uint64_t i, nb_handles;
-    uint64_t s_tick, e_tick;
     std::set<pos_resource_typeid_t> rid_set;
     typename std::set<pos_resource_typeid_t>::iterator rid_set_iter;
     pos_resource_typeid_t rid;
@@ -513,7 +488,6 @@ void POSClient::init_restore_recreate_handles(
     };
 
     // step 1: recreate all handles on XPU driver / device
-    s_tick = POSUtilTimestamp::get_tsc();
     rid_set = this->__get_resource_idx();
     for(rid_set_iter = rid_set.begin(); rid_set_iter != rid_set.end(); rid_set_iter++){
         rid = *rid_set_iter;
@@ -528,11 +502,8 @@ void POSClient::init_restore_recreate_handles(
             __recreate_handle_with_dependency(handle);
         }
     }
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("  => recreate handles on XPU driver/device: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
     // step 2: restore state of stateful resource via recomputation
-    s_tick = POSUtilTimestamp::get_tsc();
     for(mh_map_iter=missing_handle_map.begin(); mh_map_iter!=missing_handle_map.end(); mh_map_iter++){
         handle_missing_version = mh_map_iter->first;
         POS_CHECK_POINTER(missing_handle = mh_map_iter->second);
@@ -540,12 +511,9 @@ void POSClient::init_restore_recreate_handles(
         POS_ERROR_C_DETAIL("haven't implement the recompute logic yet");
         recomputed_handles.insert(missing_handle);
     }
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("  => restore state of stateful resource via recomputation: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
 
     // step 3: restore state of stateful resource via reload
-    s_tick = POSUtilTimestamp::get_tsc();
     for(auto &stateful_type_id : this->_cxt.stateful_handle_type_idx){
         POS_CHECK_POINTER(hm = this->__get_handle_manager_by_resource_id(stateful_type_id));
         nb_handles = hm->get_nb_handles();
@@ -562,8 +530,6 @@ void POSClient::init_restore_recreate_handles(
             }
         }
     }
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("  => restore state of stateful resource via reload: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 }
 
 
@@ -584,8 +550,6 @@ void POSClient::deinit_dump_checkpoints() {
     void *serialize_area;
     uint64_t serialize_area_size;
 
-    uint64_t s_tick, e_tick, all_tick;
-
     file_path = std::string("./") + this->_cxt.job_name + std::string("_checkpoints_") + std::to_string(this->id) + std::string(".bat");
 
     this->__ckpt_station.clear();
@@ -593,14 +557,12 @@ void POSClient::deinit_dump_checkpoints() {
     POS_LOG("collecting checkpoints...");
 
     /* ------------------ step 1: dump handles ------------------ */
-    all_tick = 0;
     // field: # resource type
     nb_resource_types = this->handle_managers.size();
     // output_file.write((const char*)(&(nb_resource_types)), sizeof(uint64_t));
     this->__ckpt_station.load_value<uint64_t>(nb_resource_types);
 
     for(hm_map_iter = this->handle_managers.begin(); hm_map_iter != handle_managers.end(); hm_map_iter++){
-        s_tick = POSUtilTimestamp::get_tsc();
         POS_CHECK_POINTER(hm = (POSHandleManager<POSHandle>*)(hm_map_iter->second));
         nb_handles = hm->get_nb_handles();
 
@@ -635,22 +597,9 @@ void POSClient::deinit_dump_checkpoints() {
             // output_file.flush();
             // free(serialize_area);
         }
-        e_tick = POSUtilTimestamp::get_tsc();
-        POS_LOG(
-            "        => dumped checkpoints of type %u: %lf us",
-            hm_map_iter->first,
-            POS_TSC_TO_USEC(e_tick - s_tick)
-        );
-        all_tick += e_tick - s_tick;
     }
-    
-    POS_LOG(
-        "    => dumped checkpoints of handles: duration(%lf us), collect_size(%lu bytes)",
-        POS_TSC_TO_USEC(all_tick), this->__ckpt_station.byte_size
-    );
 
     /* ------------------ step 2: dump api context ------------------ */
-    s_tick = POSUtilTimestamp::get_tsc();
     // field: # api context
     nb_api_cxt = this->dag.get_nb_api_cxt();
     // output_file.write((const char*)(&(nb_api_cxt)), sizeof(uint64_t));
@@ -684,10 +633,6 @@ void POSClient::deinit_dump_checkpoints() {
             // free(serialize_area);
         }
     }
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("    => dumped checkpoints of api contexts: duration(%lf us), collect_size(%lu bytes)",
-        POS_TSC_TO_USEC(e_tick-s_tick), this->__ckpt_station.byte_size
-    );
 
     /* ------------------ step 3: dump dag ------------------ */
     /*!
@@ -695,7 +640,6 @@ void POSClient::deinit_dump_checkpoints() {
      *          as the api context contains information about which handles each API would operates on, we still
      *          dump the DAG here to accelerate the re-execute algorithm in restore
      */
-    s_tick = POSUtilTimestamp::get_tsc();
     this->dag.serialize(&serialize_area);
     POS_CHECK_POINTER(serialize_area);
 
@@ -710,11 +654,6 @@ void POSClient::deinit_dump_checkpoints() {
     
     // output_file.flush();
     // free(serialize_area);
-
-    e_tick = POSUtilTimestamp::get_tsc();
-    POS_LOG("    => dumped checkpoints of DAG: duration(%lf us), collect_size(%lu bytes)",
-        POS_TSC_TO_USEC(e_tick-s_tick), this->__ckpt_station.byte_size
-    );
 
     // output_file.close();
     // POS_LOG("finish dump checkpoints to %s", file_path.c_str());

@@ -23,15 +23,6 @@
 
 #define POS_TSC_FREQ 0 // mock, delete later
 
-#define POS_TSC_RANGE_TO_MSEC(e_tick, s_tick) \
-    (double)(e_tick - s_tick) / (double) POS_TSC_FREQ * (double)1000.0f
-
-#define POS_TSC_RANGE_TO_USEC(e_tick, s_tick) \
-    (double)(e_tick - s_tick) / (double) POS_TSC_FREQ * (double)1000000.0f
-
-#define POS_TSC_TO_USEC(tick) \
-    (double)(tick) * (double)1000000.0f / (double) POS_TSC_FREQ 
-
 #define POS_TSC_TO_MSEC(tick) \
     (double)(tick) * (double)1000.0f / (double) POS_TSC_FREQ 
 
@@ -40,12 +31,6 @@
 
 #define POS_MESC_TO_TSC(mesc) \
     (double)(mesc) / (double)1000.0f * (double) POS_TSC_FREQ 
-
-#define POS_SEC_TO_TSC(sec) \
-    sec * POS_TSC_FREQ
-
-#define POS_TSC_TO_SEC(tsc) \
-    (double)(tsc) / (double) POS_TSC_FREQ
 
 
 /*!

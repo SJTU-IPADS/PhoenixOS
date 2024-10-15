@@ -175,11 +175,7 @@ pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
             
 
         case kPOS_MigrationStage_RestoreCtx: {
-            s_tick = POSUtilTimestamp::get_tsc();
             this->_client->__TMP__migration_restore_context(__TMP__context_pool_include_module);
-            e_tick = POSUtilTimestamp::get_tsc();
-
-            POS_LOG("restore context: %lf us", POS_TSC_TO_USEC(e_tick-s_tick));
 
         #if POS_CONF_EVAL_MigrOptLevel == 1
             this->_client->__TMP__migration_allreload();
