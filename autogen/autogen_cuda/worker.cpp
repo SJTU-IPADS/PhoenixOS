@@ -28,7 +28,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         pos_support_edge_meta_t *other_edge;
         std::string param_list_str, param_str;
         bool is_var_duplicated, is_param_formed;
-        
+
         // if this API is for creating new resource, we need to declare the corresponding
         // handle var at the begining
         if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
