@@ -1,13 +1,13 @@
 # PhoenixOS
 
 ![build passing](https://img.shields.io/badge/build-passed-green)
-![build passing](https://img.shields.io/badge/support-nVIDIA-blue)
-![build passing](https://img.shields.io/badge/support-ROCm-blue)
-![build passing](https://img.shields.io/badge/support-Ascend-blue)
+![build passing](https://img.shields.io/badge/supported-nVIDIA-blue)
+![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)
+![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)
 ![doc](https://img.shields.io/badge/docs-green)
 
 <div align="center">
-    <img src="./docs/docs/source/_static/images/home/pos_logo_small.png" width="250px" />
+    <img src="./docs/docs/source/_static/images/home/pos_logo.gif" width="280px" />
 </div>
 
 **PhoenixOS** (*PhOS*) is an OS service for checkpointing and restoring GPU process with transparency and efficiency.
