@@ -1,10 +1,10 @@
 # PhoenixOS (PhOS)
 
-![build passing](https://img.shields.io/badge/build-passed-green)
-![build passing](https://img.shields.io/badge/supported-CUDA-blue)
-![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)
-![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)
-![doc](https://img.shields.io/badge/docs-green)
+[![build passing](https://img.shields.io/badge/build-passed-green)](https://github.com/PhoenixOS-IPADS/PhoenixOS)
+[![build passing](https://img.shields.io/badge/supported-CUDA-blue)](https://phoenixos.readthedocs.io/en/latest/cuda_gsg/index.html)
+[![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)]()
+[![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)]()
+[![doc](https://img.shields.io/badge/docs-green)](https://phoenixos.readthedocs.io/en/latest/index.html)
 
 <table style="border:none;">
     <tr>
@@ -15,14 +15,14 @@
         </td>
         <td>
             <p>
-            <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU C/R system. It can <b>transparently</b> checkpoint or restore processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
+            <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
             <div style="padding: 0px 5px;">
                 <p>
                 <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
                 <ul>
                     <li>
                         <p style="margin:0px; margin-bottom:5px;">
-                            <b>[Oct. 20, 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos.readthedocs.io/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                            <b>[Oct.20 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos.readthedocs.io/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
                         </p>
                         <p style="margin:0px; margin-bottom:5px;">
                             👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
@@ -79,7 +79,7 @@
     <img src="./docs/docs/source/_static/images/pos_mechanism.jpg" width="80%" />
 </div>
 
-### V. Paper
+## V. Paper
 
 If you use *PhOS* in your research, please cite our paper:
 
