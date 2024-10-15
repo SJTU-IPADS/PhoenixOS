@@ -6,7 +6,7 @@
 ![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)
 ![doc](https://img.shields.io/badge/docs-green)
 
-<div style="display:flex;">
+<div style="display:flex; flex-direction:row;">
 
 <div align="center" style="margin-right:10px;">
     <img src="./docs/docs/source/_static/images/home/pos_logo.gif" width="280px" />
