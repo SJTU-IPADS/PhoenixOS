@@ -1,45 +1,60 @@
 # PhoenixOS
 
+## Introduction
+
 <div align="center">
-    <img src="./docs/pos_logo_small.png" width="250px" />
+    <img src="./docs/docs/source/_static/images/home/pos_logo_small.png" width="250px" />
 </div>
 
-**PhoenixOS** is an OS service for checkpointing and restroing GPU process with transparency and efficiency.
+**PhoenixOS** (*PhOS*) is an OS service for checkpointing and restoring GPU process with transparency and efficiency.
 
-## I. Build
+## I. Build *PhOS* From Source
 
-TODO: give an architecture figure here (e.g., remoting module, POS)
+1. **[Start Container]**
+*PhOS* can be built and installed based on official image from different vendors.
+For example, for building *PhOS* for CUDA,
+we can build based on official CUDA images
+(e.g., [`nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04/images/sha256-f676f5b29377e942b533ed13e554cc54aecf853b598ae55f6b67e20adcf81f23))
 
-### 1. Preparation docker image for specified target
+    ```bash
+    # start container
+    docker run -dit --gpus all -v.:/root --name phos nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04
 
-TODO:
+    # enter container
+    docker exec -it phos /bin/bash
+    ```
 
-### 2. Install dependencies
+2. **[Build]**
+*PhOS* provided with a convinient build system as it contains multiple components 
+(e.g., autogen, daemon, client-side hijacker, unit-testing, CLI etc.),
+simply run the build script in the container would works:
 
-```bash
-apt-get install -y pkg-config
-python3 -m pip install meson
-python3 -m pip install ninja
+    ```bash
+    # inside container
+    cd /root/scripts/build_scripts
+    bash build.sh
+    ```
+
+## II. Running *PhOS* Samples
+
+**TODO**
+
+## III. How *PhOS* Works?
+
+<div align="center">
+    <img src="./docs/docs/source/_static/images/pos_mechanism.jpg" width="80%" />
+</div>
+
+### Paper
+
+If you use *PhOS* in your research, please cite our paper:
+
+```bibtex
+@article{huang2024parallelgpuos,
+  title={PARALLELGPUOS: A Concurrent OS-level GPU Checkpoint and Restore System using Validated Speculation},
+  author={Huang, Zhuobin and Wei, Xingda and Hao, Yingyi and Chen, Rong and Han, Mingcong and Gu, Jinyu and Chen, Haibo},
+  journal={arXiv preprint arXiv:2405.12079},
+  year={2024}
+}
 ```
 
-### 3. Build From Source
-
-```bash
-bash build.sh -t cuda -c
-bash build.sh -t cuda -j -u true
-```
-
-## II. Example
-
-### 1. Resnet Training
-
-### 2. FasterTransformer Serving
-
-### III. Development Guidance
-
-## IV. Stuff
-
-```bash
-alias proxy_on='export http_proxy=http://172.17.0.1:7890; export https_proxy=http://172.17.0.1:7890; export all_proxy=http://172.17.0.1:7890; export HTTP_PROXY=http://172.17.0.1:7890; export HTTPS_PROXY=http://172.17.0.1:7890; export ALL_PROXY=http://172.17.0.1:7890'
-export CUDA_VISIBLE_DEVICES=6,7
-```
