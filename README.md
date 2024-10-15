@@ -1,6 +1,10 @@
 # PhoenixOS
 
-[![build passed](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/knative/serving)
+![build passing](https://img.shields.io/badge/build-passed-green)
+![build passing](https://img.shields.io/badge/support-nVIDIA-blue)
+![build passing](https://img.shields.io/badge/support-ROCm-blue)
+![build passing](https://img.shields.io/badge/support-Ascend-blue)
+![doc](https://img.shields.io/badge/docs-green)
 
 <div align="center">
     <img src="./docs/docs/source/_static/images/home/pos_logo_small.png" width="250px" />
