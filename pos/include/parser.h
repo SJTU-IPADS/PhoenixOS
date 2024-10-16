@@ -59,7 +59,7 @@ class POSParser {
     POSParser(POSWorkspace* ws, POSClient* client) : _ws(ws), _client(client), _stop_flag(false) {   
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(client);
-        
+
         // start daemon thread
         _daemon_thread = new std::thread(&POSParser::__daemon, this);
         POS_CHECK_POINTER(_daemon_thread);

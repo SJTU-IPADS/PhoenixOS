@@ -160,15 +160,17 @@ class POSClient {
     /*!
      *  \param  id  client identifier
      *  \param  cxt context to initialize this client
+     *  \param  ws  pointer to the global workspace
      */
-    POSClient(uint64_t id, pos_client_cxt_t cxt) 
+    POSClient(uint64_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
         :   id(id),
             dag({ .checkpoint_api_id = cxt.checkpoint_api_id }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
             _api_inst_pc(0), 
             _cxt(cxt),
-            _last_ckpt_tick(0)
+            _last_ckpt_tick(0),
+            _ws(ws)
     {}
 
     POSClient() 
@@ -176,11 +178,12 @@ class POSClient {
             dag({ .checkpoint_api_id = 0 }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
-            _last_ckpt_tick(0)
+            _last_ckpt_tick(0),
+            _ws(nullptr)
     {
         POS_ERROR_C("shouldn't call, just for passing compilation");
     }
-    
+
     ~POSClient(){}
     
 
@@ -309,17 +312,7 @@ class POSClient {
      *  \brief  get whether it's time to checkpoint this client
      *  \return the state identify whether it's time to checkpoint this client
      */
-    inline bool is_time_for_ckpt(){
-        bool retval = false;
-        uint64_t current_tick = POSUtilTimestamp::get_tsc();
-
-        if(unlikely(current_tick - this->_last_ckpt_tick >= POS_MESC_TO_TSC(POS_CONF_EVAL_CkptDefaultIntervalMs))){
-            retval = true;
-            this->_last_ckpt_tick = current_tick;
-        }
-
-        return retval;
-    }
+    bool is_time_for_ckpt();
 
 
     /*!
@@ -368,6 +361,9 @@ class POSClient {
 
     // transport endpoint
     POSTransport</* is_server */ false> *_transport;
+
+    // the global workspace
+    POSWorkspace *_ws;
 
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type

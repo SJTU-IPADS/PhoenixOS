@@ -45,15 +45,15 @@ class POSClient_CUDA : public POSClient {
      *  \param  cxt context to initialize this client
      */
     POSClient_CUDA(POSWorkspace *ws, uint64_t id, pos_client_cxt_CUDA_t cxt) 
-        : POSClient(id, cxt.cxt_base), _cxt_CUDA(cxt)
+        : POSClient(id, cxt.cxt_base, ws), _cxt_CUDA(cxt)
     {
         // raise parser thread
-        this->parser = new POSParser_CUDA(/* ws */ ws, /* client */ this);
+        this->parser = new POSParser_CUDA(ws, this);
         POS_CHECK_POINTER(this->parser);
         this->parser->init();
 
         // raise worker thread
-        this->worker = new POSWorker_CUDA(/* ws */ ws, /* client */ this);
+        this->worker = new POSWorker_CUDA(ws, this);
         POS_CHECK_POINTER(this->worker);
         this->worker->init();
   

@@ -13,18 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <iostream>
-
-#include "pos/include/common.h"
-#include "pos/include/trace/base.h"
+#pragma once
 #include "pos/include/trace/tick.h"
+#include "pos/include/trace/counter.h"
 
-#if POS_CONF_RUNTIME_EnableTrace
-
-/* ========== tick traces ========== */
-POS_TRACE_TICK_LIST_DECLARE(worker);
-
-/* ========== counter traces ========== */
-POS_TRACE_COUNTER_LIST_DECLARE(worker);
-
-#endif // POS_CONF_RUNTIME_EnableTrace
