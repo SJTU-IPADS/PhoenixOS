@@ -30,6 +30,50 @@
 #include "pos/include/dag.h"
 
 
+void POSClient::init(){
+    std::map<pos_vertex_id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
+    std::multimap<pos_vertex_id_t, POSHandle*> missing_handle_map;
+
+    this->init_handle_managers();
+    this->init_dag();
+
+    if(this->_cxt.checkpoint_file_path.size() > 0){
+        this->init_restore_load_resources();
+        this->init_restore_generate_recompute_scheme(apicxt_sequence_map, missing_handle_map);
+        this->init_restore_recreate_handles(apicxt_sequence_map, missing_handle_map);
+    }
+}
+
+
+void POSClient::deinit(){
+    pos_retval_t tmp_retval;
+    POSAPIContext_QE *ckpt_wqe;
+    uint64_t s_tick, e_tick;
+
+#if POS_CONF_EVAL_CkptOptLevel > 0
+    // drain out both the parser and worker
+    // TODO: the way to drain is not correct!
+    // s_tick = POSUtilTimestamp::get_tsc();
+    // this->dag.drain_by_dest_id(this->_api_inst_pc-1);
+    // e_tick = POSUtilTimestamp::get_tsc();
+    // POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
+#endif
+
+#if POS_CONF_EVAL_CkptOptLevel > 0
+    // dump checkpoint to file
+    // TODO: remember to decomment this!
+    // if(this->_cxt.checkpoint_file_path.size() == 0){
+    //     this->deinit_dump_checkpoints();
+    // }
+#endif
+
+    this->deinit_dump_handle_managers();
+
+exit:
+    ;
+}
+
+
 bool POSClient::is_time_for_ckpt(){
     bool retval = false;
     uint64_t current_tick = POSUtilTimestamp::get_tsc();

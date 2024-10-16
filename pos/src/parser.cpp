@@ -21,9 +21,44 @@
 #include "pos/include/transport.h"
 #include "pos/include/parser.h"
 
-/*!
- *  \brief  processing daemon of the runtime
- */
+
+POSParser::POSParser(POSWorkspace* ws, POSClient* client) 
+    : _ws(ws), _client(client), _stop_flag(false)
+{   
+    POS_CHECK_POINTER(ws);
+    POS_CHECK_POINTER(client);
+
+    // start daemon thread
+    _daemon_thread = new std::thread(&POSParser::__daemon, this);
+    POS_CHECK_POINTER(_daemon_thread);
+
+    POS_LOG_C("parser started");
+};
+
+
+POSParser::~POSParser(){ 
+    this->shutdown(); 
+}
+
+
+pos_retval_t POSParser::init(){
+    if(unlikely(POS_SUCCESS != this->init_ps_functions())){
+        POS_ERROR_C_DETAIL("failed to insert functions");
+    }
+}
+
+
+void POSParser::shutdown(){ 
+    this->_stop_flag = true;
+    if(this->_daemon_thread != nullptr){
+        this->_daemon_thread->join();
+        delete this->_daemon_thread;
+        this->_daemon_thread = nullptr;
+        POS_LOG_C("Runtime daemon thread shutdown");
+    }
+}
+
+
 void POSParser::__daemon(){
     uint64_t i, api_id;
     pos_retval_t parser_retval, dag_retval;

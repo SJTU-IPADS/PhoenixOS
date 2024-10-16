@@ -19,12 +19,8 @@
 #include <thread>
 #include <vector>
 #include <map>
-
 #include <sched.h>
 #include <pthread.h>
-
-#include <cuda_runtime_api.h>
-
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/lockfree_queue.h"
@@ -33,6 +29,7 @@
 // forward declaration
 class POSClient;
 class POSWorkspace;
+
 
 /*!
  *  \brief prototype for parser function for each API call
@@ -46,8 +43,9 @@ using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIConte
 #define POS_RT_FUNC_PARSER()                                    \
     pos_retval_t parse(POSWorkspace* ws, POSAPIContext_QE* wqe)
 
+
 namespace ps_functions {
-#define POS_PS_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
+    #define POS_PS_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_RT_FUNC_PARSER(); }
 };  // namespace ps_functions
 
 
@@ -56,21 +54,15 @@ namespace ps_functions {
  */
 class POSParser {
  public:
-    POSParser(POSWorkspace* ws, POSClient* client) : _ws(ws), _client(client), _stop_flag(false) {   
-        POS_CHECK_POINTER(ws);
-        POS_CHECK_POINTER(client);
-
-        // start daemon thread
-        _daemon_thread = new std::thread(&POSParser::__daemon, this);
-        POS_CHECK_POINTER(_daemon_thread);
-
-        POS_LOG_C("parser started");
-    };
+    /*!
+     *  \brief  constructor
+     */
+    POSParser(POSWorkspace* ws, POSClient* client);
 
     /*!
      *  \brief  deconstructor
      */
-    ~POSParser(){ shutdown(); }
+    ~POSParser();
     
     /*!
      *  \brief  function insertion
@@ -78,24 +70,12 @@ class POSParser {
      *          that implemented by derived class
      *  \return POS_SUCCESS for successfully insertion
      */
-    pos_retval_t init(){
-        if(unlikely(POS_SUCCESS != init_ps_functions())){
-            POS_ERROR_C_DETAIL("failed to insert functions");
-        }
-    }
+    pos_retval_t init();
 
     /*!
      *  \brief  raise the shutdown signal to stop the daemon
      */
-    inline void shutdown(){ 
-        _stop_flag = true;
-        if(_daemon_thread != nullptr){
-            _daemon_thread->join();
-            delete _daemon_thread;
-            _daemon_thread = nullptr;
-            POS_LOG_C("Runtime daemon thread shutdown");
-        }
-    }
+    void shutdown();
 
  protected:
     // stop flag to indicate the daemon thread to stop
