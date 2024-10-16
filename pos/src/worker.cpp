@@ -19,18 +19,16 @@
 #include <thread>
 #include <vector>
 #include <map>
-
 #include <sched.h>
 #include <pthread.h>
-
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/workspace.h"
+#include "pos/include/client.h"
+#include "pos/include/worker.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
 #include "pos/include/trace.h"
-#include "pos/include/worker.h"
-#include "pos/include/client.h"
-#include "pos/include/workspace.h"
 
 
 POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) {
@@ -63,12 +61,29 @@ POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) {
 }
 
 
-/*!
- *  \brief  generic restore procedure
- *  \note   should be invoked within the landing function, while exeucting failed
- *  \param  ws  the global workspace
- *  \param  wqe the work QE where failure was detected
- */
+POSWorker::~POSWorker(){ 
+    this->shutdown(); 
+}
+
+
+pos_retval_t POSWorker::init(){
+    if(unlikely(POS_SUCCESS != this->init_wk_functions())){
+        POS_ERROR_C_DETAIL("failed to insert functions");
+    }
+}
+
+
+void POSWorker::shutdown(){ 
+    this->_stop_flag = true;
+    if(this->_daemon_thread != nullptr){
+        this->_daemon_thread->join();
+        delete this->_daemon_thread;
+        this->_daemon_thread = nullptr;
+        POS_LOG_C("Worker daemon thread shutdown");
+    }
+}
+
+
 void POSWorker::__restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
     POS_ERROR_DETAIL(
         "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
@@ -76,12 +91,7 @@ void POSWorker::__restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
     ); 
 }
 
-/*!
- *  \brief  generic complete procedure
- *  \note   should be invoked within the landing function, while exeucting success
- *  \param  ws  the global workspace
- *  \param  wqe the work QE where failure was detected
- */
+
 void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
     POSClient *client;
     uint64_t i;
@@ -105,6 +115,24 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
     }
 }
 
+
+void POSWorker::__daemon(){
+    if(unlikely(POS_SUCCESS != this->daemon_init())){
+        POS_WARN_C("failed to init daemon, worker daemon exit");
+        return;
+    }
+
+    #if POS_CONF_EVAL_MigrOptLevel == 0
+        // case: continuous checkpoint
+        #if POS_CONF_EVAL_CkptOptLevel <= 1
+            this->__daemon_ckpt_sync();
+        #elif POS_CONF_EVAL_CkptOptLevel == 2
+            this->__daemon_ckpt_async();
+        #endif
+    #else
+        this->__daemon_migration_opt();
+    #endif
+}
 
 
 #if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1

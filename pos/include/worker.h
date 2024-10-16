@@ -35,10 +35,12 @@
 class POSClient;
 class POSWorkspace;
 
+
 /*!
  *  \brief prototype for worker launch function for each API call
  */
 using pos_worker_launch_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
+
 
 /*!
  *  \brief  macro for the definition of the worker launch functions
@@ -78,8 +80,6 @@ typedef struct checkpoint_async_cxt {
 
 #endif // POS_CONF_EVAL_CkptOptLevel == 2
 
-// forward declaration
-class POSClient;
 
 /*!
  *  \brief  POS Worker
@@ -96,7 +96,7 @@ class POSWorker {
     /*!
      *  \brief  deconstructor
      */
-    ~POSWorker(){ shutdown(); }
+    ~POSWorker();
 
     /*!
      *  \brief  function insertion
@@ -104,24 +104,12 @@ class POSWorker {
      *          that implemented by derived class
      *  \return POS_SUCCESS for successfully insertion
      */
-    pos_retval_t init(){
-        if(unlikely(POS_SUCCESS != this->init_wk_functions())){
-            POS_ERROR_C_DETAIL("failed to insert functions");
-        }
-    }
+    pos_retval_t init();
 
     /*!
      *  \brief  raise the shutdown signal to stop the daemon
      */
-    inline void shutdown(){ 
-        _stop_flag = true;
-        if(_daemon_thread != nullptr){
-            _daemon_thread->join();
-            delete _daemon_thread;
-            _daemon_thread = nullptr;
-            POS_LOG_C("Worker daemon thread shutdown");
-        }
-    }
+    void shutdown();
 
     /*!
      *  \brief  generic restore procedure
@@ -240,23 +228,7 @@ class POSWorker {
     /*!
      *  \brief  processing daemon of the worker
      */
-    void __daemon(){
-        if(unlikely(POS_SUCCESS != this->daemon_init())){
-            POS_WARN_C("failed to init daemon, worker daemon exit");
-            return;
-        }
-
-        #if POS_CONF_EVAL_MigrOptLevel == 0
-            // case: continuous checkpoint
-            #if POS_CONF_EVAL_CkptOptLevel <= 1
-                this->__daemon_ckpt_sync();
-            #elif POS_CONF_EVAL_CkptOptLevel == 2
-                this->__daemon_ckpt_async();
-            #endif
-        #else
-            this->__daemon_migration_opt();
-        #endif
-    }
+    void __daemon();
 
     #if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1
         /*!

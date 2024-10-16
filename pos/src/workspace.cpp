@@ -69,6 +69,55 @@ exit:
 }
 
 
+POSWorkspace::POSWorkspace(int argc, char *argv[]) 
+    : _current_max_uuid(0), ws_conf(this) 
+{
+    // readin commandline options
+    this->parse_command_line_options(argc, argv);
+
+    // create out-of-band server
+    _oob_server = new POSOobServer(
+        /* ws */ this,
+        /* callback_handlers */ {
+            {   kPOS_OOB_Msg_Agent_Register_Client,   oob_functions::agent_register_client::sv      },
+            {   kPOS_OOB_Msg_Agent_Unregister_Client, oob_functions::agent_unregister_client::sv    },
+            {   kPOS_OOB_Msg_Utils_MockAPICall,     oob_functions::utils_mock_api_call::sv        },
+            {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::sv     },
+            {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::sv       },
+        },
+        /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
+        /* port */ POS_OOB_SERVER_DEFAULT_PORT
+    );
+    POS_CHECK_POINTER(_oob_server);
+
+    POS_LOG(
+        "workspace created:                             \n"
+        "   common configurations:                      \n"
+        "       =>  enable_context_pool(%s)             \n"
+        "   ckpt configirations:                        \n"
+        "       =>  ckpt_opt_level(%d, %s)              \n"
+        "       =>  ckpt_interval(%lu ms)               \n"
+        "       =>  enable_ckpt_increamental(%s)        \n"
+        "       =>  enable_ckpt_pipeline(%s)            \n"
+        "   migration configurations:                   \n"
+        "       =>  migration_opt_level(%d, %s)         \n"
+        ,
+        POS_CONF_EVAL_RstEnableContextPool == 1 ? "true" : "false",
+        POS_CONF_EVAL_CkptOptLevel,
+        POS_CONF_EVAL_CkptOptLevel == 0 ? "no ckpt" : POS_CONF_EVAL_CkptOptLevel == 1 ? "sync ckpt" : "async ckpt",
+        POS_CONF_EVAL_CkptDefaultIntervalMs,
+        POS_CONF_EVAL_CkptOptLevel == 0 ? "N/A" : POS_CONF_EVAL_CkptEnableIncremental == 1 ? "true" : "false",
+        POS_CONF_EVAL_CkptOptLevel <= 1 ? "N/A" : POS_CONF_EVAL_CkptEnablePipeline == 1 ? "true" : "false",
+        POS_CONF_EVAL_MigrOptLevel,
+        POS_CONF_EVAL_MigrOptLevel == 0 ? "no migration" : POS_CONF_EVAL_MigrOptLevel == 1 ? "naive" : "pre-copy"
+    );
+}
+
+
+POSWorkspace::~POSWorkspace(){ 
+    clear(); 
+}
+
 
 void POSWorkspace::clear(){
     typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
@@ -88,6 +137,187 @@ void POSWorkspace::clear(){
         }
     }
 }
+
+
+pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
+    pos_retval_t retval = POS_SUCCESS;
+    void* clnt;
+
+    /*!
+     * \todo    we need to prevent other functions would access
+     *          those client to be removed, might need a mutex lock to manage the client
+     *          map, to be added later
+     */
+    if(unlikely(this->_client_map.count(uuid) == 0)){
+        retval = POS_FAILED_NOT_EXIST;
+        POS_WARN_C("try to remove an non-exist client: uuid(%lu)", uuid);
+    } else {
+        // clnt = _client_map[uuid];
+        // delete clnt;
+        // _client_map.erase(uuid);
+        // POS_DEBUG_C("remove client: uuid(%lu)", uuid);
+    }
+
+    return retval;
+}
+
+
+POSClient* POSWorkspace::get_client_by_uuid(pos_client_uuid_t uuid){
+    POSClient *retval = nullptr;
+
+    if(unlikely(this->_client_map.count(uuid) > 0)){
+        retval = this->_client_map[uuid];
+    }
+
+    return retval;
+}
+
+
+pos_retval_t POSWorkspace::create_qp(pos_client_uuid_t uuid){
+    if(unlikely(_parser_wqs.count(uuid) > 0 || _parser_cqs.count(uuid) > 0)){
+        return POS_FAILED_ALREADY_EXIST;
+    }
+
+    // create queue pair between frontend and parser
+    POSLockFreeQueue<POSAPIContext_QE_t*> *wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(wq);
+    _parser_wqs[uuid] = wq;
+
+    POSLockFreeQueue<POSAPIContext_QE_t*> *cq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(cq);
+    _parser_cqs[uuid] = cq;
+
+    // create completion queue between frontend and worker
+    POSLockFreeQueue<POSAPIContext_QE_t*> *cq2 = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(cq2);
+    _worker_cqs[uuid] = cq2;
+
+    return POS_SUCCESS;
+}
+
+
+POSAPIContext_QE* POSWorkspace::dequeue_parser_job(pos_client_uuid_t uuid){
+    pos_retval_t tmp_retval;
+    POSAPIContext_QE *wqe = nullptr;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *wq;
+
+    if(unlikely(this->_parser_wqs.count(uuid) == 0)){
+        POS_WARN("no parser wq with client uuid %lu registered", uuid);
+        goto exit;
+    }
+
+    POS_CHECK_POINTER(wq = _parser_wqs[uuid]);
+    wq->dequeue(wqe);
+
+exit:
+    return wqe;
+}
+
+
+template<pos_queue_position_t qt>
+pos_retval_t POSWorkspace::poll_cq(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes){
+    POSAPIContext_QE *cqe;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *cq;
+
+    POS_CHECK_POINTER(cqes);
+
+    if constexpr (qt == kPOS_Queue_Position_Parser){
+        if(unlikely(_parser_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
+        cq = _parser_cqs[uuid];
+    } else if (qt == kPOS_Queue_Position_Worker){
+        if(unlikely(_worker_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
+        cq = _worker_cqs[uuid];
+    }
+
+    if(unlikely(_client_map.count(uuid) == 0)){
+        /*!
+            *  \todo   try to lazyly delete the cq from the consumer-side here
+            *          but met some multi-thread bug; temp comment out here, which
+            *          will cause memory leak here
+            */
+        if constexpr (qt == kPOS_Queue_Position_Parser){
+            // _remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Parser>(uuid);
+        } else if (qt == kPOS_Queue_Position_Worker){
+            // _remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Worker>(uuid);
+        }
+    } else {
+        while(POS_SUCCESS == cq->dequeue(cqe)){
+            cqes->push_back(cqe);
+        }
+    }
+
+    return POS_SUCCESS;
+}
+template pos_retval_t POSWorkspace::poll_cq<kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
+template pos_retval_t POSWorkspace::poll_cq<kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
+
+
+template<pos_queue_position_t qposition>
+pos_retval_t POSWorkspace::push_cq(POSAPIContext_QE *cqe){
+    pos_client_uuid_t uuid;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *cq;
+
+    POS_CHECK_POINTER(cqe);
+    uuid = cqe->client_id;
+
+    if constexpr (qposition == kPOS_Queue_Position_Parser){
+        if(unlikely(_parser_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
+        cq = _parser_cqs[uuid];
+    } else if (qposition == kPOS_Queue_Position_Worker){
+        if(unlikely(_worker_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
+        cq = _worker_cqs[uuid];
+    }
+
+    cq->push(cqe);
+
+    return POS_SUCCESS;
+}
+template pos_retval_t POSWorkspace::push_cq<kPOS_Queue_Position_Worker>(POSAPIContext_QE *cqe);
+template pos_retval_t POSWorkspace::push_cq<kPOS_Queue_Position_Parser>(POSAPIContext_QE *cqe);
+
+
+template<pos_queue_type_t qtype, pos_queue_position_t qposition>
+pos_retval_t POSWorkspace::_remove_q(pos_client_uuid_t uuid){
+    pos_retval_t retval = POS_SUCCESS;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *q;
+
+    if constexpr (qtype == kPOS_Queue_Type_WQ){
+        if(unlikely(_parser_wqs.count(uuid) == 0)){
+            retval = POS_FAILED_NOT_EXIST;
+            POS_WARN_C("try to remove an non-exist work queue: uuid(%lu)", uuid);
+        } else {
+            q = _parser_wqs[uuid]; delete q; 
+            _parser_wqs.erase(uuid);
+            POS_DEBUG_C("remove work queue: uuid(%lu)", uuid);
+        }
+    } else if (qtype == kPOS_Queue_Type_CQ){
+        if constexpr (qposition == kPOS_Queue_Position_Parser){
+            if(unlikely(_parser_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                POS_WARN_C("try to remove an non-exist runtime CQ: uuid(%lu)", uuid);
+            } else {
+                q = _parser_cqs[uuid]; delete q; 
+                _parser_cqs.erase(uuid);
+                POS_DEBUG_C("remove runtime CQ: uuid(%lu)", uuid);
+            }
+        } else if (qposition == kPOS_Queue_Position_Worker){
+            if(unlikely(_worker_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                POS_WARN_C("try to remove an non-exist worker CQ: uuid(%lu)", uuid);
+            } else {
+                q = _worker_cqs[uuid]; delete q; 
+                _worker_cqs.erase(uuid);
+                POS_DEBUG_C("remove worker CQ: uuid(%lu)", uuid);
+            }
+        }
+    }
+
+    return retval;
+}
+template pos_retval_t POSWorkspace::_remove_q<kPOS_Queue_Type_WQ, kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::_remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::_remove_q<kPOS_Queue_Type_WQ, kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::_remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid);
 
 
 void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
@@ -202,11 +432,11 @@ int POSWorkspace::pos_process(
      */
     if(unlikely(api_meta.is_sync)){
         while(1){
-            if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Parser>(&cqes, uuid))){
+            if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Parser>(uuid, &cqes))){
                 POS_ERROR_C_DETAIL("failed to poll runtime cq");
             }
 
-            if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Worker>(&cqes, uuid))){
+            if(unlikely(POS_SUCCESS != poll_cq<kPOS_Queue_Position_Worker>(uuid, &cqes))){
                 POS_ERROR_C_DETAIL("failed to poll worker cq");
             }
 
