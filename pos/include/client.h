@@ -18,12 +18,8 @@
 #include <iostream>
 #include <map>
 #include <set>
-
 #include <stdint.h>
 #include <assert.h>
-
-class POSClient;
-
 #include "pos/include/common.h"
 #include "pos/include/worker.h"
 #include "pos/include/parser.h"
@@ -33,8 +29,10 @@ class POSClient;
 #include "pos/include/migration.h"
 #include "pos/include/utils/timer.h"
 
-#define pos_get_client_typed_hm(client, resource_id, hm_type)  \
-    (hm_type*)(client->handle_managers[resource_id])
+
+// forward declaration
+class POSWorkspace;
+
 
 /*!
  *  \brief  context of the client
@@ -56,8 +54,8 @@ typedef struct pos_client_cxt {
     // indices of stateful handle type
     std::vector<uint64_t> stateful_handle_type_idx;
 } pos_client_cxt_t;
-
 #define POS_CLIENT_CXT_HEAD pos_client_cxt cxt_base;
+
 
 /*!
  * \brief   status of POS client
@@ -192,19 +190,7 @@ class POSClient {
      *  \note   this part can't be in the constructor as we will invoke functions
      *          that implemented by derived class
      */
-    void init(){
-        std::map<pos_vertex_id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
-        std::multimap<pos_vertex_id_t, POSHandle*> missing_handle_map;
-
-        this->init_handle_managers();
-        this->init_dag();
-
-        if(this->_cxt.checkpoint_file_path.size() > 0){
-            this->init_restore_load_resources();
-            this->init_restore_generate_recompute_scheme(apicxt_sequence_map, missing_handle_map);
-            this->init_restore_recreate_handles(apicxt_sequence_map, missing_handle_map);
-        }
-    }
+    void init();
 
 
     /*!
@@ -212,33 +198,7 @@ class POSClient {
      *  \note   this part can't be in the deconstructor as we will invoke functions
      *          that implemented by derived class
      */
-    void deinit(){
-        pos_retval_t tmp_retval;
-        POSAPIContext_QE *ckpt_wqe;
-        uint64_t s_tick, e_tick;
-
-    #if POS_CONF_EVAL_CkptOptLevel > 0
-        // drain out both the parser and worker
-        // TODO: the way to drain is not correct!
-        // s_tick = POSUtilTimestamp::get_tsc();
-        // this->dag.drain_by_dest_id(this->_api_inst_pc-1);
-        // e_tick = POSUtilTimestamp::get_tsc();
-        // POS_LOG("preempt checkpoint: drain(%lf us)", POS_TSC_TO_USEC(e_tick-s_tick));
-    #endif
-
-    #if POS_CONF_EVAL_CkptOptLevel > 0
-        // dump checkpoint to file
-        // TODO: remember to decomment this!
-        // if(this->_cxt.checkpoint_file_path.size() == 0){
-        //     this->deinit_dump_checkpoints();
-        // }
-    #endif
-
-        this->deinit_dump_handle_managers();
-
-    exit:
-        ;
-    }
+    void deinit();
     
 
     /*!
@@ -436,3 +396,6 @@ class POSClient {
         return retval;
     }
 };
+
+#define pos_get_client_typed_hm(client, resource_id, hm_type)  \
+    (hm_type*)(client->handle_managers[resource_id])
