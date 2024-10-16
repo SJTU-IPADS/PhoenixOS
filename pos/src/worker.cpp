@@ -27,11 +27,40 @@
 #include "pos/include/log.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
-#include "pos/include/trace/base.h"
-#include "pos/include/trace/tick.h"
+#include "pos/include/trace.h"
 #include "pos/include/worker.h"
 #include "pos/include/client.h"
 #include "pos/include/workspace.h"
+
+
+POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) {
+    POS_CHECK_POINTER(this->_ws = ws);
+    POS_CHECK_POINTER(this->_client = client);
+    this->_stop_flag = false;
+
+    // start daemon thread
+    this->_daemon_thread = new std::thread(&POSWorker::__daemon, this);
+    POS_CHECK_POINTER(this->_daemon_thread);
+    
+    #if POS_CONF_EVAL_CkptOptLevel == 2
+        this->_ckpt_stream_id = 0;
+        this->_cow_stream_id = 0;
+    #endif
+
+    #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
+        this->_ckpt_commit_stream_id = 0;
+    #endif
+
+    #if POS_CONF_EVAL_MigrOptLevel > 0
+        this->_migration_precopy_stream_id = 0;
+    #endif
+
+    // initialize trace tick list
+    POS_TRACE_TICK_LIST_SET_TSC_TIMER(ckpt, &ws->tsc_timer);
+    POS_TRACE_TICK_LIST_RESET(ckpt);
+
+    POS_LOG_C("worker started");
+}
 
 
 /*!
@@ -249,12 +278,12 @@ void POSWorker::__daemon_ckpt_async(){
                     goto ckpt_finished;
                 }
 
-                POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_drain));
+                POS_TRACE_TICK_START(ckpt, ckpt_drain);
                 if(unlikely(POS_SUCCESS != this->sync())){
                     POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
                     goto ckpt_finished;
                 }
-                POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_drain));
+                POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
 
                 /*!
                     *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
@@ -275,51 +304,48 @@ void POSWorker::__daemon_ckpt_async(){
                     delete this->async_ckpt_cxt.thread;
 
                     // collect the statistic of last checkpoint round
-                    POS_TRACE(
-                        /* cond */ true,
-                        /* trace_workload */ {
-                            POS_LOG(
-                                "[Worker] Checkpoint Statistics:\n"
-                                "   [Drain]     Overall(%lf ms), Times(%lu), Avg.(%lf ms)\n"
-                                "   [CoW-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                                "   [CoW-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                                "   [Add-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                                "   [Add-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                                "   [Commit]    Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                                ,
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_drain),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_drain),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_drain),
+                    #if POS_CONF_RUNTIME_EnableTrace
+                        POS_LOG(
+                            "[Worker] Checkpoint Statistics:\n"
+                            "   [Drain]     Overall(%lf ms), Times(%lu), Avg.(%lf ms)\n"
+                            "   [CoW-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+                            "   [CoW-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+                            "   [Add-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+                            "   [Add-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+                            "   [Commit]    Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+                            ,
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_drain),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_drain),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_drain),
 
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_cow_done),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_cow_done),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_cow_done),
-                                POS_TRACE_COUNTER_GET(worker, ckpt_cow_done_size),
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_done),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_done),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_done),
+                            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_done_size),
 
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_cow_wait),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_cow_wait),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_cow_wait),
-                                POS_TRACE_COUNTER_GET(worker, ckpt_cow_wait_size),
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_wait),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_wait),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_wait),
+                            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_wait_size),
 
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_add_done),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_add_done),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_add_done),
-                                POS_TRACE_COUNTER_GET(worker, ckpt_add_done_size),
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_done),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_done),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_done),
+                            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_done_size),
 
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_add_wait),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_add_wait),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_add_wait),
-                                POS_TRACE_COUNTER_GET(worker, ckpt_add_wait_size),
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_wait),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_wait),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_wait),
+                            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_wait_size),
 
-                                POS_TRACE_TICK_GET_MS(worker, ckpt_commit),
-                                POS_TRACE_TICK_GET_TIMES(worker, ckpt_commit),
-                                POS_TRACE_TICK_GET_AVG_MS(worker, ckpt_commit),
-                                POS_TRACE_COUNTER_GET(worker, ckpt_commit_size)
-                            );
-                            POS_TRACE_TICK_LIST_RESET(worker);
-                            POS_TRACE_COUNTER_LIST_RESET(worker);
-                        }
-                    );
+                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_commit),
+                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_commit),
+                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_commit),
+                            POS_TRACE_COUNTER_GET(ckpt, ckpt_commit_size)
+                        );
+                        POS_TRACE_TICK_LIST_RESET(ckpt);
+                        POS_TRACE_COUNTER_LIST_RESET(ckpt);
+                    #endif
                 }
 
                 // reset checkpoint version map
@@ -378,8 +404,8 @@ void POSWorker::__daemon_ckpt_async(){
                         continue;
                     }
                     if(this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0){
-                        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_cow_done));
-                        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_cow_wait));
+                        POS_TRACE_TICK_START(ckpt, ckpt_cow_done);
+                        POS_TRACE_TICK_START(ckpt, ckpt_cow_wait);
                         tmp_retval = handle->checkpoint_add(
                             /* version_id */ this->async_ckpt_cxt.checkpoint_version_map[handle],
                             /* stream_id */ // wqe->execution_stream_id
@@ -387,11 +413,11 @@ void POSWorker::__daemon_ckpt_async(){
                         );
                         POS_ASSERT(tmp_retval == POS_SUCCESS || tmp_retval == POS_WARN_ABANDONED || tmp_retval == POS_FAILED_ALREADY_EXIST);
                         if(tmp_retval == POS_SUCCESS){
-                            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_cow_done));
-                            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_cow_done_size, handle->state_size));
+                            POS_TRACE_TICK_APPEND(ckpt, ckpt_cow_done);
+                            POS_TRACE_COUNTER_ADD(ckpt, ckpt_cow_done_size, handle->state_size);
                         } else if(tmp_retval == POS_WARN_ABANDONED){
-                            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_cow_wait));
-                            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_cow_wait_size, handle->state_size));
+                            POS_TRACE_TICK_APPEND(ckpt, ckpt_cow_wait);
+                            POS_TRACE_COUNTER_ADD(ckpt, ckpt_cow_wait_size, handle->state_size);
                         }
                     }
                 }
@@ -404,8 +430,8 @@ void POSWorker::__daemon_ckpt_async(){
                         continue;
                     }
                     if(this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0){
-                        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_cow_done));
-                        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_cow_wait));
+                        POS_TRACE_TICK_START(ckpt, ckpt_cow_done);
+                        POS_TRACE_TICK_START(ckpt, ckpt_cow_wait);
                         tmp_retval = handle->checkpoint_add(
                             /* version_id */ this->async_ckpt_cxt.checkpoint_version_map[handle],
                             /* stream_id */ // wqe->execution_stream_id
@@ -413,11 +439,11 @@ void POSWorker::__daemon_ckpt_async(){
                         );
                         POS_ASSERT(tmp_retval == POS_SUCCESS || tmp_retval == POS_WARN_ABANDONED || tmp_retval == POS_FAILED_ALREADY_EXIST);
                         if(tmp_retval == POS_SUCCESS){
-                            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_cow_done));
-                            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_cow_done_size, handle->state_size));
+                            POS_TRACE_TICK_APPEND(ckpt, ckpt_cow_done);
+                            POS_TRACE_COUNTER_ADD(ckpt, ckpt_cow_done_size, handle->state_size);
                         } else if(tmp_retval == POS_WARN_ABANDONED){
-                            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_cow_wait));
-                            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_cow_wait_size, handle->state_size));
+                            POS_TRACE_TICK_APPEND(ckpt, ckpt_cow_wait);
+                            POS_TRACE_COUNTER_ADD(ckpt, ckpt_cow_wait_size, handle->state_size);
                         }
                     }
                 }
@@ -506,19 +532,19 @@ void POSWorker::__checkpoint_async_thread() {
          *  \brief  [phrase 1]  add the state of this handle from its origin buffer
          *  \note   the adding process is sync as it might disturbed by CoW
          */
-        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_add_done));
-        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_add_wait));
+        POS_TRACE_TICK_START(ckpt, ckpt_add_done);
+        POS_TRACE_TICK_START(ckpt, ckpt_add_wait);
         retval = handle->checkpoint_add(
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_stream_id
         );
         POS_ASSERT(retval == POS_SUCCESS || retval == POS_WARN_ABANDONED || retval == POS_FAILED_ALREADY_EXIST);
         if(retval == POS_SUCCESS){
-            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_add_done));
-            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_add_done_size, handle->state_size));
+            POS_TRACE_TICK_APPEND(ckpt, ckpt_add_done);
+            POS_TRACE_COUNTER_ADD(ckpt, ckpt_add_done_size, handle->state_size);
         } else if(retval == POS_WARN_ABANDONED){
-            POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_add_wait));
-            POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_add_wait_size, handle->state_size));
+            POS_TRACE_TICK_APPEND(ckpt, ckpt_add_wait);
+            POS_TRACE_COUNTER_ADD(ckpt, ckpt_add_wait_size, handle->state_size);
         }
 
         /*!
@@ -526,7 +552,7 @@ void POSWorker::__checkpoint_async_thread() {
          *  \note   originally the commit process is async as it would never be disturbed by CoW, but we also need to prevent
          *          ckpt memcpy conflict with normal memcpy, so we sync the execution here to check the memcpy flag
          */
-        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_commit));
+        POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit(
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_commit_stream_id
@@ -541,14 +567,14 @@ void POSWorker::__checkpoint_async_thread() {
             POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
         }
 
-        POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_commit));
-        POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_commit_size, handle->state_size));
+        POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
+        POS_TRACE_COUNTER_ADD(ckpt, ckpt_commit_size, handle->state_size);
     #else
         /*!
          *  \brief  [phrase 1]  commit the resource state from origin buffer or CoW cache
          *  \note   if the CoW is ongoing or finished, it commit from cache; otherwise it commit from origin buffer
          */
-        POS_TRACE(true, POS_TRACE_TICK_START(worker, ckpt_commit));
+        POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit(
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_stream_id
@@ -563,8 +589,8 @@ void POSWorker::__checkpoint_async_thread() {
             POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
         }
 
-        POS_TRACE(true, POS_TRACE_TICK_APPEND(worker, ckpt_commit));
-        POS_TRACE(true, POS_TRACE_COUNTER_ADD(worker, ckpt_commit_size, handle->state_size));
+        POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
+        POS_TRACE_COUNTER_ADD(ckpt, ckpt_commit_size, handle->state_size);
     #endif
     
         wqe->nb_ckpt_handles += 1;
@@ -577,10 +603,7 @@ void POSWorker::__checkpoint_async_thread() {
     }
 
     
-    // POS_TRACE(
-    //     /* cond */ true,
-    //     /* trace_workload */ POS_TRACE_TICK_START(worker, ckpt_commit)
-    // );
+    //  POS_TRACE_TICK_START(ckpt, ckpt_commit)
     // #if POS_CONF_EVAL_CkptEnablePipeline == 1
     //     /*!
     //      *  \note   [phrase 3]  synchronize all commits
@@ -603,10 +626,7 @@ void POSWorker::__checkpoint_async_thread() {
     //     retval = this->sync(this->_ckpt_stream_id);
     //     POS_ASSERT(retval == POS_SUCCESS);
     // #endif
-    // POS_TRACE(
-    //     /* cond */ true,
-    //     /* trace_workload */ POS_TRACE_TICK_APPEND_NO_COUNT(worker, ckpt_commit)
-    // );
+    // POS_TRACE_TICK_APPEND_NO_COUNT(ckpt, ckpt_commit)
 
     POS_LOG(
         "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",

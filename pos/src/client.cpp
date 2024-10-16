@@ -23,15 +23,29 @@
 #include <assert.h>
 
 #include "pos/include/common.h"
+#include "pos/include/workspace.h"
 #include "pos/include/handle.h"
 #include "pos/include/client.h"
 #include "pos/include/api_context.h"
 #include "pos/include/dag.h"
 
 
-/*!
- *  \brief  restore resources from checkpointed file
- */
+bool POSClient::is_time_for_ckpt(){
+    bool retval = false;
+    uint64_t current_tick = POSUtilTimestamp::get_tsc();
+
+    if(unlikely(
+        current_tick - this->_last_ckpt_tick 
+            >= this->_ws->tsc_timer.ms_to_tick(POS_CONF_EVAL_CkptDefaultIntervalMs)
+    )){
+        retval = true;
+        this->_last_ckpt_tick = current_tick;
+    }
+
+    return retval;
+}
+
+
 void POSClient::init_restore_load_resources() {
     pos_retval_t temp_retval;
     uint64_t i, j;
@@ -211,12 +225,6 @@ void POSClient::init_restore_load_resources() {
 }
 
 
-/*!
- *  \brief  generate recompute wqe sequence
- *  \param  apicxt_sequence_map     the generated recompute sequence
- *  \param  missing_handle_map      the generated all missing handles
- *  \todo   this algorithm need to be reconsidered
- */
 void POSClient::init_restore_generate_recompute_scheme(
     std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
     std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
@@ -432,11 +440,6 @@ void POSClient::init_restore_generate_recompute_scheme(
 }
 
 
-/*!
- *  \brief  recreate handles and their state via reloading / recompute
- *  \param  apicxt_sequence_map     recompute sequence
- *  \param  missing_handle_map      all missing handles that need to be restored
- */
 void POSClient::init_restore_recreate_handles(
     std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
     std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
@@ -533,9 +536,6 @@ void POSClient::init_restore_recreate_handles(
 }
 
 
-/*!
- *  \brief  dump checkpoints to file
- */
 void POSClient::deinit_dump_checkpoints() {
     std::string file_path;
     
