@@ -110,7 +110,6 @@ sources += [
     'pos/src/handle.cpp',
     'pos/src/api_context.cpp',
     'pos/src/client.cpp',
-    'pos/src/trace.cpp',
     'pos/src/worker.cpp',
     'pos/src/parser.cpp',
     'pos/src/workspace.cpp',

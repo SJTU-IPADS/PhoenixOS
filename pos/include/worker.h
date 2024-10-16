@@ -28,8 +28,8 @@
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
 #include "pos/include/handle.h"
-#include "pos/include/trace/base.h"
-#include "pos/include/trace/tick.h"
+#include "pos/include/trace.h"
+
 
 // forward declaration
 class POSClient;
@@ -86,33 +86,12 @@ class POSClient;
  */
 class POSWorker {
  public:
-    POSWorker(POSWorkspace* ws, POSClient* client)
-        : _ws(ws), _client(client), _stop_flag(false)
-    {
-        int rc;
-
-        // start daemon thread
-        _daemon_thread = new std::thread(&POSWorker::__daemon, this);
-        POS_CHECK_POINTER(_daemon_thread);
-        
-        #if POS_CONF_EVAL_CkptOptLevel == 2
-            _ckpt_stream_id = 0;
-            _cow_stream_id = 0;
-        #endif
-
-        #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
-            _ckpt_commit_stream_id = 0;
-        #endif
-
-        #if POS_CONF_EVAL_MigrOptLevel > 0
-            _migration_precopy_stream_id = 0;
-        #endif
-
-        // initialize trace tick list
-        POS_TRACE(true, POS_TRACE_TICK_LIST_RESET(worker));
-
-        POS_LOG_C("worker started");
-    }
+    /*!
+     *  \brief  constructor
+     *  \param  ws      pointer to the global workspace that create this worker
+     *  \param  client  pointer to the client which this worker thread belongs to
+     */
+    POSWorker(POSWorkspace* ws, POSClient* client);
 
     /*!
      *  \brief  deconstructor
@@ -126,7 +105,7 @@ class POSWorker {
      *  \return POS_SUCCESS for successfully insertion
      */
     pos_retval_t init(){
-        if(unlikely(POS_SUCCESS != init_wk_functions())){
+        if(unlikely(POS_SUCCESS != this->init_wk_functions())){
             POS_ERROR_C_DETAIL("failed to insert functions");
         }
     }
@@ -223,6 +202,39 @@ class POSWorker {
     virtual pos_retval_t daemon_init(){
         return POS_SUCCESS; 
     }
+
+    /*!
+     *  \brief  profiling metrics for worker
+     */
+    #if POS_CONF_RUNTIME_EnableTrace
+        /* ========== tick traces ========== */
+        // tick metrics for checkpoint process
+        POS_TRACE_TICK_LIST_DEF(
+            /* list_name */ ckpt,
+            /* tick_list */
+                ckpt_drain,
+                ckpt_cow_done,       
+                ckpt_cow_wait,
+                ckpt_add_done,
+                ckpt_add_wait,
+                ckpt_commit
+        );
+        POS_TRACE_TICK_LIST_DECLARE(ckpt);
+
+        /* ========== counter traces ========== */
+        // counter metrics for checkpoint process
+        POS_TRACE_COUNTER_LIST_DEF(
+            /* list_name */ ckpt,
+            /* counters */
+                ckpt_drain,
+                ckpt_cow_done_size,       
+                ckpt_cow_wait_size,
+                ckpt_add_done_size,
+                ckpt_add_wait_size,
+                ckpt_commit_size
+        );
+        POS_TRACE_COUNTER_LIST_DECLARE(ckpt);
+    #endif
 
  private:
     /*!

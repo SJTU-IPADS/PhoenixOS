@@ -21,18 +21,6 @@
 
 #include "pos/include/common.h"
 
-#define POS_TSC_FREQ 0 // mock, delete later
-
-#define POS_TSC_TO_MSEC(tick) \
-    (double)(tick) * (double)1000.0f / (double) POS_TSC_FREQ 
-
-#define POS_USEC_TO_TSC(usec) \
-    (double)(usec) * (double) POS_TSC_FREQ / (double)1000000.0f 
-
-#define POS_MESC_TO_TSC(mesc) \
-    (double)(mesc) / (double)1000.0f * (double) POS_TSC_FREQ 
-
-
 /*!
  *  \brief  HPET-based timer
  *  \note   we provide HPET-based timer mainly for measuring the frequency of TSC
@@ -169,6 +157,24 @@ class POSUtilTscTimer {
      */
     inline double us_to_tick(uint64_t duration){
         return (double)(duration) / (double)1000000.0f * (double) this->_tsc_freq;
+    }
+
+    /*!
+     *  \brief  calculate from tick steps to duration (ms)
+     *  \param  tick steps 
+     *  \return duration  duration (ms)
+     */
+    inline double tick_to_ms(uint64_t ticks){
+        return (double)(ticks) * (double)1000.0f / (double) this->_tsc_freq;
+    }
+
+    /*!
+     *  \brief  calculate from tick steps to duration (us)
+     *  \param  tick steps 
+     *  \return duration  duration (us)
+     */
+    inline double tick_to_us(uint64_t ticks){
+        return (double)(ticks) * (double)1000000.0f / (double) this->_tsc_freq;
     }
 
  private:

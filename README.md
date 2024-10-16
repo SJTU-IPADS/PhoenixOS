@@ -8,7 +8,7 @@
 
 <table style="border:none;">
     <tr>
-        <td>
+        <td width='30%'>
             <div align="center" style="margin:0px; padding:0px;">
                 <img src="./docs/docs/source/_static/images/home/pos_logo.gif" style="margin:0px; padding:0px;" />
             </div>
@@ -42,7 +42,7 @@
 
 > [!NOTE]  
 > Contributions from community are very welcomed!<br />
-> See all potential cool features could be implemented on *PhOS* at <a href="">Contribute to <i>PhOS</i></a>
+> See all potential cool features could be built on *PhOS* at [<a href=""><i>PhOS</i> Roadmap</a>] and [<a href="">Contribute to <i>PhOS</i></a>]
 
 
 ## II. Build *PhOS* From Source
