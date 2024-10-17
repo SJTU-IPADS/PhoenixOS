@@ -20,9 +20,9 @@ pos_retval_t test_cu_ctx_get_current(test_cxt* cxt){
     CUcontext ctx;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cuCtxGetCurrent(&ctx);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -41,9 +41,9 @@ pos_retval_t test_cuda_get_last_error(test_cxt* cxt){
     cudaError cuda_result;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaGetLastError();
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -62,9 +62,9 @@ pos_retval_t test_cuda_peek_at_last_error(test_cxt* cxt){
     cudaError cuda_result;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaPeekAtLastError();
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -83,9 +83,9 @@ pos_retval_t test_cuda_get_error_string(test_cxt* cxt){
     const char* str = nullptr;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     str = cudaGetErrorString(cudaErrorDeviceUninitialized);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 

@@ -18,9 +18,9 @@ pos_retval_t test_cublas_create(test_cxt* cxt){
     cublasHandle_t handle = nullptr;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cublas_result = cublasCreate_v2(&handle);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -47,9 +47,9 @@ pos_retval_t test_cublas_set_stream(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cublas_result = cublasSetStream(handle, 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -74,9 +74,9 @@ pos_retval_t test_cublas_set_mathmode(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cublas_result = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -205,7 +205,7 @@ pos_retval_t test_cublas_sgemm(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cublas_result = cublasSgemm(    
         handle,
         CUBLAS_OP_T,
@@ -222,7 +222,7 @@ pos_retval_t test_cublas_sgemm(test_cxt* cxt){
         d_C,
         M
     );
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
     
@@ -367,7 +367,7 @@ pos_retval_t test_cublas_sgemm_stride_batched(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cublas_result = cublasSgemmStridedBatched(
         handle, 
         CUBLAS_OP_N, CUBLAS_OP_N, 
@@ -380,7 +380,7 @@ pos_retval_t test_cublas_sgemm_stride_batched(test_cxt* cxt){
         1
     );
 
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
     

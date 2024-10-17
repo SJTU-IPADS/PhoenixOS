@@ -42,6 +42,9 @@ meson_file_dir = meson.current_source_dir()
 
 
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
+# NOTE: the configurations here is not comprehensive
+#       please indicate the meson.build udner autogen to check comprehensive version
+
 # target selection (options: cuda, todos: rocm/ascend)
 conf_runtime_target = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeTarget').stdout().strip()
 if conf_runtime_target != 'cuda'
@@ -136,6 +139,7 @@ endif
 if conf_runtime_target == 'cuda'
     sources += [
         'pos/cuda_impl/api_context.cpp',
+        'pos/cuda_impl/workspace.cpp',
         'pos/cuda_impl/utils/fatbin.cpp',
         'pos/cuda_impl/parser/cublas.cpp',
         'pos/cuda_impl/parser/cuda_driver.cpp',
@@ -154,6 +158,7 @@ inc_dirs += ['./']
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
 if conf_runtime_target == 'cuda'
     ld_args += ['-ldl', '-lpatcher']    # for cuda patcher
+    ld_args += ['-libverbs']            # for migration
     ld_args += ['-lclang']              # for using libclang for cuda target
     ld_args += ['-lrt']                 # for support shm_x
     ld_args += ['-pthread']             # for support pthread_x

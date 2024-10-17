@@ -196,7 +196,7 @@ build_cuda() {
       # raise POS server
       cd $script_dir
       cd remoting/cuda/cpu
-      nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../build ./cricket-rpc-server -n test' &
+      nohup bash -c 'LD_LIBRARY_PATH=../submodules/libtirpc/install/lib:../../../lib ./cricket-rpc-server -n test' &
       server_pid=$!
 
       # raise per-api unittest client
@@ -204,7 +204,7 @@ build_cuda() {
       cd $script_dir
       cd unittest/cuda/build
       rm client_exist.txt
-      LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../build LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 ../bin/per_api_test
+      LD_LIBRARY_PATH=../../../remoting/cuda/submodules/libtirpc/install/lib/:../../../remoting/cuda/cpu/:../../../lib LD_PRELOAD=../../../remoting/cuda/cpu/cricket-client.so REMOTE_GPU_ADDRESS=10.66.10.1 ../bin/per_api_test
       client_retval=$?
       kill -SIGINT $server_pid
 

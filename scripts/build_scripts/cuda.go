@@ -388,6 +388,7 @@ func buildRemoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		#!/bin/bash
 		set -e
 		%s
+		export POS_ENABLE=true
 		cd %s/%s
 		make libtirpc -j &>%s 2>&1
 		cp ./submodules/libtirpc/install/lib/libtirpc.so %s/%s

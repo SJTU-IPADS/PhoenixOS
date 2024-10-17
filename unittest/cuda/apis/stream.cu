@@ -70,9 +70,9 @@ pos_retval_t test_cuda_launch_kernel(test_cxt* cxt){
 
     cudaMemcpy(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     kernel_1<<<1,256>>>(d_buf_1, d_buf_2, d_buf_3, d_buf_4, kNbElement);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -112,9 +112,9 @@ pos_retval_t test_cuda_stream_synchronize(test_cxt* cxt){
     cudaError cuda_result;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaStreamSynchronize(0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -134,9 +134,9 @@ pos_retval_t test_cuda_stream_is_capturing(test_cxt* cxt){
     cudaStreamCaptureStatus status;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaStreamIsCapturing(0, &status);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -158,9 +158,9 @@ pos_retval_t test_cuda_event_create_with_flags(test_cxt* cxt){
     cudaError cuda_result;
     uint64_t s_tick, e_tick;
     
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaEventCreateWithFlags(&event, cudaEventDefault);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -187,9 +187,9 @@ pos_retval_t test_cuda_event_record(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaEventRecord(event, 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -217,9 +217,9 @@ pos_retval_t test_cuda_event_destory(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaEventDestroy(event);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     if(unlikely(cuda_result != cudaSuccess)){
         POS_WARN_DETAIL("failed: %d", cuda_result);
@@ -247,9 +247,9 @@ pos_retval_t test_cuda_event_query(test_cxt* cxt){
         goto exit;
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaEventQuery(event);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -265,9 +265,9 @@ pos_retval_t test_cuda_func_get_attributes(test_cxt* cxt){
 
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaFuncGetAttributes(&attr, kernel_1);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     if(unlikely(cuda_result != cudaSuccess)){
         POS_WARN_DETAIL("failed: %d", cuda_result);
@@ -290,7 +290,7 @@ pos_retval_t test_cuda_occupancy_max_active_bpm_with_flags(test_cxt* cxt){
     int flags = cudaOccupancyDefault;
     uint64_t s_tick, e_tick;
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cuda_result = cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
         &numBlocks,
         kernel_1,
@@ -298,7 +298,7 @@ pos_retval_t test_cuda_occupancy_max_active_bpm_with_flags(test_cxt* cxt){
         dynamicSMemSize,
         flags
     );
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
