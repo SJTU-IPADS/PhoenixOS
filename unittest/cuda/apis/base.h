@@ -7,9 +7,11 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/timer.h"
 
 typedef struct test_cxt_t {
     uint64_t duration_ticks;
+    POSUtilTscTimer *tsc_timer;
 } test_cxt;
 
 pos_retval_t test_cuda_malloc(test_cxt* cxt);

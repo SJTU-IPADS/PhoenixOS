@@ -19,9 +19,9 @@ pos_retval_t test_cuda_malloc(test_cxt* cxt){
     
     float *d_buf_1 = nullptr, *d_buf_2 = nullptr, *d_buf_3 = nullptr, *d_buf_4 = nullptr, *d_buf_5 = nullptr;
     
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMalloc((void**)&d_buf_1, kNbElement*sizeof(float));
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -47,9 +47,9 @@ pos_retval_t test_cuda_free(test_cxt* cxt){
     float *d_buf_1 = nullptr;
     cudaMalloc((void**)&d_buf_1, kNbElement*sizeof(float));
 
-    s_tick = POSUtilTimestamp::get_tsc();    
+    s_tick = POSUtilTscTimer::get_tsc();    
     cuda_rt_retval = cudaFree(d_buf_1);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -74,9 +74,9 @@ pos_retval_t test_cuda_memcpy_h2d(test_cxt* cxt){
     }
     buf_2.reserve(kNbElement);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpy(d_buf_1+kNbElement, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -112,9 +112,9 @@ pos_retval_t test_cuda_memcpy_d2h(test_cxt* cxt){
 
     cudaMemcpy(d_buf_1+kNbElement, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpy(buf_2.data(), d_buf_1+kNbElement, kNbElement*sizeof(float), cudaMemcpyDeviceToHost);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -142,9 +142,9 @@ pos_retval_t test_cuda_memcpy_d2d(test_cxt* cxt){
 
     cudaMemcpy(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpy(d_buf_2, d_buf_1, kNbElement*sizeof(float), cudaMemcpyDeviceToDevice);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -177,9 +177,9 @@ pos_retval_t test_cuda_memcpy_h2d_async(test_cxt* cxt){
     }
     buf_2.reserve(kNbElement);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpyAsync(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice, 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -213,9 +213,9 @@ pos_retval_t test_cuda_memcpy_d2h_async(test_cxt* cxt){
 
     cudaMemcpyAsync(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice, 0);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpyAsync(buf_2.data(), d_buf_1, kNbElement*sizeof(float), cudaMemcpyDeviceToHost, 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
 
@@ -248,9 +248,9 @@ pos_retval_t test_cuda_memcpy_d2d_async(test_cxt* cxt){
 
     cudaMemcpyAsync(d_buf_1, buf_1.data(), kNbElement*sizeof(float), cudaMemcpyHostToDevice, 0);
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemcpyAsync(d_buf_2, d_buf_1, kNbElement*sizeof(float), cudaMemcpyDeviceToDevice, 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
     
     cxt->duration_ticks = e_tick - s_tick;
     
@@ -284,9 +284,9 @@ pos_retval_t test_cuda_memset_async(test_cxt* cxt){
         buf_1.push_back(0);
     }
 
-    s_tick = POSUtilTimestamp::get_tsc();
+    s_tick = POSUtilTscTimer::get_tsc();
     cudaMemsetAsync(d_buf_1, 3, kNbElement*sizeof(uint8_t), 0);
-    e_tick = POSUtilTimestamp::get_tsc();
+    e_tick = POSUtilTscTimer::get_tsc();
 
     cudaMemcpy(buf_1.data(), d_buf_1, kNbElement*sizeof(uint8_t), cudaMemcpyDeviceToHost);
     for (i=0; i<kNbElement; i++){
