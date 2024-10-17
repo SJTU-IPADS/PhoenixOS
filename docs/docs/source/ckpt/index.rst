@@ -9,5 +9,7 @@ Checkpoint Mechanism
     :maxdepth: 2
     :numbered:
 
-    pipeline
+    memory_ckpt
+    driver_object_ckpt
     validation
+    distributed
