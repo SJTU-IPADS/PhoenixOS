@@ -48,7 +48,7 @@ namespace cu_module_load {
         POSHandleManager_CUDA_Module *hm_module;
         POSHandleManager_CUDA_Function *hm_function;
 
-    #define __POS_DUMP_FATBIN 1
+    #define __POS_DUMP_FATBIN 0
     #if __POS_DUMP_FATBIN
         std::ofstream fatbin_file("/tmp/fatbin.bin", std::ios::binary);
         if(unlikely(!fatbin_file)){
@@ -144,20 +144,20 @@ namespace cu_module_load {
         );
         
         // patched PTX within the fatbin
-        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
-            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
-            /* patched_binary */ module_handle->patched_binary
-        );
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN(
-                "parse(cu_module_load): failed to patch PTX within the fatbin with %lu functions",
-                module_handle->function_desps.size()
-            );
-        }
-        POS_LOG(
-            "parse(cu_module_load): patched %lu functions in the fatbin",
-            module_handle->function_desps.size()
-        );
+        // retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+        //     /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 1)),
+        //     /* patched_binary */ module_handle->patched_binary
+        // );
+        // if(unlikely(retval != POS_SUCCESS)){
+        //     POS_WARN(
+        //         "parse(cu_module_load): failed to patch PTX within the fatbin with %lu functions",
+        //         module_handle->function_desps.size()
+        //     );
+        // }
+        // POS_LOG(
+        //     "parse(cu_module_load): patched %lu functions in the fatbin",
+        //     module_handle->function_desps.size()
+        // );
 
     #if __POS_DUMP_FATBIN
         fatbin_patch_file.write((const char*)(module_handle->patched_binary.data()), module_handle->patched_binary.size());
@@ -241,7 +241,7 @@ namespace cu_module_load_data {
         POSHandleManager_CUDA_Module *hm_module;
         POSHandleManager_CUDA_Function *hm_function;
 
-    #define __POS_DUMP_FATBIN 1
+    #define __POS_DUMP_FATBIN 0
     #if __POS_DUMP_FATBIN 
         std::ofstream fatbin_file("/tmp/fatbin.bin", std::ios::binary);
         if(unlikely(!fatbin_file)){
@@ -338,20 +338,20 @@ namespace cu_module_load_data {
         }
 
         // patched PTX within the fatbin
-        retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
-            /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
-            /* patched_binary */ module_handle->patched_binary
-        );
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN(
-                "parse(cu_module_load_data): failed to patch PTX within the fatbin with %lu functions",
-                module_handle->function_desps.size()
-            );
-        }
-        POS_LOG(
-            "parse(cu_module_load_data): patched %lu functions in the fatbin",
-            module_handle->function_desps.size()
-        );
+        // retval = POSUtil_CUDA_Kernel_Patcher::patch_fatbin_binary(
+        //     /* binary_ptr */ (uint8_t*)(pos_api_param_addr(wqe, 0)),
+        //     /* patched_binary */ module_handle->patched_binary
+        // );
+        // if(unlikely(retval != POS_SUCCESS)){
+        //     POS_WARN(
+        //         "parse(cu_module_load_data): failed to patch PTX within the fatbin with %lu functions",
+        //         module_handle->function_desps.size()
+        //     );
+        // }
+        // POS_LOG(
+        //     "parse(cu_module_load_data): patched %lu functions in the fatbin",
+        //     module_handle->function_desps.size()
+        // );
 
     #if __POS_DUMP_FATBIN
         fatbin_patch_file.write((const char*)(module_handle->patched_binary.data()), module_handle->patched_binary.size());

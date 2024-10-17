@@ -7,9 +7,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/timer.h"
-
 #include "pos/cuda_impl/api_index.h"
-
 #include "unittest/cuda/apis/base.h"
 
 using pos_unittest_func_t = pos_retval_t(*)(test_cxt*);
@@ -18,6 +16,9 @@ class POSUnitTest {
  public:
     POSUnitTest(){
         insert_unittest_funcs();
+
+        // init timer
+
     }
     ~POSUnitTest() = default;
 
@@ -72,14 +73,14 @@ class POSUnitTest {
         std::map<uint64_t, pos_unittest_func_t>::iterator iter;
 
         for(iter=func_map.begin(); iter!=func_map.end(); iter++){
-            test_cxt cxt = {0};
+            test_cxt cxt = { 0, &this->_tsc_timer };
             retval = run_one(iter->first, &cxt);
             POS_LOG(
                 "API(%lu): status = %s(%d), duration = %lf us",
                 iter->first,
                 retval == POS_SUCCESS ? "success" : "failed",
                 retval,
-                POS_TSC_TO_USEC(cxt.duration_ticks)
+                this->_tsc_timer.tick_to_us(cxt.duration_ticks)
             );
             if(unlikely(retval != POS_SUCCESS)){
                 has_error = true;
@@ -90,7 +91,6 @@ class POSUnitTest {
     }
 
     pos_retval_t run_one(uint64_t api_id, test_cxt* cxt){
-        
         if(unlikely(func_map.count(api_id) == 0)){
             POS_ERROR_C("no unit test function registered: api_id(%lu)", api_id);
         }
@@ -99,5 +99,6 @@ class POSUnitTest {
     }
 
  private:
+    POSUtilTscTimer _tsc_timer;
     std::map<uint64_t, pos_unittest_func_t> func_map;
 };

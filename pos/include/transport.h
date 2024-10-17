@@ -80,20 +80,24 @@ class POSTransport_RDMA : public POSTransport<is_server> {
    POSTransport_RDMA(std::string dev_name){ 
       pos_retval_t tmp_retval;
 
-      // make sure ib device exist
-      POS_ASSERT(POSTransport_RDMA::has_ib_device());
+        // make sure ib device exist
+        // TODO: temp comment this out
+        // POS_ASSERT(POSTransport_RDMA::has_ib_device());
+        if(POSTransport_RDMA::has_ib_device() == false){
+            goto exit;
+        }
 
-      // open and init IB device
-      tmp_retval = __open_and_init_ib_device(dev_name);
-      if(unlikely(POS_SUCCESS != tmp_retval)){
-         goto exit;
-      }
+        // open and init IB device
+        tmp_retval = __open_and_init_ib_device(dev_name);
+        if(unlikely(POS_SUCCESS != tmp_retval)){
+            goto exit;
+        }
 
-      // create Reliable & Connect-oriented (RC) QP and corresponding PD and CQ
-      tmp_retval = this->__create_qctx(IBV_QPT_RC);
-      if(unlikely(POS_SUCCESS != tmp_retval)){
-         goto exit;
-      }
+        // create Reliable & Connect-oriented (RC) QP and corresponding PD and CQ
+        tmp_retval = this->__create_qctx(IBV_QPT_RC);
+        if(unlikely(POS_SUCCESS != tmp_retval)){
+            goto exit;
+        }
 
    exit:
       ;

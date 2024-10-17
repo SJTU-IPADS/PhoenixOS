@@ -41,21 +41,24 @@ foreach( test_target ${TEST_TARGETS} )
     set_target_properties(${test_target} PROPERTIES LINKER_LANGUAGE CUDA)
 
     # target_link_libraries(${test_target} nvToolsExt -lcublas -lcurand)
-    target_link_libraries(${test_target} -lcuda -lcublas -ldl -lpthread -lclang)
+    target_link_libraries(${test_target} -lcuda -lcublas -ldl -lpthread)
     # target_link_libraries(${test_target} Boost::serialization)
 
     target_include_directories(${test_target} PUBLIC ${CUDA_TOOLKIT_ROOT_DIR}/include)
 
     # POS root path
     target_include_directories(${test_target} PUBLIC ../../)
-    target_include_directories(${test_target} PUBLIC ../../build)
+    target_include_directories(${test_target} PUBLIC ../../lib)
 
     # link POS
-    find_library(pos_so NAMES pos HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../build)
+    find_library(pos_so NAMES pos HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
     target_link_libraries(${test_target} ${pos_so})
 
+    find_library(clang_so NAMES clang HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
+    target_link_libraries(${test_target} ${clang_so})
+
     # include third party header
-    target_include_directories(${test_target} PUBLIC ../../third_party/libclang-static-build/include)
+    target_include_directories(${test_target} PUBLIC ../../lib/pos/include)
 
     # important here to set cuda as dynamically linked
     set_target_properties(${test_target} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
