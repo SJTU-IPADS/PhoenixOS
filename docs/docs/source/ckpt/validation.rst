@@ -1,4 +1,4 @@
-Validation
+Infer and Validation of Memory Access Pattern
 ============
 
 .. Format of `fatbinary`
