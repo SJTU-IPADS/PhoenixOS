@@ -9,5 +9,5 @@ Checkpoint Mechanism
     :maxdepth: 2
     :numbered:
 
-    intro
+    pipeline
     validation
