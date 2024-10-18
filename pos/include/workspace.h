@@ -137,17 +137,15 @@ class POSWorkspace {
     ~POSWorkspace();
 
     /*!
-     *  \brief  initialize the workspace, including raise the runtime and worker threads
-     *  \note   this part can't be in the constructor as we will invoke functions
-     *          that implemented by derived class
+     *  \brief  initialize the workspace
      *  \return POS_SUCCESS for successfully initialization
      */
-    virtual pos_retval_t init() { return POS_FAILED_NOT_IMPLEMENTED; };
+    pos_retval_t init();
 
     /*!
      *  \brief  shutdown the POS server
      */
-    void clear();
+    pos_retval_t deinit();
 
 
     /* =============== client management functions =============== */
@@ -282,6 +280,20 @@ class POSWorkspace {
 
     // context for creating the client
     pos_client_cxt_t _template_client_cxt;
+
+    /*!
+     *  \brief  initialize the workspace
+     *  \note   create device context inside this function, implementation on specific platform
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    virtual pos_retval_t __init() { return POS_FAILED_NOT_IMPLEMENTED; }
+
+    /*!
+     *  \brief  deinitialize the workspace
+     *  \note   destory device context inside this function, implementation on specific platform
+     *  \return POS_SUCCESS for successfully deinitialization
+     */
+    virtual pos_retval_t __deinit(){ return POS_FAILED_NOT_IMPLEMENTED; }
 
     /*!
      *  \brief  preserve resource on posd
