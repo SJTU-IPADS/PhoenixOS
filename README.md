@@ -33,31 +33,45 @@
 </div>
 
 
-## I. What *PhOS* Does?
-
 > [!NOTE]  
 > Contributions from community are very welcomed!<br />
 > See all potential cool features could be built on *PhOS* at [<a href="">Roadmap</a>] and [<a href="">Contribution</a>]
 
+
+## I. What *PhOS* Does?
 
 ## II. Build *PhOS* From Source
 
 1. **[Start Container]**
     *PhOS* can be built and installed on official image from different vendors.
 
-    For example, for running *PhOS* for CUDA 12.1,
+    For example, for running *PhOS* for CUDA 11.3,
     one can build on official CUDA images
-    (e.g., [`nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04/images/sha256-f676f5b29377e942b533ed13e554cc54aecf853b598ae55f6b67e20adcf81f23))
+    (e.g., [`nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-459c130c94363099b02706b9b25d9fe5822ea233203ce9fbf8dfd276a55e7e95))
 
     ```bash
     # start container
-    docker run -dit --gpus all -v.:/root --name phos nvidia/cuda/12.1.1-cudnn8-devel-ubuntu20.04
+    docker run -dit --gpus all -v.:/root --name phos nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 
     # enter container
     docker exec -it phos /bin/bash
     ```
 
-2. **[Build]**
+    Note that currently *PhOS* is only fully tested under CUDA 11.3, we will support other latest CUDA version soon!
+
+
+2. **[Downloading Necesssary Assets]**
+    *PhOS* relies on some assets to build and test,
+    please download these assets by simply running following commands
+
+    ```bash
+    # inside container
+    cd /root/scripts/build_scripts
+    bash download_assets.sh
+    ```
+
+
+3. **[Build]**
     Building *PhOS* is simple!
 
     *PhOS* provides a convinient build system as *PhOS* contains multiple dependent components 
