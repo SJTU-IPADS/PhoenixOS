@@ -1,10 +1,10 @@
 # PhoenixOS (PhOS)
 
 [![build passing](https://img.shields.io/badge/build-passed-green)](https://github.com/PhoenixOS-IPADS/PhoenixOS)
-[![build passing](https://img.shields.io/badge/supported-CUDA-blue)](https://phoenixos.readthedocs.io/en/latest/cuda_gsg/index.html)
+[![build passing](https://img.shields.io/badge/supported-CUDA-blue)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/cuda_gsg/index.html)
 [![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)]()
 [![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)]()
-[![doc](https://img.shields.io/badge/docs-green)](https://phoenixos.readthedocs.io/en/latest/index.html)
+[![doc](https://img.shields.io/badge/docs-green)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/index.html)
 
 <div align="center">
     <img src="./docs/docs/source/_static/images/home/pos_logo.gif" height="150px" />
@@ -19,7 +19,7 @@
         <ul>
             <li>
                 <p style="margin:0px; margin-bottom:5px;">
-                    <b>[Oct.20 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos.readthedocs.io/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                    <b>[Oct.20 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
                 </p>
                 <p style="margin:0px; margin-bottom:5px;">
                     👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
