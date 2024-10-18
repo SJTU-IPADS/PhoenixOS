@@ -1,18 +1,18 @@
 [submodule "remoting/cuda"]
 	path = remoting/cuda
-	url = git@ipads.se.sjtu.edu.cn:scaleaisys/cricket.git
+  url = https://github.com/PhoenixGPU/cricket.git
 	branch = pos/add_stub
 [submodule "third_party/cuda-checkpoint"]
 	path = third_party/cuda-checkpoint
-	url = git@github.com:NVIDIA/cuda-checkpoint.git
+  url = https://github.com/NVIDIA/cuda-checkpoint.git
 	branch = main
 [submodule "third_party/criu"]
 	path = third_party/criu
-	url = git@ipads.se.sjtu.edu.cn:scaleaisys/criu.git
+  url = https://github.com/PhoenixGPU/criu.git
 	branch = criu-dev
 [submodule "third_party/googletest"]
 	path = third_party/googletest
-	url = git@github.com:google/googletest.git
+  url = https://github.com/google/googletest.git
 [submodule "third_party/yaml-cpp"]
 	path = third_party/yaml-cpp
-	url = git@github.com:jbeder/yaml-cpp.git
+  url = https://github.com/jbeder/yaml-cpp.git
