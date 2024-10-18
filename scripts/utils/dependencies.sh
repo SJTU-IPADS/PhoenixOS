@@ -1,11 +1,50 @@
 #!/bin/bash
 
-check_requirement() {
+__package_manager_update () {
+    log "updating package manager apt..."
+    sudo apt-get update
+}
+
+
+__package_manager_install () {
+    # $1: package name from package manager
+    sudo apt-get install -y --allow-downgrades $1
+}
+
+
+util_check_dep_retval=0
+util_check_dep () {
     # $1 cmd line binary name
+    # $2: package name from package manager
     if [[ ! -x "$(command -v $1)" ]]; then
-        error "no $1 installed"
+        warn "check dependencies [$2]: failed"
+        util_check_dep_retval=0
+    else
+        log "check dependencies [$2]: success"
+        util_check_dep_retval=1
     fi
 }
+
+
+util_install_common () {
+    # $1: command line name, "*" for no command line checking
+    # $2: package name from package manager
+    if [ "$1" = "*" ]; then
+        warn "check dependencies [$2]: skipped checking, directly install"
+        __package_manager_install $2
+    else
+        util_check_dep $1 $2
+        if [[ $util_check_dep_retval -eq 0 ]]; then
+            __package_manager_install $2
+            # check again
+            util_check_dep $1 $2
+            if [[ $util_check_dep_retval -eq 0 ]]; then
+                error "failed to install $2"
+            fi
+        fi
+    fi   
+}
+
 
 check_and_install_go() {
     if [[ ! -x "$(command -v go)" ]]; then
@@ -22,3 +61,5 @@ check_and_install_go() {
         warn "please \"source $HOME/.bashrc\" for loading golang"
     fi
 }
+
+# __package_manager_update

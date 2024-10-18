@@ -240,48 +240,51 @@ print_usage() {
 
 # parse command line options
 while getopts ":t:hcju:3" opt; do
-  case $opt in
-  t)
-    target=$OPTARG
-    ;;
-  h)
-    print_usage
-    exit 0
-    ;;
-  3)
-    involve_third_party=true
-    ;;
-  u)
-    if [ "$OPTARG" = "true" ]; then
-      run_unit_test=true
-    elif [ "$OPTARG" = "false" ]; then
-      run_unit_test=false
-    else
-      error "invalid arguments of -u, should be \"true\" or \"false\""
-    fi
-    ;;
-  c)
-    doclean=true
-    ;;
-  j)
-    multithread_build=true
-    ;;
-  \?)
-    error "invalid target: -$OPTARG" >&2
-    ;;
-  :)
-    error "option -$OPTARG require extra parameter (options: cuda)" >&2
-    ;;
-  esac
+    case $opt in
+    t)
+        target=$OPTARG
+        ;;
+    h)
+        print_usage
+        exit 0
+        ;;
+    3)
+        involve_third_party=true
+        ;;
+    u)
+        if [ "$OPTARG" = "true" ]; then
+        run_unit_test=true
+        elif [ "$OPTARG" = "false" ]; then
+        run_unit_test=false
+        else
+        error "invalid arguments of -u, should be \"true\" or \"false\""
+        fi
+        ;;
+    c)
+        doclean=true
+        ;;
+    j)
+        multithread_build=true
+        ;;
+    \?)
+        error "invalid target: -$OPTARG" >&2
+        ;;
+    :)
+        error "option -$OPTARG require extra parameter (options: cuda)" >&2
+        ;;
+    esac
 done
 
 # execution
 if [ "$target" = "cuda" ]; then
-  check_requirement "git" "sudo apt-get install git"
+    util_install_common "git" "git"
 
-  . "$HOME/.cargo/env"
-  check_requirement "cargo" "curl https://sh.rustup.rs -sSf | sh ; . \"$HOME/.cargo/env\""
-  build_cuda
+    . "$HOME/.cargo/env"
+    util_check_dep "cargo" "cargo"
+    if [[ $util_check_dep_retval -eq 0 ]]; then
+        error "no cargo installed"
+    fi
+    build_cuda
 else
-  error "invalid target: $target" >&2
+    error "invalid target: $target" >&2
 fi
