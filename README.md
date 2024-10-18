@@ -37,7 +37,7 @@
 
 > [!NOTE]  
 > Contributions from community are very welcomed!<br />
-> See all potential cool features could be built on *PhOS* at [<a href=""><i>PhOS</i> Roadmap</a>] and [<a href="">Contribute to <i>PhOS</i></a>]
+> See all potential cool features could be built on *PhOS* at [<a href="">Roadmap</a>] and [<a href="">Contribution</a>]
 
 
 ## II. Build *PhOS* From Source
