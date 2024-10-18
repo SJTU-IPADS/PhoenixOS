@@ -66,8 +66,8 @@ foreach( test_target ${TEST_TARGETS} )
     target_compile_options(
         ${test_target} PRIVATE
         # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_70,code=sm_70> # v100
-        # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_80,code=sm_80> # a100
+        $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_80,code=sm_80> # a100
         # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: -gencode arch=compute_89,code=sm_89> # 4060
-        $<$<COMPILE_LANGUAGE:CUDA>:SHELL: --gpu-architecture=compute_89> # 4060
+        # $<$<COMPILE_LANGUAGE:CUDA>:SHELL: --gpu-architecture=compute_89> # 4060
     )
 endforeach( test_target ${TEST_TARGETS} )

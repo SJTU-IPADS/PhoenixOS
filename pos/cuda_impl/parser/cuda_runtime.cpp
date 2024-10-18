@@ -49,10 +49,10 @@ namespace cuda_malloc {
 
     #if POS_CONF_RUNTIME_EnableDebugCheck
         // check whether given parameter is valid
-        if(unlikely(wqe->api_cxt->params.size() != 2)){
+        if(unlikely(wqe->api_cxt->params.size() != 1)){
             POS_WARN(
                 "parse(cuda_malloc): failed to parse cuda_malloc, given %lu params, %lu expected",
-                wqe->api_cxt->params.size(), 2
+                wqe->api_cxt->params.size(), 1
             );
             retval = POS_FAILED_INVALID_INPUT;
             goto exit;
