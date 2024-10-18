@@ -8,6 +8,7 @@
 **/build
 **/bin
 **/.conda
+**/.DS_Store
 # **/lib
 **/dag.pos
 **/*.nsys-rep
@@ -35,3 +36,9 @@ build_log/
 lib/
 bin/
 tmp/
+
+# ignore all assets
+assets
+dockerfiles/assets
+third_party/libclang-static-build
+third_party/libclang-static-build.tar.gz
