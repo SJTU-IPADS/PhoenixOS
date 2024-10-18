@@ -2,7 +2,7 @@
 
 .. _ckpt_memory:
 Checkpoint of Device Memory
-============
+===========================
 
 **Authors**: `Zhuobin Huang <https://zobinhuang.github.io/>`_, `Xingda Wei <https://ipads.se.sjtu.edu.cn/pub/members/xingda_wei>`_
 
@@ -33,7 +33,7 @@ we first declare the symbols to be used:
 
 .. _ckpt_stages:
 Checkpoint Stages
-----
+-----------------
 
 .. image:: /ckpt/pic/stages.png
    :width: 90%
@@ -49,7 +49,7 @@ checkpointing GPU memory in *PhOS* could be divided into 2 stages:
     Pre-copy stage is overlapped with kernel execution,
     which uses a different GPU stream to conduct device-to-host memory copy
     while executing normal kernel on default work stream.
-    With the help of **Copy-on-Write** (CoW) mechanism (:ref:`cow_mechanism`),
+    With the help of **Copy-on-Write** (CoW) mechanism,
     the pre-copy could correctly save the memory state in :math:`t_1`,
     which is the time to start pre-copy.
     Hence, we can express pre-copy stage started at :math:`t_1` as:
@@ -135,7 +135,7 @@ In different scenarioes,
 
 
 Checkpoint Pipeline
-----
+-------------------
 
 .. image:: /ckpt/pic/pipeline.png
    :width: 80%
@@ -159,4 +159,4 @@ Checkpoint Pipeline
 
 .. _ckpt_deduplication:
 Checkpoint Deduplication
-----
+------------------------
