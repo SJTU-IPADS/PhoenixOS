@@ -87,8 +87,6 @@ func (buildConf *BuildConfigs) print(logger *log.Logger) {
 		> Runtime Configs:
 			- RuntimeTarget: %v
 			- RuntimeTargetVersion: %v
-			- RuntimeDaemonLogPath: %v
-			- RuntimeClientLogPath: %v
 			- RuntimeEnablePrintError: %v
 			- RuntimeEnablePrintWarn: %v
 			- RuntimeEnablePrintLog: %v
@@ -97,6 +95,8 @@ func (buildConf *BuildConfigs) print(logger *log.Logger) {
 			- RuntimeEnableDebugCheck: %v
 			- RuntimeEnableHijackApiCheck: %v
 			- RuntimeEnableTrace: %v
+			- RuntimeDaemonLogPath: %v
+			- RuntimeClientLogPath: %v
 		> Evaluation Configs:
 			- EvalCkptOptLevel: %v
 			- EvalCkptEnableIncremental: %v
