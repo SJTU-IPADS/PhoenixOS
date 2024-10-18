@@ -1,1 +1,0 @@
-third_party/libclang-static-build filter=lfs diff=lfs merge=lfs -text
