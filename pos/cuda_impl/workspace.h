@@ -40,14 +40,6 @@ class POSWorkspace_CUDA : public POSWorkspace {
     POSWorkspace_CUDA(int argc, char *argv[]);
 
     /*!
-     *  \brief  initialize the workspace
-     *  \note   this part can't be in the constructor as we will invoke functions
-     *          that implemented by derived class
-     *  \return POS_SUCCESS for successfully initialization
-     */
-    pos_retval_t init() override;
-
-    /*!
      *  \brief  create and add a new client to the workspace
      *  \param  clnt    pointer to the POSClient to be added
      *  \param  uuid    the result uuid of the added client
@@ -66,17 +58,19 @@ class POSWorkspace_CUDA : public POSWorkspace {
  private:
     // all CUDA context inside current workspace
     // one context per device
-    std::vector<CUcontext> _current_cu_context;
+    std::vector<CUcontext> _cu_contexts;
 
     /*!
-     *  \brief  create CUDA context across all devices
-     *  \return POS_SUCCESS for successfully creation
+     *  \brief  initialize the workspace
+     *  \note   create device context inside this function, implementation on specific platform
+     *  \return POS_SUCCESS for successfully initialization
      */
-    pos_retval_t __create_cuda_contexts();
+    pos_retval_t __init() override;
 
     /*!
-     *  \brief  destory all CUDA context across all devices
-     *  \return POS_SUCCESS for successfully destory
+     *  \brief  deinitialize the workspace
+     *  \note   destory device context inside this function, implementation on specific platform
+     *  \return POS_SUCCESS for successfully deinitialization
      */
-    pos_retval_t __destory_cuda_contexts();
+    pos_retval_t __deinit() override;
 };

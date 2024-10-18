@@ -21,6 +21,11 @@
 #include "pos/include/oob.h"
 #include "pos/include/api_context.h"
 
+
+// forward declaration
+class POSAgent;
+
+
 /*!
  *  \brief  function prototypes for cli oob client
  */
@@ -28,6 +33,40 @@ namespace oob_functions {
     POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_register_client);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(agent_unregister_client);
 }; // namespace oob_functions
+
+
+/*!
+ *  \brief  agent configuration
+ *  \note   these configurations are fixed and loaded when the client is runned
+ */
+class POSAgentConf {
+    /*!
+     *  \brief  constructor
+     *  \param  agent   the agent which thsi configuration attached to
+     */
+    POSAgentConf(POSAgent *root_agent);
+    ~POSAgentConf() = default;
+
+    /*!
+     *  \brief  load client config from yaml file
+     *  \param  file_path   path to the configuration yaml file
+     *  \return POS_SUCCESS for successfully loading
+     */
+    pos_retval_t load_config(std::string &&file_path = "./pos.yaml");
+
+ private:
+    friend class POSAgent;
+
+    // the agent which thsi configuration attached to
+    POSAgent *_root_agent;
+
+    // ip addrsss of the pos daemon, commonly 127.0.0.1
+    std::string pos_daemon_addr;
+
+    // name of the job
+    std::string job_name;
+};
+
 
 /*!
  *  \brief  client-side PhoenixOS agent, manages all POS resources
