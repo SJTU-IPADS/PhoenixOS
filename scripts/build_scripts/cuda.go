@@ -107,7 +107,7 @@ func buildLibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		if [ ! -d "./build" ]; then
 			mkdir build && cd build
 			cmake .. -DCMAKE_INSTALL_PREFIX=.. >%s 2>&1
-			make install -j4 >%s 2>&1
+			make install -j >%s 2>&1
 		fi
 		cp ../lib/libclang.so %s
 		cp ../lib/libclang.so.13 %s

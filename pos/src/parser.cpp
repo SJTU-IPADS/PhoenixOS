@@ -70,7 +70,7 @@ void POSParser::__daemon(){
         POS_WARN_C("failed to init daemon, worker daemon exit");
         return;
     }
-    
+
     while(!_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
@@ -113,19 +113,20 @@ void POSParser::__daemon(){
             }
             
             /*!
-                *  \note       for api in type of Delete_Resource, one can directly send
-                *              response to the client right after operating on mocked resources
-                *  \warning    we can't apply this rule for Create_Resource, consider the memory situation, which is passthrough addressed
-                */
+             *  \note       for api in type of Delete_Resource, one can directly send
+             *              response to the client right after operating on mocked resources
+             *  \warning    we can't apply this rule for all Create_Resource, consider the memory
+             *              situation, which is passthrough addressed
+             */
             if(unlikely(api_meta.api_type == kPOS_API_Type_Delete_Resource)){
                 POS_DEBUG_C("api(%lu) is type of Delete_Resource, set as \"Return_After_Parse\"", api_id);
                 wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
             }
 
             /*!
-                *  \note       for sync api that mark as kPOS_API_Execute_Status_Return_After_Parse,
-                *              we directly return the result back to the frontend side
-                */
+             *  \note       for sync api that mark as kPOS_API_Execute_Status_Return_After_Parse,
+             *              we directly return the result back to the frontend side
+             */
             if(wqe->status == kPOS_API_Execute_Status_Return_After_Parse){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 this->_ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
@@ -134,7 +135,6 @@ void POSParser::__daemon(){
 
         /*!
         *  \brief  ================== phrase 2 - checkpoint insertion ==================
-        *  \note   we need to do again as there might no wqe polled
         */
         #if POS_CONF_EVAL_CkptOptLevel > 0
             if(this->_client->is_time_for_ckpt()){
