@@ -20,6 +20,7 @@ const (
 	KPhOSPatcherPath = "pos/cuda_impl/patcher"
 	kPhOSAutoGenPath = "autogen"
 	KRemotingPath    = "remoting/cuda"
+	kPhOSUnitTestPath = "test"
 	KBuildLogPath    = "build_log"
 	KBuildLibPath    = "lib"
 	KBuildIncPath    = "lib/pos/include"
@@ -229,18 +230,29 @@ func buildAndRunAutoGen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 		set -e
 		%s
 		cd %s/%s
+
+		# copy common headers
+		rm -rf ./pos/include
+		mkdir -p ./pos/include
+		cp -r %s/%s/include/eval_configs.h.in ./pos/include/
+		cp -r %s/%s/include/log.h.in ./pos/include/
+		cp -r %s/%s/include/meson.build ./pos/include/
+		cp -r %s/%s/include/runtime_configs.h.in ./pos/include/
+
 		rm -rf ./build
 		meson build >%s 2>&1
 		cd build
 		ninja clean
 		ninja >%s 2>&1
-		cp -r ./pos/include/* %s/%s
 		`,
-		buildConf.export_string(),
+		buildConf.export_autogen_string(),
 		cmdOpt.RootDir, kPhOSAutoGenPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
 		buildLogPath,
 		buildLogPath,
-		cmdOpt.RootDir, KBuildIncPath,
 	)
 
 	run_script := fmt.Sprintf(`
@@ -438,8 +450,72 @@ func buildRemoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 	}
 }
 
-func buildUnitTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
-	// logger.Infof("building uint test...")
+func buildAndRunUnitTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_unittest.log")
+	runLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "run_unittest.log")
+
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		%s
+		cd %s/%s
+
+		# copy common headers
+		rm -rf ./pos/include
+		mkdir -p ./pos/include
+		cp -r %s/%s/include/eval_configs.h.in ./pos/include/
+		cp -r %s/%s/include/log.h.in ./pos/include/
+		cp -r %s/%s/include/meson.build ./pos/include/
+		cp -r %s/%s/include/runtime_configs.h.in ./pos/include/
+
+		rm -rf ./build
+		meson build >%s 2>&1
+		cd build
+		ninja clean
+		ninja >%s 2>&1
+		`,
+		buildConf.export_unittest_string(),
+		cmdOpt.RootDir, kPhOSUnitTestPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		buildLogPath,
+		buildLogPath,
+	)
+
+	run_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s/build
+		LD_LIBRARY_PATH=../../lib/ ./pos_test 2&>1
+		`,
+		cmdOpt.RootDir, kPhOSUnitTestPath,
+		buildConf.RuntimeTargetVersion,
+		runLogPath,
+	)
+
+	// build
+	logger.Infof("building unit test for CUDA target...")
+	start := time.Now()
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build unit test for CUDA target, please see log at %s", buildLogPath)
+	}
+	elapsed := time.Since(start)
+	utils.ClearLastLine()
+	logger.Infof("built unit test for CUDA target: %.2fs", elapsed.Seconds())
+
+	// unit test
+	logger.Infof("running unit test for CUDA target...")
+	start = time.Now()
+	_, err = utils.BashScriptGetOutput(run_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to pass unit test for CUDA target, please see log at %s", buildLogPath)
+	}
+	elapsed = time.Since(start)
+	utils.ClearLastLine()
+	logger.Infof("running unit test for CUDA target: passed in %.2fs", elapsed.Seconds())
 }
 
 func cleanCommon(cmdOpt CmdOptions, logger *log.Logger) {
@@ -562,6 +638,7 @@ func clearAutoGen(cmdOpt CmdOptions, logger *log.Logger) {
 		cd %s/%s
 		rm -rf build
 		rm -rf generated
+		rm -rf pos/include
 		`,
 		cmdOpt.RootDir, kPhOSAutoGenPath,
 	)
@@ -604,6 +681,23 @@ func cleanPhOSCLI(cmdOpt CmdOptions, logger *log.Logger) {
 	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
 	if err != nil {
 		logger.Fatalf("failed to clean PhOS CLI")
+	}
+	logger.Infof("done")
+}
+
+func clearUnitTest(cmdOpt CmdOptions, logger *log.Logger) {
+	logger.Infof("cleaning unit test...")
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+		cd %s/%s
+		rm -rf build
+		rm -rf pos/include
+		`,
+		cmdOpt.RootDir, kPhOSUnitTestPath,
+	)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
+	if err != nil {
+		logger.Warnf("failed to clean unit test")
 	}
 	logger.Infof("done")
 }
@@ -708,7 +802,7 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 	// ==================== Build and Run Unit Test ====================
 	if *cmdOpt.DoUnitTest {
 		BuildGoogleTest(cmdOpt, buildConf, logger)
-		buildUnitTest(cmdOpt, buildConf, logger)
+		buildAndRunUnitTest(cmdOpt, buildConf, logger)
 	}
 }
 
@@ -732,4 +826,5 @@ func CleanTarget_CUDA(cmdOpt CmdOptions, logger *log.Logger) {
 
 	// ==================== Clean Unit Test ====================
 	CleanGoogleTest(cmdOpt, logger)
+	clearUnitTest(cmdOpt, logger)
 }

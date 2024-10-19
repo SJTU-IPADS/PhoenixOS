@@ -37,15 +37,15 @@ class POSWorkspace_CUDA : public POSWorkspace {
     /*!
      *  \brief  constructor
      */
-    POSWorkspace_CUDA(int argc, char *argv[]);
+    POSWorkspace_CUDA();
 
     /*!
      *  \brief  create and add a new client to the workspace
+     *  \param  param   parameter to create the client
      *  \param  clnt    pointer to the POSClient to be added
-     *  \param  uuid    the result uuid of the added client
      *  \return POS_SUCCESS for successfully added
      */
-    pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid) override;
+    pos_retval_t create_client(pos_create_client_param_t& param, POSClient** clnt) override;
 
     /*!
      *  \brief  preserve resource on posd

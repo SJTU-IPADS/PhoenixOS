@@ -71,7 +71,7 @@ endif
 conf_runtime_enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintWarn').stdout().strip().to_int()
 if conf_runtime_enable_print_warn != 0 and conf_runtime_enable_print_warn != 1
     assert(
-        false, 
+        false,
         'conf_runtime_enable_print_warn get invalid value: ' + conf_runtime_enable_print_warn.to_string()
     )
 endif
@@ -201,7 +201,7 @@ endif
 # >>>>>>>> [3] evaluation configs >>>>>>>>
 
 
-# add pos/include/log.h support
+# add common headers
 subdir('pos/include')
 
 

@@ -180,6 +180,106 @@ func (buildConf *BuildConfigs) export_string() string {
 	)
 }
 
+func (buildConf *BuildConfigs) export_autogen_string() string {
+	// we use different configurations on auxiliaries (autogen)
+	return fmt.Sprintf(
+		`
+		# platform configs
+		export POS_BUILD_CONF_PlatformProjectRoot=%v
+		
+		# runtime build configs
+		export POS_BUILD_CONF_RuntimeTarget=%v
+		export POS_BUILD_CONF_RuntimeTargetVersion=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintError=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintWarn=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintLog=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintDebug=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintWithColor=0
+		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableTrace=%v
+		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
+		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
+
+		# PhOS core build configs
+		export POS_BUILD_CONF_EvalCkptOptLevel=%v
+		export POS_BUILD_CONF_EvalCkptEnableIncremental=%v
+		export POS_BUILD_CONF_EvalCkptEnablePipeline=%v
+		export POS_BUILD_CONF_EvalCkptDefaultIntervalMs=%v
+		export POS_BUILD_CONF_EvalMigrOptLevel=%v
+		export POS_BUILD_CONF_EvalRstEnableContextPool=%v
+		`,
+		buildConf.PlatformProjectRoot,
+
+		buildConf.RuntimeTarget,
+		buildConf.RuntimeTargetVersion,
+		buildConf.RuntimeEnablePrintError,
+		buildConf.RuntimeEnablePrintWarn,
+		buildConf.RuntimeEnablePrintLog,
+		buildConf.RuntimeEnablePrintDebug,
+		buildConf.RuntimeEnableDebugCheck,
+		buildConf.RuntimeEnableHijackApiCheck,
+		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeDefaultDaemonLogPath,
+		buildConf.RuntimeDefaultClientLogPath,
+
+		buildConf.EvalCkptOptLevel,
+		buildConf.EvalCkptEnableIncremental,
+		buildConf.EvalCkptEnablePipeline,
+		buildConf.EvalCkptDefaultIntervalMs,
+		buildConf.EvalMigrOptLevel,
+		buildConf.EvalRstEnableContextPool,
+	)
+}
+
+func (buildConf *BuildConfigs) export_unittest_string() string {
+	// we use different configurations on auxiliaries (unit test)
+	return fmt.Sprintf(
+		`
+		# platform configs
+		export POS_BUILD_CONF_PlatformProjectRoot=%v
+		
+		# runtime build configs
+		export POS_BUILD_CONF_RuntimeTarget=%v
+		export POS_BUILD_CONF_RuntimeTargetVersion=%v
+		export POS_BUILD_CONF_RuntimeEnablePrintError=0
+		export POS_BUILD_CONF_RuntimeEnablePrintWarn=0
+		export POS_BUILD_CONF_RuntimeEnablePrintLog=0
+		export POS_BUILD_CONF_RuntimeEnablePrintDebug=0
+		export POS_BUILD_CONF_RuntimeEnablePrintWithColor=0
+		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
+		export POS_BUILD_CONF_RuntimeEnableTrace=%v
+		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
+		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
+
+		# PhOS core build configs
+		export POS_BUILD_CONF_EvalCkptOptLevel=%v
+		export POS_BUILD_CONF_EvalCkptEnableIncremental=%v
+		export POS_BUILD_CONF_EvalCkptEnablePipeline=%v
+		export POS_BUILD_CONF_EvalCkptDefaultIntervalMs=%v
+		export POS_BUILD_CONF_EvalMigrOptLevel=%v
+		export POS_BUILD_CONF_EvalRstEnableContextPool=%v
+		`,
+		buildConf.PlatformProjectRoot,
+
+		buildConf.RuntimeTarget,
+		buildConf.RuntimeTargetVersion,
+		buildConf.RuntimeEnableDebugCheck,
+		buildConf.RuntimeEnableHijackApiCheck,
+		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeDefaultDaemonLogPath,
+		buildConf.RuntimeDefaultClientLogPath,
+
+		buildConf.EvalCkptOptLevel,
+		buildConf.EvalCkptEnableIncremental,
+		buildConf.EvalCkptEnablePipeline,
+		buildConf.EvalCkptDefaultIntervalMs,
+		buildConf.EvalMigrOptLevel,
+		buildConf.EvalRstEnableContextPool,
+	)
+}
+
 func BuildGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building googletest...")
 

@@ -29,7 +29,7 @@
 template<typename T>
 class POSLockFreeQueue {
  public:
-    POSLockFreeQueue(){
+    POSLockFreeQueue() : _is_enqueue_locked(false), _is_dequeue_locked(false) {
         _q = new moodycamel::ReaderWriterQueue<T, POS_LOCKLESS_QUEUE_LEN>();
         POS_CHECK_POINTER(_q);
     }
@@ -39,7 +39,10 @@ class POSLockFreeQueue {
      *  \brief  generate a new queue node and append to the tail of it
      *  \param  data    the payload that the newly added node points to
      */
-    void push(T element){ _q->enqueue(element); }
+    void push(T element){
+        if(this->_is_enqueue_locked == false)
+            _q->enqueue(element); 
+    }
 
     /*!
      *  \brief  obtain a pointer which points to the payload that the 
@@ -49,8 +52,9 @@ class POSLockFreeQueue {
      *          POS_FAILED_NOT_READY for empty queue
      */
     pos_retval_t dequeue(T& element){
-        if(_q->try_dequeue(element)){
-            return POS_SUCCESS;
+        if(this->_is_dequeue_locked == false){
+            if(_q->try_dequeue(element)){ return POS_SUCCESS; }
+            else { return POS_FAILED_NOT_READY; }
         } else {
             return POS_FAILED_NOT_READY;
         }
@@ -71,8 +75,29 @@ class POSLockFreeQueue {
         return _q->peek();
     }
 
+    /*!
+     *  \brief  obtain the length in this queue
+     *  \return length of the queue
+     */
     inline uint64_t len(){ return _q->size_approx(); }
 
+    /*!
+     *  \brief  lock the queue
+     */
+    inline void lock_enqueue(){ this->_is_enqueue_locked = true; }
+    inline void lock_dequeue(){ this->_is_dequeue_locked = true; }
+
+    /*!
+     *  \brief  unlock the queue
+     */
+    inline void unlock_enqueue(){ this->_is_enqueue_locked = false; }
+    inline void unlock_dequeue(){ this->_is_dequeue_locked = false; }
+
  private:
+    // queue object
     moodycamel::ReaderWriterQueue<T, POS_LOCKLESS_QUEUE_LEN> *_q;
+
+    // identify whether this queue is locked, if locked, nothing would be enqueued/dequeued
+    bool _is_enqueue_locked;
+    bool _is_dequeue_locked;
 };

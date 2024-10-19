@@ -72,8 +72,8 @@ void POSParser::__daemon(){
     }
     
     while(!_stop_flag){
-
-        while(this->_client->status != kPOS_ClientStatus_Active){}
+        // if the client isn't ready, the queue might not exist, we can't do any queue operation
+        if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         if((wqe = _ws->dequeue_parser_job(this->_client->id)) != nullptr){
             api_id = wqe->api_cxt->api_id;
