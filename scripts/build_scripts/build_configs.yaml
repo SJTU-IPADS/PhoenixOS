@@ -8,7 +8,7 @@ runtime_target_version: "11.3"
 runtime_enable_print_error: 1
 runtime_enable_print_warn: 1
 runtime_enable_print_log: 1
-runtime_enable_print_debug: 0
+runtime_enable_print_debug: 1
 runtime_enable_print_with_color: 1
 runtime_enable_debug_check: 0
 runtime_enable_hijack_api_check: 1

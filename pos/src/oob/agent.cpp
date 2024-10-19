@@ -18,6 +18,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
+#include "pos/include/oob/agent.h"
 #include "pos/include/log.h"
 #include "pos/include/api_context.h"
 #include "pos/include/workspace.h"
@@ -32,17 +33,11 @@ namespace oob_functions {
  *  \brief      register a new client to the server
  */
 namespace agent_register_client {
-    // payload format
-    typedef struct oob_payload {
-        /* client */
-        /* server */
-        bool is_registered;
-    } oob_payload_t;
-
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
+        pos_retval_t retval = POS_SUCCESS;
         oob_payload_t *payload;
-
+        pos_create_client_param_t create_param;
         POSClient *clnt;
 
         POS_CHECK_POINTER(remote);
@@ -50,23 +45,24 @@ namespace agent_register_client {
         POS_CHECK_POINTER(ws);
 
         payload = (oob_payload_t*)msg->payload;
-        
+        create_param.job_name = std::string(payload->job_name);
+
         // create client
-        ws->create_client(&clnt, &(msg->client_meta.uuid));
-
-        // create queue pair
-        if(unlikely(POS_SUCCESS != ws->create_qp(msg->client_meta.uuid))){
-            POS_ERROR_DETAIL("failed to create queue pair: uuid(%lu)", msg->client_meta.uuid);
+        if(unlikely(POS_SUCCESS != (
+            retval = ws->create_client(create_param, &clnt)
+        ))){
+            POS_WARN("failed to create client: job_name(%s)", payload->job_name);
+            goto exit;
         }
-        POS_DEBUG("create queue pair: uuid(%lu)", msg->client_meta.uuid);
+        POS_DEBUG("create client: job_name(%s), uuid(%lu)", payload->job_name, clnt->id);
 
-        clnt->status = kPOS_ClientStatus_Active;
-
+        msg->client_meta.uuid = clnt->id;
         payload->is_registered = true;
 
         __POS_OOB_SEND();
 
-        return POS_SUCCESS;
+    exit:
+        return retval;
     }
 
     // client
@@ -75,20 +71,32 @@ namespace agent_register_client {
     ){
         int retval = POS_SUCCESS;
         oob_payload_t *payload;
+        oob_call_data_t *call_data_;
 
         msg->msg_type = kPOS_OOB_Msg_Agent_Register_Client;
+
+        POS_CHECK_POINTER(call_data);
+        call_data_ = (oob_call_data_t*)call_data;
+        POS_ASSERT(call_data_->job_name.size() <= kMaxJobNameLen);
+
+        POS_DEBUG(
+            "[OOB %u] try registering client to the server: job_name(%s)",
+            kPOS_OOB_Msg_Agent_Register_Client, call_data_->job_name.c_str()
+        );
+
         memset(msg->payload, 0, sizeof(msg->payload));
+        payload = (oob_payload_t*)msg->payload;
+        memcpy(payload->job_name, call_data_->job_name.c_str(), call_data_->job_name.size()+1);
         __POS_OOB_SEND();
 
         __POS_OOB_RECV();
-        payload = (oob_payload_t*)msg->payload;
         if(payload->is_registered == true){
             POS_DEBUG(
                 "[OOB %u] successfully register client to the server: uuid(%lu)",
                 kPOS_OOB_Msg_Agent_Register_Client, msg->client_meta.uuid
             );
         } else {
-            POS_DEBUG("[OOB %u] failed to register client to the server", kPOS_OOB_Msg_Agent_Register_Client);
+            POS_WARN("[OOB %u] failed to register client to the server", kPOS_OOB_Msg_Agent_Register_Client);
             retval = POS_FAILED;
         }
 
@@ -106,9 +114,6 @@ namespace agent_unregister_client {
         POS_CHECK_POINTER(remote);
         POS_CHECK_POINTER(msg);
         POS_CHECK_POINTER(ws);
-
-        // remove queue pair
-        // ws->remove_qp(msg->client_meta.uuid);
 
         // remove client
         ws->remove_client(msg->client_meta.uuid);
