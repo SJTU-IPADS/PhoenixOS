@@ -37,9 +37,18 @@ sources = []
 
 
 # >>>>>>>>>>>>>> setup configurations >>>>>>>>>>>>>>
-# NOTE: the configurations here is not comprehensive
-#       please indicate the meson.build udner autogen to check comprehensive version
 
+
+# >>>>>> [1] platform configs >>>>>>>>
+# root directory of the project
+conf_platform_project_root = run_command('sh', '-c', 'echo $POS_BUILD_CONF_PlatformProjectRoot').stdout().strip()
+if conf_platform_project_root == ''
+    assert(false, 'no project root directory was set')
+endif
+# >>>>>>>> [1] platform configs >>>>>>>>
+
+
+# >>>>>>>> [2] runtime configs >>>>>>>>
 # target selection (options: cuda, todos: rocm/ascend)
 conf_runtime_target = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeTarget').stdout().strip()
 if conf_runtime_target != 'cuda'
@@ -51,6 +60,152 @@ conf_runtime_target_version = run_command('sh', '-c', 'echo $POS_BUILD_CONF_Runt
 if conf_runtime_target_version == ''
     assert(false, 'no runtime target version was provided')
 endif
+
+# whether to print all fatal messages
+conf_runtime_enable_print_error = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintError').stdout().strip().to_int()
+if conf_runtime_enable_print_error != 0 and conf_runtime_enable_print_error != 1
+    assert(
+        false, 
+        'conf_runtime_enable_print_error get invalid value: ' + conf_runtime_enable_print_error.to_string()
+    )
+endif
+
+# whether to print all warning messages
+conf_runtime_enable_print_warn = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintWarn').stdout().strip().to_int()
+if conf_runtime_enable_print_warn != 0 and conf_runtime_enable_print_warn != 1
+    assert(
+        false,
+        'conf_runtime_enable_print_warn get invalid value: ' + conf_runtime_enable_print_warn.to_string()
+    )
+endif
+
+# whether to print all log messages
+conf_runtime_enable_print_log = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintLog').stdout().strip().to_int()
+if conf_runtime_enable_print_log != 0 and conf_runtime_enable_print_log != 1
+    assert(
+        false, 
+        'conf_runtime_enable_print_log get invalid value: ' + conf_runtime_enable_print_log.to_string()
+    )
+endif
+
+# whether to print all debug messages
+conf_runtime_enable_print_debug = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintDebug').stdout().strip().to_int()
+if conf_runtime_enable_print_debug != 0 and conf_runtime_enable_print_debug != 1
+    assert(
+        false, 
+        'conf_runtime_enable_print_debug get invalid value: ' + conf_runtime_enable_print_debug.to_string()
+    )
+endif
+
+# whether to print fatal/warn/debug/log with colors
+# should be disabled when try to dump all outputs to a file
+conf_runtime_enable_print_with_color = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnablePrintWithColor').stdout().strip().to_int()
+if conf_runtime_enable_print_with_color != 0 and conf_runtime_enable_print_with_color != 1
+    assert(
+        false, 
+        'conf_runtime_enable_print_with_color get invalid value: ' + conf_runtime_enable_print_with_color.to_string()
+    )
+endif
+
+# whether to check correctness of function parameters, return values, etc.,
+# which might cause extra runtime burden, should only be enabled while debuging
+conf_runtime_enable_debug_check = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnableDebugCheck').stdout().strip().to_int()
+if conf_runtime_enable_debug_check != 0 and conf_runtime_enable_debug_check != 1
+    assert(
+        false,
+        'conf_runtime_enable_debug_check get invalid value: ' + conf_runtime_enable_debug_check.to_string()
+    )
+endif
+
+# whether to check whether POS finish the hijacking logic of called APIs,
+# which might cause extra runtime burden, should only be enabled while debuging
+conf_runtime_enable_hijack_api_check = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnableHijackApiCheck').stdout().strip().to_int()
+if conf_runtime_enable_hijack_api_check != 0 and conf_runtime_enable_hijack_api_check != 1
+    assert(
+        false, 
+        'conf_runtime_enable_hijack_api_check get invalid value: ' + conf_runtime_enable_hijack_api_check.to_string()
+    )
+endif
+
+# whether to trace the statistics
+conf_runtime_enable_trace = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnableTrace').stdout().strip().to_int()
+if conf_runtime_enable_trace != 0 and conf_runtime_enable_trace != 1
+    assert(
+        false, 
+        'conf_runtime_enable_trace get invalid value: ' + conf_runtime_enable_trace.to_string()
+    )
+endif
+
+# log path of PhOS daemon
+conf_runtime_default_daemon_log_path = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeDefaultDaemonLogPath').stdout().strip()
+if conf_runtime_default_daemon_log_path == ''
+    assert(false, 'no default log path of PhOS daemon is provided')
+endif
+
+# log path of PhOS client
+conf_runtime_default_client_log_path = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeDefaultClientLogPath').stdout().strip()
+if conf_runtime_default_client_log_path == ''
+    assert(false, 'no default log path of PhOS client is provided')
+endif
+# >>>>>>>> [2] runtime configs >>>>>>>>
+
+
+# >>>>>>>> [3] evaluation configs >>>>>>>>
+# checkpoint optimization level
+#   - 0: no ckpt support
+#   - 1: naive ckpt support
+#   - 2: pos ckpt support
+conf_eval_ckpt_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalCkptOptLevel').stdout().strip().to_int()
+if conf_eval_ckpt_opt_level != 0 and conf_eval_ckpt_opt_level != 1 and conf_eval_ckpt_opt_level != 2
+    assert(false, 'conf_eval_ckpt_opt_level with level ' + conf_eval_ckpt_opt_level.to_string() + ' is currently not supported')
+endif
+
+# sync/async checkpoint (level 1,2) optimization -> flag to control increamental checkpoint
+conf_eval_ckpt_enable_increamental = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalCkptEnableIncremental').stdout().strip().to_int()
+if conf_eval_ckpt_enable_increamental != 0 and conf_eval_ckpt_enable_increamental != 1
+    assert(
+        false,
+        'conf_eval_ckpt_enable_increamental get invalid value: ' + conf_eval_ckpt_enable_increamental.to_string()
+    )
+endif
+
+# async checkpoint (level 2) optimization -> flag to control checkpoint pipeline
+conf_eval_ckpt_enable_pipeline = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalCkptEnablePipeline').stdout().strip().to_int()
+if conf_eval_ckpt_enable_pipeline != 0 and conf_eval_ckpt_enable_pipeline != 1
+    assert(
+        false,
+        'conf_eval_ckpt_enable_pipeline get invalid value: ' + conf_eval_ckpt_enable_pipeline.to_string()
+    )
+endif
+
+# default continuous checkpoint interval (unit in ms)
+conf_eval_default_ckpt_interval_ms = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalCkptDefaultIntervalMs').stdout().strip().to_int()
+if conf_eval_default_ckpt_interval_ms < 0
+    assert(
+        false,
+        'conf_eval_default_ckpt_interval_ms get invalid value: ' + conf_eval_default_ckpt_interval_ms.to_string()
+    )
+endif
+
+# migration optimization level
+#   - 0: no migration support
+#   - 1: naive migration support
+#   - 2: pos migration support
+conf_eval_migr_opt_level = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalMigrOptLevel').stdout().strip().to_int()
+if conf_eval_migr_opt_level != 0 and conf_eval_migr_opt_level != 1 and conf_eval_migr_opt_level != 2
+    assert(false, 'conf_eval_migr_opt_level with level ' + conf_eval_migr_opt_level.to_string() + ' is currently not supported')
+endif
+
+# whether to enable context pool to restore
+conf_eval_rst_enable_context_pool = run_command('sh', '-c', 'echo $POS_BUILD_CONF_EvalRstEnableContextPool').stdout().strip().to_int()
+if conf_eval_rst_enable_context_pool != 0 and conf_eval_rst_enable_context_pool != 1 and conf_eval_rst_enable_context_pool != 2
+    assert(false, 'conf_eval_rst_enable_context_pool with level ' + conf_eval_rst_enable_context_pool.to_string() + ' is currently not supported')
+endif
+# >>>>>>>> [3] evaluation configs >>>>>>>>
+
+
+# add common headers
+subdir('pos/include')
 
 
 # >>>>>>>>>>>>>> find target libraries >>>>>>>>>>>>>>

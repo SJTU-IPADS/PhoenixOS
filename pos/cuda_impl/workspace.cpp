@@ -74,10 +74,17 @@ pos_retval_t POSWorkspace_CUDA::__init(){
 exit:
     if(unlikely(retval != POS_SUCCESS)){
         for(i=0; i<this->_cu_contexts.size(); i++){
-            cuCtxDestroy(this->_cu_contexts[i]);
-            this->_cu_contexts.erase(this->_cu_contexts.begin()+i);
-            POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
+            dr_retval = cuCtxDestroy(this->_cu_contexts[i]);
+            if(unlikely(dr_retval != CUDA_SUCCESS)){
+                POS_WARN_C(
+                    "failed to destory context on device: device_id(%d), dr_retval(%d)",
+                    i, dr_retval
+                );
+            } else {
+                POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
+            }
         }
+        this->_cu_contexts.clear();
     }
 
     return retval;
@@ -86,13 +93,21 @@ exit:
 
 pos_retval_t POSWorkspace_CUDA::__deinit(){
     pos_retval_t retval = POS_SUCCESS;
+    CUresult dr_retval;
     int i;
 
     for(i=0; i<this->_cu_contexts.size(); i++){
-        cuCtxDestroy(this->_cu_contexts[i]);
-        this->_cu_contexts.erase(this->_cu_contexts.begin()+i);
-        POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
+        dr_retval = cuCtxDestroy(this->_cu_contexts[i]);
+        if(unlikely(dr_retval != CUDA_SUCCESS)){
+            POS_WARN_C(
+                "failed to destory context on device: device_id(%d), dr_retval(%d)",
+                i, dr_retval
+            );
+        } else {
+            POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
+        }
     }
+    this->_cu_contexts.clear();
 
     return retval;
 }

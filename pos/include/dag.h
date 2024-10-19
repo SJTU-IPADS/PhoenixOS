@@ -57,7 +57,7 @@ class POSDag {
     POSDag(pos_dag_cxt cxt) : _cxt(cxt), _pc(0), _end_pc(0) {
         _api_cxts.reserve(65536);
     }
-    
+
     ~POSDag(){
         // if(_pc > 0){
         //     _graph.dump_graph_to_file(
@@ -235,9 +235,7 @@ class POSDag {
             POS_ERROR_C_DETAIL("failed to pop op: vertex_id(%lu)", _pc);
         }
 
-        if(likely(_pc < _end_pc)){ 
-            _pc++; 
-        }
+        if(likely(_pc < _end_pc)){ _pc++; }
     }
 
     /*!

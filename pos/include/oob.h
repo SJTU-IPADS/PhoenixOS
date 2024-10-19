@@ -467,7 +467,7 @@ class POSOobServer {
         POSOobSession_t *session;
 
         if(unlikely(this->_session_map.count(port) == 0)){
-            POS_WARN_C("failed to remove session, no session with specified UDP port exit: udp_pory(%u)", port);
+            POS_WARN_C("failed to remove session, no session with specified UDP port exit: udp_port(%u)", port);
             retval = POS_FAILED_NOT_EXIST;
             goto exit;
         }
