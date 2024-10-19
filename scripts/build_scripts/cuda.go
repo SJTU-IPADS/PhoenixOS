@@ -107,7 +107,7 @@ func buildLibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		if [ ! -d "./build" ]; then
 			mkdir build && cd build
 			cmake .. -DCMAKE_INSTALL_PREFIX=.. >%s 2>&1
-			make install -j >%s 2>&1
+			make install -j4 >%s 2>&1
 		fi
 		cp ../lib/libclang.so %s
 		cp ../lib/libclang.so.13 %s
@@ -349,15 +349,27 @@ func buildPhOSCLI(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger)
 		set -e
 		%s
 		cd %s/%s
+
+		# copy common headers
+		rm -rf ./pos/include
+		mkdir -p ./pos/include
+		cp -r %s/%s/include/eval_configs.h.in ./pos/include/
+		cp -r %s/%s/include/log.h.in ./pos/include/
+		cp -r %s/%s/include/meson.build ./pos/include/
+		cp -r %s/%s/include/runtime_configs.h.in ./pos/include/
+
 		rm -rf build
-		mkdir build
+		meson build &>%s 2>&1
 		cd build
-		cmake .. &>%s 2>&1
-		make -j  &>%s 2>&1
-		cp ./pos-cli %s/%s
+		ninja  &>%s 2>&1
+		cp ./pos_cli %s/%s
 		`,
 		buildConf.export_string(),
 		cmdOpt.RootDir, KPhOSCLIPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
+		cmdOpt.RootDir, KPhOSPath,
 		buildLogPath,
 		buildLogPath,
 		cmdOpt.RootDir, KBuildBinPath,
@@ -367,7 +379,7 @@ func buildPhOSCLI(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger)
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./build/pos-cli %s
+		cp ./build/pos_cli %s
 		`,
 		cmdOpt.RootDir, KPhOSCLIPath,
 		KInstallBinPath,
@@ -673,7 +685,7 @@ func cleanPhOSCLI(cmdOpt CmdOptions, logger *log.Logger) {
 		#!/bin/bash
 		cd %s/%s
 		rm -rf build
-		rm -f %s/pos-cli
+		rm -f %s/pos_cli
 		`,
 		cmdOpt.RootDir, KPhOSCLIPath,
 		KInstallBinPath,
@@ -796,7 +808,11 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 
 	utils.SwitchGppVersion(9, logger)
 	buildPhOSCore(cmdOpt, buildConf, logger)
+
+	utils.SwitchGppVersion(13, logger)
 	buildPhOSCLI(cmdOpt, buildConf, logger)
+
+	utils.SwitchGppVersion(9, logger)
 	buildRemoting(cmdOpt, buildConf, logger)
 
 	// ==================== Build and Run Unit Test ====================
