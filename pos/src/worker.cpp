@@ -147,8 +147,7 @@ void POSWorker::__daemon_ckpt_sync(){
     POSAPIContext_QE *wqe;
 
     while(!_stop_flag){
-
-        while(this->_client->status != kPOS_ClientStatus_Active){}
+        if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         if(POS_SUCCESS == this->_client->dag.get_next_pending_op(&wqe)){
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
@@ -292,8 +291,7 @@ void POSWorker::__daemon_ckpt_async(){
     POSHandle *handle;
 
     while(!_stop_flag){
-
-        while(this->_client->status != kPOS_ClientStatus_Active){}
+        if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         if(POS_SUCCESS == this->_client->dag.get_next_pending_op(&wqe)){
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();

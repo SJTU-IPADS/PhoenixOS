@@ -18,6 +18,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <string>
 #include <stdint.h>
 #include <assert.h>
 #include "pos/include/common.h"
@@ -58,12 +59,21 @@ typedef struct pos_client_cxt {
 
 
 /*!
+ *  \brief  parameters to create a client in the workspace
+ */
+typedef struct pos_create_client_param {
+    // name of the job
+    std::string job_name;
+} pos_create_client_param_t;
+
+
+/*!
  * \brief   status of POS client
  */
 enum pos_client_status_t : uint8_t {
     kPOS_ClientStatus_CreatePending = 0,
     kPOS_ClientStatus_Active,
-    kPOS_ClientStatus_Hang
+    kPOS_ClientStatus_Hang,
 };
 
 
@@ -199,7 +209,7 @@ class POSClient {
      *          that implemented by derived class
      */
     void deinit();
-    
+
 
     /*!
      *  \brief  instantiate handle manager for all used resources
@@ -208,17 +218,20 @@ class POSClient {
      */
     virtual void init_handle_managers(){}
 
+
     /*!
      *  \brief  initialization of the DAG
      *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
      */
     virtual void init_dag(){}
     
+
     /*!
      *  \brief  initialization of transport utilities for migration  
      *  \return POS_SUCCESS for successfully initialization
      */
     virtual pos_retval_t init_transport(){}
+
 
     /*!
      *  \brief  restore resources from checkpointed file

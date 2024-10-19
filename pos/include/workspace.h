@@ -129,8 +129,8 @@ class POSWorkspace {
     /*!
      *  \brief  constructor
      */
-    POSWorkspace(int argc, char *argv[]);
-    
+    POSWorkspace();
+
     /*!
      *  \brief  deconstructor
      */
@@ -149,13 +149,14 @@ class POSWorkspace {
 
 
     /* =============== client management functions =============== */
+ public:
     /*!
      *  \brief  create and add a new client to the workspace
+     *  \param  param   parameter to create the client
      *  \param  clnt    pointer to the POSClient to be added
-     *  \param  uuid    the result uuid of the added client
      *  \return POS_SUCCESS for successfully added
      */
-    virtual pos_retval_t create_client(POSClient** clnt, pos_client_uuid_t* uuid){
+    virtual pos_retval_t create_client(pos_create_client_param_t& param, POSClient** clnt){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
@@ -185,16 +186,43 @@ class POSWorkspace {
 
 
     /* =============== queue management functions =============== */
+ protected:
+    friend class POSParser;
+    friend class POSWorker;
+
+    /*!
+     *  \brief  dequeue a wqe from parser work queue
+     *  \note   this function is called within parser thread
+     *  \param  uuid    the uuid to identify client
+     *  \return POS_SUCCESS for successfully dequeued
+     */
+    POSAPIContext_QE* dequeue_parser_job(pos_client_uuid_t uuid);
+
+    /*!
+     *  \brief  push completion queue element to completion queue
+     *  \tparam qt  completion queue position, either from parser or worker
+     *  \note   this function is called within parser / worker thread
+     *  \param  cqe poiner of the cqe to be inserted
+     *  \return POS_SUCCESS for successfully insertion
+     */
+    template<pos_queue_position_t qposition>
+    pos_retval_t push_cq(POSAPIContext_QE *cqe);
+
     /*!
      *  \brief  create a new queue pair between frontend and runtime for the client specified with uuid
-     *  \param  uuid    the uuid to identify a created client
+     *  \param  uuid    the uuid to identify client where to create queue pair
      *  \return POS_FAILED_ALREADY_EXIST for duplicated queue pair;
      *          POS_SUCCESS for successfully created
      */
-    pos_retval_t create_qp(pos_client_uuid_t uuid);
+    pos_retval_t __create_qp(pos_client_uuid_t uuid);
 
-    
-    POSAPIContext_QE* dequeue_parser_job(pos_client_uuid_t uuid);
+    /*!
+     *  \brief  remove a queue pair of the client specified with uuid
+     *  \param  uuid    the uuid to identify client where to remove queue pair
+     *  \return POS_FAILED_NOT_EXIST for no queue pair exist
+     *          POS_SUCCESS for successfully removing
+     */
+    pos_retval_t __remove_qp(pos_client_uuid_t uuid);
 
     /*!
      *  \brief  polling the completion queue from parser / worker of a specific client
@@ -204,16 +232,7 @@ class POSWorkspace {
      *  \return POS_SUCCESS for successfully polling
      */
     template<pos_queue_position_t qt>
-    pos_retval_t poll_cq(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
-
-    /*!
-     *  \brief  push completion queue element to completion queue
-     *  \tparam qt  completion queue position, either from parser or worker
-     *  \param  cqe poiner of the cqe to be inserted
-     *  \return POS_SUCCESS for successfully insertion
-     */
-    template<pos_queue_position_t qposition>
-    pos_retval_t push_cq(POSAPIContext_QE *cqe);
+    pos_retval_t __poll_cq(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
 
     /*!
      *  \brief  remove queue by given uuid
@@ -225,9 +244,10 @@ class POSWorkspace {
      *          POS_SUCCESS for successfully removing
      */
     template<pos_queue_type_t qtype, pos_queue_position_t qposition>
-    pos_retval_t _remove_q(pos_client_uuid_t uuid);
+    pos_retval_t __remove_q(pos_client_uuid_t uuid);
     /* ============ end of queue management functions =========== */
-
+ 
+ public:
     /*!
      *  \brief  entrance of POS :)
      *  \param  api_id          index of the called API

@@ -1,7 +1,7 @@
 #include "pos/cuda_impl/workspace.h"
 
 
-POSWorkspace_CUDA::POSWorkspace_CUDA(int argc, char *argv[]) : POSWorkspace(argc, argv){
+POSWorkspace_CUDA::POSWorkspace_CUDA() : POSWorkspace(){
     this->checkpoint_api_id = 6666;
 }
 
@@ -62,6 +62,7 @@ pos_retval_t POSWorkspace_CUDA::__init(){
             }
         }
         this->_cu_contexts.push_back(cu_context);
+        POS_DEBUG_C("created CUDA context: device_id(%d)", i);
     }
 
     if(unlikely(this->_cu_contexts.size() == 0)){
@@ -75,6 +76,7 @@ exit:
         for(i=0; i<this->_cu_contexts.size(); i++){
             cuCtxDestroy(this->_cu_contexts[i]);
             this->_cu_contexts.erase(this->_cu_contexts.begin()+i);
+            POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
         }
     }
 
@@ -89,27 +91,38 @@ pos_retval_t POSWorkspace_CUDA::__deinit(){
     for(i=0; i<this->_cu_contexts.size(); i++){
         cuCtxDestroy(this->_cu_contexts[i]);
         this->_cu_contexts.erase(this->_cu_contexts.begin()+i);
+        POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
     }
 
     return retval;
 }
 
 
-pos_retval_t POSWorkspace_CUDA::create_client(POSClient** clnt, pos_client_uuid_t* uuid){
+pos_retval_t POSWorkspace_CUDA::create_client(pos_create_client_param_t& param, POSClient** clnt){
+    pos_retval_t retval = POS_SUCCESS;
     pos_client_cxt_CUDA_t client_cxt;
-    client_cxt.cxt_base = this->_template_client_cxt;
+    client_cxt.cxt_base.job_name = param.job_name;
     client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
     client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
 
+    // create client
     POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* ws */ this, /* id */ _current_max_uuid, /* cxt */ client_cxt));
     (*clnt)->init();
-    
-    *uuid = _current_max_uuid;
-    _current_max_uuid += 1;
-    _client_map[*uuid] = (*clnt);
+    this->_current_max_uuid += 1;
+    this->_client_map[(*clnt)->id] = (*clnt);
+    POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), (*clnt)->id);
 
-    POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), *uuid);
-    return POS_SUCCESS;
+    // create queue pair
+    retval = this->__create_qp((*clnt)->id);
+
+    if(retval == POS_SUCCESS){
+        POS_DEBUG_C("add queue pair: uuid(%lu)", (*clnt)->id);
+        (*clnt)->status = kPOS_ClientStatus_Active;
+    } else {
+        POS_WARN_C("failed to create queue pair: uuid(%lu)", (*clnt)->id);
+    }
+
+    return retval;
 }
 
 
