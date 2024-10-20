@@ -63,9 +63,8 @@ void POSParser::__daemon(){
     uint64_t i, api_id;
     pos_retval_t parser_retval, dag_retval;
     POSAPIMeta_t api_meta;
-    POSAPIContext_QE* wqe;
     uint64_t last_ckpt_tick = 0, current_tick;
-    pos_retval_t retval;
+    POSAPIContext_QE* wqe;
     std::vector<POSAPIContext_QE*> wqes;
 
     if(unlikely(POS_SUCCESS != this->daemon_init())){
@@ -79,10 +78,10 @@ void POSParser::__daemon(){
 
         // poll apicxt from work queue connected to rpc frontend
         wqes.clear();
-        retval = this->_ws->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(
+        this->_ws->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(
             this->_client->id, &wqes
         );
-        
+
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
 
@@ -138,15 +137,17 @@ void POSParser::__daemon(){
              *  \note       for sync api that mark as kPOS_API_Execute_Status_Return_After_Parse,
              *              we directly return the result back to the frontend side
              */
-            if(wqe->status == kPOS_API_Execute_Status_Return_After_Parse){
+            if(     wqe->status == kPOS_API_Execute_Status_Return_After_Parse 
+                ||  wqe->status == kPOS_API_Execute_Status_Return_Without_Worker
+            ){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
 
             // insert wqe to worker queue
-            // if(wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
-            //     this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(wqe);
-            // }
+            if(wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
+                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(wqe);
+            }
         }
 
         /*!

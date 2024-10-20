@@ -502,12 +502,6 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
         /* in_edge_map */ support_api_meta->api_type == kPOS_API_Type_Create_Resource ? &in_edge_map : nullptr
     );
 
-    // step 6: launch the wqe to the queue to worker
-    parser_function->append_content(std::string(
-        "// launch the op to the dag\n"
-        "retval = client->dag.launch_op(wqe);"
-    ));
-
     // step 7: exit processing
     parser_function->append_content(
         "// parser exit\n"

@@ -74,7 +74,9 @@ class POSUnitTest {
 
         for(iter=func_map.begin(); iter!=func_map.end(); iter++){
             test_cxt cxt = { 0, &this->_tsc_timer };
+            POS_LOG("testing API(%lu)...", iter->first);
             retval = run_one(iter->first, &cxt);
+            POS_BACK_LINE;
             POS_LOG(
                 "API(%lu): status = %s(%d), duration = %lf us",
                 iter->first,
