@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <unistd.h>
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
@@ -16,6 +17,7 @@ namespace agent_register_client {
     typedef struct oob_payload {
         /* client */
         char job_name[kMaxJobNameLen+1];
+        __pid_t pid;
         /* server */
         bool is_registered;
     } oob_payload_t;
@@ -23,6 +25,7 @@ namespace agent_register_client {
     // metadata of the client-side call
     typedef struct oob_call_data {
         std::string job_name;
+        __pid_t pid;
     } oob_call_data_t;
 } // namespace agent_register_client
 

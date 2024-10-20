@@ -46,6 +46,7 @@ namespace agent_register_client {
 
         payload = (oob_payload_t*)msg->payload;
         create_param.job_name = std::string(payload->job_name);
+        create_param.pid = payload->pid;
 
         // create client
         if(unlikely(POS_SUCCESS != (
@@ -80,13 +81,14 @@ namespace agent_register_client {
         POS_ASSERT(call_data_->job_name.size() <= kMaxJobNameLen);
 
         POS_DEBUG(
-            "[OOB %u] try registering client to the server: job_name(%s)",
-            kPOS_OOB_Msg_Agent_Register_Client, call_data_->job_name.c_str()
+            "[OOB %u] try registering client to the server: job_name(%s), pid(%d)",
+            kPOS_OOB_Msg_Agent_Register_Client, call_data_->job_name.c_str(), call_data_->pid
         );
 
         memset(msg->payload, 0, sizeof(msg->payload));
         payload = (oob_payload_t*)msg->payload;
         memcpy(payload->job_name, call_data_->job_name.c_str(), call_data_->job_name.size()+1);
+        payload->pid = call_data_->pid;
         __POS_OOB_SEND();
 
         __POS_OOB_RECV();

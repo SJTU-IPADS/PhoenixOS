@@ -258,6 +258,7 @@ sources += [
     'pos/src/oob/agent.cpp',
     'pos/src/oob/cli.cpp',
     'pos/src/oob/utils.cpp',
+    'pos/src/oob/ckpt.cpp',
     'pos/src/oob/migration.cpp',
     'pos/src/oob/mgnt.cpp'
 ]

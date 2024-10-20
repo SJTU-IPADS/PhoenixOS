@@ -64,6 +64,9 @@ typedef struct pos_client_cxt {
 typedef struct pos_create_client_param {
     // name of the job
     std::string job_name;
+
+    // pid of the client-side process
+    __pid_t pid;
 } pos_create_client_param_t;
 
 
