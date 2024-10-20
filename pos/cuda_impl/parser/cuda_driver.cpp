@@ -191,8 +191,8 @@ namespace cu_module_load {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load): failed to launch op");
             goto exit;
@@ -385,8 +385,8 @@ namespace cu_module_load_data {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load_data): failed to launch op");
             goto exit;
@@ -558,8 +558,8 @@ namespace __register_function {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -713,8 +713,8 @@ namespace cu_module_get_function {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -825,8 +825,8 @@ namespace cu_module_get_global {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -892,8 +892,8 @@ namespace cu_device_primary_ctx_get_state {
             /* handle */ device_handle
         });
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:
         return retval;
@@ -930,11 +930,8 @@ namespace cu_ctx_get_current {
         POS_CHECK_POINTER(wqe->api_cxt->ret_data);
         memcpy(wqe->api_cxt->ret_data, &(hm_context->latest_used_handle->client_addr), sizeof(CUcontext));
 
-        // launch the op to the dag
-        // retval = client->dag.launch_op(wqe);
-
         // mark this sync call can be returned after parsing
-        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        wqe->status = kPOS_API_Execute_Status_Return_Without_Worker;
         
     exit:
         return retval;
@@ -967,8 +964,8 @@ namespace cu_get_error_string {
         }
     #endif
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:   
         return retval;

@@ -42,7 +42,7 @@ namespace remoting_deinit {
         POS_CHECK_POINTER(ws);
 
         // mark this sync call can be returned after parsing
-        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        wqe->status = kPOS_API_Execute_Status_Return_Without_Worker;
 
     exit:
         return retval;

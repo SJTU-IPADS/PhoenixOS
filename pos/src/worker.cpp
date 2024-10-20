@@ -100,7 +100,7 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
     POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
 
     // forward the DAG pc
-    client->dag.forward_pc();
+    // client->dag.forward_pc();
 
     // set the latest version of all output handles
     for(i=0; i<wqe->output_handle_views.size(); i++){
@@ -137,19 +137,26 @@ void POSWorker::__daemon(){
 
 #if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1
 
-/*!
- *  \brief  worker daemon with / without SYNC checkpoint support (checkpoint optimization level 0 and 1)
- */
+
 void POSWorker::__daemon_ckpt_sync(){
-    uint64_t i, j, k, w, api_id;
+    uint64_t i, api_id;
     pos_retval_t launch_retval;
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
+    std::vector<POSAPIContext_QE*> wqes;
 
     while(!_stop_flag){
+        // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
-        if(POS_SUCCESS == this->_client->dag.get_next_pending_op(&wqe)){
+        wqes.clear();
+        this->_ws->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
+            this->_client->id, &wqes
+        );
+
+        for(i=0; i<wqes.size(); i++){
+            POS_CHECK_POINTER(wqe = wqes[i]);
+            
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
             api_id = wqe->api_cxt->api_id;
 
@@ -205,18 +212,13 @@ void POSWorker::__daemon_ckpt_sync(){
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
-            }   
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+            }
         }
     }
 }
 
-/*!
- *  \brief  checkpoint procedure, should be implemented by each platform
- *  \note   this function will be invoked by level-1 ckpt
- *  \param  wqe     the checkpoint op
- *  \return POS_SUCCESS for successfully checkpointing
- */
+
 pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
     uint64_t i;
     std::vector<POSHandleView_t>* handle_views;
@@ -278,22 +280,29 @@ exit:
 
 #elif POS_CONF_EVAL_CkptOptLevel == 2
 
-/*!
- *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)
- */
+
 void POSWorker::__daemon_ckpt_async(){
-    uint64_t i, j, k, w, api_id;
+    uint64_t i, api_id;
     pos_retval_t launch_retval, tmp_retval;
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
+    std::vector<POSAPIContext_QE*> wqes;
 
     typename std::set<POSHandle*>::iterator handle_set_iter;
     POSHandle *handle;
 
     while(!_stop_flag){
+        // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
-        if(POS_SUCCESS == this->_client->dag.get_next_pending_op(&wqe)){
+        wqes.clear();
+        this->_ws->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
+            this->_client->id, &wqes
+        );
+
+        for(i=0; i<wqes.size(); i++){
+            POS_CHECK_POINTER(wqe = wqes[i]);
+
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
             api_id = wqe->api_cxt->api_id;
 
@@ -402,6 +411,7 @@ void POSWorker::__daemon_ckpt_async(){
             // check and restore broken handles
             if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
                 POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
+                // TODO: we need to deal with this continue, as we will loss the wqe after continue
                 continue;
             }
 
@@ -500,13 +510,7 @@ void POSWorker::__daemon_ckpt_async(){
     }
 }
 
-/*!
- *  \brief  overlapped checkpoint procedure, should be implemented by each platform
- *  \note   this thread will be raised by level-2 ckpt
- *  \note   aware of the macro POS_CONF_EVAL_CkptEnablePipeline
- *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
- *  \param  cxt     the context of this checkpointing
- */
+
 void POSWorker::__checkpoint_async_thread() {
     uint64_t i;
     pos_vertex_id_t checkpoint_version;
@@ -667,9 +671,7 @@ exit:
 
 
 #if POS_CONF_EVAL_MigrOptLevel > 0
-    /*!
-     *  \brief  worker daemon with optimized migration support (POS)
-     */
+
     void POSWorker::__daemon_migration_opt(){
         uint64_t i, j, k, w, api_id;
         pos_vertex_id_t latest_pc = 0;
@@ -774,12 +776,6 @@ exit:
 #endif // POS_CONF_EVAL_MigrOptLevel
 
 
-/*!
- *  \brief  check and restore all broken handles, if there's any exists
- *  \param  wqe         the op to be checked and restored
- *  \param  api_meta    metadata of the called API
- *  \return POS_SUCCESS for successfully checking and restoring
- */
 pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t& api_meta){
     pos_retval_t retval = POS_SUCCESS;
     
