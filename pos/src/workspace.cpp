@@ -113,8 +113,7 @@ POSWorkspace::~POSWorkspace() = default;
 
 
 pos_retval_t POSWorkspace::init(){
-    POS_DEBUG("initializing POS workspace...")
-    POS_DEBUG("init platform-specific context...");
+    POS_DEBUG_C("initializing POS workspace...")
     return this->__init();
 }
 
@@ -122,22 +121,22 @@ pos_retval_t POSWorkspace::init(){
 pos_retval_t POSWorkspace::deinit(){
     typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
 
-    POS_DEBUG("deinitializing POS workspace...")
+    POS_DEBUG_C("deinitializing POS workspace...")
 
     if(likely(_oob_server != nullptr)){
-        POS_DEBUG("shutdowning out-of-band server...");
+        POS_DEBUG_C("shutdowning out-of-band server...");
         delete _oob_server;
     }
 
-    POS_DEBUG("cleaning all clients...: #clients(%lu)", _client_map.size());
-    for(clnt_iter = _client_map.begin(); clnt_iter != _client_map.end(); clnt_iter++){
+    POS_DEBUG_C("cleaning all clients...: #clients(%lu)", this->_client_map.size());
+    for(clnt_iter = this->_client_map.begin(); clnt_iter != this->_client_map.end(); clnt_iter++){
         if(clnt_iter->second != nullptr){
             clnt_iter->second->deinit();
             delete clnt_iter->second;
         }
     }
 
-    POS_DEBUG("deinit platform-specific context...");
+    POS_DEBUG_C("deinit platform-specific context...");
     return this->__deinit();
 }
 

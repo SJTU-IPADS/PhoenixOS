@@ -9,9 +9,9 @@ TEST_F(PhOSCudaTest, cudaMalloc) {
     cudaError cuda_retval;
     void *mem_ptr;
     std::vector<void*> mem_ptrs;
-    std::vector<int> mem_sizes({ 16, 512, KB(1), KB(2), KB(4), KB(8) });
+    std::vector<size_t> mem_sizes({ 16, 512, KB(1), KB(2), KB(4), KB(8) });
 
-    for(int mem_size : mem_sizes){
+    for(size_t mem_size : mem_sizes){
         cuda_retval = (cudaError)this->_ws->pos_process( 
             /* api_id */ CUDA_MALLOC, 
             /* uuid */ this->_clnt->id,
