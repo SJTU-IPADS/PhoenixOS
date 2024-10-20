@@ -16,7 +16,7 @@ enum pos_command_typeid_t : uint16_t {
     kPOS_Command_OobToParser_PreDumpStart,
 
     /* ========== Cmd From Worker to Parser ========== */
-    kPOS_Command_OobToParser_PreDumpEnd
+    kPOS_Command_WorkerToParser_PreDumpEnd
 };
 
 

@@ -127,6 +127,7 @@ enum pos_queue_type_t : uint8_t {
     kPOS_Queue_Type_CQ,
     kPOS_QueueType_ApiCxt_WQ,
     kPOS_QueueType_ApiCxt_CQ,
+    kPOS_QueueType_ApiCxt_CkptDag_WQ,
     kPOS_QueueType_Cmd_WQ,
     kPOS_QueueType_Cmd_CQ
 };
@@ -311,6 +312,9 @@ class POSWorkspace {
 
     // api context work queue from parser to worker (per client)
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_parser2worker_wqs;
+
+    // api context work queue from parser to worker, record during ckpt (per client)
+    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_parser2worker_ckptdag_wqs;
 
     // api context completion queue from worker to RPC frontend (per client)
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2worker_cqs;
