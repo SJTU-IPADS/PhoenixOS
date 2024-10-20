@@ -106,7 +106,7 @@ namespace cuda_malloc {
             goto exit;
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -171,7 +171,7 @@ namespace cuda_free {
             /* handle */ memory_handle
         });
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
         
     exit:
@@ -645,7 +645,7 @@ namespace cuda_memcpy_h2d {
             hm_memory->record_modified_handle(memory_handle);
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_memcpy_h2d): failed to launch op");
@@ -730,7 +730,7 @@ namespace cuda_memcpy_d2h {
             });
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -816,7 +816,7 @@ namespace cuda_memcpy_d2d {
             });
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -909,7 +909,7 @@ namespace cuda_memcpy_h2d_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
         
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_memcpy_h2d_async): failed to launch op");
@@ -1018,7 +1018,7 @@ namespace cuda_memcpy_d2h_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1130,7 +1130,7 @@ namespace cuda_memcpy_d2d_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1222,7 +1222,7 @@ namespace cuda_memset_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1288,7 +1288,7 @@ namespace cuda_set_device {
 
         hm_device->latest_used_handle = device_handle;
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1336,7 +1336,7 @@ namespace cuda_get_error_string {
         }
     #endif
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:   
@@ -1392,9 +1392,6 @@ namespace cuda_get_device_count {
         memcpy(wqe->api_cxt->ret_data, &nb_handles_int, sizeof(int));
 
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
-        
-        // launch the op to the dag (just for profiling)
-        retval = client->dag.launch_op(wqe);
 
         return retval;
     }
@@ -1455,7 +1452,7 @@ namespace cuda_get_device_properties {
             /* handle */ device_handle
         });
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1518,7 +1515,7 @@ namespace cuda_device_get_attribute {
             /* handle */ device_handle
         });
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -1557,7 +1554,7 @@ namespace cuda_get_device {
         memcpy(wqe->api_cxt->ret_data, &(hm_device->latest_used_handle->device_id), sizeof(int));
 
         // the api is finish, one can directly return
-        wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+        wqe->status = kPOS_API_Execute_Status_Return_Without_Worker;
 
     exit:
         return retval;
@@ -1739,7 +1736,7 @@ namespace cuda_stream_synchronize {
             });
         }
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
     
     exit:
@@ -1814,9 +1811,6 @@ namespace cuda_stream_is_capturing {
         // mark this sync call can be returned after parsing
         // wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
-        // launch the op to the dag (TODO: for debug)
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1886,7 +1880,7 @@ namespace cuda_event_create_with_flags {
             goto exit;
         }
         
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
         // mark this sync call can be returned after parsing
@@ -1955,7 +1949,7 @@ namespace cuda_event_destory {
             /* handle */ event_handle
         });
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -2043,7 +2037,7 @@ namespace cuda_event_record {
         });
         wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:
@@ -2105,7 +2099,7 @@ namespace cuda_event_query {
             /* handle */ event_handle
         });
 
-        // launch the op to the dag
+        
         retval = client->dag.launch_op(wqe);
 
     exit:

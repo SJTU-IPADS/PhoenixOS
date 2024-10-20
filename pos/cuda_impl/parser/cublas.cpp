@@ -100,8 +100,8 @@ namespace cublas_create {
             goto exit;
         }
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
@@ -191,8 +191,8 @@ namespace cublas_set_stream {
         // record the used stream
         cublas_context_handle->lastest_used_stream = stream_handle;
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:
         return retval;
@@ -254,8 +254,8 @@ namespace cublas_set_math_mode {
             /* handle */ cublas_context_handle
         });
         
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:
         return retval;
@@ -381,8 +381,8 @@ namespace cublas_sgemm {
         POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
         wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:
         return retval;
@@ -508,8 +508,8 @@ namespace cublas_sgemm_strided_batched {
         POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
         wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
 
-        // launch the op to the dag
-        retval = client->dag.launch_op(wqe);
+        
+        
 
     exit:
         return retval;
