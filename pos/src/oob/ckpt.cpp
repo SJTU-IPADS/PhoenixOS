@@ -22,6 +22,7 @@ namespace oob_functions {
 namespace cli_ckpt_predump {
     // server
     pos_retval_t sv(int fd, struct sockaddr_in* remote, POSOobMsg_t* msg, POSWorkspace* ws, POSOobServer* oob_server){
+        pos_retval_t retval = POS_SUCCESS;
         oob_payload_t *payload;
         POSClient *client;
         std::string retmsg;
@@ -45,7 +46,13 @@ namespace cli_ckpt_predump {
         cmd->type = kPOS_Command_OobToParser_PreDumpStart;
 
         // send to parser
-        ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(&cmd);
+        retval = ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
+        if(unlikely(retval != POS_SUCCESS)){
+            retmsg = "see posd log for more details";
+            payload->retval = POS_FAILED;
+            memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
+            goto response;
+        }
 
         // wait parser reply
         cmds.clear();
@@ -63,6 +70,8 @@ namespace cli_ckpt_predump {
 
     response:
         __POS_OOB_SEND();
+
+        return retval;
     }
 
     // client
