@@ -23,7 +23,7 @@
 
 
 POSParser::POSParser(POSWorkspace* ws, POSClient* client) 
-    : _ws(ws), _client(client), _stop_flag(false)
+    : is_checkpointing(false), _ws(ws), _client(client), _stop_flag(false)
 {   
     POS_CHECK_POINTER(ws);
     POS_CHECK_POINTER(client);
@@ -114,11 +114,8 @@ void POSParser::__daemon(){
             }
         #endif
 
-            /*!
-            *  \brief  ================== phrase 1 - parse API semantics ==================
-            */
             apicxt_wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
-            parser_retval = (*(this->_parser_functions[api_id]))(this->_ws, apicxt_wqe);
+            parser_retval = (*(this->_parser_functions[api_id]))(this->_ws, this, apicxt_wqe);
             apicxt_wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
 
             // set the return code
@@ -162,127 +159,63 @@ void POSParser::__daemon(){
                 this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
             }
 
+            // skip those APIs that doesn't need worker support
+            if(apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker){ continue; }
+
             // insert apicxt_wqe to worker queue
-            if(apicxt_wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
-                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
+            this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
+
+            // during checkpoint, we send this wqe to the dag queue, for potential recomputation
+            if(this->is_checkpointing){
+                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_CkptDag_WQ>(apicxt_wqe);
             }
         }
-
-        /*!
-        *  \brief  ================== phrase 2 - checkpoint insertion ==================
-        */
-        #if POS_CONF_EVAL_CkptOptLevel > 0
-            if(this->_client->is_time_for_ckpt()){
-                if(unlikely(POS_SUCCESS != this->__checkpoint_insertion())){
-                    POS_WARN_C("failed to insert checkpointing op");
-                }
-            }
-        #else
-            /* do nothing */ ;
-        #endif
     }
-}
-
-
-/*!
- *  \brief  insert checkpoint op to the DAG based on certain conditions
- *  \note   aware of the macro POS_CONF_EVAL_CkptEnableIncremental
- *  \return POS_SUCCESS for successfully checkpoint insertion
- */
-pos_retval_t POSParser::__checkpoint_insertion() {
-    #if POS_CONF_EVAL_CkptEnableIncremental == 1
-        return this->__checkpoint_insertion_incremental();
-    #else
-        return this->__checkpoint_insertion_naive();
-    #endif
-}
-
-
-/*!
- *  \brief  naive implementation of checkpoint insertion procedure
- *  \note   this implementation naively insert a checkpoint op to the dag, 
- *          without any optimization hint
- *  \return POS_SUCCESS for successfully checkpoint insertion
- */
-pos_retval_t POSParser::__checkpoint_insertion_naive() { 
-    pos_retval_t retval = POS_SUCCESS;
-    POSHandle *handle;
-    POSHandleManager<POSHandle>* hm;
-    POSAPIContext_QE *ckpt_wqe;
-    uint64_t i, nb_handles;
-
-    ckpt_wqe = new POSAPIContext_QE_t(
-        /* api_id*/ this->_ws->checkpoint_api_id,
-        /* client */ this->_client
-    );
-    POS_CHECK_POINTER(ckpt_wqe);
-
-    for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-        hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>);
-        POS_CHECK_POINTER(hm);
-        nb_handles = hm->get_nb_handles();
-        for(i=0; i<nb_handles; i++){
-            handle = hm->get_handle_by_id(i);
-            POS_CHECK_POINTER(handle);
-            ckpt_wqe->record_checkpoint_handles(handle);
-        }
-    }
-
-    retval = this->_client->dag.launch_op(ckpt_wqe);
-
-exit:
-    return retval;
-}
-
-
-/*!
- *  \brief  level-1/2 optimization of checkpoint insertion procedure
- *  \note   this implementation give hints of those memory handles that
- *          been modified (INOUT/OUT) since last checkpoint
- *  \return POS_SUCCESS for successfully checkpoint insertion
- */
-pos_retval_t POSParser::__checkpoint_insertion_incremental() {
-    pos_retval_t retval = POS_SUCCESS;
-    POSHandleManager<POSHandle>* hm;
-    POSAPIContext_QE *ckpt_wqe;
-    uint64_t i;
-
-    ckpt_wqe = new POSAPIContext_QE_t(
-        /* api_id*/ this->_ws->checkpoint_api_id,
-        /* client */ this->_client
-    );
-    POS_CHECK_POINTER(ckpt_wqe);
-
-    /*!
-        *  \note   we only checkpoint those resources that has been modified since last checkpoint
-        */
-    for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
-        hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>);
-        POS_CHECK_POINTER(hm);
-        std::set<POSHandle*>& modified_handles = hm->get_modified_handles();
-        if(likely(modified_handles.size() > 0)){
-            ckpt_wqe->record_checkpoint_handles(modified_handles);
-        }
-        hm->clear_modified_handle();
-    }
-
-    retval = this->_client->dag.launch_op(ckpt_wqe);
-    
-exit:
-    return retval;
 }
 
 
 pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
+    POSHandleManager<POSHandle>* hm;
+    POSAPIContext_QE *ckpt_wqe;
+    POSHandle *handle;
+    uint64_t i;
 
     POS_CHECK_POINTER(cmd);
 
     switch (cmd->type)
     {
+    /* ========== Command from OOB thread ========== */
     case kPOS_Command_OobToParser_PreDumpStart:
-        // TODO: todo
-        cmd->retval = POS_SUCCESS;
+    #if POS_CONF_EVAL_CkptOptLevel > 0
+        /*!
+         *  \note   mark the parser as checkpointing, in order to:
+         *          1. the parser function would start recording edges
+         *          2. subsquent wqe would be send to the the ckpt_dag_wq
+         */
+        this->is_checkpointing = true;
+
+        // generate checkpoint op to notify worker to start checkpointing
+        POS_CHECK_POINTER(ckpt_wqe = new POSAPIContext_QE_t(/* ckpt_mark_*/ true, /* client */ this->_client));
+        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
+            POS_CHECK_POINTER(
+                hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>)
+            );
+            for(i=0; i<hm->get_nb_handles(); i++){
+                POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
+                ckpt_wqe->record_checkpoint_handles(handle);
+            }
+        }
+        this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(ckpt_wqe);
+    #else
+        cmd->retval = POS_FAILED_NOT_ENABLED;
+        this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    #endif // POS_CONF_EVAL_CkptOptLevel
+        
+        break;
+
+    /* ========== Command from worker thread ========== */
+    case kPOS_Command_WorkerToParser_PreDumpEnd:
         this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
         break;
 
