@@ -3,7 +3,7 @@
 #include "yaml-cpp/yaml.h"
 
 
-POSAgentConf::POSAgentConf(POSAgent *root_agent) : _root_agent(root_agent) {}
+POSAgentConf::POSAgentConf(POSAgent *root_agent) : _root_agent(root_agent), _pid(0) {}
 
 
 pos_retval_t POSAgentConf::load_config(std::string &&file_path){
@@ -75,7 +75,9 @@ POSAgent::POSAgent() : _agent_conf(this) {
     if(unlikely(POS_SUCCESS != this->_agent_conf.load_config())){
         POS_ERROR_C("failed to load agent configuration");
     }
-    
+    this->_agent_conf._pid = getpid();
+    POS_ASSERT(this->_agent_conf._pid > 0);
+
     this->_pos_oob_client = new POSOobClient(
         /* agent */ this,
         /* req_functions */ {
@@ -91,10 +93,14 @@ POSAgent::POSAgent() : _agent_conf(this) {
 
     // register client
     call_data.job_name = this->_agent_conf._job_name;
+    call_data.pid = this->_agent_conf._pid;
     if(POS_SUCCESS != this->_pos_oob_client->call(kPOS_OOB_Msg_Agent_Register_Client, &call_data)){
         POS_ERROR_C_DETAIL("failed to register the client");
     }
-    POS_DEBUG_C("successfully register client: uuid(%lu)", this->_uuid);
+    POS_DEBUG_C(
+        "successfully register client: uuid(%lu), pid(%d), job_name(%s)",
+        this->_uuid, this->_agent_conf._pid, this->_agent_conf._job_name.c_str()
+    );
 }
 
 

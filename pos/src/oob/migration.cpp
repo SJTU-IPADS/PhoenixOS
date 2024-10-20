@@ -74,6 +74,6 @@ namespace cli_migration_remote_prepare {
         return retval;
     }
 
-} // namespace 
+} // namespace cli_migration_remote_prepare
 
 } // namespace oob_functions

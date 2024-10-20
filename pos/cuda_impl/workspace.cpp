@@ -127,6 +127,7 @@ pos_retval_t POSWorkspace_CUDA::create_client(pos_create_client_param_t& param, 
     (*clnt)->init();
     this->_current_max_uuid += 1;
     this->_client_map[(*clnt)->id] = (*clnt);
+    this->_pid_client_map[param.pid] = (*clnt);
     POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), (*clnt)->id);
 
     // create queue pair

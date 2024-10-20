@@ -22,6 +22,8 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/oob.h"
+#include "pos/include/oob/ckpt.h"
 
 
 /*!
@@ -29,11 +31,31 @@
  */
 enum pos_cli_arg : int {
     kPOS_CliAction_Unknown = 0,
-    /* ============ basic types ============ */
+    /* ============ actions ============ */
     /*!
      *  \brief  print help message
      */
     kPOS_CliAction_Help,
+
+    /*!
+     *  \brief  pre-dump state of an XPU process, but don't stop the execution
+     *  \param  pid     [Required] PID of the process to be migrated
+     *  \param  path    [Required] path to the checkpoint file
+     */
+    kPOS_CliAction_PreDump,
+
+    /*!
+     *  \brief  final dump state of an XPU process, and stop the execution
+     *  \param  pid     [Required] PID of the process to be migrated
+     *  \param  path    [Required] path to the checkpoint file
+     */
+    kPOS_CliAction_Dump,
+
+    /*!
+     *  \brief  restore the state of an XPU process, and continue the execution
+     *  \param  path    [Required] path to the checkpoint file
+     */
+    kPOS_CliAction_Restore,
 
     /*!
      *  \brief  migrate context of a XPU process to a new process
@@ -57,6 +79,8 @@ enum pos_cli_arg : int {
     /* ============ metadatas ============ */
     // target process id
     kPOS_CliMeta_Pid,
+    // checkpoint file path
+    kPOS_CliMeta_CkptFilePath,
     // oob ip
     kPOS_CliMeta_Dip,
     // oob port
@@ -89,6 +113,11 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
     }
 }
 
+typedef struct pos_cli_predump_metas {
+    uint64_t pid;
+    char ckpt_file_path[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
+} pos_cli_predump_metas_t;
+
 
 typedef struct pos_cli_migrate_metas {
     uint64_t pid;
@@ -115,6 +144,7 @@ typedef struct pos_cli_options {
 
     // metadata of corresponding cli option
     union {
+        pos_cli_predump_metas_t pre_dump;
         pos_cli_migrate_metas migrate;
     } metas;
 
@@ -133,6 +163,7 @@ typedef struct pos_cli_meta_check_rule {
     cast_func_t cast_func;
     bool is_required;
 } pos_arg_check_rule_t;
+
 
 /*!
  *  \brief  validate correctness of arguments
@@ -156,4 +187,5 @@ static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_
     }
 }
 
+pos_retval_t handle_predump(pos_cli_options_t &clio);
 pos_retval_t handle_migrate(pos_cli_options_t &clio);

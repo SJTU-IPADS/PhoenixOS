@@ -75,6 +75,12 @@ enum pos_oob_msg_typeid_t {
 
     // ========== cli message ==========
     /*!
+     *  \note   checkpoint / restore
+     */
+    kPOS_OOB_Msg_CLI_Ckpt_PreDump,
+    kPOS_OOB_Msg_CLI_Ckpt_Dump,
+    kPOS_OOB_Msg_CLI_Ckpt_Restore,
+    /*!
      *  \note   migration
      */
     kPOS_OOB_Msg_CLI_Migration_RemotePrepare,

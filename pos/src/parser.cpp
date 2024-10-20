@@ -61,11 +61,13 @@ void POSParser::shutdown(){
 
 void POSParser::__daemon(){
     uint64_t i, api_id;
-    pos_retval_t parser_retval, dag_retval;
+    pos_retval_t parser_retval, cmd_retval;
     POSAPIMeta_t api_meta;
     uint64_t last_ckpt_tick = 0, current_tick;
-    POSAPIContext_QE* wqe;
-    std::vector<POSAPIContext_QE*> wqes;
+    POSAPIContext_QE* apicxt_wqe;
+    std::vector<POSAPIContext_QE*> apicxt_wqes;
+    POSCommand_QE_t *cmd_wqe;
+    std::vector<POSCommand_QE_t*> cmd_wqes;
 
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -76,16 +78,32 @@ void POSParser::__daemon(){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
-        // poll apicxt from work queue connected to rpc frontend
-        wqes.clear();
+        // step 1: digest cmd from oob work queue
+        cmd_wqes.clear();
+        this->_ws->poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(this->_client->id, &cmd_wqes);
+        for(i=0; i<cmd_wqes.size(); i++){
+            POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
+            this->__process_cmd(cmd_wqe);
+        }
+
+        // step 2: digest cmd from worker work queue
+        cmd_wqes.clear();
+        this->_ws->poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(this->_client->id, &cmd_wqes);
+        for(i=0; i<cmd_wqes.size(); i++){
+            POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
+            this->__process_cmd(cmd_wqe);
+        }
+
+        // step 3: digest apicxt from rpc work queue
+        apicxt_wqes.clear();
         this->_ws->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(
-            this->_client->id, &wqes
+            this->_client->id, &apicxt_wqes
         );
 
-        for(i=0; i<wqes.size(); i++){
-            POS_CHECK_POINTER(wqe = wqes[i]);
+        for(i=0; i<apicxt_wqes.size(); i++){
+            POS_CHECK_POINTER(apicxt_wqe = apicxt_wqes[i]);
 
-            api_id = wqe->api_cxt->api_id;
+            api_id = apicxt_wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
         #if POS_CONF_RUNTIME_EnableDebugCheck
@@ -99,12 +117,12 @@ void POSParser::__daemon(){
             /*!
             *  \brief  ================== phrase 1 - parse API semantics ==================
             */
-            wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
-            parser_retval = (*(this->_parser_functions[api_id]))(this->_ws, wqe);
-            wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
+            apicxt_wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
+            parser_retval = (*(this->_parser_functions[api_id]))(this->_ws, apicxt_wqe);
+            apicxt_wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
 
             // set the return code
-            wqe->api_cxt->return_code = this->_ws->api_mgnr->cast_pos_retval(
+            apicxt_wqe->api_cxt->return_code = this->_ws->api_mgnr->cast_pos_retval(
                 /* pos_retval */ parser_retval, 
                 /* library_id */ api_meta.library_id
             );
@@ -112,11 +130,11 @@ void POSParser::__daemon(){
             if(unlikely(POS_SUCCESS != parser_retval)){
                 POS_WARN_C(
                     "failed to execute parser function: client_id(%lu), api_id(%lu)",
-                    wqe->client_id, api_id
+                    apicxt_wqe->client_id, api_id
                 );
-                wqe->status = kPOS_API_Execute_Status_Parser_Failed;
-                wqe->return_tick = POSUtilTimestamp::get_tsc();                    
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                apicxt_wqe->status = kPOS_API_Execute_Status_Parser_Failed;
+                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();                    
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
 
                 continue;
             }
@@ -130,23 +148,23 @@ void POSParser::__daemon(){
              */
             if(unlikely(api_meta.api_type == kPOS_API_Type_Delete_Resource)){
                 POS_DEBUG_C("api(%lu) is type of Delete_Resource, set as \"Return_After_Parse\"", api_id);
-                wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
+                apicxt_wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
             }
 
             /*!
              *  \note       for sync api that mark as kPOS_API_Execute_Status_Return_After_Parse,
              *              we directly return the result back to the frontend side
              */
-            if(     wqe->status == kPOS_API_Execute_Status_Return_After_Parse 
-                ||  wqe->status == kPOS_API_Execute_Status_Return_Without_Worker
+            if(     apicxt_wqe->status == kPOS_API_Execute_Status_Return_After_Parse 
+                ||  apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker
             ){
-                wqe->return_tick = POSUtilTimestamp::get_tsc();
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
             }
 
-            // insert wqe to worker queue
-            if(wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
-                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(wqe);
+            // insert apicxt_wqe to worker queue
+            if(apicxt_wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
+                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
             }
         }
 
@@ -250,6 +268,28 @@ pos_retval_t POSParser::__checkpoint_insertion_incremental() {
 
     retval = this->_client->dag.launch_op(ckpt_wqe);
     
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
+    pos_retval_t retval = POS_SUCCESS;
+
+    POS_CHECK_POINTER(cmd);
+
+    switch (cmd->type)
+    {
+    case kPOS_Command_OobToParser_PreDumpStart:
+        // TODO: todo
+        cmd->retval = POS_SUCCESS;
+        this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        break;
+    
+    default:
+        POS_ERROR_C_DETAIL("unknown command type %u, this is a bug", cmd->type);
+    }
+
 exit:
     return retval;
 }

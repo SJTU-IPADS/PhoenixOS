@@ -144,6 +144,7 @@ pos_retval_t POSWorkspace::deinit(){
 pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     pos_retval_t retval = POS_SUCCESS;
     void* clnt;
+    typename std::map<__pid_t, POSClient*>::iterator pid_client_map_iter;
 
     if(unlikely(this->_client_map.count(uuid) == 0)){
         POS_WARN_C("try to remove an non-exist client: uuid(%lu)", uuid);
@@ -159,6 +160,17 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
         goto exit;
     }
 
+    // delete from pid map
+    for(pid_client_map_iter = this->_pid_client_map.begin();
+        pid_client_map_iter != this->_pid_client_map.end();
+        pid_client_map_iter ++
+    ){
+        if(pid_client_map_iter->second == clnt){
+            this->_pid_client_map.erase(pid_client_map_iter);
+            break;
+        }
+    }
+
     // delete client
     delete clnt;
     _client_map.erase(uuid);
@@ -166,6 +178,17 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     POS_DEBUG_C("removed client: uuid(%lu)", uuid);
 
 exit:
+    return retval;
+}
+
+
+POSClient* POSWorkspace::get_client_by_pid(__pid_t pid){
+    POSClient *retval = nullptr;
+
+    if(unlikely(this->_pid_client_map.count(pid) > 0)){
+        retval = this->_pid_client_map[pid];
+    }
+
     return retval;
 }
 

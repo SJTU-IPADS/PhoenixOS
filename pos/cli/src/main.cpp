@@ -42,12 +42,16 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
 
     sprintf(
         short_opt,
-        /* action */    "%d%d%d"
-        /* meta */      "%d:%d:%d:",
+        /* action */    "%d%d%d%d%d%d"
+        /* meta */      "%d:%d:%d:%d:",
         kPOS_CliAction_Help,
+        kPOS_CliAction_PreDump,
+        kPOS_CliAction_Dump,
+        kPOS_CliAction_Restore,
         kPOS_CliAction_Migrate,
         kPOS_CliAction_Preserve,
         kPOS_CliMeta_Pid,
+        kPOS_CliMeta_CkptFilePath,
         kPOS_CliMeta_Dip,
         kPOS_CliMeta_Dport
     );
@@ -55,11 +59,15 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
     struct option long_opt[] = {
         // action types
         {"help",        no_argument,        NULL,   kPOS_CliAction_Help},
+        {"pre-dump",    no_argument,        NULL,   kPOS_CliAction_PreDump},
+        {"dump",        no_argument,        NULL,   kPOS_CliAction_Dump},
+        {"restore",     no_argument,        NULL,   kPOS_CliAction_Restore},
         {"migrate",     no_argument,        NULL,   kPOS_CliAction_Migrate},
         {"preserve",    no_argument,        NULL,   kPOS_CliAction_Preserve},
         
         // metadatas
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
+        {"file",        required_argument,  NULL,   kPOS_CliMeta_CkptFilePath},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},
         {"dport",       required_argument,  NULL,   kPOS_CliMeta_Dport},
         
@@ -79,6 +87,9 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
 inline pos_retval_t __dispatch(pos_cli_options_t &clio){
     switch (clio.action_type)
     {
+    case kPOS_CliAction_PreDump:
+        return handle_predump(clio);
+
     case kPOS_CliAction_Migrate:
         return handle_migrate(clio);
     
@@ -93,6 +104,7 @@ inline pos_retval_t __dispatch(pos_cli_options_t &clio){
  */
 namespace oob_functions {
     // TODO: define other client-side functions here
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_ckpt_predump);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_restore_signal);
 }; // namespace oob_functions
@@ -106,6 +118,7 @@ int main(int argc, char *argv[]){
 
     clio.local_oob_client = new POSOobClient(
         /* req_functions */ {
+            {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,      oob_functions::cli_ckpt_predump::clnt       },
             {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::clnt   },
             {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::clnt     },
         },
@@ -113,7 +126,7 @@ int main(int argc, char *argv[]){
         /* local_ip */ CLIENT_IP
     );
     POS_CHECK_POINTER(clio.local_oob_client);
-    
+
     retval = __dispatch(clio);
     switch (retval)
     {

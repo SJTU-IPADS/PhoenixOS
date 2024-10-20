@@ -25,6 +25,7 @@
 #include "pos/include/log.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
+#include "pos/include/command.h"
 
 // forward declaration
 class POSClient;
@@ -134,4 +135,12 @@ class POSParser {
      *  \return POS_SUCCESS for successfully checkpoint insertion
      */
     pos_retval_t __checkpoint_insertion_incremental();
+
+
+    /*!
+     *  \brief  process command received in the parser daemon
+     *  \param  cmd the received command
+     *  \return POS_SUCCESS for successfully process the command
+     */
+    pos_retval_t __process_cmd(POSCommand_QE_t *cmd);
 };
