@@ -27,22 +27,24 @@
 #include "pos/include/api_context.h"
 #include "pos/include/command.h"
 
+
 // forward declaration
 class POSClient;
+class POSParser;
 class POSWorkspace;
 
 
 /*!
  *  \brief prototype for parser function for each API call
  */
-using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
+using pos_runtime_parser_function_t = pos_retval_t(*)(POSWorkspace*, POSParser*, POSAPIContext_QE*);
 
 
 /*!
  *  \brief  macro for the definition of the runtime parser functions
  */
 #define POS_RT_FUNC_PARSER()                                    \
-    pos_retval_t parse(POSWorkspace* ws, POSAPIContext_QE* wqe)
+    pos_retval_t parse(POSWorkspace* ws, POSParser* parser, POSAPIContext_QE* wqe)
 
 
 namespace ps_functions {
@@ -77,6 +79,13 @@ class POSParser {
      *  \brief  raise the shutdown signal to stop the daemon
      */
     void shutdown();
+
+    /*!
+     *  \brief  identify whether the client is under checkpointing,
+     *          if it's, all parser functions would start recording
+     *          in/out/inout/create/destory edges
+     */
+    bool is_checkpointing;
 
  protected:
     // stop flag to indicate the daemon thread to stop

@@ -63,7 +63,11 @@ namespace cli_ckpt_predump {
 
         // transfer error status
         if(unlikely(cmds[0]->retval != POS_SUCCESS)){
-            retmsg = "see posd log for more details";
+            if(cmds[0]->retval == POS_FAILED_NOT_ENABLED){
+                retmsg = "posd doesn't enable ckpt support";
+            } else {
+                retmsg = "see posd log for more details";
+            }
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
         }
         payload->retval = cmds[0]->retval;

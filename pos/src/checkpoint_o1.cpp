@@ -91,6 +91,7 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(uint64_t version, POSCheckp
 exit:
     return retval;
 }
+template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<true>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite); // TODO: for pass compile
 template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<false>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite);
 
 /*!

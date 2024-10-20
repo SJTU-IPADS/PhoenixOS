@@ -354,6 +354,9 @@ typedef struct POSAPIContext_QE {
     // context of the called API
     POSAPIContext *api_cxt;
     
+    // identify whether this apicxt is a checkpoint mark
+    bool ckpt_mark;
+
     // execution status of the API call
     pos_api_execute_status_t status;
 
@@ -441,13 +444,12 @@ typedef struct POSAPIContext_QE {
     /*!
      *  \brief  constructor
      *  \note   this constructor is for checkpointing ops
-     *  \param  api_id              specialized API index of the checkpointing op
-     *  \param  pos_client          pointer to the POSClient instance
+     *  \param  ckpt_mark_  identify whether this is a ckpt mark
+     *  \param  pos_client  pointer to the POSClient instance
      */
-    POSAPIContext_QE(uint64_t api_id, void* pos_client) : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0) {
-        api_cxt = new POSAPIContext_t(api_id);
-        POS_CHECK_POINTER(api_cxt);
-
+    POSAPIContext_QE(bool ckpt_mark_, void* pos_client) 
+        : client(pos_client), ckpt_mark(ckpt_mark_), is_ckpt_pruned(false), execution_stream_id(0) 
+    {
         // initialization of checkpoint op specific fields
         nb_ckpt_handles = 0;
         nb_abandon_handles = 0;
@@ -461,7 +463,8 @@ typedef struct POSAPIContext_QE {
      *  \note   this constructor is used only during restore phrase
      *  \param  pos_client          pointer to the POSClient instance
      */
-    POSAPIContext_QE(void* pos_client) : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0) {}
+    POSAPIContext_QE(void* pos_client) 
+        : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0){}
 
     /*!
      *  \brief  deconstructor
