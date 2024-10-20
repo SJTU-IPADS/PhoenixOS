@@ -48,6 +48,7 @@ class POSWorkspace;
 namespace oob_functions {
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_register_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_unregister_client);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_predump);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore_signal);
     POS_OOB_DECLARE_SVR_FUNCTIONS(utils_mock_api_call);
@@ -183,7 +184,14 @@ class POSWorkspace {
      *  \param  uuid    uuid of the client
      *  \return pointer to the corresponding POSClient
      */
-    inline POSClient* get_client_by_uuid(pos_client_uuid_t uuid);
+    POSClient* get_client_by_uuid(pos_client_uuid_t uuid);
+
+    /*!
+     *  \brief  obtain client by given pid
+     *  \param  pid     pid of the client
+     *  \return pointer to the corresponding POSClient
+     */
+    POSClient* get_client_by_pid(__pid_t pid);
 
     /*!
      *  \brief  obtain client map
@@ -196,10 +204,7 @@ class POSWorkspace {
 
 
     /* =============== queue management functions =============== */
- protected:
-    friend class POSParser;
-    friend class POSWorker;
-
+ public:
     /*!
      *  \brief  push queue element to specified queue
      *  \tparam qdir    queue direction
@@ -231,7 +236,8 @@ class POSWorkspace {
      */
     template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
     pos_retval_t poll_q(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
-
+ 
+ protected:
     /*!
      *  \brief  create a new queue pairs
      *  \param  uuid    the uuid to identify client where to create queue pair
@@ -320,6 +326,7 @@ class POSWorkspace {
 
     // map of clients
     std::map<pos_client_uuid_t, POSClient*> _client_map;
+    std::map<__pid_t, POSClient*> _pid_client_map;
 
     // the max uuid that has been recorded
     pos_client_uuid_t _current_max_uuid;

@@ -43,7 +43,5 @@ typedef struct pos_cli_migrate {
  */
 typedef struct pos_cli_preserve {
     // client
-
     // server
 } pos_cli_preserve_t;
-

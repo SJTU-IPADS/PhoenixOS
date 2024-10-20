@@ -18,6 +18,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <unistd.h>
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
@@ -68,6 +69,9 @@ class POSAgentConf {
 
     // name of the job
     std::string _job_name;
+
+    // pid of the current process
+    __pid_t _pid;
 };
 
 
