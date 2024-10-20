@@ -285,7 +285,7 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
         cmd->retval = POS_SUCCESS;
         this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
         break;
-    
+
     default:
         POS_ERROR_C_DETAIL("unknown command type %u, this is a bug", cmd->type);
     }

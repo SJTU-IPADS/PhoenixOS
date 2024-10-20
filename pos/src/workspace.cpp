@@ -214,7 +214,8 @@ pos_retval_t POSWorkspace::push_q(void *qe){
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
     pos_client_uuid_t uuid;
 
-    static_assert(qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
+    static_assert(
+            qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
         ||  qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
         "unknown queue type obtained"
     );
@@ -298,7 +299,7 @@ pos_retval_t POSWorkspace::push_q(void *qe){
         if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
             if(unlikely(this->_cmd_worker2parser_wqs.count(uuid) == 0)){
                 POS_WARN_C(
-                    "failed to insert POSCommand_QE_t to worker2parser queue, queue not exist: client_id(%lu)", uuid
+                    "failed to insert POSCommand_QE_t to worker2parser work queue, queue not exist: client_id(%lu)", uuid
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
@@ -308,7 +309,7 @@ pos_retval_t POSWorkspace::push_q(void *qe){
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             if(unlikely(this->_cmd_oob2parser_wqs.count(uuid) == 0)){
                 POS_WARN_C(
-                    "failed to insert POSCommand_QE_t to oob2parser queue, queue not exist: client_id(%lu)", uuid
+                    "failed to insert POSCommand_QE_t to oob2parser work queue, queue not exist: client_id(%lu)", uuid
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
@@ -331,7 +332,7 @@ pos_retval_t POSWorkspace::push_q(void *qe){
         if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
             if(unlikely(this->_cmd_worker2parser_cqs.count(uuid) == 0)){
                 POS_WARN_C(
-                    "failed to insert POSCommand_QE_t to worker2parser queue, queue not exist: client_id(%lu)", uuid
+                    "failed to insert POSCommand_QE_t to worker2parser completion queue, queue not exist: client_id(%lu)", uuid
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
@@ -341,7 +342,7 @@ pos_retval_t POSWorkspace::push_q(void *qe){
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             if(unlikely(this->_cmd_oob2parser_cqs.count(uuid) == 0)){
                 POS_WARN_C(
-                    "failed to insert POSCommand_QE_t to oob2parser queue, queue not exist: client_id(%lu)", uuid
+                    "failed to insert POSCommand_QE_t to oob2parser completion queue, queue not exist: client_id(%lu)", uuid
                 );
                 retval = POS_FAILED_NOT_EXIST;
                 goto exit;
