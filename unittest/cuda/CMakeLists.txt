@@ -49,6 +49,7 @@ foreach( test_target ${TEST_TARGETS} )
     # POS root path
     target_include_directories(${test_target} PUBLIC ../../)
     target_include_directories(${test_target} PUBLIC ../../lib)
+    target_include_directories(${test_target} PUBLIC ../../build)
 
     # link POS
     find_library(pos_so NAMES pos HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
