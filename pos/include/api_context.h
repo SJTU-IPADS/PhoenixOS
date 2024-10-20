@@ -116,8 +116,9 @@ class POSApiManager {
 enum pos_api_execute_status_t : uint8_t {
     kPOS_API_Execute_Status_Init = 0,
     kPOS_API_Execute_Status_Return_After_Parse,
-    kPOS_API_Execute_Status_Parse_Failed,
-    kPOS_API_Execute_Status_Launch_Failed
+    kPOS_API_Execute_Status_Return_Without_Worker,
+    kPOS_API_Execute_Status_Parser_Failed,
+    kPOS_API_Execute_Status_Worker_Failed
 };
 
 /*!

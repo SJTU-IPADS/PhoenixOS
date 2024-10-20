@@ -181,71 +181,234 @@ POSClient* POSWorkspace::get_client_by_uuid(pos_client_uuid_t uuid){
 }
 
 
-POSAPIContext_QE* POSWorkspace::dequeue_parser_job(pos_client_uuid_t uuid){
-    pos_retval_t tmp_retval;
-    POSAPIContext_QE *wqe = nullptr;
-    POSLockFreeQueue<POSAPIContext_QE_t*> *wq;
+template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+pos_retval_t POSWorkspace::push_q(void *qe){
+    pos_retval_t retval = POS_SUCCESS;
+    POSAPIContext_QE_t *apictx_qe;
+    POSCommand_QE_t *cmd_qe;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apictx_q;
+    POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
+    pos_client_uuid_t uuid;
 
-    if(unlikely(this->_parser_wqs.count(uuid) == 0)){
-        POS_WARN("no parser wq with client uuid %lu registered", uuid);
-        goto exit;
+    static_assert(qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
+        ||  qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
+        "unknown queue type obtained"
+    );
+
+    // api context worker queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_WQ){
+        POS_CHECK_POINTER(apictx_qe = reinterpret_cast<POSAPIContext_QE_t*>(qe));
+        uuid = apictx_qe->client_id;
+        
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Parser2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or parser2worker queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            if(unlikely(this->_apicxt_rpc2parser_wqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSAPIContext_QE_t to rpc2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(apictx_q = this->_apicxt_rpc2parser_wqs[uuid]);
+            apictx_q->push(apictx_qe);
+        } else { // qdir == kPOS_QueueDirection_Parser2Worker
+            if(unlikely(this->_apicxt_parser2worker_wqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSAPIContext_QE_t to parser2worker queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(apictx_q = this->_apicxt_parser2worker_wqs[uuid]);
+            apictx_q->push(apictx_qe);
+        }
     }
 
-    POS_CHECK_POINTER(wq = _parser_wqs[uuid]);
-    wq->dequeue(wqe);
+    // api context completion queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_CQ){
+        POS_CHECK_POINTER(apictx_qe = reinterpret_cast<POSAPIContext_QE_t*>(qe));
+        uuid = apictx_qe->client_id;
+        
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Rpc2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or rpc2worker queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            if(unlikely(this->_apicxt_rpc2parser_cqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSAPIContext_QE_t to rpc2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(apictx_q = this->_apicxt_rpc2parser_cqs[uuid]);
+            apictx_q->push(apictx_qe);
+        } else { // qdir == kPOS_QueueDirection_Rpc2Worker
+            if(unlikely(this->_apicxt_rpc2worker_cqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSAPIContext_QE_t to rpc2worker queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(apictx_q = this->_apicxt_rpc2worker_cqs[uuid]);
+            apictx_q->push(apictx_qe);
+        }
+    }
+
+    // command work queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
+        POS_CHECK_POINTER(cmd_qe = reinterpret_cast<POSCommand_QE_t*>(qe));
+        uuid = cmd_qe->client_id;
+        
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            if(unlikely(this->_cmd_worker2parser_wqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSCommand_QE_t to worker2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(cmd_q = this->_cmd_worker2parser_wqs[uuid]);
+            cmd_q->push(cmd_qe);
+        } else { // qdir == kPOS_QueueDirection_Oob2Parser
+            if(unlikely(this->_cmd_oob2parser_wqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSCommand_QE_t to oob2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(cmd_q = this->_cmd_oob2parser_wqs[uuid]);
+            cmd_q->push(cmd_qe);
+        }
+    }
+
+    // command completion queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_CQ){
+        POS_CHECK_POINTER(cmd_qe = reinterpret_cast<POSCommand_QE_t*>(qe));
+        uuid = cmd_qe->client_id;
+        
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            if(unlikely(this->_cmd_worker2parser_cqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSCommand_QE_t to worker2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(cmd_q = this->_cmd_worker2parser_cqs[uuid]);
+            cmd_q->push(cmd_qe);
+        } else { // qdir == kPOS_QueueDirection_Oob2Parser
+            if(unlikely(this->_cmd_oob2parser_cqs.count(uuid) == 0)){
+                POS_WARN_C(
+                    "failed to insert POSCommand_QE_t to oob2parser queue, queue not exist: client_id(%lu)", uuid
+                );
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            POS_CHECK_POINTER(cmd_q = this->_cmd_oob2parser_cqs[uuid]);
+            cmd_q->push(cmd_qe);
+        }
+    }
 
 exit:
-    return wqe;
+    return retval;
 }
-
-
-template<pos_queue_position_t qposition>
-pos_retval_t POSWorkspace::push_cq(POSAPIContext_QE *cqe){
-    pos_client_uuid_t uuid;
-    POSLockFreeQueue<POSAPIContext_QE_t*> *cq;
-
-    POS_CHECK_POINTER(cqe);
-    uuid = cqe->client_id;
-
-    if constexpr (qposition == kPOS_Queue_Position_Parser){
-        if(unlikely(_parser_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
-        cq = _parser_cqs[uuid];
-    } else if (qposition == kPOS_Queue_Position_Worker){
-        if(unlikely(_worker_cqs.count(uuid) == 0)){ return POS_FAILED_NOT_EXIST; }
-        cq = _worker_cqs[uuid];
-    }
-
-    cq->push(cqe);
-
-    return POS_SUCCESS;
-}
-template pos_retval_t POSWorkspace::push_cq<kPOS_Queue_Position_Worker>(POSAPIContext_QE *cqe);
-template pos_retval_t POSWorkspace::push_cq<kPOS_Queue_Position_Parser>(POSAPIContext_QE *cqe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(void *qe);
+template pos_retval_t POSWorkspace::push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(void *qe);
 
 
 pos_retval_t POSWorkspace::__create_qp(pos_client_uuid_t uuid){
-    if(unlikely(this->_parser_wqs.count(uuid) > 0 || this->_parser_cqs.count(uuid) > 0)){
-        return POS_FAILED_ALREADY_EXIST;
+    pos_retval_t retval = POS_SUCCESS;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_rpc2parser_wq, *apicxt_rpc2parser_cq;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_parser2worker_wq, *apicxt_rpc2worker_cq;
+    POSLockFreeQueue<POSCommand_QE_t*> *cmd_worker2parser_wq, *cmd_worker2parser_cq;
+    POSLockFreeQueue<POSCommand_QE_t*> *cmd_oob2parser_wq, *cmd_oob2parser_cq;
+
+    if(unlikely(
+            this->_apicxt_rpc2parser_wqs.count(uuid) > 0 
+        ||  this->_apicxt_rpc2parser_cqs.count(uuid) > 0
+        ||  this->_apicxt_parser2worker_wqs.count(uuid) > 0
+        ||  this->_apicxt_rpc2worker_cqs.count(uuid) > 0
+        ||  this->_cmd_worker2parser_wqs.count(uuid) > 0
+        ||  this->_cmd_worker2parser_cqs.count(uuid) > 0
+        ||  this->_cmd_oob2parser_wqs.count(uuid) > 0
+        ||  this->_cmd_oob2parser_cqs.count(uuid) > 0
+    )){
+        POS_ERROR_C_DETAIL("try to create queue pairs with same client id, this is a bug: client_id(%lu)", uuid);
     }
 
-    // create queue pair between frontend and parser
-    POSLockFreeQueue<POSAPIContext_QE_t*> *wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
-    POS_CHECK_POINTER(wq);
-    this->_parser_wqs[uuid] = wq;
-    POS_DEBUG_C("create parser work queue: uuid(%lu)", uuid);
+    // rpc2parser apicxt work queue
+    apicxt_rpc2parser_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(apicxt_rpc2parser_wq);
+    this->_apicxt_rpc2parser_wqs[uuid] = apicxt_rpc2parser_wq;
+    POS_DEBUG_C("create rpc2parser apicxt work queue: uuid(%lu)", uuid);
 
-    POSLockFreeQueue<POSAPIContext_QE_t*> *cq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
-    POS_CHECK_POINTER(cq);
-    this->_parser_cqs[uuid] = cq;
-    POS_DEBUG_C("create parser completion queue: uuid(%lu)", uuid);
+    // rpc2parser apicxt completion queue
+    apicxt_rpc2parser_cq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(apicxt_rpc2parser_cq);
+    this->_apicxt_rpc2parser_cqs[uuid] = apicxt_rpc2parser_cq;
+    POS_DEBUG_C("create rpc2parser apicxt completion queue: uuid(%lu)", uuid);
 
-    // create completion queue between frontend and worker
-    POSLockFreeQueue<POSAPIContext_QE_t*> *cq2 = new POSLockFreeQueue<POSAPIContext_QE_t*>();
-    POS_CHECK_POINTER(cq2);
-    this->_worker_cqs[uuid] = cq2;
-    POS_DEBUG_C("create worker completion queue: uuid(%lu)", uuid);
+    // parser2worker apicxt work queue
+    apicxt_parser2worker_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(apicxt_parser2worker_wq);
+    this->_apicxt_parser2worker_wqs[uuid] = apicxt_parser2worker_wq;
+    POS_DEBUG_C("create parser2worker apicxt work queue: uuid(%lu)", uuid);
 
-    return POS_SUCCESS;
+    // rpc2worker apicxt completion queue
+    apicxt_rpc2worker_cq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(apicxt_rpc2worker_cq);
+    this->_apicxt_rpc2worker_cqs[uuid] = apicxt_rpc2worker_cq;
+    POS_DEBUG_C("create rpc2worker apicxt completion queue: uuid(%lu)", uuid);
+
+    // worker2parser cmd work queue
+    cmd_worker2parser_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(cmd_worker2parser_wq);
+    this->_cmd_worker2parser_wqs[uuid] = cmd_worker2parser_wq;
+    POS_DEBUG_C("create worker2parser cmd work queue: uuid(%lu)", uuid);
+
+    // worker2parser cmd completion queue
+    cmd_worker2parser_cq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(cmd_worker2parser_cq);
+    this->_cmd_worker2parser_cqs[uuid] = cmd_worker2parser_cq;
+    POS_DEBUG_C("create worker2parser cmd completion queue: uuid(%lu)", uuid);
+
+    // oob2parser cmd work queue
+    cmd_oob2parser_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(cmd_oob2parser_wq);
+    this->_cmd_oob2parser_wqs[uuid] = cmd_oob2parser_wq;
+    POS_DEBUG_C("create oob2parser cmd work queue: uuid(%lu)", uuid);
+
+    // oob2parser cmd completion queue
+    cmd_oob2parser_cq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(cmd_oob2parser_cq);
+    this->_cmd_oob2parser_cqs[uuid] = cmd_oob2parser_cq;
+    POS_DEBUG_C("create oob2parser cmd completion queue: uuid(%lu)", uuid);
+
+    return retval;
 }
 
 
@@ -262,48 +425,113 @@ pos_retval_t POSWorkspace::__remove_qp(pos_client_uuid_t uuid){
     }
     POS_CHECK_POINTER(clnt = this->_client_map[uuid]);
     clnt->status = kPOS_ClientStatus_Hang;
-
-    if(this->_parser_wqs[uuid] != nullptr){
-        POS_DEBUG_C("removing parser work queue...: uuid(%lu)", uuid);
+    
+    // rpc2parser apicxt work queue
+    if(this->_apicxt_rpc2parser_wqs[uuid] != nullptr){
+        POS_DEBUG_C("removing apicxt rpc2parser work queue...: uuid(%lu)", uuid);
         /*!
-         *  \note   parser wq is polled by parser thread,
-         *          so we wait until the queue is drain
+         *  \note   this queue is polled by parser thread, so we wait until the queue is drain
          */
-        this->_parser_wqs[uuid]->lock_enqueue();
-        while(this->_parser_wqs[uuid]->len() > 0){}
-        retval = this->__remove_q<kPOS_Queue_Type_WQ, kPOS_Queue_Position_Parser>(uuid);
+        this->_apicxt_rpc2parser_wqs[uuid]->lock_enqueue();
+        while(this->_apicxt_rpc2parser_wqs[uuid]->len() > 0){}
+        retval = this->__remove_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(uuid);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to remove parser work queue: uuid(%lu)", uuid);
+            POS_WARN_C("failed to remove rpc2parser work queue: uuid(%lu)", uuid);
             goto exit;
         }
     }
 
-    if(this->_parser_cqs[uuid] != nullptr){
-        POS_DEBUG_C("removing parser completion queue...: uuid(%lu)", uuid);
+    // rpc2parser apicxt completion queue
+    if(this->_apicxt_rpc2parser_cqs[uuid] != nullptr){
+        POS_DEBUG_C("removing apicxt rpc2parser completion queue...: uuid(%lu)", uuid);
         /*!
-         *  \note   parser cq is polled by unpredictable rpc thread,
-         *          so we need to manully lock this queue
+         *  \note   this queue is polled by unpredictable rpc thread, so we need to manully lock this queue
          */
-        this->_parser_cqs[uuid]->lock_enqueue();
-        this->_parser_cqs[uuid]->lock_dequeue();
-        retval = this->__remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Parser>(uuid);
+        this->_apicxt_rpc2parser_cqs[uuid]->lock_enqueue();
+        this->_apicxt_rpc2parser_cqs[uuid]->lock_dequeue();
+        retval = this->__remove_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(uuid);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to remove parser completion queue: uuid(%lu)", uuid);
+            POS_WARN_C("failed to remove rpc2parser completion queue: uuid(%lu)", uuid);
             goto exit;
         }
     }
 
-    if(this->_worker_cqs[uuid] != nullptr){
-        POS_DEBUG_C("removing worker completion queue...: uuid(%lu)", uuid);
+    // parser2worker apicxt work queue
+    if(this->_apicxt_parser2worker_wqs[uuid] != nullptr){
+        POS_DEBUG_C("removing apicxt parser2worker work queue...: uuid(%lu)", uuid);
         /*!
-         *  \note   worker cq is polled by unpredictable rpc thread,
-         *          so we need to manully lock this queue
+         *  \note   this queue is polled by worker thread, so we wait until the queue is drain
          */
-        this->_worker_cqs[uuid]->lock_enqueue();
-        this->_worker_cqs[uuid]->lock_dequeue();
-        retval = this->__remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Worker>(uuid);
+        this->_apicxt_parser2worker_wqs[uuid]->lock_enqueue();
+        while(this->_apicxt_parser2worker_wqs[uuid]->len() > 0){}
+        retval = this->__remove_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(uuid);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to remove worker completion queue: uuid(%lu)", uuid);
+            POS_WARN_C("failed to remove parser2worker work queue: uuid(%lu)", uuid);
+            goto exit;
+        }
+    }
+
+    // rpc2worker apicxt completion queue
+    if(this->_apicxt_rpc2worker_cqs[uuid] != nullptr){
+        POS_DEBUG_C("removing apicxt rpc2worker completion queue...: uuid(%lu)", uuid);
+        /*!
+         *  \note   this queue is polled by unpredictable rpc thread, so we need to manully lock this queue
+         */
+        this->_apicxt_rpc2worker_cqs[uuid]->lock_enqueue();
+        this->_apicxt_rpc2worker_cqs[uuid]->lock_dequeue();
+        retval = this->__remove_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(uuid);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to remove rpc2worker completion queue: uuid(%lu)", uuid);
+            goto exit;
+        }
+    }
+
+    // worker2parser cmd work queue
+    if(this->_cmd_worker2parser_wqs[uuid] != nullptr){
+        POS_DEBUG_C("removing cmd worker2parser work queue...: uuid(%lu)", uuid);
+        this->_cmd_worker2parser_wqs[uuid]->lock_enqueue();
+        this->_cmd_worker2parser_wqs[uuid]->lock_dequeue();
+        while(this->_cmd_worker2parser_wqs[uuid]->len() > 0){}
+        retval = this->__remove_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(uuid);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to remove cmd worker2parser work queue: uuid(%lu)", uuid);
+            goto exit;
+        }
+    }
+
+    // worker2parser cmd completion queue
+    if(this->_cmd_worker2parser_cqs[uuid] != nullptr){
+        POS_DEBUG_C("removing cmd worker2parser completion queue...: uuid(%lu)", uuid);
+        this->_cmd_worker2parser_cqs[uuid]->lock_enqueue();
+        this->_cmd_worker2parser_cqs[uuid]->lock_dequeue();
+        retval = this->__remove_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(uuid);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to remove cmd worker2parser completion queue: uuid(%lu)", uuid);
+            goto exit;
+        }
+    }
+
+    // oob2parser cmd work queue
+    if(this->_cmd_oob2parser_wqs[uuid] != nullptr){
+        POS_DEBUG_C("removing cmd oob2parser work queue...: uuid(%lu)", uuid);
+        this->_cmd_oob2parser_wqs[uuid]->lock_enqueue();
+        this->_cmd_oob2parser_wqs[uuid]->lock_dequeue();
+        while(this->_cmd_oob2parser_wqs[uuid]->len() > 0){}
+        retval = this->__remove_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(uuid);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to remove cmd oob2parser work queue: uuid(%lu)", uuid);
+            goto exit;
+        }
+    }
+
+    // oob2parser cmd completion queue
+    if(this->_cmd_oob2parser_cqs[uuid] != nullptr){
+        POS_DEBUG_C("removing cmd oob2parser completion queue...: uuid(%lu)", uuid);
+        this->_cmd_oob2parser_cqs[uuid]->lock_enqueue();
+        this->_cmd_oob2parser_cqs[uuid]->lock_dequeue();
+        retval = this->__remove_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(uuid);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to remove cmd oob2parser completion queue: uuid(%lu)", uuid);
             goto exit;
         }
     }
@@ -313,98 +541,267 @@ exit:
 }
 
 
-template<pos_queue_position_t qt>
-pos_retval_t POSWorkspace::__poll_cq(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes){
+template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+pos_retval_t POSWorkspace::poll_q(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes){
     pos_retval_t retval = POS_SUCCESS;
-    POSAPIContext_QE *cqe;
-    POSLockFreeQueue<POSAPIContext_QE_t*> *cq;
+    POSAPIContext_QE *apicxt_qe;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_q;
 
-    POS_CHECK_POINTER(cqes);
+    static_assert(
+        qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ,
+        "invalid queue type obtained"
+    );
+
+    POS_CHECK_POINTER(qes);
 
     if(unlikely(this->_client_map.count(uuid) == 0)){
-        POS_WARN_C(
-            "failed to poll cq, no client exist: uuid(%lu), cq_position(%s)",
-            uuid, qt == kPOS_Queue_Position_Parser ? "parser" : "worker"
+        POS_ERROR_C_DETAIL(
+            "failed to poll q, no client exist, this is a bug: uuid(%lu), qir(%d), qtype(%d)",
+            uuid, qdir, qtype
         );
-        retval = POS_FAILED_NOT_EXIST;
-        goto exit;
     }
 
-    if constexpr (qt == kPOS_Queue_Position_Parser){
-        if(unlikely(this->_parser_cqs.count(uuid) == 0)){
-            POS_WARN_C(
-                "failed to poll cq, no cq exist: uuid(%lu), cq_position(%s)",
-                uuid, qt == kPOS_Queue_Position_Parser ? "parser" : "worker"
-            );
-            retval = POS_FAILED_NOT_EXIST;
-            goto exit;
+    // api context worker queue
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_WQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Parser2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or parser2worker queue"
+        );
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            if(unlikely(this->_apicxt_rpc2parser_wqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            apicxt_q = this->_apicxt_rpc2parser_wqs[uuid];
+        } else { // kPOS_QueueDirection_Parser2Worker
+            if(unlikely(this->_apicxt_parser2worker_wqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            apicxt_q = this->_apicxt_parser2worker_wqs[uuid];
         }
-        cq = this->_parser_cqs[uuid];
-    } else if (qt == kPOS_Queue_Position_Worker){
-        if(unlikely(this->_worker_cqs.count(uuid) == 0)){
-            POS_WARN_C(
-                "failed to poll cq, no cq exist: uuid(%lu), cq_position(%s)",
-                uuid, qt == kPOS_Queue_Position_Parser ? "parser" : "worker"
-            );
-            retval = POS_FAILED_NOT_EXIST;
-            goto exit;
-        }
-        cq = this->_worker_cqs[uuid];
     }
 
-    while(POS_SUCCESS == cq->dequeue(cqe)){
-        cqes->push_back(cqe);
+    // api context completion queue
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_CQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Rpc2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or parser2worker queue"
+        );
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            if(unlikely(this->_apicxt_rpc2parser_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            apicxt_q = this->_apicxt_rpc2parser_cqs[uuid];
+        } else { // kPOS_QueueDirection_Rpc2Worker
+            if(unlikely(this->_apicxt_rpc2worker_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            apicxt_q = this->_apicxt_rpc2worker_cqs[uuid];
+        }
+    }
+
+    POS_CHECK_POINTER(apicxt_q);
+    while(POS_SUCCESS == apicxt_q->dequeue(apicxt_qe)){
+        qes->push_back(apicxt_qe);
     }
 
 exit:
     return retval;
 }
-template pos_retval_t POSWorkspace::__poll_cq<kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
-template pos_retval_t POSWorkspace::__poll_cq<kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* cqes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes);
 
 
-template<pos_queue_type_t qtype, pos_queue_position_t qposition>
+template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+pos_retval_t POSWorkspace::poll_q(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes){
+    pos_retval_t retval = POS_SUCCESS;
+    POSCommand_QE_t *cmd_qe;
+    POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
+    
+    static_assert(
+        qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
+        "invalid queue type obtained"
+    );
+
+    POS_CHECK_POINTER(qes);
+
+    if(unlikely(this->_client_map.count(uuid) == 0)){
+        POS_ERROR_C_DETAIL(
+            "failed to poll q, no client exist, this is a bug: uuid(%lu), qir(%d), qtype(%d)",
+            uuid, qdir, qtype
+        );
+    }
+
+    // command work queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            if(unlikely(this->_cmd_worker2parser_wqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            cmd_q = this->_cmd_worker2parser_wqs[uuid];
+        } else { // kPOS_QueueDirection_Oob2Parser
+            if(unlikely(this->_cmd_oob2parser_wqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            cmd_q = this->_cmd_oob2parser_wqs[uuid];
+        }
+    }
+
+    // command completion queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_CQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            if(unlikely(this->_cmd_worker2parser_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            cmd_q = this->_cmd_worker2parser_cqs[uuid];
+        } else { // kPOS_QueueDirection_Oob2Parser
+            if(unlikely(this->_cmd_oob2parser_cqs.count(uuid) == 0)){
+                retval = POS_FAILED_NOT_EXIST;
+                goto exit;
+            }
+            cmd_q = this->_cmd_oob2parser_cqs[uuid];
+        }
+    }
+
+    POS_CHECK_POINTER(cmd_q);
+    while(POS_SUCCESS == cmd_q->dequeue(cmd_qe)){
+        qes->push_back(cmd_qe);
+    }
+
+exit:
+    return retval;
+}
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
+template pos_retval_t POSWorkspace::poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
+
+
+template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
 pos_retval_t POSWorkspace::__remove_q(pos_client_uuid_t uuid){
     pos_retval_t retval = POS_SUCCESS;
-    POSLockFreeQueue<POSAPIContext_QE_t*> *q;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apictx_q;
+    POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
 
-    if constexpr (qtype == kPOS_Queue_Type_WQ){
-        if(unlikely(_parser_wqs.count(uuid) == 0)){
-            retval = POS_FAILED_NOT_EXIST;
-            POS_WARN_C("try to remove an non-exist work queue: uuid(%lu)", uuid);
-        } else {
-            q = _parser_wqs[uuid]; delete q; 
-            _parser_wqs.erase(uuid);
-            POS_DEBUG_C("remove work queue: uuid(%lu)", uuid);
+    static_assert(qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
+        ||  qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
+        "unknown queue type obtained"
+    );
+
+    // api context worker queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_WQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Parser2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or parser2worker queue"
+        );
+        
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            apictx_q = this->_apicxt_rpc2parser_wqs[uuid];
+            delete apictx_q;
+            this->_apicxt_rpc2parser_wqs.erase(uuid);
+            POS_DEBUG_C("remove apicxt rpc2parser work queue: uuid(%lu)", uuid);
         }
-    } else if (qtype == kPOS_Queue_Type_CQ){
-        if constexpr (qposition == kPOS_Queue_Position_Parser){
-            if(unlikely(_parser_cqs.count(uuid) == 0)){
-                retval = POS_FAILED_NOT_EXIST;
-                POS_WARN_C("try to remove an non-exist runtime CQ: uuid(%lu)", uuid);
-            } else {
-                q = _parser_cqs[uuid]; delete q; 
-                _parser_cqs.erase(uuid);
-                POS_DEBUG_C("remove runtime CQ: uuid(%lu)", uuid);
-            }
-        } else if (qposition == kPOS_Queue_Position_Worker){
-            if(unlikely(_worker_cqs.count(uuid) == 0)){
-                retval = POS_FAILED_NOT_EXIST;
-                POS_WARN_C("try to remove an non-exist worker CQ: uuid(%lu)", uuid);
-            } else {
-                q = _worker_cqs[uuid]; delete q; 
-                _worker_cqs.erase(uuid);
-                POS_DEBUG_C("remove worker CQ: uuid(%lu)", uuid);
-            }
+
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            apictx_q = this->_apicxt_parser2worker_wqs[uuid];
+            delete apictx_q;
+            this->_apicxt_parser2worker_wqs.erase(uuid);
+            POS_DEBUG_C("remove apicxt parser2worker work queue: uuid(%lu)", uuid);
+        }
+    }
+
+    // api context completion queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_CQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_Rpc2Parser || qdir == kPOS_QueueDirection_Rpc2Worker,
+            "POSAPIContext_QE_t can only be passed within rpc2parser or rpc2worker queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Parser){
+            apictx_q = this->_apicxt_rpc2parser_cqs[uuid];
+            delete apictx_q;
+            this->_apicxt_rpc2parser_cqs.erase(uuid);
+            POS_DEBUG_C("remove apicxt rpc2parser completion queue: uuid(%lu)", uuid);
+        }
+
+        if constexpr (qdir == kPOS_QueueDirection_Rpc2Worker){
+            apictx_q = this->_apicxt_rpc2worker_cqs[uuid];
+            delete apictx_q;
+            this->_apicxt_rpc2worker_cqs.erase(uuid);
+            POS_DEBUG_C("remove apicxt rpc2worker completion queue: uuid(%lu)", uuid);
+        }
+    }
+
+    // command work queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_WQ){        
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            cmd_q = this->_cmd_worker2parser_wqs[uuid];
+            delete cmd_q;
+            this->_cmd_worker2parser_wqs.erase(uuid);
+            POS_DEBUG_C("remove cmd worker2parser work queue: uuid(%lu)", uuid);
+        }
+
+        if constexpr (qdir == kPOS_QueueDirection_Oob2Parser){
+            cmd_q = this->_cmd_oob2parser_wqs[uuid];
+            delete cmd_q;
+            this->_cmd_oob2parser_wqs.erase(uuid);
+            POS_DEBUG_C("remove cmd oob2parser work queue: uuid(%lu)", uuid);
+        }
+    }
+
+    // command completion queue
+    if constexpr (qtype == kPOS_QueueType_Cmd_CQ){        
+        static_assert(
+            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_QE_t can only be passed within worker2parser or oob2parser queue"
+        );
+
+        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
+            cmd_q = this->_cmd_worker2parser_cqs[uuid];
+            delete cmd_q;
+            this->_cmd_worker2parser_cqs.erase(uuid);
+            POS_DEBUG_C("remove cmd worker2parser completion queue: uuid(%lu)", uuid);
+        }
+
+        if constexpr (qdir == kPOS_QueueDirection_Oob2Parser){
+            cmd_q = this->_cmd_oob2parser_cqs[uuid];
+            delete cmd_q;
+            this->_cmd_oob2parser_cqs.erase(uuid);
+            POS_DEBUG_C("remove cmd oob2parser completion queue: uuid(%lu)", uuid);
         }
     }
 
     return retval;
 }
-template pos_retval_t POSWorkspace::__remove_q<kPOS_Queue_Type_WQ, kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid);
-template pos_retval_t POSWorkspace::__remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Worker>(pos_client_uuid_t uuid);
-template pos_retval_t POSWorkspace::__remove_q<kPOS_Queue_Type_WQ, kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid);
-template pos_retval_t POSWorkspace::__remove_q<kPOS_Queue_Type_CQ, kPOS_Queue_Position_Parser>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(pos_client_uuid_t uuid);
+template pos_retval_t POSWorkspace::__remove_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(pos_client_uuid_t uuid);
 
 
 void POSWorkspace::parse_command_line_options(int argc, char *argv[]){
@@ -475,13 +872,13 @@ int POSWorkspace::pos_process(
 
     // check whether the work queue exists
 #if POS_CONF_RUNTIME_EnableDebugCheck
-    if(unlikely(_parser_wqs.count(uuid) == 0)){
+    if(unlikely(_apicxt_rpc2parser_wqs.count(uuid) == 0)){
         POS_WARN_C_DETAIL("no work queue with client uuid(%lu) was created", uuid);
         return POS_FAILED_NOT_EXIST;
     }
 #endif // POS_CONF_RUNTIME_EnableDebugCheck
 
-    POS_CHECK_POINTER(wq = _parser_wqs[uuid]);
+    POS_CHECK_POINTER(wq = _apicxt_rpc2parser_wqs[uuid]);
 
     // check whether the metadata of the API was recorded
 #if POS_CONF_RUNTIME_EnableDebugCheck
@@ -518,11 +915,15 @@ int POSWorkspace::pos_process(
      */
     if(unlikely(api_meta.is_sync)){
         while(1){
-            if(unlikely(POS_SUCCESS != __poll_cq<kPOS_Queue_Position_Parser>(uuid, &cqes))){
+            if(unlikely(
+                POS_SUCCESS != (this->template poll_q<kPOS_QueueDirection_Rpc2Parser,kPOS_QueueType_ApiCxt_CQ>(uuid, &cqes))
+            )){
                 POS_ERROR_C_DETAIL("failed to poll runtime cq");
             }
 
-            if(unlikely(POS_SUCCESS != __poll_cq<kPOS_Queue_Position_Worker>(uuid, &cqes))){
+            if(unlikely(
+                POS_SUCCESS != (this->template poll_q<kPOS_QueueDirection_Rpc2Worker,kPOS_QueueType_ApiCxt_CQ>(uuid, &cqes))
+            )){
                 POS_ERROR_C_DETAIL("failed to poll worker cq");
             }
 
@@ -557,8 +958,8 @@ int POSWorkspace::pos_process(
 
                 // record previous async error
                 if(unlikely(
-                    cqe->status == kPOS_API_Execute_Status_Parse_Failed
-                    || cqe->status == kPOS_API_Execute_Status_Launch_Failed
+                    cqe->status == kPOS_API_Execute_Status_Parser_Failed
+                    || cqe->status == kPOS_API_Execute_Status_Worker_Failed
                 )){
                     has_prev_error = true;
                     prev_error_code = cqe->api_cxt->return_code;

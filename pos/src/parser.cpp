@@ -65,6 +65,8 @@ void POSParser::__daemon(){
     POSAPIMeta_t api_meta;
     POSAPIContext_QE* wqe;
     uint64_t last_ckpt_tick = 0, current_tick;
+    pos_retval_t retval;
+    std::vector<POSAPIContext_QE*> wqes;
 
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
@@ -75,7 +77,15 @@ void POSParser::__daemon(){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
-        if((wqe = _ws->dequeue_parser_job(this->_client->id)) != nullptr){
+        // poll apicxt from work queue connected to rpc frontend
+        wqes.clear();
+        retval = this->_ws->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(
+            this->_client->id, &wqes
+        );
+        
+        for(i=0; i<wqes.size(); i++){
+            POS_CHECK_POINTER(wqe = wqes[i]);
+
             api_id = wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
@@ -105,18 +115,19 @@ void POSParser::__daemon(){
                     "failed to execute parser function: client_id(%lu), api_id(%lu)",
                     wqe->client_id, api_id
                 );
-                wqe->status = kPOS_API_Execute_Status_Parse_Failed;
+                wqe->status = kPOS_API_Execute_Status_Parser_Failed;
                 wqe->return_tick = POSUtilTimestamp::get_tsc();                    
-                this->_ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(wqe);
 
                 continue;
             }
-            
+
             /*!
              *  \note       for api in type of Delete_Resource, one can directly send
              *              response to the client right after operating on mocked resources
              *  \warning    we can't apply this rule for all Create_Resource, consider the memory
              *              situation, which is passthrough addressed
+             *  TODO: delete this block, should be implement in autogen system
              */
             if(unlikely(api_meta.api_type == kPOS_API_Type_Delete_Resource)){
                 POS_DEBUG_C("api(%lu) is type of Delete_Resource, set as \"Return_After_Parse\"", api_id);
@@ -129,8 +140,13 @@ void POSParser::__daemon(){
              */
             if(wqe->status == kPOS_API_Execute_Status_Return_After_Parse){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                this->_ws->template push_cq<kPOS_Queue_Position_Parser>(wqe);
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
+
+            // insert wqe to worker queue
+            // if(wqe->status != kPOS_API_Execute_Status_Return_Without_Worker){
+            //     this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(wqe);
+            // }
         }
 
         /*!
