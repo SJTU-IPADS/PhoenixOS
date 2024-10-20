@@ -74,11 +74,12 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
     _oob_server = new POSOobServer(
         /* ws */ this,
         /* callback_handlers */ {
-            {   kPOS_OOB_Msg_Agent_Register_Client,   oob_functions::agent_register_client::sv      },
-            {   kPOS_OOB_Msg_Agent_Unregister_Client, oob_functions::agent_unregister_client::sv    },
-            {   kPOS_OOB_Msg_Utils_MockAPICall,     oob_functions::utils_mock_api_call::sv        },
-            {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::sv     },
-            {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::sv       },
+            {   kPOS_OOB_Msg_Agent_Register_Client,     oob_functions::agent_register_client::sv    },
+            {   kPOS_OOB_Msg_Agent_Unregister_Client,   oob_functions::agent_unregister_client::sv  },
+            {   kPOS_OOB_Msg_Utils_MockAPICall,         oob_functions::utils_mock_api_call::sv      },
+            {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,          oob_functions::cli_ckpt_predump::sv         },
+            {   kPOS_OOB_Msg_CLI_Migration_Signal,      oob_functions::cli_migration_signal::sv     },
+            {   kPOS_OOB_Msg_CLI_Restore_Signal,        oob_functions::cli_restore_signal::sv       },
         },
         /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
         /* port */ POS_OOB_SERVER_DEFAULT_PORT
