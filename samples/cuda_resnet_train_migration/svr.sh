@@ -3,7 +3,7 @@
 # >>>>>>>>>> common variables <<<<<<<<<<
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-SUDO=
+SUDO=sudo
 
 # >>>>>>>>>> action configurations <<<<<<<<<<
 container_id=0
@@ -45,7 +45,7 @@ start_server() {
         cd $script_dir && cd .. && cd ..
         # $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
         #                 --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
-        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
+        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pos_svr_base:12.1
         # $SUDO docker run -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         $SUDO docker exec -it $container_name bash
     fi

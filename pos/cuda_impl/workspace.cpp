@@ -97,6 +97,7 @@ pos_retval_t POSWorkspace_CUDA::__deinit(){
     int i;
 
     for(i=0; i<this->_cu_contexts.size(); i++){
+        POS_DEBUG("destorying cuda context on device...: device_id(%d)", i);
         dr_retval = cuCtxDestroy(this->_cu_contexts[i]);
         if(unlikely(dr_retval != CUDA_SUCCESS)){
             POS_WARN_C(
@@ -104,7 +105,8 @@ pos_retval_t POSWorkspace_CUDA::__deinit(){
                 i, dr_retval
             );
         } else {
-            POS_DEBUG_C("destoried CUDA context: device_id(%d)", i);
+            POS_BACK_LINE
+            POS_DEBUG_C("destoried cuda context on device: device_id(%d)", i);
         }
     }
     this->_cu_contexts.clear();

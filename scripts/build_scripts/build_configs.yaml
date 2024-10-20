@@ -4,7 +4,7 @@
 
 # ========= Runtime configs =========
 runtime_target: "cuda"
-runtime_target_version: "11.3"
+runtime_target_version: "12.1"
 runtime_enable_print_error: 1
 runtime_enable_print_warn: 1
 runtime_enable_print_log: 1

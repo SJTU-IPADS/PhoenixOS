@@ -251,13 +251,16 @@ class POSOobServer {
         typename std::map<uint16_t, POSOobSession_t*>::iterator session_map_iter;
 
         for(session_map_iter = this->_session_map.begin(); session_map_iter != this->_session_map.end(); session_map_iter++) {
-            tmp_retval = this->__remove_session(session_map_iter->first);
+            tmp_retval = this->__shutdown_session(session_map_iter->first);
             if(unlikely(tmp_retval != POS_SUCCESS)){
                 POS_WARN_C("failed to shutdown session: udp_port(%u), retval(%u)", session_map_iter->first, tmp_retval);
             } else {
                 POS_DEBUG_C("shutdown session: udp_port(%u)", session_map_iter->first);
             }
         }
+
+        // remove all sessions from session map
+        this->_session_map.clear();
     }
 
 
@@ -311,11 +314,13 @@ class POSOobServer {
             // clean closed session
             if constexpr (is_main_session == true) {
                 for(port_set_iter = this->_close_session_ports.begin(); port_set_iter != this->_close_session_ports.end(); port_set_iter++){
-                    retval = this->__remove_session(*port_set_iter);
+                    retval = this->__shutdown_session(*port_set_iter);
                     if(unlikely(retval != POS_SUCCESS)){
                         POS_WARN_C("failed to clean closed session: retval(%u), udp_port(%u)", retval, *port_set_iter);
                     }
+                    this->_session_map.erase(*port_set_iter);
                 }
+                this->_close_session_ports.clear();
             }
         }
     }
@@ -462,7 +467,7 @@ class POSOobServer {
      *  \param  port    specified UDP port
      *  \return POS_SUCCESS for succesfully remove
      */
-    pos_retval_t __remove_session(uint16_t port){
+    pos_retval_t __shutdown_session(uint16_t port){
         pos_retval_t retval = POS_SUCCESS;
         POSOobSession_t *session;
 
@@ -475,23 +480,20 @@ class POSOobServer {
         session = this->_session_map[port];
         POS_CHECK_POINTER(session);
 
-        // 1. close socket
-        if(session->fd > 0){
-            close(session->fd);
-        }
-
-        // 2. stop daemon thread for the session
+        // 1. stop daemon thread for the session
         if(session->daemon != nullptr){
             session->quit_flag = true;
             session->daemon->join();
             delete session->daemon;
         }
 
+        // 2. close socket
+        if(session->fd > 0){
+            close(session->fd);
+        }
+
         // 3. delete session context
         delete session;
-
-        // 4. remove from session map
-        this->_session_map.erase(port);
 
     exit:
         return retval;
