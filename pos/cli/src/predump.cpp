@@ -67,7 +67,7 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
     );
 
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_PreDump, &call_data);
-    if(POS_SUCCESS != retval){
+    if(POS_SUCCESS != call_data.retval){
         POS_WARN("predump failed, %s", call_data.retmsg);
     } else {
         POS_LOG("predump done");

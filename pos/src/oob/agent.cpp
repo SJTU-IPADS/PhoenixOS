@@ -55,7 +55,7 @@ namespace agent_register_client {
             POS_WARN("failed to create client: job_name(%s)", payload->job_name);
             goto exit;
         }
-        POS_DEBUG("create client: job_name(%s), uuid(%lu)", payload->job_name, clnt->id);
+        POS_DEBUG("create client: job_name(%s), uuid(%lu), pid(%d)", payload->job_name, clnt->id, create_param.pid);
 
         msg->client_meta.uuid = clnt->id;
         payload->is_registered = true;
