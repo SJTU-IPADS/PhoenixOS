@@ -170,7 +170,7 @@ class POSClient {
      *  \param  cxt context to initialize this client
      *  \param  ws  pointer to the global workspace
      */
-    POSClient(uint64_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
+    POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
         :   id(id),
             dag({ .checkpoint_api_id = cxt.checkpoint_api_id }),
             migration_ctx(this),
@@ -309,7 +309,7 @@ class POSClient {
     std::map<pos_resource_typeid_t, void*> handle_managers;
 
     // client identifier
-    uint64_t id;
+    pos_client_uuid_t id;
 
     // the execution dag
     POSDag dag;

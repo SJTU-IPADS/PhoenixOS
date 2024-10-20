@@ -198,14 +198,14 @@ void POSWorker::__daemon_ckpt_sync(){
 
             // check whether the execution is success
             if(unlikely(launch_retval != POS_SUCCESS)){
-                wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                wqe->status = kPOS_API_Execute_Status_Worker_Failed;
             }
 
             // check whether we need to return to frontend
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }   
         }
     }
@@ -487,14 +487,14 @@ void POSWorker::__daemon_ckpt_async(){
 
             // check whether the execution is success
             if(unlikely(launch_retval != POS_SUCCESS)){
-                wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                wqe->status = kPOS_API_Execute_Status_Worker_Failed;
             }
 
             // check whether we need to return to frontend
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
     }
@@ -755,14 +755,14 @@ exit:
 
                 // check whether the execution is success
                 if(unlikely(launch_retval != POS_SUCCESS)){
-                    wqe->status = kPOS_API_Execute_Status_Launch_Failed;
+                    wqe->status = kPOS_API_Execute_Status_Worker_Failed;
                 }
 
                 // check whether we need to return to frontend
                 if(wqe->status == kPOS_API_Execute_Status_Init){
                     // we only return the QE back to frontend when it hasn't been returned before
                     wqe->return_tick = POSUtilTimestamp::get_tsc();
-                    _ws->template push_cq<kPOS_Queue_Position_Worker>(wqe);
+                    _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
                 } 
             }        
 

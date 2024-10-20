@@ -50,7 +50,7 @@ pos_retval_t POSAgentConf::load_config(std::string &&file_path){
         }
         
         // load daemon addr
-        if(config["job_name"]){
+        if(config["daemon_addr"]){
             this->_daemon_addr = config["daemon_addr"].as<std::string>();
         } else {
             this->_daemon_addr = "127.0.0.1";
