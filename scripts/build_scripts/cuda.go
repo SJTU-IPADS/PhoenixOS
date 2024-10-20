@@ -15,16 +15,16 @@ const (
 	KLibYamlCppPath = "third_party/yaml-cpp"
 
 	// PhOS repo
-	KPhOSPath        = "pos"
-	KPhOSCLIPath     = "pos/cli"
-	KPhOSPatcherPath = "pos/cuda_impl/patcher"
-	kPhOSAutoGenPath = "autogen"
-	KRemotingPath    = "remoting/cuda"
+	KPhOSPath         = "pos"
+	KPhOSCLIPath      = "pos/cli"
+	KPhOSPatcherPath  = "pos/cuda_impl/patcher"
+	kPhOSAutoGenPath  = "autogen"
+	KRemotingPath     = "remoting/cuda"
 	kPhOSUnitTestPath = "test"
-	KBuildLogPath    = "build_log"
-	KBuildLibPath    = "lib"
-	KBuildIncPath    = "lib/pos/include"
-	KBuildBinPath    = "bin"
+	KBuildLogPath     = "build_log"
+	KBuildLibPath     = "lib"
+	KBuildIncPath     = "lib/pos/include"
+	KBuildBinPath     = "bin"
 
 	// system
 	KInstallLibPath = "/lib/x86_64-linux-gnu"
@@ -500,10 +500,9 @@ func buildAndRunUnitTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.
 		#!/bin/bash
 		set -e
 		cd %s/%s/build
-		LD_LIBRARY_PATH=../../lib/ ./pos_test 2&>1
+		LD_LIBRARY_PATH=../../lib/ ./pos_test >%s 2&>1
 		`,
 		cmdOpt.RootDir, kPhOSUnitTestPath,
-		buildConf.RuntimeTargetVersion,
 		runLogPath,
 	)
 
