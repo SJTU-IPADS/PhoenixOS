@@ -43,7 +43,7 @@ namespace cli_ckpt_predump {
         // form cmd
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
-        cmd->type = kPOS_Command_OobToParser_PreDumpStart;
+        cmd->type = kPOS_Command_Oob2Parser_PreDump;
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
@@ -60,13 +60,14 @@ namespace cli_ckpt_predump {
             client->template poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(&cmds);
         }
         POS_ASSERT(cmds.size() == 1);
-        POS_ASSERT(cmds[0]->type == kPOS_Command_WorkerToParser_DumpEnd
-                || cmds[0]->type == kPOS_Command_WorkerToParser_PreDumpEnd);
+        POS_ASSERT(cmds[0]->type == kPOS_Command_Oob2Parser_PreDump);
 
         // transfer error status
         if(unlikely(cmds[0]->retval != POS_SUCCESS)){
             if(cmds[0]->retval == POS_FAILED_NOT_ENABLED){
                 retmsg = "posd doesn't enable ckpt support";
+            } else if (cmds[0]->retval == POS_FAILED_ALREADY_EXIST){
+                retmsg = "pre-dump too frequent, conflict";
             } else {
                 retmsg = "see posd log for more details";
             }

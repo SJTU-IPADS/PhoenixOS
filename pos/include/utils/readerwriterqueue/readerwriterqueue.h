@@ -692,10 +692,7 @@ private:
 		AE_NO_TSAN ReentrantGuard(weak_atomic<bool>& _inSection)
 			: inSection(_inSection)
 		{
-			// assert(!inSection && "Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
-			if(inSection){
-                throw std::runtime_error("Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
-            }
+			assert(!inSection && "Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
             inSection = true;
 		}
 
