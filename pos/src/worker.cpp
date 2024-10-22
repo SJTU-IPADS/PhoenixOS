@@ -161,7 +161,6 @@ void POSWorker::__daemon_ckpt_sync(){
             POS_CHECK_POINTER(wqe = wqes[i]);
             
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
-            api_id = wqe->api_cxt->api_id;
 
             // this is a checkpoint op
             if(unlikely(wqe->ckpt_mark == true)){
@@ -180,7 +179,9 @@ void POSWorker::__daemon_ckpt_sync(){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 continue;
             }
-
+            
+            POS_CHECK_POINTER(wqe->api_cxt);
+            api_id = wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
             // check and restore broken handles
@@ -279,10 +280,10 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
     
     // reply to parser
     POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
-    cmd->client_id = wqe->client_id;
+    cmd->client_id = this->_client->id;
     cmd->retval = retval;
     cmd->type = kPOS_Command_WorkerToParser_DumpEnd;
-    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }
