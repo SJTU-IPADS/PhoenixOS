@@ -1,9 +1,7 @@
 #include "pos/cuda_impl/workspace.h"
 
 
-POSWorkspace_CUDA::POSWorkspace_CUDA() : POSWorkspace(){
-    this->checkpoint_api_id = 6666;
-}
+POSWorkspace_CUDA::POSWorkspace_CUDA() : POSWorkspace(){}
 
 
 pos_retval_t POSWorkspace_CUDA::__init(){
@@ -118,9 +116,18 @@ pos_retval_t POSWorkspace_CUDA::__deinit(){
 pos_retval_t POSWorkspace_CUDA::create_client(pos_create_client_param_t& param, POSClient** clnt){
     pos_retval_t retval = POS_SUCCESS;
     pos_client_cxt_CUDA_t client_cxt;
+    std::string runtime_daemon_log_path;
+
     client_cxt.cxt_base.job_name = param.job_name;
-    client_cxt.cxt_base.checkpoint_api_id = this->checkpoint_api_id;
     client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
+
+    retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeDaemonLogPath, runtime_daemon_log_path);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to obtain runtime daemon log path");
+    } else {
+        client_cxt.cxt_base.kernel_meta_path = runtime_daemon_log_path + std::string("/") 
+                                                + param.job_name + std::string("_kernel_metas.txt");
+    }
 
     // create client
     POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* ws */ this, /* id */ _current_max_uuid, /* cxt */ client_cxt));

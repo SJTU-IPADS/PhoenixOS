@@ -1,6 +1,6 @@
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd $script_dir
-LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../build ../../remoting/cuda/cpu/cricket-rpc-server -n resnet -k ./resnet_kernel_metas.txt
+LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../lib ../../remoting/cuda/cpu/cricket-rpc-server
 
 # echo '0' | sudo tee /proc/PID_OF_PROCESS/coredump_filter
 

@@ -39,9 +39,6 @@ class POSWorkspace;
  *  \brief  context of the client
  */
 typedef struct pos_client_cxt {
-    // api id of the checkpoint operation
-    uint64_t checkpoint_api_id;
-
     // name of the job
     std::string job_name;
 
@@ -175,7 +172,7 @@ class POSClient {
      */
     POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
         :   id(id),
-            dag({ .checkpoint_api_id = cxt.checkpoint_api_id }),
+            dag({ .something = 0 }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
             _api_inst_pc(0), 
@@ -186,7 +183,7 @@ class POSClient {
 
     POSClient() 
         :   id(0),
-            dag({ .checkpoint_api_id = 0 }),
+            dag({ .something = 0 }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
             _last_ckpt_tick(0),
@@ -282,13 +279,6 @@ class POSClient {
     virtual void __TMP__migration_ondemand_reload(){}
     virtual void __TMP__migration_allcopy(){}
     virtual void __TMP__migration_allreload(){}
-
-
-    /*!
-     *  \brief  get whether it's time to checkpoint this client
-     *  \return the state identify whether it's time to checkpoint this client
-     */
-    bool is_time_for_ckpt();
 
 
     /*!
@@ -401,7 +391,6 @@ class POSClient {
 
         POS_CHECK_POINTER(ckpt_wqe);
         *ckpt_wqe = new POSAPIContext_QE_t(
-            /* api_id*/ this->_cxt.checkpoint_api_id,
             /* client */ this
         );
         POS_CHECK_POINTER(*ckpt_wqe);

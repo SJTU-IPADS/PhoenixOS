@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "pos/include/command.h"
+#include "pos/include/common.h"
 #include "pos/include/log.h"
 
 

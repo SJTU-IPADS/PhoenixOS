@@ -67,6 +67,9 @@ class POSAgentConf {
     // ip addrsss of the pos daemon, commonly 127.0.0.1
     std::string _daemon_addr;
 
+    // path of the client's log
+    std::string _runtime_client_log_path;
+
     // name of the job
     std::string _job_name;
 

@@ -74,22 +74,6 @@ exit:
 }
 
 
-bool POSClient::is_time_for_ckpt(){
-    bool retval = false;
-    uint64_t current_tick = POSUtilTimestamp::get_tsc();
-
-    if(unlikely(
-        current_tick - this->_last_ckpt_tick 
-            >= this->_ws->tsc_timer.ms_to_tick(POS_CONF_EVAL_CkptDefaultIntervalMs)
-    )){
-        retval = true;
-        this->_last_ckpt_tick = current_tick;
-    }
-
-    return retval;
-}
-
-
 void POSClient::init_restore_load_resources() {
     pos_retval_t temp_retval;
     uint64_t i, j;
