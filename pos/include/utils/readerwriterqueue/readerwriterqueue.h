@@ -119,8 +119,7 @@ public:
 	// at least one extra buffer block).
 	AE_NO_TSAN explicit ReaderWriterQueue(size_t size = 15)
 #ifndef NDEBUG
-		: enqueuing(false)
-		,dequeuing(false)
+		: enqueuing(false), dequeuing(false)
 #endif
 	{
 		assert(MAX_BLOCK_SIZE == ceilToPow2(MAX_BLOCK_SIZE) && "MAX_BLOCK_SIZE must be a power of 2");
@@ -693,8 +692,11 @@ private:
 		AE_NO_TSAN ReentrantGuard(weak_atomic<bool>& _inSection)
 			: inSection(_inSection)
 		{
-			assert(!inSection && "Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
-			inSection = true;
+			// assert(!inSection && "Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
+			if(inSection){
+                throw std::runtime_error("Concurrent (or re-entrant) enqueue or dequeue operation detected (only one thread at a time may hold the producer or consumer role)");
+            }
+            inSection = true;
 		}
 
 		AE_NO_TSAN ~ReentrantGuard() { inSection = false; }

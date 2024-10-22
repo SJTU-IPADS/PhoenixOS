@@ -21,8 +21,6 @@
 #include <stdint.h>
 #include <assert.h>
 
-using pos_retval_t = uint8_t;
-
 #ifdef __GNUC__
     #define likely(x)       __builtin_expect(!!(x), 1)
     #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -32,7 +30,7 @@ using pos_retval_t = uint8_t;
 #endif
 #define _unused(x) ((void)(x))  // make production build happy
 
-enum pos_retval {
+enum pos_retval : uint8_t {
     POS_SUCCESS = 0,
     POS_WARN_DUPLICATED,
     POS_WARN_NOT_READY,
@@ -74,6 +72,11 @@ enum pos_retval {
 #define GB(x)   ((size_t) (x) << 30)
 
 /*!
+ *  \brief  type for return value
+ */
+using pos_retval_t = uint8_t;
+
+/*!
  *  \brief  type for resource typeid
  */
 using pos_resource_typeid_t = uint32_t;
@@ -87,3 +90,19 @@ using pos_client_uuid_t = uint64_t;
  *  \brief  type for uniquely identify a transport
  */
 using pos_transport_id_t = uint64_t;
+
+/*!
+ *  \brief  type for uniquely identify a resource
+ */
+using pos_u64id_t = uint64_t;
+
+/*!
+ *  \brief  edge attributes for POS DAG
+ */
+enum pos_edge_direction_t : uint8_t {
+    kPOS_Edge_Direction_In = 0,
+    kPOS_Edge_Direction_Out,
+    kPOS_Edge_Direction_InOut,
+    kPOS_Edge_Direction_Create,
+    kPOS_Edge_Direction_Delete
+};

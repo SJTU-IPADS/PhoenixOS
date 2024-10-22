@@ -183,9 +183,39 @@ pos_retval_t POSWorkspace::deinit(){
 }
 
 
+pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSClient** clnt){
+    pos_retval_t retval = POS_SUCCESS;
+
+    param.id = this->_current_max_uuid;
+
+    // create client
+    retval = this->__create_client(param, clnt);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to create platform-specific client");
+        goto exit;
+    }
+    this->_current_max_uuid += 1;
+    this->_client_map[(*clnt)->id] = (*clnt);
+    this->_pid_client_map[param.pid] = (*clnt);
+    POS_DEBUG_C("create client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, param.pid);
+
+    // create queue pair
+    retval = this->__create_qp((*clnt)->id);
+    if(retval == POS_SUCCESS){
+        POS_DEBUG_C("add queue pair: uuid(%lu)", (*clnt)->id);
+        (*clnt)->status = kPOS_ClientStatus_Active;
+    } else {
+        POS_WARN_C("failed to create queue pair: uuid(%lu)", (*clnt)->id);
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     pos_retval_t retval = POS_SUCCESS;
-    void* clnt;
+    POSClient *clnt;
     typename std::map<__pid_t, POSClient*>::iterator pid_client_map_iter;
 
     if(unlikely(this->_client_map.count(uuid) == 0)){
@@ -194,13 +224,6 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
         goto exit;
     }
     POS_CHECK_POINTER(clnt = _client_map[uuid]);
-
-    // remove queue pair first
-    retval = this->__remove_qp(uuid);
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C("failed to remove queue pair: uuid(%lu)", uuid);
-        goto exit;
-    }
 
     // delete from pid map
     for(pid_client_map_iter = this->_pid_client_map.begin();
@@ -214,7 +237,20 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     }
 
     // delete client
-    delete clnt;
+    retval = this->__destory_client(clnt);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to destory client: uuid(%lu)", uuid);
+        goto exit;
+    }
+
+    // remove queue pair
+    retval = this->__remove_qp(uuid);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to remove queue pair: uuid(%lu)", uuid);
+        goto exit;
+    }
+
+    // erase from global map
     _client_map.erase(uuid);
 
     POS_DEBUG_C("removed client: uuid(%lu)", uuid);
@@ -254,6 +290,8 @@ pos_retval_t POSWorkspace::push_q(void *qe){
     POSLockFreeQueue<POSAPIContext_QE_t*> *apictx_q;
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
     pos_client_uuid_t uuid;
+
+    std::lock_guard<std::mutex> lock(this->q_mtx);
 
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
@@ -435,6 +473,8 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
     POSLockFreeQueue<POSAPIContext_QE_t*> *apictx_q;
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
 
+    std::lock_guard<std::mutex> lock(this->q_mtx);
+
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
         ||  qtype == kPOS_QueueType_ApiCxt_CkptDag_WQ
@@ -468,7 +508,7 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
             }
             POS_CHECK_POINTER(apictx_q = this->_apicxt_parser2worker_wqs[uuid]);
         }
-        apictx_q->clear();
+        apictx_q->drain();
     }
 
     // api context completion queue 
@@ -497,7 +537,7 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
             }
             POS_CHECK_POINTER(apictx_q = this->_apicxt_rpc2worker_cqs[uuid]);
         }
-        apictx_q->clear();
+        apictx_q->drain();
     }
 
     // api context ckptdag queue 
@@ -515,7 +555,7 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
             goto exit;
         }
         POS_CHECK_POINTER(apictx_q = this->_apicxt_workerlocal_ckptdag_wqs[uuid]);
-        apictx_q->clear();
+        apictx_q->drain();
     }
 
     // command work queue
@@ -544,7 +584,7 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
             }
             POS_CHECK_POINTER(cmd_q = this->_cmd_oob2parser_wqs[uuid]);
         }
-        cmd_q->clear();
+        cmd_q->drain();
     }
 
     // command completion queue
@@ -573,7 +613,7 @@ pos_retval_t POSWorkspace::clear_q(pos_client_uuid_t uuid){
             }
             POS_CHECK_POINTER(cmd_q = this->_cmd_oob2parser_cqs[uuid]);
         }
-        cmd_q->clear();
+        cmd_q->drain();
     }
 
 exit:
@@ -594,10 +634,16 @@ pos_retval_t POSWorkspace::__create_qp(pos_client_uuid_t uuid){
     pos_retval_t retval = POS_SUCCESS;
     POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_rpc2parser_wq, *apicxt_rpc2parser_cq;
     POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_parser2worker_wq, *apicxt_rpc2worker_cq;
-    POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_parser2worker_ckptdag_wq;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_workerlocal_ckptdag_wq;
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_worker2parser_wq, *cmd_worker2parser_cq;
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_oob2parser_wq, *cmd_oob2parser_cq;
 
+    std::lock_guard<std::mutex> lock(this->q_mtx);
+
+    if(unlikely(this->_client_map.count(uuid) == 0)){
+        POS_ERROR_C_DETAIL("failed to create qp, no client exist, this is a bug: uuid(%lu)", uuid);
+    }
+    
     if(unlikely(
             this->_apicxt_rpc2parser_wqs.count(uuid) > 0 
         ||  this->_apicxt_rpc2parser_cqs.count(uuid) > 0
@@ -636,11 +682,11 @@ pos_retval_t POSWorkspace::__create_qp(pos_client_uuid_t uuid){
     this->_apicxt_rpc2worker_cqs[uuid] = apicxt_rpc2worker_cq;
     POS_DEBUG_C("create rpc2worker apicxt completion queue: uuid(%lu)", uuid);
 
-    // parser2worker apicxt ckptdag queue
-    apicxt_parser2worker_ckptdag_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
-    POS_CHECK_POINTER(apicxt_parser2worker_ckptdag_wq);
-    this->_apicxt_workerlocal_ckptdag_wqs[uuid] = apicxt_parser2worker_ckptdag_wq;
-    POS_DEBUG_C("create parser2worker apicxt completion queue: uuid(%lu)", uuid);
+    // workerlocal apicxt ckptdag queue
+    apicxt_workerlocal_ckptdag_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(apicxt_workerlocal_ckptdag_wq);
+    this->_apicxt_workerlocal_ckptdag_wqs[uuid] = apicxt_workerlocal_ckptdag_wq;
+    POS_DEBUG_C("create workerlocal ckptdagapicxt work queue: uuid(%lu)", uuid);
 
     // worker2parser cmd work queue
     cmd_worker2parser_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
@@ -673,6 +719,8 @@ pos_retval_t POSWorkspace::__create_qp(pos_client_uuid_t uuid){
 pos_retval_t POSWorkspace::__remove_qp(pos_client_uuid_t uuid){
     pos_retval_t retval = POS_SUCCESS;
     POSClient *clnt;
+
+    std::lock_guard<std::mutex> lock(this->q_mtx);
 
     if(unlikely(this->_client_map.count(uuid) == 0)){
         POS_WARN_C(
@@ -744,14 +792,14 @@ pos_retval_t POSWorkspace::__remove_qp(pos_client_uuid_t uuid){
         }
     }
 
-    // parser2worker_ckptdag apicxt completion queue
+    // workerlocal_ckptdag apicxt completion queue
     if(this->_apicxt_workerlocal_ckptdag_wqs[uuid] != nullptr){
         POS_DEBUG_C("removing apicxt rpc2worker completion queue...: uuid(%lu)", uuid);
         this->_apicxt_workerlocal_ckptdag_wqs[uuid]->lock_enqueue();
         this->_apicxt_workerlocal_ckptdag_wqs[uuid]->lock_dequeue();
         retval = this->__remove_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(uuid);
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to remove parser2worker_ckptdag work queue: uuid(%lu)", uuid);
+            POS_WARN_C("failed to remove workerlocal_ckptdag work queue: uuid(%lu)", uuid);
             goto exit;
         }
     }
@@ -816,6 +864,8 @@ pos_retval_t POSWorkspace::poll_q(pos_client_uuid_t uuid, std::vector<POSAPICont
     pos_retval_t retval = POS_SUCCESS;
     POSAPIContext_QE *apicxt_qe;
     POSLockFreeQueue<POSAPIContext_QE_t*> *apicxt_q;
+
+    std::lock_guard<std::mutex> lock(this->q_mtx);
 
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ 
@@ -910,6 +960,8 @@ pos_retval_t POSWorkspace::poll_q(pos_client_uuid_t uuid, std::vector<POSCommand
     POSCommand_QE_t *cmd_qe;
     POSLockFreeQueue<POSCommand_QE_t*> *cmd_q;
     
+    std::lock_guard<std::mutex> lock(this->q_mtx);
+
     static_assert(
         qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
         "invalid queue type obtained"
@@ -1199,7 +1251,7 @@ int POSWorkspace::pos_process(
         /* api_id*/ api_id,
         /* uuid */ uuid,
         /* param_desps */ param_desps,
-        /* api_inst_id */ client->get_and_move_api_inst_pc(),
+        /* id */ client->get_and_move_api_inst_pc(),
         /* retval_data */ ret_data,
         /* retval_size */ ret_data_len,
         /* pos_client */ (void*)client
@@ -1240,7 +1292,7 @@ int POSWorkspace::pos_process(
                 POS_CHECK_POINTER(cqe = cqes[i]);
 
                 // found the called sync api
-                if(cqe->api_inst_id == wqe->api_inst_id){
+                if(cqe->id == wqe->id){
                     // we should NOT do this assumtion here!
                     // POS_ASSERT(i == cqes.size() - 1);
 

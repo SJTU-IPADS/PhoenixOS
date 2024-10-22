@@ -19,13 +19,13 @@
 #include <map>
 #include <set>
 #include <string>
+#include <fstream>
 #include <stdint.h>
 #include <assert.h>
 #include "pos/include/common.h"
 #include "pos/include/worker.h"
 #include "pos/include/parser.h"
 #include "pos/include/handle.h"
-#include "pos/include/dag.h"
 #include "pos/include/transport.h"
 #include "pos/include/migration.h"
 #include "pos/include/utils/timer.h"
@@ -33,6 +33,7 @@
 
 // forward declaration
 class POSWorkspace;
+typedef struct POSAPIContext_QE POSAPIContext_QE_t;
 
 
 /*!
@@ -64,6 +65,9 @@ typedef struct pos_create_client_param {
 
     // pid of the client-side process
     __pid_t pid;
+
+    // id of the newly created client
+    pos_client_uuid_t id;
 } pos_create_client_param_t;
 
 
@@ -172,7 +176,6 @@ class POSClient {
      */
     POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
         :   id(id),
-            dag({ .something = 0 }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
             _api_inst_pc(0), 
@@ -183,7 +186,6 @@ class POSClient {
 
     POSClient() 
         :   id(0),
-            dag({ .something = 0 }),
             migration_ctx(this),
             status(kPOS_ClientStatus_CreatePending),
             _last_ckpt_tick(0),
@@ -217,13 +219,6 @@ class POSClient {
      *          own needed handle managers
      */
     virtual void init_handle_managers(){}
-
-
-    /*!
-     *  \brief  initialization of the DAG
-     *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
-     */
-    virtual void init_dag(){}
     
 
     /*!
@@ -231,35 +226,6 @@ class POSClient {
      *  \return POS_SUCCESS for successfully initialization
      */
     virtual pos_retval_t init_transport(){}
-
-
-    /*!
-     *  \brief  restore resources from checkpointed file
-     */
-    void init_restore_load_resources();
-
-
-    /*!
-     *  \brief  generate recompute wqe sequence
-     *  \param  apicxt_sequence_map     the generated recompute sequence
-     *  \param  missing_handle_map      the generated all missing handles
-     *  \todo   this algorithm need to be reconsidered
-     */
-    void init_restore_generate_recompute_scheme(
-        std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
-        std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
-    );
-
-
-    /*!
-     *  \brief  recreate handles and their state via reloading / recompute
-     *  \param  apicxt_sequence_map     recompute sequence
-     *  \param  missing_handle_map      all missing handles that need to be restored
-     */
-    void init_restore_recreate_handles(
-        std::map<pos_vertex_id_t, POSAPIContext_QE_t*>& apicxt_sequence_map,
-        std::multimap<pos_vertex_id_t, POSHandle*>& missing_handle_map
-    );
 
 
     /*!
@@ -282,12 +248,6 @@ class POSClient {
 
 
     /*!
-     *  \brief  dump checkpoints to file
-     */
-    void deinit_dump_checkpoints();
-
-
-    /*!
      *  \brief  obtain the current pc, and update it
      *  \return the current pc
      */
@@ -303,9 +263,6 @@ class POSClient {
 
     // client identifier
     pos_client_uuid_t id;
-
-    // the execution dag
-    POSDag dag;
     
     // context of migration
     POSMigrationCtx migration_ctx;
@@ -377,29 +334,6 @@ class POSClient {
      *  \brief  last time to do ckpt of this client
      */
     uint64_t _last_ckpt_tick;
-
-    /*!
-     *  \brief  launch checkpoint ops to checkpoint all stateful resources
-     *  \note   this function should be invoked during the preemption
-     *  \param  the issued checkpoint wqe
-     */
-    pos_retval_t __preempt_checkpoint_all_resource(POSAPIContext_QE **ckpt_wqe){
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandleManager<POSHandle> *hm;
-        uint64_t nb_handles, i;
-        POSHandle *handle;
-
-        POS_CHECK_POINTER(ckpt_wqe);
-        *ckpt_wqe = new POSAPIContext_QE_t(
-            /* client */ this
-        );
-        POS_CHECK_POINTER(*ckpt_wqe);
-
-        retval = this->dag.launch_op(*ckpt_wqe);
-
-    exit:
-        return retval;
-    }
 };
 
 #define pos_get_client_typed_hm(client, resource_id, hm_type)  \

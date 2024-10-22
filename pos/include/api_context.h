@@ -28,9 +28,9 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
+#include "pos/include/client.h"
 #include "pos/include/utils/timer.h"
 #include "pos/include/utils/serializer.h"
-#include "pos/include/utils/bipartite_graph.h"
 
 
 /*!
@@ -219,13 +219,13 @@ typedef struct POSAPIContext {
 
     /*!
      *  \brief  constructor
-     *  \param  id              index of the called API
+     *  \param  api_id_         index of the called API
      *  \param  param_desps     descriptors of all involved parameters
      *  \param  ret_data_       pointer to the memory area that store the returned value
      *  \param  retval_size_    size of the return value
      */
-    POSAPIContext(uint64_t id, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0) 
-        : api_id(id), ret_data(ret_data_), retval_size(retval_size_)
+    POSAPIContext(uint64_t api_id_, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0) 
+        : api_id(api_id_), ret_data(ret_data_), retval_size(retval_size_)
     {
         POSAPIParam_t *param;
 
@@ -243,9 +243,9 @@ typedef struct POSAPIContext {
     /*!
      *  \brief  constructor
      *  \note   this constructor is for checkpointing ops
-     *  \param  id  specialized API index of the checkpointing op
+     *  \param  api_id_ specialized API index of the checkpointing op
      */
-    POSAPIContext(uint64_t id) : api_id(id), overall_param_size(0) {}
+    POSAPIContext(uint64_t api_id_) : api_id(api_id_), overall_param_size(0) {}
 
     /*!
      *  \brief  constructor
@@ -266,11 +266,8 @@ typedef struct POSHandleView {
     // pointer to the used handle
     POSHandle *handle;
 
-    /*!
-     *  \brief  dag index of the handle
-     *  \note   this field is only used during restoring phrase
-     */
-    pos_vertex_id_t handle_dag_id;
+    // id of the handle inside handle manager list
+    pos_u64id_t id;
 
     /*!
      *  \brief  resource type index of the handle
@@ -300,7 +297,7 @@ typedef struct POSHandleView {
      */
     static inline uint64_t get_serialize_size(){
         return (
-            /* handle_dag_id */         sizeof(pos_vertex_id_t)
+            /* handle_id */             sizeof(uint64_t)
             /* handle_resource_typeid*/ + sizeof(pos_resource_typeid_t)
             /* param_index */           + sizeof(uint64_t)
             /* offset */                + sizeof(uint64_t)
@@ -327,13 +324,13 @@ typedef struct POSHandleView {
      */
     POSHandleView(
         POSHandle* handle_, uint64_t param_index_ = 0, uint64_t offset_ = 0
-    ) : handle(handle_), handle_dag_id(0), param_index(param_index_), offset(offset_){}
+    ) : handle(handle_), param_index(param_index_), offset(offset_){}
 
     /*!
      *  \brief  constructor
      *  \note   this constructor is used only during restore phrase
      */
-    POSHandleView() : handle(nullptr), handle_dag_id(0), param_index(0), offset(0){}
+    POSHandleView() : handle(nullptr), param_index(0), offset(0){}
 } POSHandleView_t;
 
 /*!
@@ -349,7 +346,7 @@ typedef struct POSAPIContext_QE {
     void *client;
 
     // uuid of this API call instance within the client
-    uint64_t api_inst_id;
+    uint64_t id;
 
     // context of the called API
     POSAPIContext *api_cxt;
@@ -360,9 +357,6 @@ typedef struct POSAPIContext_QE {
     // execution status of the API call
     pos_api_execute_status_t status;
 
-    // id of the DAG vertex of this api instance (aka, op)
-    pos_vertex_id_t dag_vertex_id;
-
     // mark whether this api context has been pruned in the checkpoint system
     bool is_ckpt_pruned;
 
@@ -372,9 +366,6 @@ typedef struct POSAPIContext_QE {
     std::vector<POSHandleView_t> create_handle_views;
     std::vector<POSHandleView_t> delete_handle_views;
     std::vector<POSHandleView_t> inout_handle_views;
-
-    // flatten recording of involved handles of this wqe (to accelerate launch_op)
-    POSNeighborList_t dag_neighbors;
 
     /* =========== profiling fields =========== */
     uint64_t create_tick, return_tick;
@@ -416,8 +407,8 @@ typedef struct POSAPIContext_QE {
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
         uint64_t inst_id, void* retval_data, uint64_t retval_size, void* pos_client
-    ) : client_id(uuid), client(pos_client), execution_stream_id(0),
-        status(kPOS_API_Execute_Status_Init), dag_vertex_id(0), api_inst_id(inst_id), is_ckpt_pruned(false)
+    ) : client_id(uuid), client(pos_client), ckpt_mark(false), execution_stream_id(0),
+        status(kPOS_API_Execute_Status_Init), id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);
         api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
@@ -438,7 +429,6 @@ typedef struct POSAPIContext_QE {
         inout_handle_views.reserve(5);
         create_handle_views.reserve(1);
         delete_handle_views.reserve(1);
-        dag_neighbors.reserve(5);
     }
     
     /*!
@@ -464,7 +454,7 @@ typedef struct POSAPIContext_QE {
      *  \param  pos_client          pointer to the POSClient instance
      */
     POSAPIContext_QE(void* pos_client) 
-        : client(pos_client), is_ckpt_pruned(false), execution_stream_id(0){}
+        : client(pos_client), ckpt_mark(false), is_ckpt_pruned(false), execution_stream_id(0){}
 
     /*!
      *  \brief  deconstructor
@@ -490,7 +480,7 @@ typedef struct POSAPIContext_QE {
 
         return (
             // part 1: base fields
-            /* dag_vertex_id */             sizeof(pos_vertex_id_t)
+            /* id */                        sizeof(uint64_t)
 
             // part 2: api context
             /* size of api_context */       + sizeof(uint64_t)
@@ -526,19 +516,14 @@ typedef struct POSAPIContext_QE {
     inline void record_handle(POSHandleView_t&& handle_view){
         if constexpr (dir == kPOS_Edge_Direction_In){
             input_handle_views.emplace_back(handle_view);
-            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_In});
         } else if (dir == kPOS_Edge_Direction_Out){
             output_handle_views.emplace_back(handle_view);
-            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Out});
         } else if (dir == kPOS_Edge_Direction_Create){
             create_handle_views.emplace_back(handle_view);
-            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Create});
         } else if (dir == kPOS_Edge_Direction_Delete){
             delete_handle_views.emplace_back(handle_view);
-            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_Delete});
         } else { // inout
             inout_handle_views.emplace_back(handle_view);
-            dag_neighbors.push_back({.d_vid = handle_view.handle->dag_vertex_id, .dir = kPOS_Edge_Direction_InOut});
         }
     }
 

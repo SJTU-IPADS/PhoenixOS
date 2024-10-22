@@ -25,7 +25,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/bipartite_graph.h"
 #include "pos/include/utils/serializer.h"
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
@@ -320,8 +319,8 @@ uint64_t POSHandle::__get_basic_serialize_size(){
             /* client_addr */               + sizeof(uint64_t)
             /* server_addr */               + sizeof(uint64_t)
             /* nb_parent_handle */          + sizeof(uint64_t)
-            /* parent_handle_indices */     + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
-            /* dag_vertex_id */             + sizeof(pos_vertex_id_t)
+            /* parent_handle_indices */     + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_u64id_t))
+            /* id */                        + sizeof(pos_u64id_t)
             /* size */                      + sizeof(uint64_t)
             /* state_size */                + sizeof(uint64_t)
             /* is_lastest_used_handle */    + sizeof(bool)
@@ -334,15 +333,15 @@ uint64_t POSHandle::__get_basic_serialize_size(){
         ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
 
         host_ckpt_records = this->ckpt_bag->get_host_checkpoint_records();
-        host_ckpt_serialization_size = host_ckpt_records.size() * (sizeof(pos_vertex_id_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint64_t));
+        host_ckpt_serialization_size = host_ckpt_records.size() * (sizeof(pos_u64id_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint64_t));
 
         return (
             /* resource_type_id */          sizeof(pos_resource_typeid_t)
             /* client_addr */               + sizeof(uint64_t)
             /* server_addr */               + sizeof(uint64_t)
             /* nb_parent_handle */          + sizeof(uint64_t)
-            /* parent_handle_indices */     + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_vertex_id_t))
-            /* dag_vertex_id */             + sizeof(pos_vertex_id_t)
+            /* parent_handle_indices */     + parent_handles.size() * (sizeof(pos_resource_typeid_t) + sizeof(pos_u64id_t))
+            /* id */                        + sizeof(pos_u64id_t)
             /* size */                      + sizeof(uint64_t)
             /* state_size */                + sizeof(uint64_t)
             /* is_lastest_used_handle */    + sizeof(bool) 
@@ -388,9 +387,9 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
     POSUtil_Serializer::write_field(&ptr, &(nb_parent_handles), sizeof(uint64_t));
     for(auto& parent_handle : this->parent_handles){
         POSUtil_Serializer::write_field(&ptr, &(parent_handle->resource_type_id), sizeof(pos_resource_typeid_t));
-        POSUtil_Serializer::write_field(&ptr, &(parent_handle->dag_vertex_id), sizeof(pos_vertex_id_t));
+        POSUtil_Serializer::write_field(&ptr, &(parent_handle->id), sizeof(pos_u64id_t));
     }
-    POSUtil_Serializer::write_field(&ptr, &(this->dag_vertex_id), sizeof(pos_vertex_id_t));
+    POSUtil_Serializer::write_field(&ptr, &(this->id), sizeof(pos_u64id_t));
     POSUtil_Serializer::write_field(&ptr, &(this->size), sizeof(uint64_t));
     POSUtil_Serializer::write_field(&ptr, &(this->state_size), sizeof(uint64_t));
 
@@ -430,7 +429,7 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
         nb_host_ckpt = host_ckpt_records.size();
         POSUtil_Serializer::write_field(&ptr, &(nb_host_ckpt), sizeof(uint64_t));
         for(i=0; i<nb_host_ckpt; i++){
-            POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].wqe->dag_vertex_id), sizeof(pos_vertex_id_t));
+            POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].wqe->id), sizeof(pos_u64id_t));
             POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].param_index), sizeof(uint32_t));
             POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].offset), sizeof(uint64_t));
             POSUtil_Serializer::write_field(&ptr, &(host_ckpt_records[i].size), sizeof(uint64_t));
@@ -453,11 +452,11 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
     uint64_t i;
     uint64_t _nb_parent_handles;
     pos_resource_typeid_t parent_resource_id;
-    pos_vertex_id_t parent_handle_dag_id;
+    pos_u64id_t parent_handle_id;
     uint64_t nb_ckpt_version, ckpt_version;
     uint64_t nb_host_ckpt, host_ckpt_offset, host_ckpt_size;
     uint32_t param_id;
-    pos_vertex_id_t wqe_dag_id;
+    pos_u64id_t wqe_apicxt_id;
 
     void *ptr = raw_data;
     POS_CHECK_POINTER(ptr);
@@ -470,13 +469,13 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
 
     for(i=0; i<_nb_parent_handles; i++){
         POSUtil_Deserializer::read_field(&parent_resource_id, &ptr, sizeof(pos_resource_typeid_t));
-        POSUtil_Deserializer::read_field(&parent_handle_dag_id, &ptr, sizeof(pos_vertex_id_t));
+        POSUtil_Deserializer::read_field(&parent_handle_id, &ptr, sizeof(pos_u64id_t));
         this->parent_handles_waitlist.push_back(
-            std::pair<pos_resource_typeid_t, pos_vertex_id_t>(parent_resource_id, parent_handle_dag_id)
+            std::pair<pos_resource_typeid_t, pos_u64id_t>(parent_resource_id, parent_handle_id)
         );
     }
 
-    POSUtil_Deserializer::read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
+    POSUtil_Deserializer::read_field(&(this->id), &ptr, sizeof(pos_u64id_t));
     POSUtil_Deserializer::read_field(&(this->size), &ptr, sizeof(uint64_t));
     POSUtil_Deserializer::read_field(&(this->state_size), &ptr, sizeof(uint64_t));
     POSUtil_Deserializer::read_field(&(this->is_lastest_used_handle), &ptr, sizeof(bool));
@@ -505,12 +504,12 @@ pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
         // second part: host-side checkpoint record
         POSUtil_Deserializer::read_field(&nb_host_ckpt, &ptr, sizeof(uint64_t));
         for(i=0; i<nb_host_ckpt; i++){
-            POSUtil_Deserializer::read_field(&wqe_dag_id, &ptr, sizeof(pos_vertex_id_t));
+            POSUtil_Deserializer::read_field(&wqe_apicxt_id, &ptr, sizeof(pos_u64id_t));
             POSUtil_Deserializer::read_field(&param_id, &ptr, sizeof(uint32_t));
             POSUtil_Deserializer::read_field(&host_ckpt_offset, &ptr, sizeof(uint64_t));
             POSUtil_Deserializer::read_field(&host_ckpt_size, &ptr, sizeof(uint64_t));
             this->ckpt_bag->host_ckpt_waitlist.push_back(
-                std::tuple<pos_vertex_id_t, uint32_t, uint64_t, uint64_t>(wqe_dag_id, param_id, host_ckpt_offset, host_ckpt_size)
+                std::tuple<pos_u64id_t, uint32_t, uint64_t, uint64_t>(wqe_apicxt_id, param_id, host_ckpt_offset, host_ckpt_size)
             );
         }
     }

@@ -17,7 +17,8 @@
 
 #include <iostream>
 #include <vector>
-
+#include <set>
+#include <unordered_map>
 #include <stdint.h>
 
 #include "pos/include/common.h"
@@ -114,7 +115,7 @@ class POSCheckpointBag {
     /*!
      *  \brief  allocate a new checkpoint slot inside this bag
      *  \tparam on_device           whether to apply the slot on the device
-     *  \param  version             version (i.e., dag index) of this checkpoint
+     *  \param  version             version of this checkpoint
      *  \param  ptr                 pointer to the checkpoint slot
      *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
      *                              (if no available slot exit)
@@ -202,7 +203,7 @@ class POSCheckpointBag {
 
     // waitlist of the host-side checkpoint record, populated during restore phrase
     std::vector<std::tuple<
-        /* wqe_id */ pos_vertex_id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
+        /* wqe_id */ pos_u64id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
     > host_ckpt_waitlist;
 
     // indicate whether the checkpoint has been finished in the latest checkpoint round

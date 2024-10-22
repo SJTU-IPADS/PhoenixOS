@@ -254,16 +254,6 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 handle_name
             ));
         }
-        
-
-        // step 5: allocate the handle in the dag
-        if (edge_direction == kPOS_Edge_Direction_Create){
-            parser_function->append_content(std::format(
-                "retval = client->dag.allocate_handle({});\n"
-                "if(unlikely(retval != POS_SUCCESS)){{ goto exit; }}\n",
-                handle_name
-            ));
-        }
     };
 
 

@@ -5,7 +5,7 @@ if [ -f "./client_exist.txt" ]; then
     rm ./client_exist.txt
 fi
 
-LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../remoting/cuda/cpu/:../../lib LD_PRELOAD=../../remoting/cuda/cpu/cricket-client.so gdb --args python3 ./train.py 
+LD_LIBRARY_PATH=../../remoting/cuda/submodules/libtirpc/install/lib:../../remoting/cuda/cpu/:../../lib LD_PRELOAD=../../remoting/cuda/cpu/cricket-client.so python3 ./train.py 
 
 
 # nsys for client behaviour:

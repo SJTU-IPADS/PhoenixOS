@@ -84,7 +84,7 @@ class POSLockFreeQueue {
     /*!
      *  \brief  clear the queue
      */
-    inline void clear(){
+    inline void drain(){
         uint64_t i, len;
         len = this->len();
 

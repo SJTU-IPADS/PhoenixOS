@@ -21,7 +21,6 @@
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
 #include "pos/include/api_context.h"
-#include "pos/include/utils/bipartite_graph.h"
 #include "pos/include/utils/lockfree_queue.h"
 
 typedef struct pos_handle_meta {
@@ -72,7 +71,7 @@ class POSDag {
      *  \brief  block until the dag is drained out
      */
     void drain(){
-        while(this->has_pending_op()){}
+        // while(this->has_pending_op()){}
     }
 
     /*!
@@ -94,7 +93,7 @@ class POSDag {
      */
     inline pos_retval_t allocate_handle(POSHandle* handle){
         pos_retval_t retval = POS_SUCCESS;
-        pos_vertex_id_t vertex_id;
+        pos_u64id_t vertex_id;
         POSNeighborList_t empty_neighbor_list;
 
         pos_handle_meta_t *h_meta = new pos_handle_meta_t(handle, _end_pc);
@@ -126,58 +125,58 @@ class POSDag {
      *  \note   this function will be called by the parser thread
      *  \return POS_SUCCESS for successfully adding operator
      */
-    inline pos_retval_t launch_op(POSAPIContext_QE* wqe){
-        uint64_t i;
-        pos_retval_t retval = POS_SUCCESS;
-        std::vector<POSHandleView_t>* handle_view_vec;
-        std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
-        std::map<pos_vertex_id_t, pos_edge_direction_t> neighbor_map;
+    // inline pos_retval_t launch_op(POSAPIContext_QE* wqe){
+    //     uint64_t i;
+    //     pos_retval_t retval = POS_SUCCESS;
+    //     std::vector<POSHandleView_t>* handle_view_vec;
+    //     std::map<pos_resource_typeid_t, std::vector<POSHandleView_t>*>::iterator map_iter;
+    //     std::map<pos_u64id_t, pos_edge_direction_t> neighbor_map;
 
-        POS_CHECK_POINTER(wqe);
+    //     POS_CHECK_POINTER(wqe);
 
-        pos_op_meta_t *o_meta = new pos_op_meta_t(wqe);
-        POS_CHECK_POINTER(o_meta);
+    //     pos_op_meta_t *o_meta = new pos_op_meta_t(wqe);
+    //     POS_CHECK_POINTER(o_meta);
 
-        uint64_t s_tick, e_tick;
+    //     uint64_t s_tick, e_tick;
 
-        // record the API context to the DAG
-        retval =_graph.add_vertex<pos_op_meta_t>(
-            /* data */ o_meta,
-            /* neighbor */ wqe->dag_neighbors,
-            /* id */ &(wqe->dag_vertex_id)
-        );
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C_DETAIL("failed to add op to the DAG graph");
-            goto exit_POSDag_add_op;
-        }
+    //     // record the API context to the DAG
+    //     retval =_graph.add_vertex<pos_op_meta_t>(
+    //         /* data */ o_meta,
+    //         /* neighbor */ wqe->dag_neighbors,
+    //         /* id */ &(wqe->dag_vertex_id)
+    //     );
+    //     if(unlikely(retval != POS_SUCCESS)){
+    //         POS_WARN_C_DETAIL("failed to add op to the DAG graph");
+    //         goto exit_POSDag_add_op;
+    //     }
 
-        // the vertex id of the op should be exactly the end pc
-        POS_ASSERT(wqe->dag_vertex_id == _end_pc);
+    //     // the vertex id of the op should be exactly the end pc
+    //     POS_ASSERT(wqe->dag_vertex_id == _end_pc);
 
-        // push the API context to the queue
-        _api_cxts_queue.push(wqe);
+    //     // push the API context to the queue
+    //     _api_cxts_queue.push(wqe);
 
-        // record the api context to the list
-        // if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
-        //     _api_cxts.push_back(wqe);
-        // } else {
-        //     latest_checkpoint_version = wqe->dag_vertex_id;
-        // }
+    //     // record the api context to the list
+    //     // if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
+    //     //     _api_cxts.push_back(wqe);
+    //     // } else {
+    //     //     latest_checkpoint_version = wqe->dag_vertex_id;
+    //     // }
 
-        POS_DEBUG_C(
-            "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",
-            wqe->api_cxt->api_id, _end_pc, wqe->dag_vertex_id, neighbor_map.size()
-        );
+    //     POS_DEBUG_C(
+    //         "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",
+    //         wqe->api_cxt->api_id, _end_pc, wqe->dag_vertex_id, neighbor_map.size()
+    //     );
 
-        /*!
-         *  \note   adding end_pc must locate here, as the worker thread will imediately detect the laucnhed op
-         *          once this value is udpated
-         */
-        _end_pc += 1;
+    //     /*!
+    //      *  \note   adding end_pc must locate here, as the worker thread will imediately detect the laucnhed op
+    //      *          once this value is udpated
+    //      */
+    //     _end_pc += 1;
 
-    exit_POSDag_add_op:
-        return retval;
-    }
+    // exit_POSDag_add_op:
+    //     return retval;
+    // }
 
 
     /*!
@@ -201,68 +200,68 @@ class POSDag {
      *  \return POS_SUCCESS for successfully obtain;
      *          POS_FAILED_NOT_READY for no pending op exist
      */
-    pos_retval_t get_next_pending_op(POSAPIContext_QE** wqe, uint64_t* nb_pending_ops=nullptr){
-        pos_retval_t retval = POS_SUCCESS;
-        pos_op_meta_t *op_meta;
-        POS_CHECK_POINTER(wqe);
+    // pos_retval_t get_next_pending_op(POSAPIContext_QE** wqe, uint64_t* nb_pending_ops=nullptr){
+    //     pos_retval_t retval = POS_SUCCESS;
+    //     pos_op_meta_t *op_meta;
+    //     POS_CHECK_POINTER(wqe);
         
-        if(likely(nb_pending_ops != nullptr)){
-            *nb_pending_ops = _end_pc - _pc;
-        }
+    //     if(likely(nb_pending_ops != nullptr)){
+    //         *nb_pending_ops = _end_pc - _pc;
+    //     }
 
-        if(unlikely(_pc == _end_pc)){
-            // no op is pending
-            *wqe = nullptr;
-            return POS_FAILED_NOT_READY;
-        }
+    //     if(unlikely(_pc == _end_pc)){
+    //         // no op is pending
+    //         *wqe = nullptr;
+    //         return POS_FAILED_NOT_READY;
+    //     }
 
-        *wqe = *( (POSAPIContext_QE**)(_api_cxts_queue.peek()) );
-        if(unlikely((*wqe) == nullptr)){
-            POS_WARN_C_DETAIL("failed to obtain op: vertex_id(%lu)", _pc);
-            retval = POS_FAILED_NOT_EXIST;
-        } else {
-            POS_ASSERT((*wqe)->dag_vertex_id == _pc);
-        }
+    //     *wqe = *( (POSAPIContext_QE**)(_api_cxts_queue.peek()) );
+    //     if(unlikely((*wqe) == nullptr)){
+    //         POS_WARN_C_DETAIL("failed to obtain op: vertex_id(%lu)", _pc);
+    //         retval = POS_FAILED_NOT_EXIST;
+    //     } else {
+    //         POS_ASSERT((*wqe)->dag_vertex_id == _pc);
+    //     }
         
-        return retval;
-    }
+    //     return retval;
+    // }
 
     /*!
      *  \brief  forward the pc of the DAG
      */
-    inline void forward_pc(){
-        if(unlikely(false == _api_cxts_queue.pop())){
-            POS_ERROR_C_DETAIL("failed to pop op: vertex_id(%lu)", _pc);
-        }
+    // inline void forward_pc(){
+    //     if(unlikely(false == _api_cxts_queue.pop())){
+    //         POS_ERROR_C_DETAIL("failed to pop op: vertex_id(%lu)", _pc);
+    //     }
 
-        if(likely(_pc < _end_pc)){ _pc++; }
-    }
+    //     if(likely(_pc < _end_pc)){ _pc++; }
+    // }
 
     /*!
      *  \brief  identify whether current DAG has pending op
      *  \return identify result
      */
-    inline bool has_pending_op(){ return _end_pc > _pc; }
+    // inline bool has_pending_op(){ return _end_pc > _pc; }
 
     /*!
      *  \brief  obtain the number of pending operators in the DAG
      *  \return the number of pending operators in the DAG result
      */
-    inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
+    // inline uint64_t get_nb_pending_op(){ return _end_pc - _pc; }
 
     /*!
      *  \brief  obtain the current version
      *  \note   must be called parser function
      *  \return the current version
      */
-    inline uint64_t get_current_pc_parser(){ return _end_pc; }
+    // inline uint64_t get_current_pc_parser(){ return _end_pc; }
 
     /*!
      *  \brief  obtain the current version
      *  \note   must be called worker function
      *  \return the current version
      */
-    inline uint64_t get_current_pc_worker(){ return _pc; }
+    // inline uint64_t get_current_pc_worker(){ return _pc; }
 
     /*!
      *  \brief  obtain the number of API context within this DAG
@@ -286,17 +285,17 @@ class POSDag {
      *  \param  vid  the specified dag index
      *  \return pointer to the founed api context wqe or nullptr
      */
-    inline POSAPIContext_QE_t* get_api_cxt_by_dag_id(pos_vertex_id_t vid){
+    inline POSAPIContext_QE_t* get_api_cxt_by_dag_id(pos_u64id_t vid){
         POSAPIContext_QE_t *retval = nullptr;
         uint64_t i;
 
-        for(i=0; i<_api_cxts.size(); i++){
-            POS_CHECK_POINTER(_api_cxts[i]);
-            if(unlikely(_api_cxts[i]->dag_vertex_id == vid)){
-                retval = _api_cxts[i];
-                break;
-            }
-        }
+        // for(i=0; i<_api_cxts.size(); i++){
+        //     POS_CHECK_POINTER(_api_cxts[i]);
+        //     if(unlikely(_api_cxts[i]->dag_vertex_id == vid)){
+        //         retval = _api_cxts[i];
+        //         break;
+        //     }
+        // }
 
         return retval;
     }
@@ -310,7 +309,7 @@ class POSDag {
      *  \param  vo          missing checkpoint version
      *  \note   vh < vo < vg  
      */
-    void check_missing_ckpt(pos_vertex_id_t handle_vid, pos_vertex_id_t vh, pos_vertex_id_t vg, bool& is_missing, pos_vertex_id_t& vo){
+    void check_missing_ckpt(pos_u64id_t handle_vid, pos_u64id_t vh, pos_u64id_t vg, bool& is_missing, pos_u64id_t& vo){
         uint64_t i;
         POSNeighborList_t *neighbor_list;
         POSAPIContext_QE_t *wqe;
@@ -352,7 +351,7 @@ class POSDag {
      *  \param  ddl_vid     deadline version index
      *  \return pointer to the founed api context wqe or nullptr
      */
-    POSAPIContext_QE_t* get_handle_upstream_api_cxt_by_ddl(pos_vertex_id_t handle_vid, pos_vertex_id_t ddl_vid){
+    POSAPIContext_QE_t* get_handle_upstream_api_cxt_by_ddl(pos_u64id_t handle_vid, pos_u64id_t ddl_vid){
         POSAPIContext_QE_t *retval = nullptr;
         uint64_t i;
         POSNeighborList_t *neighbor_list;
@@ -385,7 +384,7 @@ class POSDag {
      */
     uint64_t get_serialize_size(){
         return (
-            /* latest_checkpoint_version*/  sizeof(pos_vertex_id_t)
+            /* latest_checkpoint_version*/  sizeof(pos_u64id_t)
             /* graph topo */                + _graph.get_serialize_size()
         );
     }
@@ -404,7 +403,7 @@ class POSDag {
         ptr = *serialized_area;
 
         // field: latest_checkpoint_version
-        POSUtil_Serializer::write_field(&ptr, &(latest_checkpoint_version), sizeof(pos_vertex_id_t));
+        POSUtil_Serializer::write_field(&ptr, &(latest_checkpoint_version), sizeof(pos_u64id_t));
 
         // field: graph topo
         _graph.serialize(ptr);
@@ -420,14 +419,14 @@ class POSDag {
         POS_CHECK_POINTER(ptr);
 
         // field: latest_checkpoint_version
-        POSUtil_Deserializer::read_field(&(this->latest_checkpoint_version), &ptr, sizeof(pos_vertex_id_t));
+        POSUtil_Deserializer::read_field(&(this->latest_checkpoint_version), &ptr, sizeof(pos_u64id_t));
 
         // field: graph topo
         _graph.deserialize(ptr);
     }
 
     // dag vertex id of latest checkpoint op
-    pos_vertex_id_t latest_checkpoint_version;
+    pos_u64id_t latest_checkpoint_version;
 
  private:
     // context of this dag
@@ -472,26 +471,26 @@ class POSDag {
         POS_CHECK_POINTER(meta);
         POS_CHECK_POINTER(wqe = meta->wqe);
         
-        dump_flow.insert(dump_flow.end(), {
-            /* vid */                       [&](){ result += std::to_string(wqe->dag_vertex_id); },
-            /* api_id */                    [&](){ result += std::to_string(wqe->api_cxt->api_id); },
-            /* return_code */               [&](){ result += std::to_string(wqe->api_cxt->return_code); },
-            /* create_tick */               [&](){ result += std::to_string(wqe->create_tick); },
-            /* return_tick */               [&](){ result += std::to_string(wqe->return_tick); },
-            /* runtime_s_tick */            [&](){ result += std::to_string(wqe->runtime_s_tick); },
-            /* runtime_e_tick */            [&](){ result += std::to_string(wqe->runtime_e_tick); },
-            /* worker_s_tick */             [&](){ result += std::to_string(wqe->worker_s_tick); },
-            /* worker_e_tick */             [&](){ result += std::to_string(wqe->worker_e_tick); },
-            /* queue_len_before_parse */    [&](){ result += std::to_string(wqe->queue_len_before_parse); },
+        // dump_flow.insert(dump_flow.end(), {
+        //     /* vid */                       [&](){ result += std::to_string(wqe->dag_vertex_id); },
+        //     /* api_id */                    [&](){ result += std::to_string(wqe->api_cxt->api_id); },
+        //     /* return_code */               [&](){ result += std::to_string(wqe->api_cxt->return_code); },
+        //     /* create_tick */               [&](){ result += std::to_string(wqe->create_tick); },
+        //     /* return_tick */               [&](){ result += std::to_string(wqe->return_tick); },
+        //     /* runtime_s_tick */            [&](){ result += std::to_string(wqe->runtime_s_tick); },
+        //     /* runtime_e_tick */            [&](){ result += std::to_string(wqe->runtime_e_tick); },
+        //     /* worker_s_tick */             [&](){ result += std::to_string(wqe->worker_s_tick); },
+        //     /* worker_e_tick */             [&](){ result += std::to_string(wqe->worker_e_tick); },
+        //     /* queue_len_before_parse */    [&](){ result += std::to_string(wqe->queue_len_before_parse); },
 
-            /* =========== checkpoint op specific fields =========== */
-            /* nb_ckpt_handles */           [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
-            /* ckpt_size */                 [&](){ result += std::to_string(wqe->ckpt_size); },
-            /* nb_abandon_handles */        [&](){ result += std::to_string(wqe->nb_abandon_handles); },
-            /* abandon_ckpt_size */         [&](){ result += std::to_string(wqe->abandon_ckpt_size); },
-            /* ckpt_memory_consumption */   
-                                            [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
-        });
+        //     /* =========== checkpoint op specific fields =========== */
+        //     /* nb_ckpt_handles */           [&](){ result += std::to_string(wqe->nb_ckpt_handles); },
+        //     /* ckpt_size */                 [&](){ result += std::to_string(wqe->ckpt_size); },
+        //     /* nb_abandon_handles */        [&](){ result += std::to_string(wqe->nb_abandon_handles); },
+        //     /* abandon_ckpt_size */         [&](){ result += std::to_string(wqe->abandon_ckpt_size); },
+        //     /* ckpt_memory_consumption */   
+        //                                     [&](){ result += std::to_string(wqe->ckpt_memory_consumption); },
+        // });
         
         result.clear();
         for(i=0; i<dump_flow.size(); i++){
