@@ -316,7 +316,6 @@ void POSWorker::__daemon_ckpt_async(){
             POS_CHECK_POINTER(wqe = wqes[i]);
 
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
-            api_id = wqe->api_cxt->api_id;
             
             // this is a checkpoint op
             if(unlikely(wqe->ckpt_mark == true)){
@@ -396,7 +395,7 @@ void POSWorker::__daemon_ckpt_async(){
                 }
 
                 // clear the ckpt dag queue
-                this->_client->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe->client_id);
+                this->_client->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>();
 
                 // reset checkpoint version map
                 this->async_ckpt_cxt.checkpoint_version_map.clear();
@@ -420,6 +419,9 @@ void POSWorker::__daemon_ckpt_async(){
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 continue;
             }
+
+            POS_CHECK_POINTER(wqe->api_cxt);
+            api_id = wqe->api_cxt->api_id;
 
             /*!
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
@@ -694,7 +696,7 @@ void POSWorker::__checkpoint_async_thread() {
     cmd->client_id = wqe->client_id;
     cmd->retval = dirty_retval;
     cmd->type = kPOS_Command_WorkerToParser_PreDumpEnd;
-    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }
