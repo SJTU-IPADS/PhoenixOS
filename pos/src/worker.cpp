@@ -225,6 +225,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
     uint64_t nb_handles;
     POSHandleManager<POSHandle>* hm;
     POSCheckpointSlot *ckpt_slot;
+    POSCommand_QE_t* cmd;
     pos_retval_t retval = POS_SUCCESS;
 
     typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
@@ -263,9 +264,8 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
     
     // make sure the checkpoint is finished
     retval = this->sync();
-
     if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN("checkpoint unfinished: failed to synchronize");
+        POS_WARN_C("checkpoint unfinished: failed to synchronize");
     } else {
         // TODO: record to trace
         POS_LOG(
@@ -274,6 +274,16 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
         );
     }
     
+    // reply to parser
+    POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
+    cmd->client_id = wqe->client_id;
+    cmd->retval = retval;
+    cmd->type = kPOS_Command_WorkerToParser_DumpEnd;
+    retval = this->_ws->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+    }
+
 exit:
     return retval;
 }
@@ -504,7 +514,7 @@ void POSWorker::__daemon_ckpt_async(){
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
     }
@@ -514,9 +524,10 @@ void POSWorker::__daemon_ckpt_async(){
 void POSWorker::__checkpoint_async_thread() {
     uint64_t i;
     pos_vertex_id_t checkpoint_version;
-    pos_retval_t retval = POS_SUCCESS;
+    pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
     POSAPIContext_QE *wqe;
     POSHandle *handle;
+    POSCommand_QE_t* cmd;
     uint64_t s_tick = 0, e_tick = 0;
 
 #if POS_CONF_EVAL_CkptEnablePipeline == 1
@@ -589,12 +600,14 @@ void POSWorker::__checkpoint_async_thread() {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+            dirty_retval = retval;
             continue;
         }
 
         retval = this->sync(this->_ckpt_commit_stream_id);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+            dirty_retval = retval;
         }
 
         POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
@@ -611,12 +624,14 @@ void POSWorker::__checkpoint_async_thread() {
         );
         if(unlikely(retval != POS_SUCCESS && retval != POS_WARN_ABANDONED)){
             POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+            dirty_retval = retval;
             continue;
         }
         
         retval = this->sync(this->_ckpt_stream_id);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+            dirty_retval = retval;
         }
 
         POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
@@ -632,7 +647,6 @@ void POSWorker::__checkpoint_async_thread() {
         while(this->async_ckpt_cxt.membus_lock == true){ /* block */ }
     }
 
-    
     //  POS_TRACE_TICK_START(ckpt, ckpt_commit)
     // #if POS_CONF_EVAL_CkptEnablePipeline == 1
     //     /*!
@@ -662,6 +676,16 @@ void POSWorker::__checkpoint_async_thread() {
         "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",
         wqe->nb_ckpt_handles, wqe->ckpt_size
     );
+
+    // reply to parser
+    POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
+    cmd->client_id = wqe->client_id;
+    cmd->retval = dirty_retval;
+    cmd->type = kPOS_Command_WorkerToParser_PreDumpEnd;
+    retval = this->_ws->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+    }
 
 exit:
     this->async_ckpt_cxt.is_active = false;
