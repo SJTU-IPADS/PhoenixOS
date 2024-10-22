@@ -42,7 +42,6 @@ enum pos_queue_direction_t : uint8_t {
     kPOS_QueueDirection_Rpc2Parser = 0,
     kPOS_QueueDirection_Rpc2Worker,
     kPOS_QueueDirection_Parser2Worker,
-    kPOS_QueueDirection_Worker2Parser,
     kPOS_QueueDirection_Oob2Parser,
     kPOS_QueueDirection_WorkerLocal
 };
@@ -353,8 +352,8 @@ class POSClient {
     POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_rpc2worker_cq;
 
     // command queue pairs from worker to parser
-    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_worker2parser_wq;
-    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_worker2parser_cq;
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_parser2worker_wq;
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_parser2worker_cq;
 
     // command queue pairs from OOB to parser
     POSLockFreeQueue<POSCommand_QE_t*> *_cmd_oob2parser_wq;

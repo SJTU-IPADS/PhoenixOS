@@ -137,12 +137,12 @@ pos_retval_t POSClient::push_q(void *qe){
         POS_CHECK_POINTER(cmd_qe = reinterpret_cast<POSCommand_QE_t*>(qe));
         
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "Cmd_WQE can only be pushed to worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "Cmd_WQE can only be pushed to parser2worker or oob2parser queue"
         );
 
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            this->_cmd_worker2parser_wq->push(cmd_qe);
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            this->_cmd_parser2worker_wq->push(cmd_qe);
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             this->_cmd_oob2parser_wq->push(cmd_qe);
         }
@@ -153,12 +153,12 @@ pos_retval_t POSClient::push_q(void *qe){
         POS_CHECK_POINTER(cmd_qe = reinterpret_cast<POSCommand_QE_t*>(qe));
         
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "Cmd_CQE can only be pushed to worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "Cmd_CQE can only be pushed to parser2worker or oob2parser queue"
         );
 
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            this->_cmd_worker2parser_cq->push(cmd_qe);
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            this->_cmd_parser2worker_cq->push(cmd_qe);
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             this->_cmd_oob2parser_cq->push(cmd_qe);
         }
@@ -172,8 +172,8 @@ template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_Que
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(void *qe);
-template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(void *qe);
-template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(void *qe);
+template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(void *qe);
+template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(void *qe);
 
@@ -227,12 +227,12 @@ pos_retval_t POSClient::clear_q(){
     // command work queue
     if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "Cmd_WQE can only be located within worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "Cmd_WQE can only be located within parser2worker or oob2parser queue"
         );
 
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            this->_cmd_worker2parser_wq->drain();
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            this->_cmd_parser2worker_wq->drain();
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             this->_cmd_oob2parser_wq->drain();
         }
@@ -241,12 +241,12 @@ pos_retval_t POSClient::clear_q(){
     // command completion queue
     if constexpr (qtype == kPOS_QueueType_Cmd_CQ){
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "Cmd_CQE can only be located within worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "Cmd_CQE can only be located within parser2worker or oob2parser queue"
         );
 
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            this->_cmd_worker2parser_cq->drain();
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            this->_cmd_parser2worker_cq->drain();
         } else { // qdir == kPOS_QueueDirection_Oob2Parser
             this->_cmd_oob2parser_cq->drain();
         }
@@ -260,8 +260,8 @@ template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Rpc2Parser, kPOS_Qu
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>();
-template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>();
-template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>();
+template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>();
+template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>();
 
@@ -347,11 +347,11 @@ pos_retval_t POSClient::poll_q(std::vector<POSCommand_QE_t*>* qes){
     // command work queue
     if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "POSCommand_WQE can only be polled from worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_WQE can only be polled from parser2worker or oob2parser queue"
         );
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            cmd_q = this->_cmd_worker2parser_wq;
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            cmd_q = this->_cmd_parser2worker_wq;
         } else { // kPOS_QueueDirection_Oob2Parser
             cmd_q = this->_cmd_oob2parser_wq;
         }
@@ -360,11 +360,11 @@ pos_retval_t POSClient::poll_q(std::vector<POSCommand_QE_t*>* qes){
     // command completion queue
     if constexpr (qtype == kPOS_QueueType_Cmd_CQ){
         static_assert(
-            qdir == kPOS_QueueDirection_Worker2Parser || qdir == kPOS_QueueDirection_Oob2Parser,
-            "POSCommand_CQE can only be polled from worker2parser or oob2parser queue"
+            qdir == kPOS_QueueDirection_Parser2Worker || qdir == kPOS_QueueDirection_Oob2Parser,
+            "POSCommand_CQE can only be polled from parser2worker or oob2parser queue"
         );
-        if constexpr (qdir == kPOS_QueueDirection_Worker2Parser){
-            cmd_q = this->_cmd_worker2parser_cq;
+        if constexpr (qdir == kPOS_QueueDirection_Parser2Worker){
+            cmd_q = this->_cmd_parser2worker_cq;
         } else { // kPOS_QueueDirection_Oob2Parser
             cmd_q = this->_cmd_oob2parser_cq;
         }
@@ -378,9 +378,9 @@ pos_retval_t POSClient::poll_q(std::vector<POSCommand_QE_t*>* qes){
 exit:
     return retval;
 }
-template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(std::vector<POSCommand_QE_t*>* qes);
+template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(std::vector<POSCommand_QE_t*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(std::vector<POSCommand_QE_t*>* qes);
-template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(std::vector<POSCommand_QE_t*>* qes);
+template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(std::vector<POSCommand_QE_t*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(std::vector<POSCommand_QE_t*>* qes);
 
 
@@ -412,15 +412,15 @@ pos_retval_t POSClient::__create_qgroup(){
     POS_CHECK_POINTER(this->_apicxt_workerlocal_ckptdag_wq);
     POS_DEBUG_C("created workerlocal ckptdagapicxt WQ: uuid(%lu)", this->id);
 
-    // worker2parser cmd work queue
-    this->_cmd_worker2parser_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
-    POS_CHECK_POINTER(this->_cmd_worker2parser_wq);
-    POS_DEBUG_C("created worker2parser cmd WQ: uuid(%lu)", this->id);
+    // parser2worker cmd work queue
+    this->_cmd_parser2worker_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(this->_cmd_parser2worker_wq);
+    POS_DEBUG_C("created parser2worker cmd WQ: uuid(%lu)", this->id);
 
-    // worker2parser cmd completion queue
-    this->_cmd_worker2parser_cq = new POSLockFreeQueue<POSCommand_QE_t*>();
-    POS_CHECK_POINTER(this->_cmd_worker2parser_cq);
-    POS_DEBUG_C("created worker2parser cmd CQ: uuid(%lu)", this->id);
+    // parser2worker cmd completion queue
+    this->_cmd_parser2worker_cq = new POSLockFreeQueue<POSCommand_QE_t*>();
+    POS_CHECK_POINTER(this->_cmd_parser2worker_cq);
+    POS_DEBUG_C("created parser2worker cmd CQ: uuid(%lu)", this->id);
 
     // oob2parser cmd work queue
     this->_cmd_oob2parser_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
@@ -469,17 +469,17 @@ pos_retval_t POSClient::__destory_qgroup(){
     delete this->_apicxt_workerlocal_ckptdag_wq;
     POS_DEBUG_C("destoryed workerlocal_ckptdag apicxt WQ: uuid(%lu)", this->id);
 
-    // worker2parser cmd work queue
-    POS_CHECK_POINTER(this->_cmd_worker2parser_wq);
-    this->_cmd_worker2parser_wq->lock();
-    delete this->_cmd_worker2parser_wq;
-    POS_DEBUG_C("destoryed worker2parser apicxt WQ: uuid(%lu)", this->id);
+    // parser2worker cmd work queue
+    POS_CHECK_POINTER(this->_cmd_parser2worker_wq);
+    this->_cmd_parser2worker_wq->lock();
+    delete this->_cmd_parser2worker_wq;
+    POS_DEBUG_C("destoryed parser2worker apicxt WQ: uuid(%lu)", this->id);
 
-    // worker2parser cmd completion queue
-    POS_CHECK_POINTER(this->_cmd_worker2parser_cq);
-    this->_cmd_worker2parser_cq->lock();
-    delete this->_cmd_worker2parser_cq;
-    POS_DEBUG_C("destoryed worker2parser cmd CQ: uuid(%lu)", this->id);
+    // parser2worker cmd completion queue
+    POS_CHECK_POINTER(this->_cmd_parser2worker_cq);
+    this->_cmd_parser2worker_cq->lock();
+    delete this->_cmd_parser2worker_cq;
+    POS_DEBUG_C("destoryed parser2worker cmd CQ: uuid(%lu)", this->id);
 
     // oob2parser cmd work queue
     POS_CHECK_POINTER(this->_cmd_oob2parser_wq);
