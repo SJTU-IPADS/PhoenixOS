@@ -26,14 +26,37 @@
 #include "pos/include/worker.h"
 #include "pos/include/parser.h"
 #include "pos/include/handle.h"
+#include "pos/include/command.h"
 #include "pos/include/transport.h"
 #include "pos/include/migration.h"
+#include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/utils/timer.h"
 
 
 // forward declaration
 class POSWorkspace;
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+
+
+enum pos_queue_direction_t : uint8_t {
+    kPOS_QueueDirection_Rpc2Parser = 0,
+    kPOS_QueueDirection_Rpc2Worker,
+    kPOS_QueueDirection_Parser2Worker,
+    kPOS_QueueDirection_Worker2Parser,
+    kPOS_QueueDirection_Oob2Parser,
+    kPOS_QueueDirection_WorkerLocal
+};
+
+
+enum pos_queue_type_t : uint8_t {
+    kPOS_Queue_Type_WQ = 0,
+    kPOS_Queue_Type_CQ,
+    kPOS_QueueType_ApiCxt_WQ,
+    kPOS_QueueType_ApiCxt_CQ,
+    kPOS_QueueType_ApiCxt_CkptDag_WQ,
+    kPOS_QueueType_Cmd_WQ,
+    kPOS_QueueType_Cmd_CQ
+};
 
 
 /*!
@@ -170,30 +193,13 @@ typedef struct pos_client_ckpt_station {
 class POSClient {
  public:
     /*!
+     *  \brief  constructor
      *  \param  id  client identifier
      *  \param  cxt context to initialize this client
      *  \param  ws  pointer to the global workspace
      */
-    POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
-        :   id(id),
-            migration_ctx(this),
-            status(kPOS_ClientStatus_CreatePending),
-            _api_inst_pc(0), 
-            _cxt(cxt),
-            _last_ckpt_tick(0),
-            _ws(ws)
-    {}
-
-    POSClient() 
-        :   id(0),
-            migration_ctx(this),
-            status(kPOS_ClientStatus_CreatePending),
-            _last_ckpt_tick(0),
-            _ws(nullptr)
-    {
-        POS_ERROR_C("shouldn't call, just for passing compilation");
-    }
-
+    POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws);
+    POSClient();
     ~POSClient(){}
     
 
@@ -288,6 +294,87 @@ class POSClient {
     // the global workspace
     POSWorkspace *_ws;
 
+    /* =============== asynchronous queues =============== */
+ public:
+    /*!
+     *  \brief  push queue element to specified queue
+     *  \tparam qdir    queue direction
+     *  \tparam qtype   type of the queue
+     *  \param  qe      queue element to be pushed
+     *  \return POS_SUCCESS for successfully pushed  
+     */
+    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+    pos_retval_t push_q(void *qe);
+
+    /*!
+     *  \brief  poll apicxt queue element from specified queue
+     *  \tparam qdir    queue direction
+     *  \tparam qtype   type of the queue
+     *  \param  uuid    uuid for specifying client
+     *  \param  cqes    returned queue elements
+     *  \return POS_SUCCESS for successfully polling
+     */
+    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+    pos_retval_t poll_q(std::vector<POSAPIContext_QE*>* qes);
+
+    /*!
+     *  \brief  poll cmd queue element from specified queue
+     *  \tparam qdir    queue direction
+     *  \tparam qtype   type of the queue
+     *  \param  uuid    uuid for specifying client
+     *  \param  cqes    returned queue elements
+     *  \return POS_SUCCESS for successfully polling
+     */
+    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+    pos_retval_t poll_q(std::vector<POSCommand_QE_t*>* qes);
+
+    /*!
+     *  \brief  clear all elements inside the queue
+     *  \tparam qdir    queue direction
+     *  \tparam qtype   type of the queue
+     *  \param  uuid    uuid for specifying client
+     *  \return POS_SUCCESS for successfully clear
+     */
+    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+    pos_retval_t clear_q();
+
+ protected:
+    // api context queue pairs from RPC frontend to parser
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_rpc2parser_wq;
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_rpc2parser_cq;
+
+    // api context work queue from parser to worker
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_parser2worker_wq;
+
+    // api context work queue from parser to worker, record during ckpt
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_workerlocal_ckptdag_wq;
+
+    // api context completion queue from worker to RPC frontend
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_rpc2worker_cq;
+
+    // command queue pairs from worker to parser
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_worker2parser_wq;
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_worker2parser_cq;
+
+    // command queue pairs from OOB to parser
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_oob2parser_wq;
+    POSLockFreeQueue<POSCommand_QE_t*> *_cmd_oob2parser_cq;
+
+ private:
+    /*!
+     *  \brief  create queue group for this client
+     *  \return POS_SUCCESS for successfully creation
+     */
+    pos_retval_t __create_qgroup();
+
+    /*!
+     *  \brief  destory queue group of this client
+     *  \return POS_SUCCESS for successfully destory
+     */
+    pos_retval_t __destory_qgroup();
+    /* =============== asynchronous queues =============== */
+
+ protected:
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type
      *  \note   this function is used during restore phrase
@@ -299,7 +386,6 @@ class POSClient {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
-
     /*!
      *  \brief  obtain all resource type indices of this client
      *  \return all resource type indices of this client
@@ -308,7 +394,6 @@ class POSClient {
         return std::set<pos_resource_typeid_t>();
     }
 
-    
     /*!
      *  \brief  get handle manager by given resource index
      *  \param  rid    resource index

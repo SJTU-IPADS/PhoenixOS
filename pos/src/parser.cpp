@@ -80,7 +80,7 @@ void POSParser::__daemon(){
 
         // step 1: digest cmd from oob work queue
         cmd_wqes.clear();
-        this->_ws->poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(this->_client->id, &cmd_wqes);
+        this->_client->poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
         for(i=0; i<cmd_wqes.size(); i++){
             POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
             this->__process_cmd(cmd_wqe);
@@ -88,7 +88,7 @@ void POSParser::__daemon(){
 
         // step 2: digest cmd from worker work queue
         cmd_wqes.clear();
-        this->_ws->poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(this->_client->id, &cmd_wqes);
+        this->_client->poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
         for(i=0; i<cmd_wqes.size(); i++){
             POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
             this->__process_cmd(cmd_wqe);
@@ -96,9 +96,7 @@ void POSParser::__daemon(){
 
         // step 3: digest apicxt from rpc work queue
         apicxt_wqes.clear();
-        this->_ws->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(
-            this->_client->id, &apicxt_wqes
-        );
+        this->_client->poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(&apicxt_wqes);
 
         for(i=0; i<apicxt_wqes.size(); i++){
             POS_CHECK_POINTER(apicxt_wqe = apicxt_wqes[i]);
@@ -130,9 +128,8 @@ void POSParser::__daemon(){
                     apicxt_wqe->client_id, api_id
                 );
                 apicxt_wqe->status = kPOS_API_Execute_Status_Parser_Failed;
-                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();                    
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
-
+                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();
+                this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
                 continue;
             }
 
@@ -156,14 +153,14 @@ void POSParser::__daemon(){
                 ||  apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker
             ){
                 apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
+                this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
             }
 
             // skip those APIs that doesn't need worker support
             if(apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker){ continue; }
 
             // insert apicxt_wqe to worker queue
-            this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
+            this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
         }
     }
 }
@@ -200,22 +197,22 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
                 ckpt_wqe->record_checkpoint_handles(handle);
             }
         }
-        this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(ckpt_wqe);
+        this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(ckpt_wqe);
     #else
         cmd->retval = POS_FAILED_NOT_ENABLED;
-        this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
     #endif // POS_CONF_EVAL_CkptOptLevel
         
         break;
 
     /* ========== Command from worker thread ========== */
     case kPOS_Command_WorkerToParser_PreDumpEnd:
-        this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
         this->is_checkpointing = false;
         break;
     
     case kPOS_Command_WorkerToParser_DumpEnd:
-        this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
         this->is_checkpointing = false;
         break;
 

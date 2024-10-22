@@ -46,7 +46,7 @@ namespace cli_ckpt_predump {
         cmd->type = kPOS_Command_OobToParser_PreDumpStart;
 
         // send to parser
-        retval = ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
+        retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
         if(unlikely(retval != POS_SUCCESS)){
             retmsg = "see posd log for more details";
             payload->retval = POS_FAILED;
@@ -57,7 +57,7 @@ namespace cli_ckpt_predump {
         // wait parser reply
         cmds.clear();
         while(cmds.size() == 0){
-            ws->template poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(client->id, &cmds);
+            client->template poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(&cmds);
         }
         POS_ASSERT(cmds.size() == 1);
         POS_ASSERT(cmds[0]->type == kPOS_Command_WorkerToParser_DumpEnd
