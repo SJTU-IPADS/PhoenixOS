@@ -29,6 +29,7 @@
 
 // forward declaration
 class POSClient;
+class POSHandle;
 class POSWorkspace;
 typedef struct POSAPIMeta POSAPIMeta_t;
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
