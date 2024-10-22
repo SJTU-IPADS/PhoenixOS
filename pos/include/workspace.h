@@ -31,11 +31,10 @@
 #include "pos/include/client.h"
 #include "pos/include/parser.h"
 #include "pos/include/worker.h"
-#include "pos/include/transport.h"=
+#include "pos/include/transport.h"
 #include "pos/include/oob.h"
 #include "pos/include/api_context.h"
 #include "pos/include/utils/timer.h"
-#include "pos/include/utils/lockfree_queue.h"
 
 
 // forward declaration
@@ -106,27 +105,6 @@ class POSWorkspaceConf {
 
     // mutex to avoid contension
     std::mutex _mutex;
-};
-
-
-enum pos_queue_direction_t : uint8_t {
-    kPOS_QueueDirection_Rpc2Parser = 0,
-    kPOS_QueueDirection_Rpc2Worker,
-    kPOS_QueueDirection_Parser2Worker,
-    kPOS_QueueDirection_Worker2Parser,
-    kPOS_QueueDirection_Oob2Parser,
-    kPOS_QueueDirection_WorkerLocal
-};
-
-
-enum pos_queue_type_t : uint8_t {
-    kPOS_Queue_Type_WQ = 0,
-    kPOS_Queue_Type_CQ,
-    kPOS_QueueType_ApiCxt_WQ,
-    kPOS_QueueType_ApiCxt_CQ,
-    kPOS_QueueType_ApiCxt_CkptDag_WQ,
-    kPOS_QueueType_Cmd_WQ,
-    kPOS_QueueType_Cmd_CQ
 };
 
 
@@ -218,96 +196,6 @@ class POSWorkspace {
     }
     /* ============ end of client management functions =========== */
 
-
-    /* =============== queue management functions =============== */
- public:
-    /*!
-     *  \brief  push queue element to specified queue
-     *  \tparam qdir    queue direction
-     *  \tparam qtype   type of the queue
-     *  \param  qe      queue element to be pushed
-     *  \return POS_SUCCESS for successfully pushed  
-     */
-    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
-    pos_retval_t push_q(void *qe);
-
-    /*!
-     *  \brief  poll apicxt queue element from specified queue
-     *  \tparam qdir    queue direction
-     *  \tparam qtype   type of the queue
-     *  \param  uuid    uuid for specifying client
-     *  \param  cqes    returned queue elements
-     *  \return POS_SUCCESS for successfully polling
-     */
-    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
-    pos_retval_t poll_q(pos_client_uuid_t uuid, std::vector<POSAPIContext_QE*>* qes);
-
-    /*!
-     *  \brief  poll cmd queue element from specified queue
-     *  \tparam qdir    queue direction
-     *  \tparam qtype   type of the queue
-     *  \param  uuid    uuid for specifying client
-     *  \param  cqes    returned queue elements
-     *  \return POS_SUCCESS for successfully polling
-     */
-    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
-    pos_retval_t poll_q(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
-    
-    /*!
-     *  \brief  clear all elements inside the queue
-     *  \tparam qdir    queue direction
-     *  \tparam qtype   type of the queue
-     *  \param  uuid    uuid for specifying client
-     *  \return POS_SUCCESS for successfully clear
-     */
-    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
-    pos_retval_t clear_q(pos_client_uuid_t uuid);
-
-    /*!
-     *  \brief  export queue group of a specific client
-     *  \note   this function is used to export queue to every client,
-     *          so that there's no need to access the global map every
-     *          time poll/push queues
-     *  \param  uuid        uuid of a given client
-     *  \param  apicxt_qs   the obtained API context queues
-     *  \param  cmd_qs      the obatined command queues
-     *  \return POS_SUCCESS for succesfully obtained
-     */
-    pos_retval_t get_q_group(
-        pos_client_uuid_t uuid,
-        std::vector<POSLockFreeQueue<POSAPIContext_QE_t*>*>& apicxt_qs,
-        std::vector<POSLockFreeQueue<POSCommand_QE_t*>*> cmd_qs
-    );
-
- protected:
-    /*!
-     *  \brief  create a new queue pairs
-     *  \param  uuid    the uuid to identify client where to create queue pair
-     *  \return POS_FAILED_ALREADY_EXIST for duplicated queue pair;
-     *          POS_SUCCESS for successfully created
-     */
-    pos_retval_t __create_qp(pos_client_uuid_t uuid);
-
-    /*!
-     *  \brief  remove all queues of the client specified with uuid
-     *  \param  uuid    the uuid to identify client where to remove queues
-     *  \return POS_FAILED_NOT_EXIST for no queue pair exist
-     *          POS_SUCCESS for successfully removing
-     */
-    pos_retval_t __remove_qp(pos_client_uuid_t uuid);
-
-    /*!
-     *  \brief  remove queue by given uuid
-     *  \tparam qdir    queue direction
-     *  \tparam qtype   type of the queue
-     *  \param  uuid        specified uuid of the queue to be removed
-     *  \return POS_FAILED_NOT_EXIST for no work queue with the given uuid exists;
-     *          POS_SUCCESS for successfully removing
-     */
-    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
-    pos_retval_t __remove_q(pos_client_uuid_t uuid);
-    /* ============ end of queue management functions =========== */
- 
  public:
     /*!
      *  \brief  entrance of POS :)
@@ -342,32 +230,6 @@ class POSWorkspace {
      *  \note   use cases: intereact with CLI, and also agent-side
      */
     POSOobServer *_oob_server;
-
-    /* =============== asynchronous queues =============== */
-    // TODO: remove this mutex for god sake
-    std::mutex q_mtx;
-
-    // api context queue pairs from RPC frontend to parser (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2parser_wqs;
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2parser_cqs;
-
-    // api context work queue from parser to worker (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_parser2worker_wqs;
-
-    // api context work queue from parser to worker, record during ckpt (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_workerlocal_ckptdag_wqs;
-
-    // api context completion queue from worker to RPC frontend (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2worker_cqs;
-
-    // command queue pairs from worker to parser (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSCommand_QE_t*>*> _cmd_worker2parser_wqs;
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSCommand_QE_t*>*> _cmd_worker2parser_cqs;
-
-    // command queue pairs from OOB to parser (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSCommand_QE_t*>*> _cmd_oob2parser_wqs;
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSCommand_QE_t*>*> _cmd_oob2parser_cqs;
-    /* =============== asynchronous queues =============== */
 
     // map of clients
     std::map<pos_client_uuid_t, POSClient*> _client_map;

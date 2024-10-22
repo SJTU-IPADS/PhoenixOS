@@ -144,6 +144,7 @@ pos_retval_t POSWorkspace_CUDA::__destory_client(POSClient *client){
     POSClient_CUDA *cuda_client;
 
     POS_CHECK_POINTER(cuda_client = reinterpret_cast<POSClient_CUDA*>(client));
+    cuda_client->deinit();
     delete cuda_client;
 
 exit:
