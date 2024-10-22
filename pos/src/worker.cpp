@@ -151,9 +151,7 @@ void POSWorker::__daemon_ckpt_sync(){
 
         wqes.clear();
         try {
-            this->_ws->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
-                this->_client->id, &wqes
-            );
+            this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
         } catch (const std::exception& e) {
             POS_ERROR_C("failed, uuid: %lu, p: %lu", this->_client->id, p);
         }
@@ -217,7 +215,7 @@ void POSWorker::__daemon_ckpt_sync(){
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
     }
@@ -284,7 +282,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
     cmd->client_id = wqe->client_id;
     cmd->retval = retval;
     cmd->type = kPOS_Command_WorkerToParser_DumpEnd;
-    retval = this->_ws->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }
@@ -311,9 +309,7 @@ void POSWorker::__daemon_ckpt_async(){
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         wqes.clear();
-        this->_ws->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
-            this->_client->id, &wqes
-        );
+        this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
 
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
@@ -399,7 +395,7 @@ void POSWorker::__daemon_ckpt_async(){
                 }
 
                 // clear the ckpt dag queue
-                this->_ws->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe->client_id);
+                this->_client->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe->client_id);
 
                 // reset checkpoint version map
                 this->async_ckpt_cxt.checkpoint_version_map.clear();
@@ -428,7 +424,7 @@ void POSWorker::__daemon_ckpt_async(){
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
              */
             if(unlikely(this->async_ckpt_cxt.is_active == true)){
-                this->_ws->template push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe);
+                this->_client->template push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe);
             }
 
             api_meta = _ws->api_mgnr->api_metas[api_id];
@@ -529,7 +525,7 @@ void POSWorker::__daemon_ckpt_async(){
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
-                this->_ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
     }
@@ -697,7 +693,7 @@ void POSWorker::__checkpoint_async_thread() {
     cmd->client_id = wqe->client_id;
     cmd->retval = dirty_retval;
     cmd->type = kPOS_Command_WorkerToParser_PreDumpEnd;
-    retval = this->_ws->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }

@@ -101,12 +101,20 @@ class POSLockFreeQueue {
      */
     inline void lock_enqueue(){ this->_is_enqueue_locked = true; }
     inline void lock_dequeue(){ this->_is_dequeue_locked = true; }
+    inline void lock(){ 
+        this->_is_enqueue_locked = true;
+        this->_is_dequeue_locked = true; 
+    }
 
     /*!
      *  \brief  unlock the queue
      */
     inline void unlock_enqueue(){ this->_is_enqueue_locked = false; }
     inline void unlock_dequeue(){ this->_is_dequeue_locked = false; }
+    inline void unlock(){ 
+        this->_is_enqueue_locked = false;
+        this->_is_dequeue_locked = false; 
+    }
 
  private:
     // queue object
