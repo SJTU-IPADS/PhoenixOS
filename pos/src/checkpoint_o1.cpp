@@ -54,30 +54,19 @@ POSCheckpointBag::POSCheckpointBag(
 }
 
 
-/*!
- *  \brief  clear current checkpoint bag
- */
 void POSCheckpointBag::clear(){
     _use_front = true;
     _front_version = 0;
     _back_version = 0;
 }
 
-/*!
- *  \brief  allocate a new checkpoint slot inside this bag
- *  \tparam on_device           whether to apply the slot on the device
- *  \param  version             version of this checkpoint
- *  \param  ptr                 pointer to the checkpoint slot
- *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
- *                              (if no available slot exist)
- *  \return POS_SUCCESS for successfully allocation
- */
+
 template<bool on_device>
 pos_retval_t POSCheckpointBag::apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite){
     pos_retval_t retval = POS_SUCCESS;
 
     POS_CHECK_POINTER(ptr);
-    
+
     if(_use_front){
         _front_version = version;
         *ptr = _ckpt_front;
@@ -94,14 +83,7 @@ exit:
 template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<true>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite); // TODO: for pass compile
 template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<false>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite);
 
-/*!
- *  \brief  obtain checkpointed data by given checkpoint version
- *  \tparam on_device   whether to apply the slot on the device
- *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
- *  \param  version     the specified version
- *  \return POS_SUCCESS for successfully obtained
- *          POS_FAILED_NOT_EXIST for no checkpoint is found
- */
+
 template<bool on_device>
 pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t version){
     pos_retval_t retval = POS_SUCCESS;
@@ -130,11 +112,6 @@ template pos_retval_t POSCheckpointBag::get_checkpoint_slot<true>(POSCheckpointS
 template pos_retval_t POSCheckpointBag::get_checkpoint_slot<false>(POSCheckpointSlot** ckpt_slot, uint64_t version);
 
 
-/*!
- *  \brief  obtain the number of recorded checkpoints inside this bag
- *  \tparam on_device   whether the slot to be applied is on the device
- *  \return number of recorded checkpoints
- */
 template<bool on_device>
 uint64_t POSCheckpointBag::get_nb_checkpoint_slots(){
     return 1;
@@ -142,11 +119,6 @@ uint64_t POSCheckpointBag::get_nb_checkpoint_slots(){
 template uint64_t POSCheckpointBag::get_nb_checkpoint_slots<false>();
 
 
-/*!
- *  \brief  obtain the checkpoint version list
- *  \tparam on_device   whether the slot to be applied is on the device
- *  \return the checkpoint version list
- */
 template<bool on_device>
 std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set(){
      bool _has_record;
@@ -163,21 +135,12 @@ std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set(){
 template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<true>();   /* for migration */
 template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<false>();
 
-/*!
- *  \brief  obtain overall memory consumption of this checkpoint bag
- *  \return overall memory consumption of this checkpoint bag
- */
+
 uint64_t POSCheckpointBag::get_memory_consumption(){
     return 2 * _state_size;
 }
 
-/*!
- *  \brief  invalidate the checkpoint from this bag
- *  \tparam on_device   whether to apply the slot on the device
- *  \param  version version of the checkpoint to be removed
- *  \return POS_SUCCESS for successfully invalidate
- *          POS_NOT_READY for no checkpoint had been record
- */
+
 template<bool on_device>
 pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
     pos_retval_t retval = POS_SUCCESS;
@@ -204,12 +167,6 @@ exit:
 template pos_retval_t POSCheckpointBag::invalidate_by_version<false>(uint64_t version);
 
 
-/*!
- *  \brief  invalidate all checkpoint from this bag
- *  \tparam on_device   whether the checkpoints are on the device
- *  \return POS_SUCCESS for successfully invalidate
- *          POS_NOT_READY for no checkpoint had been record
- */
 template<bool on_device>
 pos_retval_t POSCheckpointBag::invalidate_all_version(){
     pos_retval_t retval = POS_SUCCESS;
@@ -230,13 +187,6 @@ exit:
 template pos_retval_t POSCheckpointBag::invalidate_all_version<false>();
 
 
-/*!
- *  \brief  load binary checkpoint data into this bag
- *  \note   this function will be invoked during the restore process
- *  \param  version     version of this checkpoint
- *  \param  ckpt_data   pointer to the buffer that stores the checkpointed data
- *  \return POS_SUCCESS for successfully loading
- */
 pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
     pos_retval_t retval = POS_SUCCESS;
     POSCheckpointSlot *ckpt_slot;
@@ -256,13 +206,7 @@ exit:
     return retval;
 }
 
-/*!
- *  \brief  record a new host-side checkpoint of this bag
- *  \note   this function is invoked within parser thread
- *  \param  ckpt    host-side checkpoint record
- *  \return POS_SUCCESS for successfully recorded
- *          POS_FAILED_ALREADY_EXIST for duplicated version
- */
+
 pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
     pos_retval_t retval = POS_SUCCESS;
 
@@ -278,11 +222,7 @@ pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
     return retval;
 }
 
-/*!
- *  \brief  obtain all host-side checkpoint records
- *  \note   this function only return those api context that hasn't been pruned by checkpoint system
- *  \return all host-side checkpoint records
- */
+
 std::vector<pos_host_ckpt_t> POSCheckpointBag::get_host_checkpoint_records(){
     std::vector<pos_host_ckpt_t> ret_list;
     typename std::unordered_map<uint64_t, pos_host_ckpt_t>::iterator map_iter;

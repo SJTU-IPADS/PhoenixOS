@@ -24,12 +24,24 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
+
+// forward declaration
+typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+
+
 using pos_custom_ckpt_allocate_func_t = void*(*)(uint64_t size);
 using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
 
 
+/*!
+ *  \brief  a slot to store one version of checkpoint
+ */
 class POSCheckpointSlot {
  public:
+    /*!
+     *  \brief  construtor
+     *  \param  state_size  size of the data inside this slot
+     */
     POSCheckpointSlot(uint64_t state_size) : _state_size(state_size), _custom_deallocator(nullptr) {
         if(likely(state_size > 0)){
             POS_CHECK_POINTER(_data = malloc(state_size));
@@ -39,6 +51,12 @@ class POSCheckpointSlot {
         }
     }
 
+    /*!
+     *  \brief  construtor
+     *  \param  state_size  size of the data inside this slot
+     *  \param  allocator   allocator for allocating host-side memory region to store checkpoint
+     *  \param  deallocator deallocator for deallocating host-side memory region that stores checkpoint
+     */
     POSCheckpointSlot(
         uint64_t state_size,
         pos_custom_ckpt_allocate_func_t allocator,
@@ -53,8 +71,9 @@ class POSCheckpointSlot {
         }
     }
 
-    inline void* expose_pointer(){ return _data; }
-
+    /*!
+     *  \brief  deconstrutor
+     */
     ~POSCheckpointSlot(){
         if(likely(_custom_deallocator != nullptr)){
             _custom_deallocator(_data);
@@ -65,16 +84,23 @@ class POSCheckpointSlot {
             }
         }   
     }
+    
+    /*!
+     *  \brief  expose the memory pointer of the slot
+     *  \return pointer to the checkpoint memory region
+     */
+    inline void* expose_pointer(){ return _data; }
 
  private:
+    // size of the data inside this slot
     uint64_t _state_size;
+
+    // pointer to the checkpoint memory region
     void *_data;
+
+    // deallocator for deallocating memory region that stores checkpoint
     pos_custom_ckpt_deallocate_func_t _custom_deallocator;
 };
-
-
-// forward declaration
-typedef struct POSAPIContext_QE POSAPIContext_QE_t;
 
 
 /*!
@@ -95,8 +121,19 @@ typedef struct pos_host_ckpt {
 } pos_host_ckpt_t;
 
 
+/*!
+ *  \brief  collection of checkpoint slots of a handle
+ */
 class POSCheckpointBag {
  public:
+    /*!
+     *  \brief  construtor
+     *  \param  state_size      size of the data inside this slot
+     *  \param  allocator       allocator for allocating host-side memory region to store checkpoint
+     *  \param  deallocator     deallocator for deallocating host-side memory region that stores checkpoint
+     *  \param  dev_allocator   allocator for allocating device-side memory region to store checkpoint
+     *  \param  dev_deallocator deallocator for deallocating device-side memory region that stores checkpoint
+     */
     POSCheckpointBag(
         uint64_t state_size,
         pos_custom_ckpt_allocate_func_t allocator,

@@ -399,7 +399,7 @@ class POSHandle {
                 /*!
                 *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
                 *                  commit from the new buffer
-                *  \note   we commit from the cache under this hood, and the commit process is async as there's not CoW 
+                *  \note   we commit from the cache under this hood, and the commit process is async as there's no CoW 
                 *          on this handle anymore
                 */
                 while(this->_state_preserve_counter < 3){}

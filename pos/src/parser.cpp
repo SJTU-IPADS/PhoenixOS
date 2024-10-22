@@ -86,9 +86,9 @@ void POSParser::__daemon(){
             this->__process_cmd(cmd_wqe);
         }
 
-        // step 2: digest cmd from worker work queue
+        // step 2: digest cmd from worker completion queue
         cmd_wqes.clear();
-        this->_client->poll_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
+        this->_client->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(&cmd_wqes);
         for(i=0; i<cmd_wqes.size(); i++){
             POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
             this->__process_cmd(cmd_wqe);
@@ -169,7 +169,6 @@ void POSParser::__daemon(){
 pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
     POSHandleManager<POSHandle>* hm;
-    POSAPIContext_QE *ckpt_wqe;
     POSHandle *handle;
     uint64_t i;
 
@@ -177,43 +176,40 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
 
     switch (cmd->type)
     {
-    /* ========== Command from OOB thread ========== */
-    case kPOS_Command_OobToParser_PreDumpStart:
+    /* ========== Ckpt WQ Command from OOB thread ========== */
+    case kPOS_Command_Oob2Parser_PreDump:
+    case kPOS_Command_Oob2Parser_Dump:
     #if POS_CONF_EVAL_CkptOptLevel > 0
-        /*!
-         *  \note   mark the parser as checkpointing, in order to:
-         *          1. the parser function would start recording edges
-         */
         this->is_checkpointing = true;
 
-        // generate checkpoint op to notify worker to start checkpointing
-        POS_CHECK_POINTER(ckpt_wqe = new POSAPIContext_QE_t(/* ckpt_mark_*/ true, /* client */ this->_client));
+        // collect all handles at this timespot to be checkpointed
         for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
             POS_CHECK_POINTER(
                 hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>)
             );
             for(i=0; i<hm->get_nb_handles(); i++){
                 POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-                ckpt_wqe->record_checkpoint_handles(handle);
+                cmd->record_checkpoint_handles(handle);
             }
         }
-        this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(ckpt_wqe);
+        cmd->type = cmd->type == kPOS_Command_Oob2Parser_PreDump 
+                    ? kPOS_Command_Parser2Worker_PreDump
+                    : kPOS_Command_Parser2Worker_Dump;
+        this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(cmd);
     #else
         cmd->retval = POS_FAILED_NOT_ENABLED;
         this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
     #endif // POS_CONF_EVAL_CkptOptLevel
-        
         break;
 
-    /* ========== Command from worker thread ========== */
-    case kPOS_Command_WorkerToParser_PreDumpEnd:
-        this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+    /* ========== Ckpt CQ Command from worker thread ========== */
+    case kPOS_Command_Parser2Worker_PreDump:
+    case kPOS_Command_Parser2Worker_Dump:
         this->is_checkpointing = false;
-        break;
-    
-    case kPOS_Command_WorkerToParser_DumpEnd:
+        cmd->type = cmd->type == kPOS_Command_Parser2Worker_PreDump 
+                    ? kPOS_Command_Oob2Parser_PreDump
+                    : kPOS_Command_Oob2Parser_Dump;
         this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
-        this->is_checkpointing = false;
         break;
 
     default:

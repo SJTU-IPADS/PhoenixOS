@@ -33,6 +33,7 @@ class POSHandle;
 class POSWorkspace;
 typedef struct POSAPIMeta POSAPIMeta_t;
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+typedef struct POSCommand_QE POSCommand_QE_t;
 
 
 /*!
@@ -60,9 +61,9 @@ namespace wk_functions {
 typedef struct checkpoint_async_cxt {
     // flag: checkpoint thread to notify the worker thread that the previous checkpoint has done
     bool is_active;
-    
-    // checkpoint op context
-    POSAPIContext_QE_t *wqe;
+
+    // checkpoint cmd
+    POSCommand_QE_t *cmd;
 
     // (latest) version of each handle to be checkpointed
     std::map<POSHandle*, pos_u64id_t> checkpoint_version_map;
@@ -239,10 +240,10 @@ class POSWorker {
         /*!
          *  \brief  checkpoint procedure, should be implemented by each platform
          *  \note   this function will be invoked by level-1 ckpt
-         *  \param  wqe     the checkpoint op
+         *  \param  cmd     the checkpoint command
          *  \return POS_SUCCESS for successfully checkpointing
          */
-        pos_retval_t __checkpoint_sync(POSAPIContext_QE_t* wqe);
+        pos_retval_t __checkpoint_sync(POSCommand_QE_t *cmd);
     #elif POS_CONF_EVAL_CkptOptLevel == 2
         /*!
          *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)
@@ -264,6 +265,13 @@ class POSWorker {
          */
         void __daemon_migration_opt();
     #endif
+
+    /*!
+     *  \brief  process command received in the worker daemon
+     *  \param  cmd the received command
+     *  \return POS_SUCCESS for successfully process the command
+     */
+    pos_retval_t __process_cmd(POSCommand_QE_t *cmd);
 
     /*!
      *  \brief  check and restore all broken handles, if there's any exists

@@ -142,45 +142,31 @@ void POSWorker::__daemon_ckpt_sync(){
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
-
-    uint64_t p = 0;
+    POSCommand_QE_t *cmd_wqe;
+    std::vector<POSCommand_QE_t*> cmd_wqes;
 
     while(!_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
-        wqes.clear();
-        try {
-            this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
-        } catch (const std::exception& e) {
-            POS_ERROR_C("failed, uuid: %lu, p: %lu", this->_client->id, p);
+        // step 1: digest cmd from parser work queue
+        cmd_wqes.clear();
+        this->_client->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
+        for(i=0; i<cmd_wqes.size(); i++){
+            POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
+            this->__process_cmd(cmd_wqe);
         }
-        p++;
+
+        // step 2: digest apicxt from parser work queue
+        wqes.clear();
+        this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
 
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
+            POS_CHECK_POINTER(wqe->api_cxt);
             
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
-
-            // this is a checkpoint op
-            if(unlikely(wqe->ckpt_mark == true)){
-                if(unlikely(POS_SUCCESS != this->sync())){
-                    POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
-                    goto ckpt_finished;
-                }
-
-                if(unlikely(POS_SUCCESS != this->__checkpoint_sync(wqe))){
-                    POS_WARN_C("failed to do checkpointing");
-                }
             
-            ckpt_finished:
-                __done(this->_ws, wqe);
-                wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-                wqe->return_tick = POSUtilTimestamp::get_tsc();
-                continue;
-            }
-            
-            POS_CHECK_POINTER(wqe->api_cxt);
             api_id = wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
@@ -223,25 +209,14 @@ void POSWorker::__daemon_ckpt_sync(){
 }
 
 
-pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
-    uint64_t i;
-    std::vector<POSHandleView_t>* handle_views;
-    uint64_t nb_handles;
-    POSHandleManager<POSHandle>* hm;
-    POSCheckpointSlot *ckpt_slot;
-    POSCommand_QE_t* cmd;
+pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
-
-    typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
+    uint64_t nb_ckpt_handles = 0, ckpt_size = 0;
     typename std::set<POSHandle*>::iterator set_iter;
 
-    POS_CHECK_POINTER(wqe);
+    POS_CHECK_POINTER(cmd);
 
-    wqe->nb_ckpt_handles = 0;
-    wqe->ckpt_size = 0;
-    wqe->ckpt_memory_consumption = 0;
-
-    for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+    for(set_iter=cmd->checkpoint_handles.begin(); set_iter!=cmd->checkpoint_handles.end(); set_iter++){
         const POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
 
@@ -262,8 +237,8 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
             goto exit;
         }
 
-        wqe->nb_ckpt_handles += 1;
-        wqe->ckpt_size += handle->state_size;
+        nb_ckpt_handles += 1;
+        ckpt_size += handle->state_size;
     }
     
     // make sure the checkpoint is finished
@@ -274,23 +249,57 @@ pos_retval_t POSWorker::__checkpoint_sync(POSAPIContext_QE* wqe){
         // TODO: record to trace
         POS_LOG(
             "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",
-            wqe->nb_ckpt_handles, wqe->ckpt_size
+            nb_ckpt_handles, ckpt_size
         );
-    }
-    
-    // reply to parser
-    POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
-    cmd->client_id = this->_client->id;
-    cmd->retval = retval;
-    cmd->type = kPOS_Command_WorkerToParser_DumpEnd;
-    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }
 
 exit:
     return retval;
 }
+
+
+pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
+    pos_retval_t retval = POS_SUCCESS;
+    POSHandleManager<POSHandle>* hm;
+    POSHandle *handle;
+    uint64_t i;
+
+    POS_CHECK_POINTER(cmd);
+
+    switch (cmd->type)
+    {
+    /* ========== Ckpt WQ Command from parser thread ========== */
+    case kPOS_Command_Parser2Worker_PreDump:
+    case kPOS_Command_Parser2Worker_Dump:
+        if(unlikely(
+            POS_SUCCESS != (retval = this->sync())
+        )){
+            POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
+            goto ckpt_finished;
+        }
+        if(unlikely(
+            POS_SUCCESS != (retval = this->__checkpoint_sync(cmd))
+        )){
+            POS_WARN_C("failed to do checkpointing");
+        }
+    
+    ckpt_finished:
+        // reply to parser
+        cmd->retval = retval;
+        retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+        }
+        break;
+
+    default:
+        POS_ERROR_C_DETAIL("unknown command type %u, this is a bug", cmd->type);
+    }
+
+exit:
+    return retval;
+}
+
 
 #elif POS_CONF_EVAL_CkptOptLevel == 2
 
@@ -301,14 +310,23 @@ void POSWorker::__daemon_ckpt_async(){
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
-
-    typename std::set<POSHandle*>::iterator handle_set_iter;
+    POSCommand_QE_t *cmd_wqe;
+    std::vector<POSCommand_QE_t*> cmd_wqes;
     POSHandle *handle;
 
     while(!_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
+        // step 1: digest cmd from parser work queue
+        cmd_wqes.clear();
+        this->_client->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
+        for(i=0; i<cmd_wqes.size(); i++){
+            POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
+            this->__process_cmd(cmd_wqe);
+        }
+
+        // step 2: digest apicxt from parser work queue
         wqes.clear();
         this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
 
@@ -317,112 +335,6 @@ void POSWorker::__daemon_ckpt_async(){
 
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
             
-            // this is a checkpoint op
-            if(unlikely(wqe->ckpt_mark == true)){
-                // if nothing to be checkpointed, we just omit
-                if(unlikely(wqe->checkpoint_handles.size() == 0)){
-                    goto ckpt_finished;
-                }
-
-                POS_TRACE_TICK_START(ckpt, ckpt_drain);
-                if(unlikely(POS_SUCCESS != this->sync())){
-                    POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
-                    goto ckpt_finished;
-                }
-                POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
-
-                /*!
-                    *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
-                    *          to avoid waiting overhead here
-                    *  \note   so the actual checkpoint interval might not be accurate
-                    */
-                if(this->async_ckpt_cxt.is_active == true){
-                    POS_LOG("skip checkpoint due to previous one is still non-finished");
-                    goto ckpt_finished;
-                }
-                
-                // start new checkpoint thread
-                this->async_ckpt_cxt.wqe = wqe;
-
-                // delete the handle of previous checkpoint
-                if(likely(this->async_ckpt_cxt.thread != nullptr)){
-                    this->async_ckpt_cxt.thread->join();
-                    delete this->async_ckpt_cxt.thread;
-
-                    // collect the statistic of last checkpoint round
-                    #if POS_CONF_RUNTIME_EnableTrace
-                        POS_LOG(
-                            "[Worker] Checkpoint Statistics:\n"
-                            "   [Drain]     Overall(%lf ms), Times(%lu), Avg.(%lf ms)\n"
-                            "   [CoW-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                            "   [CoW-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                            "   [Add-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                            "   [Add-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                            "   [Commit]    Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
-                            ,
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_drain),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_drain),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_drain),
-
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_done),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_done),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_done),
-                            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_done_size),
-
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_wait),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_wait),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_wait),
-                            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_wait_size),
-
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_done),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_done),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_done),
-                            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_done_size),
-
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_wait),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_wait),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_wait),
-                            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_wait_size),
-
-                            POS_TRACE_TICK_GET_MS(ckpt, ckpt_commit),
-                            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_commit),
-                            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_commit),
-                            POS_TRACE_COUNTER_GET(ckpt, ckpt_commit_size)
-                        );
-                        POS_TRACE_TICK_LIST_RESET(ckpt);
-                        POS_TRACE_COUNTER_LIST_RESET(ckpt);
-                    #endif
-                }
-
-                // clear the ckpt dag queue
-                this->_client->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>();
-
-                // reset checkpoint version map
-                this->async_ckpt_cxt.checkpoint_version_map.clear();
-                for(handle_set_iter = wqe->checkpoint_handles.begin(); 
-                    handle_set_iter != wqe->checkpoint_handles.end(); 
-                    handle_set_iter++)
-                {
-                    POS_CHECK_POINTER(handle = *handle_set_iter);
-                    handle->reset_preserve_counter();
-                    this->async_ckpt_cxt.checkpoint_version_map[handle] = handle->latest_version;
-                }
-
-                // raise new checkpoint thread
-                this->async_ckpt_cxt.thread = new std::thread(&POSWorker::__checkpoint_async_thread, this);
-                POS_CHECK_POINTER(this->async_ckpt_cxt.thread);
-                this->async_ckpt_cxt.is_active = true;
-
-            ckpt_finished:
-                __done(this->_ws, wqe);
-                wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-                wqe->return_tick = POSUtilTimestamp::get_tsc();
-                continue;
-            }
-
-            POS_CHECK_POINTER(wqe->api_cxt);
-            api_id = wqe->api_cxt->api_id;
-
             /*!
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
              */
@@ -430,12 +342,13 @@ void POSWorker::__daemon_ckpt_async(){
                 this->_client->template push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe);
             }
 
-            api_meta = _ws->api_mgnr->api_metas[api_id];
+            POS_CHECK_POINTER(wqe->api_cxt);
+            api_id = wqe->api_cxt->api_id;
+            api_meta = this->_ws->api_mgnr->api_metas[api_id];
 
             // check and restore broken handles
             if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, &api_meta))){
                 POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
-                // TODO: we need to deal with this continue, as we will loss the wqe after continue
                 continue;
             }
 
@@ -539,9 +452,8 @@ void POSWorker::__checkpoint_async_thread() {
     uint64_t i;
     pos_u64id_t checkpoint_version;
     pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
-    POSAPIContext_QE *wqe;
+    POSCommand_QE_t *cmd;
     POSHandle *handle;
-    POSCommand_QE_t* cmd;
     uint64_t s_tick = 0, e_tick = 0;
 
 #if POS_CONF_EVAL_CkptEnablePipeline == 1
@@ -552,19 +464,14 @@ void POSWorker::__checkpoint_async_thread() {
     typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
     typename std::set<POSHandle*>::iterator set_iter;
 
-    POS_CHECK_POINTER(wqe = this->async_ckpt_cxt.wqe);
+    POS_CHECK_POINTER(cmd = this->async_ckpt_cxt.cmd);
     POS_ASSERT(this->_ckpt_stream_id != 0);
-    #if POS_CONF_EVAL_CkptEnablePipeline == 1
-        POS_ASSERT(this->_ckpt_commit_stream_id != 0);
-    #endif
 
-    wqe->nb_ckpt_handles = 0;
-    wqe->ckpt_size = 0;
-    wqe->nb_abandon_handles = 0;
-    wqe->abandon_ckpt_size = 0;
-    wqe->ckpt_memory_consumption = 0;
-    
-    for(set_iter=wqe->checkpoint_handles.begin(); set_iter!=wqe->checkpoint_handles.end(); set_iter++){
+#if POS_CONF_EVAL_CkptEnablePipeline == 1
+    POS_ASSERT(this->_ckpt_commit_stream_id != 0);
+#endif
+
+    for(set_iter=cmd->checkpoint_handles.begin(); set_iter!=cmd->checkpoint_handles.end(); set_iter++){
         POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
         
@@ -651,9 +558,6 @@ void POSWorker::__checkpoint_async_thread() {
         POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
         POS_TRACE_COUNTER_ADD(ckpt, ckpt_commit_size, handle->state_size);
     #endif
-    
-        wqe->nb_ckpt_handles += 1;
-        wqe->ckpt_size += handle->state_size;
 
         /*!
          *  \note   we need to avoid conflict between ckpt memcpy and normal memcpy, and we will stop once it occurs
@@ -661,49 +565,164 @@ void POSWorker::__checkpoint_async_thread() {
         while(this->async_ckpt_cxt.membus_lock == true){ /* block */ }
     }
 
-    //  POS_TRACE_TICK_START(ckpt, ckpt_commit)
-    // #if POS_CONF_EVAL_CkptEnablePipeline == 1
-    //     /*!
-    //      *  \note   [phrase 3]  synchronize all commits
-    //      *                      this phrase is only enabled when checkpoint pipeline is enabled
-    //      */
-        
-        
-    //     // wait all commit thread to exit
-    //     // for(auto &commit_thread : _commit_threads){
-    //     //     if(unlikely(POS_SUCCESS != commit_thread.get())){
-    //     //         POS_WARN_C("failure occured within the commit thread");
-    //     //     }
-    //     // }
+    // mark overlap ckpt stop immediately
+    this->async_ckpt_cxt.is_active = false;
 
-    //     // wait all commit job to finished
-    //     retval = this->sync(this->_ckpt_commit_stream_id);
-    //     POS_ASSERT(retval == POS_SUCCESS);
-    // #else
-    //     // wait all commit job to finished
-    //     retval = this->sync(this->_ckpt_stream_id);
-    //     POS_ASSERT(retval == POS_SUCCESS);
-    // #endif
-    // POS_TRACE_TICK_APPEND_NO_COUNT(ckpt, ckpt_commit)
+    // collect the statistic of of this checkpoint round
+    #if POS_CONF_RUNTIME_EnableTrace
+        POS_LOG(
+            "[Worker] Checkpoint Statistics:\n"
+            "   [Drain]     Overall(%lf ms), Times(%lu), Avg.(%lf ms)\n"
+            "   [CoW-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+            "   [CoW-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+            "   [Add-done]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+            "   [Add-wait]  Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+            "   [Commit]    Overall(%lf ms), Times(%lu), Avg.(%lf ms), Size(%lu bytes)\n"
+            ,
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_drain),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_drain),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_drain),
 
-    POS_LOG(
-        "checkpoint finished: #finished_handles(%lu), size(%lu Bytes)",
-        wqe->nb_ckpt_handles, wqe->ckpt_size
-    );
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_done),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_done),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_done),
+            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_done_size),
 
-    // reply to parser
-    POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
-    cmd->client_id = wqe->client_id;
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_cow_wait),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_cow_wait),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_cow_wait),
+            POS_TRACE_COUNTER_GET(ckpt, ckpt_cow_wait_size),
+
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_done),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_done),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_done),
+            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_done_size),
+
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_add_wait),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_add_wait),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_add_wait),
+            POS_TRACE_COUNTER_GET(ckpt, ckpt_add_wait_size),
+
+            POS_TRACE_TICK_GET_MS(ckpt, ckpt_commit),
+            POS_TRACE_TICK_GET_TIMES(ckpt, ckpt_commit),
+            POS_TRACE_TICK_GET_AVG_MS(ckpt, ckpt_commit),
+            POS_TRACE_COUNTER_GET(ckpt, ckpt_commit_size)
+        );
+        POS_TRACE_TICK_LIST_RESET(ckpt);
+        POS_TRACE_COUNTER_LIST_RESET(ckpt);
+    #endif
+
+ pre_dump_done:
+    // if this is a pre-dump command, we return the CQE here
+    if(cmd->type == kPOS_Command_Parser2Worker_PreDump){
+        cmd->retval = dirty_retval;
+        retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+        }
+        goto exit;
+    }
+
+ dump_done:
+    // TODO: should we do the dirty copy here??
+    POS_ASSERT(cmd->type == kPOS_Command_Parser2Worker_Dump);
     cmd->retval = dirty_retval;
-    cmd->type = kPOS_Command_WorkerToParser_PreDumpEnd;
-    retval = this->_client->template push_q<kPOS_QueueDirection_Worker2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
+    retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
     }
 
-exit:
-    this->async_ckpt_cxt.is_active = false;
+ exit:
+    ;
 }
+
+
+pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
+    pos_retval_t retval = POS_SUCCESS;
+    POSHandleManager<POSHandle>* hm;
+    POSHandle *handle;
+    uint64_t i;
+    typename std::set<POSHandle*>::iterator handle_set_iter;
+
+    POS_CHECK_POINTER(cmd);
+
+    switch (cmd->type)
+    {
+    /* ========== Ckpt WQ Command from parser thread ========== */
+    case kPOS_Command_Parser2Worker_PreDump:
+    case kPOS_Command_Parser2Worker_Dump:
+        // if nothing to be checkpointed, we just omit
+        if(unlikely(cmd->checkpoint_handles.size() == 0)){
+            cmd->retval = POS_SUCCESS;
+            retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+            }
+            goto exit;
+        }
+
+        /*!
+         *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
+         *          to avoid waiting overhead here
+         */
+        if(this->async_ckpt_cxt.is_active == true){
+            POS_WARN_C("skip checkpoint due to previous one is still non-finished");
+            cmd->retval = POS_FAILED_ALREADY_EXIST;
+            retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
+            }
+            goto exit;
+        }
+
+        // drain the device
+        POS_TRACE_TICK_START(ckpt, ckpt_drain);
+        if(unlikely(
+            POS_SUCCESS != (retval = this->sync())
+        )){
+            POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
+            POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
+            goto exit;
+        }
+        POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
+
+        this->async_ckpt_cxt.cmd = cmd;
+
+        // deallocate the thread handle of previous checkpoint
+        if(likely(this->async_ckpt_cxt.thread != nullptr)){
+            this->async_ckpt_cxt.thread->join();
+            delete this->async_ckpt_cxt.thread;
+        }
+
+        // clear the ckpt dag queue
+        this->_client->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>();
+
+        // reset checkpoint version map
+        this->async_ckpt_cxt.checkpoint_version_map.clear();
+        for(handle_set_iter = cmd->checkpoint_handles.begin(); 
+            handle_set_iter != cmd->checkpoint_handles.end(); 
+            handle_set_iter++)
+        {
+            POS_CHECK_POINTER(handle = *handle_set_iter);
+            handle->reset_preserve_counter();
+            this->async_ckpt_cxt.checkpoint_version_map[handle] = handle->latest_version;
+        }
+
+        // raise new checkpoint thread
+        this->async_ckpt_cxt.thread = new std::thread(&POSWorker::__checkpoint_async_thread, this);
+        POS_CHECK_POINTER(this->async_ckpt_cxt.thread);
+        this->async_ckpt_cxt.is_active = true;
+        
+        break;
+
+    default:
+        POS_ERROR_C_DETAIL("unknown command type %u, this is a bug", cmd->type);
+    }
+
+exit:
+    return retval;
+}
+
 
 #endif // POS_CONF_EVAL_CkptOptLevel
 
