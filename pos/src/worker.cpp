@@ -161,7 +161,7 @@ void POSWorker::__daemon_ckpt_sync(){
             api_id = wqe->api_cxt->api_id;
 
             // this is a checkpoint op
-            if(unlikely(api_id == this->_ws->checkpoint_api_id)){
+            if(unlikely(wqe->ckpt_mark == true)){
                 if(unlikely(POS_SUCCESS != this->sync())){
                     POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
                     goto ckpt_finished;
@@ -307,7 +307,7 @@ void POSWorker::__daemon_ckpt_async(){
             api_id = wqe->api_cxt->api_id;
 
             // this is a checkpoint op
-            if(unlikely(api_id == this->_ws->checkpoint_api_id)){
+            if(unlikely(wqe->ckpt_mark == true)){
                 // if nothing to be checkpointed, we just omit
                 if(unlikely(wqe->checkpoint_handles.size() == 0)){
                     goto ckpt_finished;
