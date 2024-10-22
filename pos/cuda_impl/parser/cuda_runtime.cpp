@@ -16,9 +16,6 @@
 #include <iostream>
 
 #include "pos/include/common.h"
-#include "pos/include/utils/bipartite_graph.h"
-#include "pos/include/dag.h"
-
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/parser.h"
 #include "pos/cuda_impl/client.h"
@@ -100,15 +97,6 @@ namespace cuda_malloc {
             /* handle */ memory_handle
         });
 
-        // allocate the memory handle in the dag
-        retval = client->dag.allocate_handle(memory_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
         return retval;
@@ -170,9 +158,6 @@ namespace cuda_free {
         wqe->record_handle<kPOS_Edge_Direction_Delete>({
             /* handle */ memory_handle
         });
-
-        
-        retval = client->dag.launch_op(wqe);
         
     exit:
         return retval;
@@ -563,8 +548,6 @@ namespace cuda_launch_kernel {
             }
         }
 
-        retval = client->dag.launch_op(wqe);
-
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(
@@ -645,17 +628,10 @@ namespace cuda_memcpy_h2d {
             hm_memory->record_modified_handle(memory_handle);
         }
 
-        
-        retval = client->dag.launch_op(wqe);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("parse(cuda_memcpy_h2d): failed to launch op");
-            goto exit;
-        }
-
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         *  \note   recording should be called after launch op, as the wqe should obtain wqe vertex id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
         retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
@@ -729,9 +705,6 @@ namespace cuda_memcpy_d2h {
                 /* offset */ pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr)
             });
         }
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;
@@ -815,9 +788,6 @@ namespace cuda_memcpy_d2d {
                 /* offset */ pos_api_param_value(wqe, 1, uint64_t) - (uint64_t)(src_memory_handle->client_addr)
             });
         }
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;
@@ -908,18 +878,11 @@ namespace cuda_memcpy_h2d_async {
             });
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
-        
-        
-        retval = client->dag.launch_op(wqe);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("parse(cuda_memcpy_h2d_async): failed to launch op");
-            goto exit;
-        }
 
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
          */
         POS_CHECK_POINTER(memory_handle->ckpt_bag);
         retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
@@ -1017,9 +980,6 @@ namespace cuda_memcpy_d2h_async {
             });
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;
@@ -1130,9 +1090,6 @@ namespace cuda_memcpy_d2d_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1222,9 +1179,6 @@ namespace cuda_memset_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1288,9 +1242,6 @@ namespace cuda_set_device {
 
         hm_device->latest_used_handle = device_handle;
 
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1335,9 +1286,6 @@ namespace cuda_get_error_string {
             goto exit;
         }
     #endif
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:   
         return retval;
@@ -1452,9 +1400,6 @@ namespace cuda_get_device_properties {
             /* handle */ device_handle
         });
 
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1514,9 +1459,6 @@ namespace cuda_device_get_attribute {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ device_handle
         });
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;
@@ -1615,8 +1557,6 @@ namespace cuda_func_get_attributes {
             /* handle */ function_handle
         });
 
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1676,8 +1616,6 @@ namespace cuda_occupancy_max_active_bpm_with_flags {
             /* handle */ function_handle
         });
 
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -1735,10 +1673,7 @@ namespace cuda_stream_synchronize {
                 /* handle */ stream_handle
             });
         }
-
-        
-        retval = client->dag.launch_op(wqe);
-    
+ 
     exit:
         return retval;
     }
@@ -1874,15 +1809,6 @@ namespace cuda_event_create_with_flags {
             /* handle */ event_handle
         });
 
-        // allocate the event handle in the dag
-        retval = client->dag.allocate_handle(event_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-        
-        
-        retval = client->dag.launch_op(wqe);
-
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
@@ -1948,9 +1874,6 @@ namespace cuda_event_destory {
         wqe->record_handle<kPOS_Edge_Direction_Delete>({
             /* handle */ event_handle
         });
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;
@@ -2037,9 +1960,6 @@ namespace cuda_event_record {
         });
         wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
-        
-        retval = client->dag.launch_op(wqe);
-
     exit:
         return retval;
     }
@@ -2098,9 +2018,6 @@ namespace cuda_event_query {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ event_handle
         });
-
-        
-        retval = client->dag.launch_op(wqe);
 
     exit:
         return retval;

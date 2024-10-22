@@ -30,7 +30,7 @@
  *          POS_FAILED_NOT_READY for migration not enabled
  *          POS_WARN_BLOCKED for blocking worker thread
  */
-pos_retval_t POSMigrationCtx::watch_dog(pos_vertex_id_t pc){
+pos_retval_t POSMigrationCtx::watch_dog(pos_u64id_t pc){
     pos_retval_t retval = POS_FAILED_NOT_READY;
     
     uint64_t eff_nb_precopy_handles = 0, eff_precopy_size = 0, all_precopy_size = 0;

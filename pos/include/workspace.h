@@ -165,9 +165,7 @@ class POSWorkspace {
      *  \param  clnt    pointer to the POSClient to be added
      *  \return POS_SUCCESS for successfully added
      */
-    virtual pos_retval_t create_client(pos_create_client_param_t& param, POSClient** clnt){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
+    pos_retval_t create_client(pos_create_client_param_t& param, POSClient** clnt);
 
     /*!
      *  \brief  remove a client by given uuid
@@ -197,6 +195,26 @@ class POSWorkspace {
      */
     inline std::map<pos_client_uuid_t, POSClient*>& get_client_map(){
         return this->_client_map;
+    }
+
+ protected:
+    /*!
+     *  \brief  create a specific-implemented client
+     *  \param  parameter to create the client
+     *  \param  client  pointer to the client to be created
+     *  \return POS_SUCCESS for successfully creating
+     */
+    virtual pos_retval_t __create_client(pos_create_client_param_t& param, POSClient **client){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+    /*!
+     *  \brief  destory a specific-implemented client
+     *  \param  client  pointer to the client to be destoried
+     *  \return POS_SUCCESS for successfully destorying
+     */
+    virtual pos_retval_t __destory_client(POSClient *client){
+        return POS_FAILED_NOT_IMPLEMENTED;
     }
     /* ============ end of client management functions =========== */
 
@@ -244,6 +262,22 @@ class POSWorkspace {
      */
     template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
     pos_retval_t clear_q(pos_client_uuid_t uuid);
+
+    /*!
+     *  \brief  export queue group of a specific client
+     *  \note   this function is used to export queue to every client,
+     *          so that there's no need to access the global map every
+     *          time poll/push queues
+     *  \param  uuid        uuid of a given client
+     *  \param  apicxt_qs   the obtained API context queues
+     *  \param  cmd_qs      the obatined command queues
+     *  \return POS_SUCCESS for succesfully obtained
+     */
+    pos_retval_t get_q_group(
+        pos_client_uuid_t uuid,
+        std::vector<POSLockFreeQueue<POSAPIContext_QE_t*>*>& apicxt_qs,
+        std::vector<POSLockFreeQueue<POSCommand_QE_t*>*> cmd_qs
+    );
 
  protected:
     /*!
@@ -310,6 +344,9 @@ class POSWorkspace {
     POSOobServer *_oob_server;
 
     /* =============== asynchronous queues =============== */
+    // TODO: remove this mutex for god sake
+    std::mutex q_mtx;
+
     // api context queue pairs from RPC frontend to parser (per client)
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2parser_wqs;
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2parser_cqs;

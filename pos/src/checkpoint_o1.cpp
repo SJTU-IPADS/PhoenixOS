@@ -66,7 +66,7 @@ void POSCheckpointBag::clear(){
 /*!
  *  \brief  allocate a new checkpoint slot inside this bag
  *  \tparam on_device           whether to apply the slot on the device
- *  \param  version             version (i.e., dag index) of this checkpoint
+ *  \param  version             version of this checkpoint
  *  \param  ptr                 pointer to the checkpoint slot
  *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
  *                              (if no available slot exist)
@@ -267,11 +267,11 @@ pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
     pos_retval_t retval = POS_SUCCESS;
 
     POS_CHECK_POINTER(ckpt.wqe);
-    if(unlikely(_host_ckpt_map.count(ckpt.wqe->dag_vertex_id) > 0)){
+    if(unlikely(_host_ckpt_map.count(ckpt.wqe->id) > 0)){
         retval = POS_FAILED_ALREADY_EXIST;
     } else {
         _host_ckpt_map.insert(
-            std::pair<uint64_t, pos_host_ckpt_t>(ckpt.wqe->dag_vertex_id, ckpt)
+            std::pair<uint64_t, pos_host_ckpt_t>(ckpt.wqe->id, ckpt)
         );
     }
 

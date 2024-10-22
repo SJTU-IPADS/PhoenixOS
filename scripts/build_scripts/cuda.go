@@ -418,7 +418,7 @@ func buildRemoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		cp ./submodules/libtirpc/install/lib/libtirpc.so %s/%s
 		cd cpu
 		make clean
-		LOG=DEBUG make cricket-rpc-server cricket-client.so -j &>%s 2>&1
+		LOG=INFO make cricket-rpc-server cricket-client.so -j &>%s 2>&1
 		cp cricket-rpc-server %s/%s
 		cp cricket-client.so %s/%s
 		`,

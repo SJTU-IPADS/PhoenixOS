@@ -113,40 +113,40 @@ pos_retval_t POSWorkspace_CUDA::__deinit(){
 }
 
 
-pos_retval_t POSWorkspace_CUDA::create_client(pos_create_client_param_t& param, POSClient** clnt){
+pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param, POSClient **client){
     pos_retval_t retval = POS_SUCCESS;
     pos_client_cxt_CUDA_t client_cxt;
     std::string runtime_daemon_log_path;
 
+    POS_CHECK_POINTER(*client);
+
     client_cxt.cxt_base.job_name = param.job_name;
     client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
-
     retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeDaemonLogPath, runtime_daemon_log_path);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to obtain runtime daemon log path");
+        goto exit;
     } else {
         client_cxt.cxt_base.kernel_meta_path = runtime_daemon_log_path + std::string("/") 
                                                 + param.job_name + std::string("_kernel_metas.txt");
     }
 
-    // create client
-    POS_CHECK_POINTER(*clnt = new POSClient_CUDA(/* ws */ this, /* id */ _current_max_uuid, /* cxt */ client_cxt));
-    (*clnt)->init();
-    this->_current_max_uuid += 1;
-    this->_client_map[(*clnt)->id] = (*clnt);
-    this->_pid_client_map[param.pid] = (*clnt);
-    POS_DEBUG_C("add client: addr(%p), uuid(%lu)", (*clnt), (*clnt)->id);
+    POS_CHECK_POINTER(*client = new POSClient_CUDA(/* ws */ this, /* id */ param.id, /* cxt */ client_cxt));
+    (*client)->init();
 
-    // create queue pair
-    retval = this->__create_qp((*clnt)->id);
+exit:
+    return retval;
+}
 
-    if(retval == POS_SUCCESS){
-        POS_DEBUG_C("add queue pair: uuid(%lu)", (*clnt)->id);
-        (*clnt)->status = kPOS_ClientStatus_Active;
-    } else {
-        POS_WARN_C("failed to create queue pair: uuid(%lu)", (*clnt)->id);
-    }
 
+pos_retval_t POSWorkspace_CUDA::__destory_client(POSClient *client){
+    pos_retval_t retval = POS_SUCCESS;
+    POSClient_CUDA *cuda_client;
+
+    POS_CHECK_POINTER(cuda_client = reinterpret_cast<POSClient_CUDA*>(client));
+    delete cuda_client;
+
+exit:
     return retval;
 }
 

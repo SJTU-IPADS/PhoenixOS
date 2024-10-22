@@ -42,6 +42,7 @@ typedef struct pos_client_cxt_CUDA {
 class POSClient_CUDA : public POSClient {
  public:
     /*!
+     *  \brief  constructor
      *  \param  id  client identifier
      *  \param  cxt context to initialize this client
      */
@@ -62,10 +63,19 @@ class POSClient_CUDA : public POSClient {
           POS_WARN_C("failed to initialize transport for client %lu, migration would be failed", id);
         }
     }
-
     POSClient_CUDA(){}
-    ~POSClient_CUDA(){}
     
+    
+    /*!
+     *  \brief  deconstructor
+     */
+    ~POSClient_CUDA(){
+        // shutdown parser and worker
+        if(this->parser != nullptr){ delete this->parser; }
+        if(this->worker != nullptr){ delete this->worker; }
+    }
+    
+
     /*!
      *  \brief  instantiate handle manager for all used CUDA resources
      *  \note   the children class should replace this method to initialize their 
@@ -123,53 +133,6 @@ class POSClient_CUDA : public POSClient {
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context]);
     }
 
-    /*!
-     *  \brief  initialization of the DAG
-     *  \note   insert initial handles to the DAG (e.g., default CUcontext, CUStream, etc.)
-     */
-    void init_dag() override {
-        uint64_t i, nb_devices;
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandleManager_CUDA_Context *ctx_mgr;
-        POSHandleManager_CUDA_Stream *stream_mgr;
-        POSHandleManager_CUDA_Device *device_mgr;
-
-        bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
-
-        ctx_mgr = (POSHandleManager_CUDA_Context*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Context]);
-        POS_CHECK_POINTER(ctx_mgr);
-        stream_mgr = (POSHandleManager_CUDA_Stream*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
-        POS_CHECK_POINTER(stream_mgr);
-        device_mgr = (POSHandleManager_CUDA_Device*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Device]);
-        POS_CHECK_POINTER(device_mgr);
-
-        /*!
-         *  \note   we only inserting new handles to the DAG while NOT restoring
-         *  TODO:   we have no need to record handles in the DAG, remove it
-         */
-        if(is_restoring == false){
-            // insert the one and only initial CUDA context
-            retval = this->dag.allocate_handle(ctx_mgr->latest_used_handle);
-            if(unlikely(POS_SUCCESS != retval)){
-                POS_ERROR_C_DETAIL("failed to allocate initial cocntext handle in the DAG");
-            }
-
-            // insert the one and only initial CUDA stream
-            retval = this->dag.allocate_handle(stream_mgr->latest_used_handle);
-            if(unlikely(POS_SUCCESS != retval)){
-                POS_ERROR_C_DETAIL("failed to allocate initial stream_mgr handle in the DAG");
-            }
-
-            // insert all device handle
-            nb_devices = device_mgr->get_nb_handles();
-            for(i=0; i<nb_devices; i++){
-                retval = this->dag.allocate_handle(device_mgr->get_handle_by_id(i));
-                if(unlikely(POS_SUCCESS != retval)){
-                    POS_ERROR_C_DETAIL("failed to allocate the %lu(th) device handle in the DAG", i);
-                }
-            }
-        }
-    }
 
     /*
      *  \brief  initialization of transport utilities for migration  

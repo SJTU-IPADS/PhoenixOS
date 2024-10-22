@@ -17,8 +17,6 @@
 #include <fstream>
 
 #include "pos/include/common.h"
-#include "pos/include/utils/bipartite_graph.h"
-#include "pos/include/dag.h"
 #include "pos/include/checkpoint.h"
 
 #include "pos/cuda_impl/handle.h"
@@ -184,14 +182,6 @@ namespace cu_module_load {
             free(sizes_info);
         }
     #endif
-
-        // allocate the module handle in the dag
-        retval = client->dag.allocate_handle(module_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
         
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load): failed to launch op");
@@ -201,7 +191,7 @@ namespace cu_module_load {
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
          */
         POS_CHECK_POINTER(module_handle->ckpt_bag);
         retval = module_handle->ckpt_bag->set_host_checkpoint_record({
@@ -378,14 +368,6 @@ namespace cu_module_load_data {
                 free(sizes_info);
             }
         #endif
-
-        // allocate the module handle in the dag
-        retval = client->dag.allocate_handle(module_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
         
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cu_module_load_data): failed to launch op");
@@ -395,7 +377,7 @@ namespace cu_module_load_data {
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
         /*!
          *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain dag id after that
+         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
          */
         POS_CHECK_POINTER(module_handle->ckpt_bag);
         retval = module_handle->ckpt_bag->set_host_checkpoint_record({
@@ -552,15 +534,6 @@ namespace __register_function {
             /* handle */ function_handle
         });
 
-        // allocate the function handle in the dag
-        retval = client->dag.allocate_handle(function_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
-        
-
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
@@ -707,15 +680,6 @@ namespace cu_module_get_function {
             /* handle */ function_handle
         });
 
-        // allocate the function handle in the dag
-        retval = client->dag.allocate_handle(function_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
-        
-
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
@@ -818,15 +782,6 @@ namespace cu_module_get_global {
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ var_handle
         });
-            
-        // allocate the var handle in the dag
-        retval = client->dag.allocate_handle(var_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
-        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;

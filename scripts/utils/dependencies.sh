@@ -2,13 +2,13 @@
 
 __package_manager_update () {
     log "updating package manager apt..."
-    sudo apt-get update
+    apt-get update
 }
 
 
 __package_manager_install () {
     # $1: package name from package manager
-    sudo apt-get install -y --allow-downgrades $1
+    apt-get install -y --allow-downgrades $1
 }
 
 
