@@ -164,11 +164,6 @@ void POSParser::__daemon(){
 
             // insert apicxt_wqe to worker queue
             this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
-
-            // during checkpoint, we send this wqe to the dag queue, for potential recomputation
-            if(this->is_checkpointing){
-                this->_ws->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_CkptDag_WQ>(apicxt_wqe);
-            }
         }
     }
 }
@@ -191,7 +186,6 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
         /*!
          *  \note   mark the parser as checkpointing, in order to:
          *          1. the parser function would start recording edges
-         *          2. subsquent wqe would be send to the the ckpt_dag_wq
          */
         this->is_checkpointing = true;
 
@@ -217,10 +211,12 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     /* ========== Command from worker thread ========== */
     case kPOS_Command_WorkerToParser_PreDumpEnd:
         this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        this->is_checkpointing = false;
         break;
     
     case kPOS_Command_WorkerToParser_DumpEnd:
         this->_ws->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        this->is_checkpointing = false;
         break;
 
     default:

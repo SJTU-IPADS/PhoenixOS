@@ -48,7 +48,7 @@ typedef struct pos_op_meta {
 
 
 typedef struct pos_dag_cxt {
-    uint64_t checkpoint_api_id;
+    int something;
 } pos_dag_cxt_t;
 
 
@@ -158,11 +158,11 @@ class POSDag {
         _api_cxts_queue.push(wqe);
 
         // record the api context to the list
-        if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
-            _api_cxts.push_back(wqe);
-        } else {
-            latest_checkpoint_version = wqe->dag_vertex_id;
-        }
+        // if(likely(wqe->api_cxt->api_id != _cxt.checkpoint_api_id)){
+        //     _api_cxts.push_back(wqe);
+        // } else {
+        //     latest_checkpoint_version = wqe->dag_vertex_id;
+        // }
 
         POS_DEBUG_C(
             "add new op to the DAG: api_id(%lu), pc(%lu), vertex_id(%lu), #handles(%lu)",

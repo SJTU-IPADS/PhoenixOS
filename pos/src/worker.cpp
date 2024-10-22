@@ -306,7 +306,7 @@ void POSWorker::__daemon_ckpt_async(){
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         wqes.clear();
-        this->_ws->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
+        this->_ws->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
             this->_client->id, &wqes
         );
 
@@ -315,7 +315,7 @@ void POSWorker::__daemon_ckpt_async(){
 
             wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
             api_id = wqe->api_cxt->api_id;
-
+            
             // this is a checkpoint op
             if(unlikely(wqe->ckpt_mark == true)){
                 // if nothing to be checkpointed, we just omit
@@ -393,6 +393,9 @@ void POSWorker::__daemon_ckpt_async(){
                     #endif
                 }
 
+                // clear the ckpt dag queue
+                this->_ws->clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe->client_id);
+
                 // reset checkpoint version map
                 this->async_ckpt_cxt.checkpoint_version_map.clear();
                 for(handle_set_iter = wqe->checkpoint_handles.begin(); 
@@ -414,6 +417,13 @@ void POSWorker::__daemon_ckpt_async(){
                 wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
                 wqe->return_tick = POSUtilTimestamp::get_tsc();
                 continue;
+            }
+
+            /*!
+             *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
+             */
+            if(unlikely(this->async_ckpt_cxt.is_active == true)){
+                this->_ws->template push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe);
             }
 
             api_meta = _ws->api_mgnr->api_metas[api_id];

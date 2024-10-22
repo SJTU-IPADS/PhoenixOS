@@ -1,5 +1,8 @@
+#include <iostream>
+#include <filesystem>
+#include "pos/include/common.h"
+#include "pos/include/log.h"
 #include "pos/include/agent.h"
-
 #include "yaml-cpp/yaml.h"
 
 
@@ -11,6 +14,10 @@ pos_retval_t POSAgentConf::load_config(std::string &&file_path){
     YAML::Node config;
 
     POS_ASSERT(file_path.size() > 0);
+
+    // obtain pid
+    this->_pid = getpid();
+    POS_ASSERT(this->_pid > 0);
 
     if(unlikely(!std::filesystem::exists(file_path))){
         POS_WARN_C(
@@ -49,6 +56,14 @@ pos_retval_t POSAgentConf::load_config(std::string &&file_path){
             goto exit;
         }
         
+        // load log path
+        if(config["log_path"]){
+            this->_runtime_client_log_path = config["log_path"].as<std::string>();
+        } else {
+            this->_runtime_client_log_path = POS_CONF_RUNTIME_DefaultClientLogPath
+                                            + std::string("/") + std::to_string(this->_pid);
+        }
+
         // load daemon addr
         if(config["daemon_addr"]){
             this->_daemon_addr = config["daemon_addr"].as<std::string>();
@@ -75,8 +90,6 @@ POSAgent::POSAgent() : _agent_conf(this) {
     if(unlikely(POS_SUCCESS != this->_agent_conf.load_config())){
         POS_ERROR_C("failed to load agent configuration");
     }
-    this->_agent_conf._pid = getpid();
-    POS_ASSERT(this->_agent_conf._pid > 0);
 
     this->_pos_oob_client = new POSOobClient(
         /* agent */ this,
@@ -90,6 +103,20 @@ POSAgent::POSAgent() : _agent_conf(this) {
         /* server_ip */ this->_agent_conf._daemon_addr.c_str()
     );
     POS_CHECK_POINTER(this->_pos_oob_client);
+
+    // create daemon directory
+    if (std::filesystem::exists(this->_agent_conf._runtime_client_log_path)) {
+        std::filesystem::remove_all(this->_agent_conf._runtime_client_log_path);
+    }
+    try {
+        std::filesystem::create_directories(this->_agent_conf._runtime_client_log_path);
+    } catch (const std::filesystem::filesystem_error& e) {
+        POS_ERROR_C(
+            "failed to create client log directory at %s: %s",
+            this->_agent_conf._runtime_client_log_path.c_str(), e.what()
+        );
+    }
+    POS_DEBUG_C("created client log directory at %s", this->_agent_conf._runtime_client_log_path.c_str());
 
     // register client
     call_data.job_name = this->_agent_conf._job_name;

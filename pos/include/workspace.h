@@ -67,7 +67,6 @@ class POSWorkspaceConf {
     // configuration index in this container
     enum ConfigType : uint16_t {
         kRuntimeDaemonLogPath = 0,
-        kRuntimeClientLogPath,
         kEvalCkptIntervfalMs,
         kUnknown
     }; 
@@ -96,11 +95,10 @@ class POSWorkspaceConf {
     // ====== runtime configurations ======
     // path of the daemon's log
     std::string _runtime_daemon_log_path;
-    // path of the client's log
-    std::string _runtime_client_log_path;
 
     // ====== evaluation configurations ======
     // continuous checkpoint interval (ticks)
+    uint64_t _eval_ckpt_interval_ms;
     uint64_t _eval_ckpt_interval_tick;
 
     // workspace that this configuration container attached to
@@ -112,13 +110,12 @@ class POSWorkspaceConf {
 
 
 enum pos_queue_direction_t : uint8_t {
-    kPOS_Queue_Position_Worker = 0,
-    kPOS_Queue_Position_Parser,
-    kPOS_QueueDirection_Rpc2Parser,
+    kPOS_QueueDirection_Rpc2Parser = 0,
     kPOS_QueueDirection_Rpc2Worker,
     kPOS_QueueDirection_Parser2Worker,
     kPOS_QueueDirection_Worker2Parser,
-    kPOS_QueueDirection_Oob2Parser
+    kPOS_QueueDirection_Oob2Parser,
+    kPOS_QueueDirection_WorkerLocal
 };
 
 
@@ -237,7 +234,17 @@ class POSWorkspace {
      */
     template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
     pos_retval_t poll_q(pos_client_uuid_t uuid, std::vector<POSCommand_QE_t*>* qes);
- 
+    
+    /*!
+     *  \brief  clear all elements inside the queue
+     *  \tparam qdir    queue direction
+     *  \tparam qtype   type of the queue
+     *  \param  uuid    uuid for specifying client
+     *  \return POS_SUCCESS for successfully clear
+     */
+    template<pos_queue_direction_t qdir, pos_queue_type_t qtype>
+    pos_retval_t clear_q(pos_client_uuid_t uuid);
+
  protected:
     /*!
      *  \brief  create a new queue pairs
@@ -286,9 +293,6 @@ class POSWorkspace {
     // api manager
     POSApiManager *api_mgnr;
 
-    // api id to mark an checkpoint op (different by platforms)
-    uint64_t checkpoint_api_id;
-
     // idx of all stateful resources (handles)
     std::vector<uint64_t> stateful_handle_type_idx;
 
@@ -314,7 +318,7 @@ class POSWorkspace {
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_parser2worker_wqs;
 
     // api context work queue from parser to worker, record during ckpt (per client)
-    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_parser2worker_ckptdag_wqs;
+    std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_workerlocal_ckptdag_wqs;
 
     // api context completion queue from worker to RPC frontend (per client)
     std::map<pos_client_uuid_t, POSLockFreeQueue<POSAPIContext_QE_t*>*> _apicxt_rpc2worker_cqs;

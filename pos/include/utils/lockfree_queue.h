@@ -82,6 +82,21 @@ class POSLockFreeQueue {
     inline uint64_t len(){ return _q->size_approx(); }
 
     /*!
+     *  \brief  clear the queue
+     */
+    inline void clear(){
+        uint64_t i, len;
+        len = this->len();
+
+        this->lock_enqueue();
+        this->lock_dequeue();
+        // TODO: how to deal with memory leak?
+        for(i=0; i<len; i++){ this->pop(); }
+        this->unlock_enqueue();
+        this->unlock_dequeue();
+    }
+
+    /*!
      *  \brief  lock the queue
      */
     inline void lock_enqueue(){ this->_is_enqueue_locked = true; }

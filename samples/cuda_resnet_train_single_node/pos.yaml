@@ -1,0 +1,2 @@
+job_name: "resnet50"
+daemon_addr: "172.17.0.2"
