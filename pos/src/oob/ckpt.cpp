@@ -60,6 +60,8 @@ namespace cli_ckpt_predump {
             ws->template poll_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(client->id, &cmds);
         }
         POS_ASSERT(cmds.size() == 1);
+        POS_ASSERT(cmds[0]->type == kPOS_Command_WorkerToParser_DumpEnd
+                || cmds[0]->type == kPOS_Command_WorkerToParser_PreDumpEnd);
 
         // transfer error status
         if(unlikely(cmds[0]->retval != POS_SUCCESS)){

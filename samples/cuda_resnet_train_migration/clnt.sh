@@ -12,7 +12,7 @@ do_close=false
 do_refresh=false
 do_enter=false
 
-SUDO=sudo
+SUDO=
 
 print_usage() {
     echo ">>>>>>>>>> PhoenixOS Client <<<<<<<<<<"
@@ -42,16 +42,19 @@ start_client() {
 
     if [ $mount = false ] ; then
         cd $script_dir && cd .. && cd ..
-        $SUDO docker run --gpus all -dit -v $PWD/pos:/root/pos -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name $used_image
-        
+        # $SUDO docker run --gpus all -dit -v $PWD/pos:/root/pos -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged --network=pos_net \
+        #                 --ip $ip_addr --ipc=host --name $container_name $used_image
+        $SUDO docker run --gpus all -dit -v $PWD/pos:/root/pos -v $PWD/samples:/root/samples -v $PWD/utils:/root/utils --privileged \
+                        --ipc=host --name $container_name $used_image
+
         # note: we copy files except the pos, samples and utils folder, which we mount to the container
         while read line; do $SUDO docker cp $line $container_name:/root; done < <(find . -mindepth 1 -maxdepth 1 | grep -v "samples$" | grep -v  "utils$" | grep -v "pos$")
         $SUDO docker exec -it $container_name bash
     else
         cd $script_dir && cd .. && cd ..
-        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name $used_image
+        # $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
+        #                 --ip $ip_addr --ipc=host --name $container_name $used_image
+        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --ipc=host --name $container_name $used_image
         $SUDO docker exec -it $container_name bash
     fi
 }
