@@ -21,7 +21,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/dag.h"
 #include "pos/include/handle.h"
 
 enum pos_migration_stage_t : uint8_t {
@@ -95,7 +94,7 @@ class POSMigrationCtx {
      *          POS_FAILED_NOT_READY for migration not enabled
      *          POS_WARN_BLOCKED for blocking worker thread
      */
-    pos_retval_t watch_dog(pos_vertex_id_t pc);
+    pos_retval_t watch_dog(pos_u64id_t pc);
 
 
     /* ========== pre-copy fields ========== */
@@ -125,7 +124,7 @@ class POSMigrationCtx {
     uint32_t _p2p_port;
     
     // start pc of the precopy stage
-    pos_vertex_id_t _precopy_start_pc;
+    pos_u64id_t _precopy_start_pc;
 
     // thread handle for conducting pre-copy
     std::thread *_precopy_thread;

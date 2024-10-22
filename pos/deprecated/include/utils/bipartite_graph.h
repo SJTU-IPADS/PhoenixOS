@@ -32,20 +32,6 @@
 #include "pos/include/utils/timer.h"
 #include "pos/include/utils/serializer.h"
 
-using pos_vertex_id_t = uint64_t;
-
-
-/*!
- *  \brief  edge attributes for POS DAG
- */
-enum pos_edge_direction_t : uint8_t {
-    kPOS_Edge_Direction_In = 0,
-    kPOS_Edge_Direction_Out,
-    kPOS_Edge_Direction_InOut,
-    kPOS_Edge_Direction_Create,
-    kPOS_Edge_Direction_Delete
-};
-
 
 /*!
  *  \brief  vertex for bipartite graph of POS
@@ -54,9 +40,9 @@ template<typename T>
 struct POSBgVertex_t {
     // pointer to the actual payload
     T* data;
-    pos_vertex_id_t id;
+    pos_u64id_t id;
     POSBgVertex_t() : data(nullptr), id(0) {}
-    POSBgVertex_t(T* data_, pos_vertex_id_t vid) : data(data_), id(vid) {}
+    POSBgVertex_t(T* data_, pos_u64id_t vid) : data(data_), id(vid) {}
 };
 
 /*!
@@ -64,7 +50,7 @@ struct POSBgVertex_t {
  */
 typedef struct POSBgEdge_t {
     // index of the destination vertex of this edge
-    pos_vertex_id_t d_vid;
+    pos_u64id_t d_vid;
 
     // direction of this edge
     pos_edge_direction_t dir;
@@ -141,7 +127,7 @@ class POSBipartiteGraph {
      */
     template<typename T>
     pos_retval_t add_vertex(
-        void* data, POSNeighborList_t& neighbors, pos_vertex_id_t* id
+        void* data, POSNeighborList_t& neighbors, pos_u64id_t* id
     ){
         static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
             "try to add invalid type of vertex into the graph, this is a bug!"
@@ -242,7 +228,7 @@ class POSBipartiteGraph {
      *          2. nullptr for no vertex founded;
      */
     template<typename T>
-    T* get_vertex_by_id(pos_vertex_id_t id){
+    T* get_vertex_by_id(pos_u64id_t id){
         static_assert((std::is_same_v<T, T1>) || (std::is_same_v<T, T2>),
             "try to get id of invalid type of vertex from the graph, this is a bug!"
         );
@@ -271,9 +257,9 @@ class POSBipartiteGraph {
      */
     void dump_graph_to_file(const char* file_path, serialize_t1_func_t serialize_t1, serialize_t2_func_t serialize_t2){
         std::ofstream output_file;
-        typename std::map<pos_vertex_id_t, POSBgVertex_t<T1>*>::iterator t1s_iter;
-        typename std::map<pos_vertex_id_t, POSBgVertex_t<T2>*>::iterator t2s_iter;
-        pos_vertex_id_t vid, nvid;
+        typename std::map<pos_u64id_t, POSBgVertex_t<T1>*>::iterator t1s_iter;
+        typename std::map<pos_u64id_t, POSBgVertex_t<T2>*>::iterator t2s_iter;
+        pos_u64id_t vid, nvid;
         pos_edge_direction_t dir;
         POSBgVertex_t<T1>* t1v;
         POSBgVertex_t<T2>* t2v;
@@ -448,7 +434,7 @@ class POSBipartiteGraph {
      *  \param  t2_vid  specified index of the T2 vertex
      *  \return neighbor list of specified vertex of type T2
      */
-    inline POSNeighborList_t* get_neighbor_list(pos_vertex_id_t t2_vid){
+    inline POSNeighborList_t* get_neighbor_list(pos_u64id_t t2_vid){
         POSNeighborList_t *retval = nullptr;
 
         if(unlikely(t2_vid >= max_t2_id)){
@@ -463,7 +449,7 @@ class POSBipartiteGraph {
 
 
  private:
-    pos_vertex_id_t max_t1_id, max_t2_id;
+    pos_u64id_t max_t1_id, max_t2_id;
     std::vector<POSBgVertex_t<T1>*> _t1s;
     std::vector<POSBgVertex_t<T2>*> _t2s;
     

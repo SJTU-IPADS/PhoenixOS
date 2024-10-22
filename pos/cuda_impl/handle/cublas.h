@@ -40,10 +40,11 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \param  client_addr     the mocked client-side address of the handle
      *  \param  size_           size of the handle it self
      *  \param  hm              handle manager which this handle belongs to
+     *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size      size of resource state behind this handle  
      */
-    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, uint64_t state_size=0)
-        : POSHandle(client_addr_, size_, hm, state_size), lastest_used_stream(nullptr)
+    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0)
+        : POSHandle(client_addr_, size_, hm, id_, state_size), lastest_used_stream(nullptr)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }
@@ -51,8 +52,8 @@ class POSHandle_cuBLAS_Context : public POSHandle {
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_cuBLAS_Context(size_t size_, void* hm, uint64_t state_size=0) 
-        : POSHandle(size_, hm, state_size), lastest_used_stream(nullptr)
+    POSHandle_cuBLAS_Context(size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0) 
+        : POSHandle(size_, hm, id_, state_size), lastest_used_stream(nullptr)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }

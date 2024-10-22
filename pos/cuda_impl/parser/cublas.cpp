@@ -18,8 +18,6 @@
 #include "cublas_v2.h"
 
 #include "pos/include/common.h"
-#include "pos/include/utils/bipartite_graph.h"
-#include "pos/include/dag.h"
 
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/parser.h"
@@ -93,15 +91,6 @@ namespace cublas_create {
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ cublas_context_handle
         });
-
-        // allocate new handle in the dag
-        retval = client->dag.allocate_handle(cublas_context_handle);
-        if(unlikely(retval != POS_SUCCESS)){
-            goto exit;
-        }
-
-        
-        
 
         // mark this sync call can be returned after parsing
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;

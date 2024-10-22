@@ -50,7 +50,7 @@ void POSCheckpointBag::clear(){}
 /*!
  *  \brief  allocate a new checkpoint slot inside this bag
  *  \tparam on_device           whether to apply the slot on the device
- *  \param  version             version (i.e., dag index) of this checkpoint
+ *  \param  version             version of this checkpoint
  *  \param  ptr                 pointer to the checkpoint slot
  *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
  *                              (if no available slot exist)

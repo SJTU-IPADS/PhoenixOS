@@ -19,34 +19,32 @@
 #include <thread>
 #include <vector>
 #include <map>
-
 #include <sched.h>
 #include <pthread.h>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/lockfree_queue.h"
-#include "pos/include/api_context.h"
-#include "pos/include/handle.h"
 #include "pos/include/trace.h"
 
 
 // forward declaration
 class POSClient;
 class POSWorkspace;
+typedef struct POSAPIMeta POSAPIMeta_t;
+typedef struct POSAPIContext_QE POSAPIContext_QE_t;
 
 
 /*!
  *  \brief prototype for worker launch function for each API call
  */
-using pos_worker_launch_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE*);
+using pos_worker_launch_function_t = pos_retval_t(*)(POSWorkspace*, POSAPIContext_QE_t*);
 
 
 /*!
  *  \brief  macro for the definition of the worker launch functions
  */
 #define POS_WK_FUNC_LAUNCH()                                        \
-    pos_retval_t launch(POSWorkspace* ws, POSAPIContext_QE* wqe)
+    pos_retval_t launch(POSWorkspace* ws, POSAPIContext_QE_t* wqe)
 
 namespace wk_functions {
     #define POS_WK_DECLARE_FUNCTIONS(api_name) namespace api_name { POS_WK_FUNC_LAUNCH(); }
@@ -63,10 +61,10 @@ typedef struct checkpoint_async_cxt {
     bool is_active;
     
     // checkpoint op context
-    POSAPIContext_QE *wqe;
+    POSAPIContext_QE_t *wqe;
 
     // (latest) version of each handle to be checkpointed
-    std::map<POSHandle*, pos_vertex_id_t> checkpoint_version_map;
+    std::map<POSHandle*, pos_u64id_t> checkpoint_version_map;
 
     //  this flag should be raise by memcpy API worker function, to avoid slow down by
     //  overlapped checkpoint process
@@ -117,7 +115,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static void __restore(POSWorkspace* ws, POSAPIContext_QE* wqe);
+    static void __restore(POSWorkspace* ws, POSAPIContext_QE_t* wqe);
 
     /*!
      *  \brief  generic complete procedure
@@ -125,7 +123,7 @@ class POSWorker {
      *  \param  ws  the global workspace
      *  \param  wqe the work QE where failure was detected
      */
-    static void __done(POSWorkspace* ws, POSAPIContext_QE* wqe);
+    static void __done(POSWorkspace* ws, POSAPIContext_QE_t* wqe);
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
         // overlapped checkpoint context
@@ -243,7 +241,7 @@ class POSWorker {
          *  \param  wqe     the checkpoint op
          *  \return POS_SUCCESS for successfully checkpointing
          */
-        pos_retval_t __checkpoint_sync(POSAPIContext_QE* wqe);
+        pos_retval_t __checkpoint_sync(POSAPIContext_QE_t* wqe);
     #elif POS_CONF_EVAL_CkptOptLevel == 2
         /*!
          *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)
@@ -272,5 +270,5 @@ class POSWorker {
      *  \param  api_meta    metadata of the called API
      *  \return POS_SUCCESS for successfully checking and restoring
      */
-    pos_retval_t __restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t& api_meta); 
+    pos_retval_t __restore_broken_handles(POSAPIContext_QE_t* wqe, POSAPIMeta_t *api_meta); 
 };

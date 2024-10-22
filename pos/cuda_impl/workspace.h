@@ -40,20 +40,28 @@ class POSWorkspace_CUDA : public POSWorkspace {
     POSWorkspace_CUDA();
 
     /*!
-     *  \brief  create and add a new client to the workspace
-     *  \param  param   parameter to create the client
-     *  \param  clnt    pointer to the POSClient to be added
-     *  \return POS_SUCCESS for successfully added
-     */
-    pos_retval_t create_client(pos_create_client_param_t& param, POSClient** clnt) override;
-
-    /*!
      *  \brief  preserve resource on posd
      *  \param  rid     the resource type to preserve
      *  \param  data    source data for preserving
      *  \return POS_SUCCESS for successfully preserving
      */
     pos_retval_t preserve_resource(pos_resource_typeid_t rid, void *data) override;
+ 
+ protected:
+    /*!
+     *  \brief  create a specific-implemented client
+     *  \param  parameter to create the client
+     *  \param  client  pointer to the client to be created
+     *  \return POS_SUCCESS for successfully creating
+     */
+    pos_retval_t __create_client(pos_create_client_param_t& param, POSClient **client) override;
+
+    /*!
+     *  \brief  destory a specific-implemented client
+     *  \param  client  pointer to the client to be destoried
+     *  \return POS_SUCCESS for successfully destorying
+     */
+    pos_retval_t __destory_client(POSClient *client) override;
 
  private:
     // all CUDA context inside current workspace

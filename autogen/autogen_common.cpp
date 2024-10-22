@@ -286,7 +286,6 @@ pos_retval_t POSAutogener::__generate_api_parser(
     // add basic headers to the parser file
     parser_file->add_include("#include <iostream>");
     parser_file->add_include("#include \"pos/include/common.h\"");
-    parser_file->add_include("#include \"pos/include/dag.h\"");
     for(i=0; i<support_api_meta->dependent_headers.size(); i++){
         parser_file->add_include(std::format("#include <{}>", support_api_meta->dependent_headers[i]));
     }

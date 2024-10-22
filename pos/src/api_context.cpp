@@ -29,7 +29,6 @@
 #include "pos/include/api_context.h"
 #include "pos/include/utils/timer.h"
 #include "pos/include/utils/serializer.h"
-#include "pos/include/utils/bipartite_graph.h"
 
 /*!
  *  \brief  serialize the current current api context into the binary area
@@ -90,7 +89,7 @@ void POSHandleView_t::serialize(void* serialized_area){
 
     POS_CHECK_POINTER(handle);
 
-    POSUtil_Serializer::write_field(&ptr, &(handle->dag_vertex_id), sizeof(pos_vertex_id_t));
+    POSUtil_Serializer::write_field(&ptr, &(handle->id), sizeof(pos_u64id_t));
     POSUtil_Serializer::write_field(&ptr, &(handle->resource_type_id), sizeof(pos_resource_typeid_t));
     POSUtil_Serializer::write_field(&ptr, &(param_index), sizeof(uint64_t));
     POSUtil_Serializer::write_field(&ptr, &(offset), sizeof(uint64_t));
@@ -106,10 +105,10 @@ void POSHandleView_t::deserialize(void* raw_data){
 
     POS_CHECK_POINTER(ptr);
 
-    POSUtil_Deserializer::read_field(&(handle_dag_id), &ptr, sizeof(pos_vertex_id_t));
-    POSUtil_Deserializer::read_field(&(resource_type_id), &ptr, sizeof(pos_resource_typeid_t));
-    POSUtil_Deserializer::read_field(&(param_index), &ptr, sizeof(uint64_t));
-    POSUtil_Deserializer::read_field(&(offset), &ptr, sizeof(uint64_t));
+    POSUtil_Deserializer::read_field(&(this->id), &ptr, sizeof(pos_u64id_t));
+    POSUtil_Deserializer::read_field(&(this->resource_type_id), &ptr, sizeof(pos_resource_typeid_t));
+    POSUtil_Deserializer::read_field(&(this->param_index), &ptr, sizeof(uint64_t));
+    POSUtil_Deserializer::read_field(&(this->offset), &ptr, sizeof(uint64_t));
 }
 
 
@@ -143,7 +142,7 @@ void POSAPIContext_QE_t::serialize(void** serialized_area){
     ptr = *serialized_area;
 
     // part 1: base fields
-    POSUtil_Serializer::write_field(&ptr, &(dag_vertex_id), sizeof(pos_vertex_id_t));
+    POSUtil_Serializer::write_field(&ptr, &(this->id), sizeof(pos_u64id_t));
 
     // part 2: api context
     api_cxt_serialize_size = api_cxt->get_serialize_size();
@@ -184,7 +183,7 @@ void POSAPIContext_QE_t::deserialize(void* raw_data){
     POS_CHECK_POINTER(ptr);
 
     // part 1: base fields
-    POSUtil_Deserializer::read_field(&(this->dag_vertex_id), &ptr, sizeof(pos_vertex_id_t));
+    POSUtil_Deserializer::read_field(&(this->id), &ptr, sizeof(pos_u64id_t));
 
     // part 2: api context
     POSUtil_Deserializer::read_field(&(api_cxt_serialize_size), &ptr, sizeof(uint64_t));

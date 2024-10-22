@@ -18,7 +18,6 @@
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
 #include "pos/include/api_context.h"
-#include "pos/include/dag.h"
 
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/parser.h"

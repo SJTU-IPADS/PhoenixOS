@@ -94,7 +94,7 @@ class POSParser_CUDA : public POSParser {
     }
 
     /*!
-     *  \brief  insertion of parse and dag functions
+     *  \brief  insertion of parse functions
      *  \return POS_SUCCESS for succefully insertion
      */
     pos_retval_t init_ps_functions() override {

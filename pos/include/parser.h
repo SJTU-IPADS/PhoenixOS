@@ -104,7 +104,7 @@ class POSParser {
     std::map<uint64_t, pos_runtime_parser_function_t> _parser_functions;
     
     /*!
-     *  \brief  insertion of parse and dag functions
+     *  \brief  insertion of parse functions
      *  \return POS_SUCCESS for succefully insertion
      */
     virtual pos_retval_t init_ps_functions(){ return POS_FAILED_NOT_IMPLEMENTED; }
@@ -130,7 +130,7 @@ class POSParser {
 
     /*!
      *  \brief  naive implementation of checkpoint insertion procedure
-     *  \note   this implementation naively insert a checkpoint op to the dag, 
+     *  \note   this implementation naively insert a checkpoint op, 
      *          without any optimization hint
      *  \param  client  the client to be checkpointed
      *  \return POS_SUCCESS for successfully checkpoint insertion

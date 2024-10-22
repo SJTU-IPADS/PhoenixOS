@@ -32,7 +32,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
-#include "pos/include/utils/bipartite_graph.h"
 #include "pos/include/utils/serializer.h"
 #include "pos/include/checkpoint.h"
 
@@ -130,14 +129,18 @@ class POSHandle {
      *  \param  client_addr_    the mocked client-side address of the handle
      *  \param  size_           size of the handle it self
      *  \param  hm              handle manager which this handle belongs to
+     *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      *  \note   this constructor is for software resource, whose client-side address
      *          and server-side address could be seperated
      */
     POSHandle(
-        void *client_addr_, size_t size_, void* hm, size_t state_size_=0
-    ) : client_addr(client_addr_), server_addr(nullptr), size(size_),
-        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+        void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0
+    ) : client_addr(client_addr_),
+        server_addr(nullptr),
+        size(size_),
+        id(id_),
+        resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
         state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
@@ -148,14 +151,18 @@ class POSHandle {
     /*!
      *  \param  size_           size of the resources represented by this handle
      *  \param  hm              handle manager which this handle belongs to
+     *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      *  \note   this constructor is for hardware resource, whose client-side address
      *          and server-side address should be equal (e.g., memory)
      */
     POSHandle(
-        size_t size_, void* hm, size_t state_size_=0
-    ) : client_addr(nullptr), server_addr(nullptr), size(size_),
-        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+        size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0
+    ) : client_addr(nullptr),
+        server_addr(nullptr),
+        size(size_),
+        id(id_),
+        resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
         state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
@@ -170,8 +177,11 @@ class POSHandle {
      */
     POSHandle(
         void* hm
-    ) : client_addr(nullptr), server_addr(nullptr), size(0),
-        dag_vertex_id(0), resource_type_id(kPOS_ResourceTypeId_Unknown),
+    ) : client_addr(nullptr),
+        server_addr(nullptr),
+        size(0),
+        id(0),
+        resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending),  state_status(kPOS_HandleStatus_StateMiss),
         state_size(0), latest_version(0), ckpt_bag(nullptr), _hm(hm)
     {
@@ -502,7 +512,7 @@ class POSHandle {
      *                      (if this option is enabled, version param will be invalidated)
      *  \return POS_SUCCESS for successfully reloading
      */
-    virtual pos_retval_t reload_state_to_device(pos_vertex_id_t version, bool load_latest=false){
+    virtual pos_retval_t reload_state_to_device(pos_u64id_t version, bool load_latest=false){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
@@ -547,14 +557,11 @@ class POSHandle {
     std::vector<POSHandle*> parent_handles;
 
     /*!
-     *  \brief  resource type and dag indices of parent handles of this handle
+     *  \brief  resource type and handle indices of parent handles of this handle
      *  \note   this field is filled during restore process, for temporily store the indices
      *          of all parent handles of this handle
      */
-    std::vector<std::pair<pos_resource_typeid_t, pos_vertex_id_t>> parent_handles_waitlist;
-
-    // id of the DAG vertex of this handle
-    pos_vertex_id_t dag_vertex_id;
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
 
     /*!
     *  \brief    size of the resources represented by this handle
@@ -583,7 +590,7 @@ class POSHandle {
      *  \note   this field should be updated after the succesful execution of API within worker thread
      *          (and the API inout/output this handle)
      */
-    pos_vertex_id_t latest_version;
+    pos_u64id_t latest_version;
     
     /*!
      *  \brief  identify whether current handle is the latest used handle in the manager
@@ -591,6 +598,8 @@ class POSHandle {
      */
     bool is_lastest_used_handle;
 
+    // index of this handle in the handle list of handle manager
+    pos_u64id_t id;
 
  protected:
     /*!
@@ -919,26 +928,6 @@ class POSHandleManager {
         }
     }
 
-    /*!
-     *  \brief  obtain a handle by given dag index
-     *  \todo   this function is slow!
-     *  \param  did  the specified dag index
-     *  \return pointer to the founed handle or nullptr
-     */
-    inline T_POSHandle* get_handle_by_dag_id(uint64_t did){
-        uint64_t i;
-        T_POSHandle *handle = nullptr;
-
-        for(i=0; i<_handles.size(); i++){
-            if(unlikely(_handles[i]->dag_vertex_id == did)){
-                handle = _handles[i];
-                break;
-            }
-        }
-
-        return handle;
-    }
-
     inline pos_retval_t mark_handle_status(T_POSHandle *handle, pos_handle_status_t status){
         typename std::map<uint64_t, T_POSHandle*>::iterator handle_map_iter;
         
@@ -1160,7 +1149,12 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
     POS_CHECK_POINTER(handle);
 
     if(this->_passthrough){
-        *handle = new T_POSHandle(size, this, state_size);
+        *handle = new T_POSHandle(
+            /* size_ */ size,
+            /* hm */ this,
+            /* id_ */ this->_handles.size(),
+            /* state_size_ */ state_size
+        );
         POS_CHECK_POINTER(*handle);
     } else {
         // if one want to create on an expected address, we directly move the pointer forward
@@ -1179,7 +1173,13 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
             goto exit;
         }
 
-        *handle = new T_POSHandle((void*)_base_ptr, size, this, state_size);
+        *handle = new T_POSHandle(
+            /* client_addr */ (void*)_base_ptr,
+            /* size_ */ size,
+            /* hm */ this,
+            /* id_ */ this->_handles.size(),
+            /* state_size_ */ state_size
+        );
         POS_CHECK_POINTER(*handle);
 
         // record client-side address to the map

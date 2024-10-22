@@ -24,6 +24,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/workspace.h"
+#include "pos/include/handle.h"
 #include "pos/include/client.h"
 #include "pos/include/worker.h"
 #include "pos/include/utils/lockfree_queue.h"
@@ -87,7 +88,7 @@ void POSWorker::shutdown(){
 void POSWorker::__restore(POSWorkspace* ws, POSAPIContext_QE* wqe){
     POS_ERROR_DETAIL(
         "execute failed, restore mechanism to be implemented: api_id(%lu), retcode(%d), pc(%lu)",
-        wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->dag_vertex_id
+        wqe->api_cxt->api_id, wqe->api_cxt->return_code, wqe->id
     ); 
 }
 
@@ -99,19 +100,16 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
     POS_CHECK_POINTER(wqe);
     POS_CHECK_POINTER(client = (POSClient*)(wqe->client));
 
-    // forward the DAG pc
-    // client->dag.forward_pc();
-
     // set the latest version of all output handles
     for(i=0; i<wqe->output_handle_views.size(); i++){
         POSHandleView_t &hv = wqe->output_handle_views[i];
-        hv.handle->latest_version = wqe->dag_vertex_id;
+        hv.handle->latest_version = wqe->id;
     }
 
     // set the latest version of all inout handles
     for(i=0; i<wqe->inout_handle_views.size(); i++){
         POSHandleView_t &hv = wqe->inout_handle_views[i];
-        hv.handle->latest_version = wqe->dag_vertex_id;
+        hv.handle->latest_version = wqe->id;
     }
 }
 
@@ -145,14 +143,21 @@ void POSWorker::__daemon_ckpt_sync(){
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
 
+    uint64_t p = 0;
+
     while(!_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
         wqes.clear();
-        this->_ws->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
-            this->_client->id, &wqes
-        );
+        try {
+            this->_ws->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(
+                this->_client->id, &wqes
+            );
+        } catch (const std::exception& e) {
+            POS_ERROR_C("failed, uuid: %lu, p: %lu", this->_client->id, p);
+        }
+        p++;
 
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
@@ -181,7 +186,7 @@ void POSWorker::__daemon_ckpt_sync(){
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
             // check and restore broken handles
-            if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
+            if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, &api_meta))){
                 POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
                 continue;
             }
@@ -429,7 +434,7 @@ void POSWorker::__daemon_ckpt_async(){
             api_meta = _ws->api_mgnr->api_metas[api_id];
 
             // check and restore broken handles
-            if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
+            if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, &api_meta))){
                 POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
                 // TODO: we need to deal with this continue, as we will loss the wqe after continue
                 continue;
@@ -533,7 +538,7 @@ void POSWorker::__daemon_ckpt_async(){
 
 void POSWorker::__checkpoint_async_thread() {
     uint64_t i;
-    pos_vertex_id_t checkpoint_version;
+    pos_u64id_t checkpoint_version;
     pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
     POSAPIContext_QE *wqe;
     POSHandle *handle;
@@ -704,116 +709,11 @@ exit:
 #endif // POS_CONF_EVAL_CkptOptLevel
 
 
-#if POS_CONF_EVAL_MigrOptLevel > 0
-
-    void POSWorker::__daemon_migration_opt(){
-        uint64_t i, j, k, w, api_id;
-        pos_vertex_id_t latest_pc = 0;
-        pos_retval_t launch_retval;
-        POSAPIMeta_t api_meta;
-        POSAPIContext_QE *wqe;
-        pos_retval_t migration_retval;
-
-        while(!_stop_flag){
-        
-            if(this->_client->status != kPOS_ClientStatus_Active){
-                continue;
-            }
-
-            // check migration
-            migration_retval = this->_client->migration_ctx.watch_dog(latest_pc);
-            if(unlikely(migration_retval != POS_FAILED_NOT_READY)){
-                switch (migration_retval)
-                {
-                case POS_WARN_BLOCKED:
-                    // case: migration finished, worker thread blocked
-                    goto loop_end;
-                
-                case POS_FAILED:
-                    POS_WARN("migration failed!");
-
-                default:
-                    break;
-                }
-            }
-
-            if(POS_SUCCESS == this->_client->dag.get_next_pending_op(&wqe)){
-                wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
-                api_id = wqe->api_cxt->api_id;
-                latest_pc = wqe->dag_vertex_id;
-                api_meta = _ws->api_mgnr->api_metas[api_id];
-
-                // check and restore broken handles
-                if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, api_meta))){
-                    POS_WARN_C("failed to check / restore broken handles: api_id(%lu)", api_id);
-                    continue;
-                }
-
-                #if POS_CONF_RUNTIME_EnableDebugCheck
-                    if(unlikely(_launch_functions.count(api_id) == 0)){
-                        POS_ERROR_C_DETAIL(
-                            "runtime has no worker launch function for api %lu, need to implement", api_id
-                        );
-                    }
-                #endif
-
-                if(unlikely(this->_client->migration_ctx.is_precopying() == true)){
-                    // invalidate handles
-                    for(auto &inout_handle_view : wqe->inout_handle_views){
-                        this->_client->migration_ctx.invalidated_handles.insert(inout_handle_view.handle);
-                    }
-                    for(auto &output_handle_view : wqe->output_handle_views){
-                        this->_client->migration_ctx.invalidated_handles.insert(output_handle_view.handle);
-                    }
-                }
-
-                if(unlikely(this->_client->migration_ctx.is_ondemand_reloading() == true)){
-                    // invalidate handles
-                    for(auto &input_handle_view : wqe->input_handle_views){
-                        while(input_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
-                    }
-                    for(auto &output_handle_view : wqe->output_handle_views){
-                        while(output_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
-                    }
-                    for(auto &inout_handle_view : wqe->inout_handle_views){
-                        while(inout_handle_view.handle->state_status != kPOS_HandleStatus_StateReady){}
-                    }
-                }
-                
-                launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
-                wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
-
-                // cast return code
-                wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
-                    /* pos_retval */ launch_retval, 
-                    /* library_id */ api_meta.library_id
-                );
-
-                // check whether the execution is success
-                if(unlikely(launch_retval != POS_SUCCESS)){
-                    wqe->status = kPOS_API_Execute_Status_Worker_Failed;
-                }
-
-                // check whether we need to return to frontend
-                if(wqe->status == kPOS_API_Execute_Status_Init){
-                    // we only return the QE back to frontend when it hasn't been returned before
-                    wqe->return_tick = POSUtilTimestamp::get_tsc();
-                    _ws->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
-                } 
-            }        
-
-        loop_end:
-            ;
-        } // stop_flag
-    }
-
-#endif // POS_CONF_EVAL_MigrOptLevel
-
-
-pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t& api_meta){
+pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t* api_meta){
     pos_retval_t retval = POS_SUCCESS;
     
     POS_CHECK_POINTER(wqe);
+    POS_CHECK_POINTER(api_meta);
 
     auto __restore_broken_hendles_per_direction = [&](std::vector<POSHandleView_t>& handle_view_vec){
         uint64_t i;
@@ -842,14 +742,14 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                 }
 
                 /*!
-                    *  \note   we don't need to restore the bottom handle while haven't create them yet
-                    */
-                if(unlikely(api_meta.api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
+                 *  \note   we don't need to restore the bottom handle while haven't create them yet
+                 */
+                if(unlikely(api_meta->api_type == kPOS_API_Type_Create_Resource && layer_id_keeper == 0)){
                     if(likely(broken_handle->status == kPOS_HandleStatus_Create_Pending)){
                         continue;
                     }
                 }
-                
+
                 // restore locally
                 if(unlikely(POS_SUCCESS != broken_handle->restore())){
                     POS_ERROR_C(
