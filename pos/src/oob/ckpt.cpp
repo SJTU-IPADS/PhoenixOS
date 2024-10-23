@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <filesystem>
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
@@ -44,6 +45,24 @@ namespace cli_ckpt_predump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
+        cmd->ckpt_dir = std::string(cmd->ckpt_dir) 
+                        + std::string("/")
+                        + std::to_string(payload->pid)
+                        + std::string("-")
+                        + std::to_string(ws->tsc_timer.get_tsc());
+
+        // make sure the directory exist
+        if (std::filesystem::exists(cmd->ckpt_dir)) {
+            std::filesystem::remove_all(cmd->ckpt_dir);
+        }
+        try {
+            std::filesystem::create_directories(cmd->ckpt_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            retmsg = std::string("failed to create dir: ") + e.what();
+            payload->retval = POS_FAILED;
+            memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
+            goto response;
+        }
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);
@@ -76,6 +95,7 @@ namespace cli_ckpt_predump {
         payload->retval = cmds[0]->retval;
 
     response:
+        POS_ASSERT(retmsg.size() < kServerRetMsgMaxLen);
         __POS_OOB_SEND();
 
         return retval;
@@ -98,7 +118,7 @@ namespace cli_ckpt_predump {
         memset(msg->payload, 0, sizeof(msg->payload));
         payload = (oob_payload_t*)msg->payload;
         payload->pid = cm->pid;
-        memcpy(payload->ckpt_file_path, cm->ckpt_file_path, kCkptFilePathMaxLen);
+        memcpy(payload->ckpt_dir, cm->ckpt_dir, kCkptFilePathMaxLen);
 
         __POS_OOB_SEND();
 

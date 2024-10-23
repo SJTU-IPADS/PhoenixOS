@@ -16,6 +16,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <filesystem>
 #include <string>
 #include <map>
 #include <type_traits>
@@ -29,14 +30,7 @@
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
 
-/*!
- *  \brief  setting both the client-side and server-side address of the handle 
- *          after finishing allocation
- *  \param  addr        the setting address of the handle
- *  \param  handle_ptr  pointer to current handle
- *  \return POS_SUCCESS for successfully setting
- *          POS_FAILED_ALREADY_EXIST for duplication failed;
- */
+
 pos_retval_t POSHandle::set_passthrough_addr(void *addr, POSHandle* handle_ptr){ 
     using handle_type = typename std::decay<decltype(*this)>::type;
 
@@ -56,11 +50,6 @@ exit:
 }
 
 
-/*!
- *  \brief  mark the status of this handle
- *  \param  status the status to mark
- *  \note   this function would call the inner function within the corresponding handle manager
- */
 void POSHandle::mark_status(pos_handle_status_t status){
     using handle_type = typename std::decay<decltype(*this)>::type;
     POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
@@ -69,10 +58,152 @@ void POSHandle::mark_status(pos_handle_status_t status){
 }
 
 
-/*!
- *  \brief  restore the current handle when it becomes broken status
- *  \return POS_SUCCESS for successfully restore
- */
+void POSHandle::reset_preserve_counter(){ 
+    this->_state_preserve_counter.store(0); 
+}
+
+
+pos_retval_t POSHandle::checkpoint_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) const {
+    return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+}
+
+
+pos_retval_t POSHandle::checkpoint_commit(uint64_t version_id, uint64_t stream_id){ 
+    pos_retval_t retval = POS_SUCCESS;
+    
+    #if POS_CONF_EVAL_CkptEnablePipeline == 1
+        //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
+        //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
+        retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+    #else
+        uint8_t old_counter;
+        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
+        if (old_counter == 0) {
+            /*!
+                *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
+                *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
+                *          commit must be sync, as there could have CoW waiting on this commit to be finished
+                */
+            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+            this->_state_preserve_counter.store(3, std::memory_order_relaxed);
+        } else if (old_counter == 1) {
+            /*!
+                *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
+                *                  commit from the new buffer
+                *  \note   we commit from the cache under this hood, and the commit process is async as there's no CoW 
+                *          on this handle anymore
+                */
+            while(this->_state_preserve_counter < 3){}
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+        } else {
+            /*!
+                *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
+                *  \note   same as the last case
+                */
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+        }
+    #endif  // POS_CONF_EVAL_CkptEnablePipeline        
+    
+    return retval;
+}
+
+
+pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) { 
+    pos_retval_t retval = POS_SUCCESS;
+    uint8_t old_counter;
+
+    /*!
+        *  \brief  [case]  the adding has been finished, nothing need to do
+        */
+    if(this->_state_preserve_counter >= 2){
+        retval = POS_FAILED_ALREADY_EXIST;
+        goto exit;
+    }
+
+    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
+    if (old_counter == 0) {
+        /*!
+            *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
+            *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
+            */
+        retval = this->__add(version_id, stream_id);
+        this->_state_preserve_counter.store(3, std::memory_order_relaxed);
+    } else if (old_counter == 1) {
+        /*!
+            *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
+            */
+        retval = POS_WARN_ABANDONED;
+        while(this->_state_preserve_counter < 3){}
+    }
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id){
+    pos_retval_t retval = POS_SUCCESS, prev_retval;
+    std::future<pos_retval_t> persist_future;
+
+    POS_CHECK_POINTER(ckpt_slot);
+
+    // no directory specified, skip persisting
+    if(ckpt_dir.size() == 0){ goto exit; }
+
+    // verify the path exists
+    if(unlikely(!std::filesystem::exists(ckpt_dir))){
+        POS_WARN_C(
+            "failed to persist checkpoint, no ckpt directory exists, this is a bug: ckpt_dir(%s)",
+            ckpt_dir.c_str()
+        );
+        retval = POS_FAILED_NOT_EXIST;
+        goto exit;
+    }
+
+    // collect previous persisting thread if any
+    if(this->_persist_thread != nullptr){
+        if(unlikely(POS_SUCCESS != (prev_retval = this->sync_persist()))){
+            POS_WARN_C("pervious persisting is failed: retval(%u)", prev_retval);
+        }
+    }
+
+    this->_persist_promise = new std::promise<pos_retval_t>;
+    POS_CHECK_POINTER(this->_persist_promise);
+
+    this->_persist_thread = new std::thread([&](){
+        pos_retval_t retval = this->__persist_async_thread(ckpt_slot, ckpt_dir, stream_id);
+        this->_persist_promise->set_value(retval);
+    });
+    POS_CHECK_POINTER(this->_persist_thread);
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle::sync_persist(){
+    pos_retval_t retval = POS_SUCCESS;
+    std::future<pos_retval_t> persist_future;
+
+    if(this->_persist_thread != nullptr){
+        POS_ASSERT(this->_persist_promise != nullptr);
+        persist_future = this->_persist_promise->get_future();
+        persist_future.wait();
+        retval = persist_future.get();
+
+        delete this->_persist_thread;
+        this->_persist_thread = nullptr;
+        delete this->_persist_promise;
+        this->_persist_promise = nullptr;
+    } else {
+        retval = POS_FAILED_NOT_EXIST;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle::restore() {
     using handle_type = typename std::decay<decltype(*this)>::type;
 
@@ -93,11 +224,6 @@ exit:
 }
 
 
-/*!
- *  \brief  reload the state behind current handle to the device
- *  \param  stream_id   stream for reloading the state
- *  \return POS_SUCCESS for successfully restore
- */
 pos_retval_t POSHandle::reload_state(uint64_t stream_id){
     pos_retval_t retval = POS_FAILED_NOT_EXIST;
     uint64_t on_device_dumped_version = 0, host_dumped_version = 0, final_dumped_version = 0;
@@ -196,12 +322,6 @@ exit:
 }
 
 
-/*!
- *  \brief  collect all broken handles along the handle trees
- *  \note   this function will call recursively, aware of performance issue!
- *  \param  broken_handle_list  list of broken handles, 
- *  \param  layer_id            index of the layer at this call
- */
 void POSHandle::collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id){
     uint64_t i;
 
@@ -219,11 +339,6 @@ void POSHandle::collect_broken_handles(pos_broken_handle_list_t *broken_handle_l
 }
 
 
-/*!
- *  \brief  serialize the state of current handle into the binary area
- *  \param  serialized_area  pointer to the binary area
- *  \return POS_SUCCESS for successfully serilization
- */
 pos_retval_t POSHandle::serialize(void** serialized_area){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t basic_field_size;
@@ -259,11 +374,6 @@ exit:
 }
 
 
-/*!
- *  \brief  deserialize the state of current handle from binary area
- *  \param  raw_area    raw data area
- *  \return POS_SUCCESS for successfully serialization
- */
 pos_retval_t POSHandle::deserialize(void* raw_area){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t basic_field_size;
@@ -294,10 +404,6 @@ exit:
 }
 
 
-/*!
- *  \brief  obtain the serilization size of basic fields of POSHandle
- *  \return the serilization size of basic fields of POSHandle
- */
 uint64_t POSHandle::__get_basic_serialize_size(){
     pos_retval_t tmp_retval;
     void *ckpt_data;
@@ -356,11 +462,6 @@ uint64_t POSHandle::__get_basic_serialize_size(){
 }
 
 
-/*!
- *  \brief  serialize the basic state of current handle into the binary area
- *  \param  serialized_area  pointer to the binary area
- *  \return POS_SUCCESS for successfully serilization
- */
 pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
     pos_retval_t retval = POS_SUCCESS;
     void *ptr = serialized_area;
@@ -441,11 +542,6 @@ exit:
 }
 
 
-/*!
- *  \brief  deserialize basic field of this handle
- *  \param  raw_data    raw data area that store the serialized data
- *  \return POS_SUCCESS for successfully deserialize
- */
 pos_retval_t POSHandle::__deserialize_basic(void* raw_data){
     pos_retval_t retval = POS_SUCCESS, tmp_retval;
 

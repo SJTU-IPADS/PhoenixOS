@@ -229,6 +229,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
 
         retval = handle->checkpoint_sync(
             /* version_id */ handle->latest_version,
+            /* ckpt_dir */ cmd->ckpt_dir,
             /* stream_id */ 0
         );
         if(unlikely(POS_SUCCESS != retval)){
@@ -275,15 +276,20 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             POS_SUCCESS != (retval = this->sync())
         )){
             POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
-            goto ckpt_finished;
+            goto reply_parser;
         }
         if(unlikely(
             POS_SUCCESS != (retval = this->__checkpoint_sync(cmd))
         )){
             POS_WARN_C("failed to do checkpointing");
         }
-    
-    ckpt_finished:
+
+        // pre-dump won't stop the execution, we just notify parser
+        if(cmd->type == kPOS_Command_Parser2Worker_PreDump){
+            goto reply_parser;
+        }
+
+    reply_parser:
         // reply to parser
         cmd->retval = retval;
         retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
