@@ -35,8 +35,8 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
         },
         {
             /* meta_type */ kPOS_CliMeta_CkptFilePath,
-            /* meta_name */ "file",
-            /* meta_desp */ "path to the checkpoint file",
+            /* meta_name */ "dir",
+            /* meta_desp */ "directory to store the checkpoint files",
             /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
                 pos_retval_t retval = POS_SUCCESS;
                 // TODO: should we cast the file path to absolute path?
@@ -49,8 +49,8 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
                     retval = POS_FAILED_INVALID_INPUT;
                     goto exit;
                 }
-                memset(clio.metas.pre_dump.ckpt_file_path, 0, oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen);
-                memcpy(clio.metas.pre_dump.ckpt_file_path, meta_val.c_str(), meta_val.size());
+                memset(clio.metas.pre_dump.ckpt_dir, 0, oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen);
+                memcpy(clio.metas.pre_dump.ckpt_dir, meta_val.c_str(), meta_val.size());
             exit:
                 return retval;
             },
@@ -61,8 +61,8 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
     // send predump request
     call_data.pid = clio.metas.pre_dump.pid;
     memcpy(
-        call_data.ckpt_file_path,
-        clio.metas.pre_dump.ckpt_file_path,
+        call_data.ckpt_dir,
+        clio.metas.pre_dump.ckpt_dir,
         oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen
     );
 

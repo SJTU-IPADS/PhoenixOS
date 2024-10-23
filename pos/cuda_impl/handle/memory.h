@@ -19,7 +19,8 @@
 #include <string>
 #include <map>
 #include <cstdlib>
-
+#include <filesystem>
+#include <fstream>
 #include <sys/resource.h>
 #include <stdint.h>
 #include <cuda.h>
@@ -445,6 +446,47 @@ class POSHandle_CUDA_Memory : public POSHandle {
             retval = POS_FAILED;
             goto exit;
         }
+
+    exit:
+        return retval;
+    }
+
+    /*!
+     *  \brief  persist the checkpoint to file system
+     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \param  stream_id   index of the stream on which checkpoint is commited
+     *  \return POS_SUCCESS for successfully persist
+     */
+    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0) override {
+        pos_retval_t retval = POS_SUCCESS;
+        cudaError_t cuda_rt_retval;
+        std::string ckpt_file_path;
+        std::ofstream ckpt_file_stream;
+
+        POS_CHECK_POINTER(ckpt_slot);
+        POS_ASSERT(std::filesystem::exists(ckpt_dir));
+
+        // form the path to the checkpoint file of this handle
+        ckpt_file_path = ckpt_dir 
+                        + std::string("/sf-")
+                        + std::to_string(this->resource_type_id) 
+                        + std::string("-")
+                        + std::to_string(this->id)
+                        + std::string(".bin");
+
+        // synchronize the commit stream
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_C(
+                "failed to synchronize commit stream before persist checkpoint to file system: server_addr(%p), retval(%d)",
+                this->server_addr, cuda_rt_retval
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+        
+        // TODO: serialize using pb
 
     exit:
         return retval;

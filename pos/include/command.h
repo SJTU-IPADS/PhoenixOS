@@ -38,6 +38,9 @@ typedef struct POSCommand_QE {
     pos_retval_t retval;
 
     // ============================== payloads ==============================
+    // path to store all checkpoints
+    std::string ckpt_dir;
+
     // for kPOS_Command_xxx_PreDump and kPOS_Command_xxx_Dump
     std::set<POSHandle*> checkpoint_handles;
 
