@@ -217,7 +217,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
     POS_CHECK_POINTER(cmd);
 
     for(set_iter=cmd->checkpoint_handles.begin(); set_iter!=cmd->checkpoint_handles.end(); set_iter++){
-        const POSHandle *handle = *set_iter;
+        POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
 
         if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 

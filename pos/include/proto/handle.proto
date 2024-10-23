@@ -7,10 +7,12 @@ package pos_protobuf;
  */
 message Bin_POSHanlde {
     uint64 id = 1;
-    uint64 client_addr = 2;
-    uint64 server_addr = 3;
-    uint64 size = 4;
-    repeated uint64 parent_handle_idx = 5;
-    uint64 state_size = 6;
-    bytes state = 7;
+    uint64 resource_type_id = 2;
+    uint64 client_addr = 3;
+    uint64 server_addr = 4;
+    uint64 size = 5;
+    repeated uint64 parent_handle_resource_type_idx = 6;
+    repeated uint64 parent_handle_idx = 7;
+    uint64 state_size = 8;
+    bytes state = 9;
 }
