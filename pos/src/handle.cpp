@@ -29,6 +29,7 @@
 #include "pos/include/utils/serializer.h"
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
+#include "pos/include/proto/handle.pb.h"
 
 
 pos_retval_t POSHandle::set_passthrough_addr(void *addr, POSHandle* handle_ptr){ 
@@ -63,8 +64,8 @@ void POSHandle::reset_preserve_counter(){
 }
 
 
-pos_retval_t POSHandle::checkpoint_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) const {
-    return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+pos_retval_t POSHandle::checkpoint_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) {
+    return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
 }
 
 
@@ -197,6 +198,41 @@ pos_retval_t POSHandle::sync_persist(){
         this->_persist_promise = nullptr;
     } else {
         retval = POS_FAILED_NOT_EXIST;
+    }
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle::__serialize_protobuf_handle_base(pos_protobuf::Bin_POSHanlde* base_binary, POSCheckpointSlot* ckpt_slot){
+    pos_retval_t retval = POS_SUCCESS;
+    uint64_t i;
+
+    POS_CHECK_POINTER(base_binary);
+
+    // base fields
+    base_binary->set_id(this->id);
+    base_binary->set_resource_type_id(this->resource_type_id);
+    base_binary->set_client_addr((uint64_t)(this->client_addr));
+    base_binary->set_server_addr((uint64_t)(this->server_addr));
+    base_binary->set_size(this->size);
+
+    // parent information
+    for(i=0; i<parent_handles.size(); i++){
+        POS_CHECK_POINTER(this->parent_handles[i]);
+        base_binary->add_parent_handle_resource_type_idx(this->parent_handles[i]->resource_type_id);
+        base_binary->add_parent_handle_idx(this->parent_handles[i]->id);
+    }
+
+    // state
+    base_binary->set_state_size(this->state_size);
+    if(unlikely(this->state_size > 0 && ckpt_slot == nullptr)){
+        POS_WARN_C("serialize stateful handle without providing checkpoint slot");
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    } else if(ckpt_slot != nullptr){
+        base_binary->set_state(reinterpret_cast<const char*>(ckpt_slot->expose_pointer()), this->state_size);
     }
 
 exit:
