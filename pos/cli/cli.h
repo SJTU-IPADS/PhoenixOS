@@ -115,7 +115,7 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
 
 typedef struct pos_cli_predump_metas {
     uint64_t pid;
-    char ckpt_file_path[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
+    char ckpt_dir[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
 } pos_cli_predump_metas_t;
 
 

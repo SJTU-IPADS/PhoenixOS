@@ -141,8 +141,14 @@ class POSHandle {
         size(size_),
         id(id_),
         resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
-        state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending),
+        state_status(kPOS_HandleStatus_StateReady), 
+        state_size(state_size_),
+        latest_version(0),
+        ckpt_bag(nullptr),
+        _hm(hm),
+        _persist_thread(nullptr),
+        _persist_promise(nullptr)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -163,8 +169,14 @@ class POSHandle {
         size(size_),
         id(id_),
         resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending), state_status(kPOS_HandleStatus_StateReady), 
-        state_size(state_size_), latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending),
+        state_status(kPOS_HandleStatus_StateReady), 
+        state_size(state_size_),
+        latest_version(0),
+        ckpt_bag(nullptr),
+        _hm(hm),
+        _persist_thread(nullptr),
+        _persist_promise(nullptr)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -182,8 +194,14 @@ class POSHandle {
         size(0),
         id(0),
         resource_type_id(kPOS_ResourceTypeId_Unknown),
-        status(kPOS_HandleStatus_Create_Pending),  state_status(kPOS_HandleStatus_StateMiss),
-        state_size(0), latest_version(0), ckpt_bag(nullptr), _hm(hm)
+        status(kPOS_HandleStatus_Create_Pending),
+        state_status(kPOS_HandleStatus_StateMiss),
+        state_size(0),
+        latest_version(0),
+        ckpt_bag(nullptr),
+        _hm(hm),
+        _persist_thread(nullptr),
+        _persist_promise(nullptr)
     {
         this->_state_preserve_counter.store(0);
     }
@@ -353,110 +371,6 @@ class POSHandle {
 
 
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle (sync)
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id  version of this checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t checkpoint_sync(uint64_t version_id, uint64_t stream_id=0) const {
-        return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
-    }
-
-
-    /*!
-     *  \brief  reset the state preserve counter to zero, to start a new checkpoint round
-     */
-    inline void reset_preserve_counter(){ this->_state_preserve_counter.store(0); }
-
-
-    /*!
-     *  \brief  commit the state of the resource behind this handle
-     *  \param  version_id  version of this checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-
-    pos_retval_t checkpoint_commit(uint64_t version_id, uint64_t stream_id=0) { 
-        pos_retval_t retval = POS_SUCCESS;
-        
-        #if POS_CONF_EVAL_CkptEnablePipeline == 1
-            //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
-            //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-        #else
-            uint8_t old_counter;
-            old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
-            if (old_counter == 0) {
-                /*!
-                 *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
-                 *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
-                 *          commit must be sync, as there could have CoW waiting on this commit to be finished
-                 */
-                retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
-                this->_state_preserve_counter.store(3, std::memory_order_relaxed);
-            } else if (old_counter == 1) {
-                /*!
-                *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
-                *                  commit from the new buffer
-                *  \note   we commit from the cache under this hood, and the commit process is async as there's no CoW 
-                *          on this handle anymore
-                */
-                while(this->_state_preserve_counter < 3){}
-                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-            } else {  
-                /*!
-                *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
-                *  \note   same as the last case
-                */
-                retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-            }
-        #endif  // POS_CONF_EVAL_CkptEnablePipeline        
-        
-        return retval;
-    }
-
-
-    /*!
-     *  \brief  add the state of the resource behind this handle to another on-device resource syncly
-     *  \param  version_id  version of this checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t checkpoint_add(uint64_t version_id, uint64_t stream_id=0) { 
-        pos_retval_t retval = POS_SUCCESS;
-        uint8_t old_counter;
-
-        /*!
-         *  \brief  [case]  the adding has been finished, nothing need to do
-         */
-        if(this->_state_preserve_counter >= 2){
-            retval = POS_FAILED_ALREADY_EXIST;
-            goto exit;
-        }
-
-        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
-        if (old_counter == 0) {
-            /*!
-             *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
-             *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
-             */
-            retval = this->__add(version_id, stream_id);
-            this->_state_preserve_counter.store(3, std::memory_order_relaxed);
-        } else if (old_counter == 1) {
-            /*!
-             *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
-             */
-            retval = POS_WARN_ABANDONED;
-            while(this->_state_preserve_counter < 3){}
-        }
-
-    exit:
-        return retval;
-    }
-
-
-    /*!
      *  \brief  restore the current handle when it becomes broken status
      *  \return POS_SUCCESS for successfully restore
      */
@@ -578,14 +492,6 @@ class POSHandle {
     size_t state_size;
 
     /*!
-     *  \brief  bag of checkpoints, implemented by different ckpt optimization level
-     *  \note   it must be initialized by different implementations of stateful handle,
-     *          as they might require different allocators and deallocators, see function
-     *          init_ckpt_bag
-     */
-    POSCheckpointBag *ckpt_bag;
-
-    /*!
      *  \brief  latest modified version of this handle
      *  \note   this field should be updated after the succesful execution of API within worker thread
      *          (and the API inout/output this handle)
@@ -600,29 +506,63 @@ class POSHandle {
 
     // index of this handle in the handle list of handle manager
     pos_u64id_t id;
+ 
+
+    /* ==================== checkpoint add/commit/persist ==================== */
+ public:
+    /*!
+     *  \brief  bag of checkpoints, implemented by different ckpt optimization level
+     *  \note   it must be initialized by different implementations of stateful handle,
+     *          as they might require different allocators and deallocators, see function
+     *          init_ckpt_bag
+     */
+    POSCheckpointBag *ckpt_bag;
+
+    /*!
+     *  \brief  reset the state preserve counter to zero, to start a new checkpoint round
+     */
+    void reset_preserve_counter();
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle (sync)
+     *  \note   only handle of stateful resource should implement this method
+     *  \param  version_id  version of this checkpoint
+     *  \param  ckpt_dir    directory to store checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_sync(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0) const;
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+
+    pos_retval_t checkpoint_commit(uint64_t version_id, uint64_t stream_id=0);
+
+    /*!
+     *  \brief  add the state of the resource behind this handle to another on-device resource syncly
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_add(uint64_t version_id, uint64_t stream_id=0);
+
+    /*!
+     *  \brief  synchronize the persisting process
+     *  \return POS_SUCCESS for successfully persist
+     */
+    pos_retval_t sync_persist();
 
  protected:
-    /*!
-     *  \note   counter for exclude copy-on-write and checkpoint process
-     */
+    // counter for exclude copy-on-write and checkpoint process
     std::atomic<uint8_t> _state_preserve_counter;
 
-    /*!
-     *  \note   the belonging handle manager
-     */
-    void *_hm;
-
-    /*!
-     *  \brief  reload state of this handle back to the device
-     *  \param  data        source data to be reloaded
-     *  \param  offset      offset from the base address of this handle to be reloaded
-     *  \param  size        reload size
-     *  \param  stream_id   stream for reloading the state
-     *  \param  on_device   whether the source data is on device
-     */
-    virtual pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
-        return POS_FAILED_NOT_IMPLEMENTED;
-    }
+    // thread to persist checkpoint of the current handle
+    std::thread *_persist_thread;
+    std::promise<pos_retval_t> *_persist_promise;
 
     /*!
      *  \brief  commit the state of the resource behind this handle
@@ -648,15 +588,45 @@ class POSHandle {
     }
 
     /*!
-     *  \brief  commit the on-device memory to host-side checkpoint area (async)
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id  version of the checkpoint to be commit
-     *  \param  stream_id   index of the stream to do this commit
-     *  \return POS_SUCCESS for successfully checkpointed
+     *  \brief  persist the checkpoint to file system
+     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \param  stream_id   index of the stream on which checkpoint is commited
+     *  \return POS_SUCCESS for successfully persist
      */
-    // virtual pos_retval_t __checkpoint_pipeline_commit_async(uint64_t version_id, uint64_t stream_id=0) const { 
-    //     return POS_FAILED_NOT_IMPLEMENTED;
-    // }
+    pos_retval_t __persist(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0);
+
+    /*!
+     *  \brief  async thread to persist the checkpoint to file system
+     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \param  stream_id   index of the stream on which checkpoint is commited
+     *  \return POS_SUCCESS for successfully persist
+     */
+    virtual pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+
+ protected:
+    /*!
+     *  \note   the belonging handle manager
+     */
+    void *_hm;
+
+    /*!
+     *  \brief  reload state of this handle back to the device
+     *  \param  data        source data to be reloaded
+     *  \param  offset      offset from the base address of this handle to be reloaded
+     *  \param  size        reload size
+     *  \param  stream_id   stream for reloading the state
+     *  \param  on_device   whether the source data is on device
+     */
+    virtual pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
     /*!
      *  \brief  obtain the serilization size of basic fields of POSHandle

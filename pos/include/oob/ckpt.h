@@ -18,7 +18,7 @@ namespace cli_ckpt_predump {
     typedef struct oob_payload {
         /* client */
         __pid_t pid;
-        char ckpt_file_path[kCkptFilePathMaxLen];
+        char ckpt_dir[kCkptFilePathMaxLen];
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];
@@ -29,7 +29,7 @@ namespace cli_ckpt_predump {
     typedef struct oob_call_data {
         /* client */
         __pid_t pid;
-        char ckpt_file_path[kCkptFilePathMaxLen];
+        char ckpt_dir[kCkptFilePathMaxLen];
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];
