@@ -242,6 +242,7 @@ endif
 sources += run_command('python3', files(scan_src_path), './src', check: false).stdout().strip().split('\n')
 message()
 ld_args += [ '-lclang', '-lyaml-cpp', '-lpos' ]
+ld_args += ['-lprotobuf', '-lprotobuf-lite', '-lprotoc']    
 
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package pos_protobuf;
+
+import "pos/include/proto/handle.proto";
+
+/*!
+ *  \brief  binary format of POSHandle
+ */
+ message Bin_POSHanlde_CUDA_Memory {
+    Bin_POSHanlde base = 1;
+}

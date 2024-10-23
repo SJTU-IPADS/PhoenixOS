@@ -260,7 +260,10 @@ sources += [
     'pos/src/oob/utils.cpp',
     'pos/src/oob/ckpt.cpp',
     'pos/src/oob/migration.cpp',
-    'pos/src/oob/mgnt.cpp'
+    'pos/src/oob/mgnt.cpp',
+
+    # protobuf generated file
+    'pos/include/proto/handle.pb.cc'
 ]
 
 if conf_eval_ckpt_opt_level == 0
@@ -287,16 +290,22 @@ if conf_runtime_target == 'cuda'
         'pos/cuda_impl/worker/cublas.cpp',
         'pos/cuda_impl/worker/cuda_driver.cpp',
         'pos/cuda_impl/worker/cuda_runtime.cpp',
-        'pos/cuda_impl/handle/memory.cpp'
+        'pos/cuda_impl/handle/memory.cpp',
+
+        # protobuf generated file
+        'pos/cuda_impl/proto/memory.pb.cc'
     ]
 endif
 
 inc_dirs += ['./']
 
 # >>>>>>>>>>>>>> setup third party dependencies >>>>>>>>>>>>>>
-ld_args += ['-lyaml-cpp']           # for loading client-side configurations
-ld_args += ['-pthread']             # for support pthread_x
-ld_args += ['-libverbs']            # for migration
+ld_args += ['-lyaml-cpp']                   # for loading client-side configurations
+ld_args += ['-pthread']                     # for support pthread_x
+ld_args += ['-libverbs']                    # for migration
+
+# for protobuf
+ld_args += ['-lprotobuf', '-lprotobuf-lite', '-lprotoc']                   
 
 if conf_runtime_target == 'cuda'
     ld_args += ['-ldl', '-lpatcher']    # for cuda patcher
@@ -305,6 +314,7 @@ if conf_runtime_target == 'cuda'
     ld_args += ['-lelf']                # for support elf_x
 endif
 
+inc_dirs += ['./third_party/protobuf/src']  # for protobuf
 
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
 c_args += ['--std=c++17']
