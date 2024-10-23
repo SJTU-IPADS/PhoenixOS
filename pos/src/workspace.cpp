@@ -17,6 +17,7 @@
 #include <filesystem>
 
 #include "pos/include/workspace.h"
+#include "pos/include/proto/handle.pb.h"
 
 
 POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
@@ -127,6 +128,9 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
         POS_DEBUG_C("reused daemon log directory at %s", this->ws_conf._runtime_daemon_log_path.c_str());
     }
 
+    // make sure the protobuf is working
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     POS_LOG(
         "workspace created:                             \n"
         "   common configurations:                      \n"
@@ -151,7 +155,10 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
 }
 
 
-POSWorkspace::~POSWorkspace() = default;
+POSWorkspace::~POSWorkspace(){
+    // clean protobuf
+    google::protobuf::ShutdownProtobufLibrary();
+};
 
 
 pos_retval_t POSWorkspace::init(){
