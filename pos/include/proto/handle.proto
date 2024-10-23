@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package pos_protobuf;
+
+/*!
+ *  \brief  binary format of POSHandle
+ */
+message Bin_POSHanlde {
+    uint64 id = 1;
+    uint64 client_addr = 2;
+    uint64 server_addr = 3;
+    uint64 size = 4;
+    repeated uint64 parent_handle_idx = 5;
+    uint64 state_size = 6;
+    bytes state = 7;
+}

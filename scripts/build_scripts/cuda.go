@@ -13,6 +13,7 @@ const (
 	// third parties
 	KLibClangPath   = "third_party/libclang-static-build"
 	KLibYamlCppPath = "third_party/yaml-cpp"
+	kProtobufPath = "third_party/protobuf"
 
 	// PhOS repo
 	KPhOSPath         = "pos"
@@ -31,6 +32,65 @@ const (
 	KInstallIncPath = "/usr/local/include"
 	KInstallBinPath = "/usr/local/bin"
 )
+
+func buildProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	logger.Infof("building protobuf...")
+
+	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_protobuf.log")
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		%s
+
+		# build protobuf
+		cd %s/%s
+		cmake . -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_SHARED_LIBS=ON -Dprotobuf_BUILD_TESTS=OFF >%s 2>&1
+		cmake --build . --config Release -- -j >%s 2>&1
+		cp -r ./lib*.so* %s
+		cp -r ./protoc %s
+		cp -r ./protoc-3.21.12.0 %s
+		`,
+		buildConf.export_string(),
+		cmdOpt.RootDir, kProtobufPath,
+		buildLogPath,
+		buildLogPath,
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath),
+		fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath),
+	)
+
+	install_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s
+		cp -r ./lib*.a %s
+		cp -r ./protoc %s
+		cp -r ./protoc-3.21.12.0 %s
+		`,
+		cmdOpt.RootDir, kProtobufPath,
+		KInstallLibPath,
+		KInstallBinPath,
+		KInstallBinPath,
+	)
+
+	start := time.Now()
+	_, err := utils.BashScriptGetOutput(build_script, false, logger)
+	if err != nil {
+		logger.Fatalf("failed to build protobuf, please see log at %s", buildLogPath)
+	}
+	elapsed := time.Since(start)
+
+	utils.ClearLastLine()
+	logger.Infof("built protobuf: %.2fs", elapsed.Seconds())
+
+	if *cmdOpt.DoInstall {
+		_, err := utils.BashScriptGetOutput(install_script, false, logger)
+		if err != nil {
+			logger.Fatalf("failed to install protobuf, please see log at %s", buildLogPath)
+		}
+		logger.Infof("installed protobuf")
+	}
+}
 
 func buildLibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	logger.Infof("building libyaml-cpp...")
@@ -300,6 +360,11 @@ func buildPhOSCore(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		%s
 		cd %s
 		rm -rf ./build
+
+		# protobuf generation
+		./bin/protoc --proto_path=. --cpp_out=. pos/include/proto/*.proto pos/cuda_impl/proto/*.proto &>%s 2>&1
+
+		# build core
 		meson build &>%s 2>&1
 		cd build
 		ninja clean
@@ -308,6 +373,7 @@ func buildPhOSCore(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		`,
 		buildConf.export_string(),
 		cmdOpt.RootDir,
+		buildLogPath,
 		buildLogPath,
 		buildLogPath,
 		cmdOpt.RootDir, cmdOpt.RootDir, KBuildLibPath,
@@ -548,13 +614,15 @@ func cleanCommon(cmdOpt CmdOptions, logger *log.Logger) {
 	} else {
 		clean_script = fmt.Sprintf(`
 			#!/bin/bash
-			rm -rf %s/%s/*
+			rm -rf %s/%s/pos-cli
+			rm -rf %s/%s/cricket-*
 			rm -rf %s/%s/libpos.so
 			# TODO: just for fast compilation of PhOS, decomment later
 			# rm -rf %s/%s/libpatcher.a
 			# rm -rf %s/%s/*.h
 			rm -rf %s/%s/*
 			`,
+			cmdOpt.RootDir, KBuildBinPath,
 			cmdOpt.RootDir, KBuildBinPath,
 			cmdOpt.RootDir, KBuildLibPath,
 			cmdOpt.RootDir, KBuildLibPath,
@@ -569,6 +637,24 @@ func cleanCommon(cmdOpt CmdOptions, logger *log.Logger) {
 	} else {
 		logger.Infof("done")
 	}
+}
+
+func cleanProtobuf(cmdOpt CmdOptions, logger *log.Logger) {
+	logger.Infof("cleaning protobuf...")
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+
+		# clean protobuf
+		cd %s/%s
+		cmake --build . --target clean
+		`,
+		cmdOpt.RootDir, kProtobufPath,
+	)
+	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
+	if err != nil {
+		logger.Warnf("failed to clean protobuf")
+	}
+	logger.Infof("done")
 }
 
 func cleanLibYamlCpp(cmdOpt CmdOptions, logger *log.Logger) {
@@ -795,6 +881,7 @@ func BuildTarget_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		logger.Infof("building dependencies...")
 		buildLibClang(cmdOpt, buildConf, logger)
 		buildLibYamlCpp(cmdOpt, buildConf, logger)
+		buildProtobuf(cmdOpt, buildConf, logger)
 
 		// TODO: just for fast compilation of PhOS, remove later
 		buildKernelPatcher(cmdOpt, buildConf, logger)
@@ -827,6 +914,7 @@ func CleanTarget_CUDA(cmdOpt CmdOptions, logger *log.Logger) {
 		logger.Infof("cleaning dependencies...")
 		cleanLibClang(cmdOpt, logger)
 		cleanLibYamlCpp(cmdOpt, logger)
+		cleanProtobuf(cmdOpt, logger)
 
 		// TODO: just for fast compilation of PhOS, remove later
 		cleanKernelPatcher(cmdOpt, logger)
