@@ -49,6 +49,7 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
     }
     
+
     /*!
      *  \param  hm  handle manager which this handle belongs to
      *  \note   this constructor is invoked during restore process, where the content of 
@@ -59,6 +60,7 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
     }
 
+
     /*!
      *  \note   never called, just for passing compilation
      */
@@ -68,14 +70,13 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
+
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
     std::string get_resource_name(){ return std::string("CUDA Device"); }
 
-    // identifier of the device
-    int device_id;
 
     /*!
      *  \brief  restore the current handle when it becomes broken state
@@ -87,12 +88,12 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
         cudaDeviceProp prop;
 
         // invoke cudaGetDeviceProperties here to make sure the device is alright
-        cuda_rt_retval = cudaGetDeviceProperties(&prop, this->device_id);
+        cuda_rt_retval = cudaGetDeviceProperties(&prop, this->id);
         
         if(unlikely(cuda_rt_retval == cudaSuccess)){
             this->mark_status(kPOS_HandleStatus_Active);
         } else {
-            POS_WARN_C_DETAIL("failed to restore CUDA device, cudaGetDeviceProperties failed: %d, device_id(%d)", cuda_rt_retval, this->device_id);
+            POS_WARN_C_DETAIL("failed to restore CUDA device, cudaGetDeviceProperties failed: %d, device_id(%d)", cuda_rt_retval, this->id);
             retval = POS_FAILED;
         } 
 
@@ -121,7 +122,7 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
 
         POS_CHECK_POINTER(ptr);
 
-        POSUtil_Serializer::write_field(&ptr, &(this->device_id), sizeof(int));
+        POSUtil_Serializer::write_field(&ptr, &(this->id), sizeof(int));
  
         return retval;
     }
@@ -137,7 +138,7 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
 
         POS_CHECK_POINTER(ptr);
 
-        POSUtil_Deserializer::read_field(&(this->device_id), &ptr, sizeof(int));
+        POSUtil_Deserializer::read_field(&(this->id), &ptr, sizeof(int));
 
         return retval;
     }
@@ -183,7 +184,6 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
                 )){
                     POS_ERROR_C_DETAIL("failed to allocate mocked CUDA device in the manager");
                 }
-                device_handle->device_id = i;
                 device_handle->mark_status(kPOS_HandleStatus_Active);
             }
 
@@ -246,25 +246,18 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *          POS_SUCCESS for successfully founded
      */
     pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset=nullptr){
-        int device_id, i;
-        uint64_t device_id_u64;
-        POSHandle_CUDA_Device *device_handle;
+        pos_retval_t retval = POS_SUCCESS;
+        POSHandle_CUDA_Device *device_handle = nullptr;
 
-        // we cast the client address into device id here
-        device_id_u64 = (uint64_t)(client_addr);
-        device_id = (int)(device_id_u64);
+        device_handle = this->get_handle_by_id((uint64_t)(client_addr));
 
-        if(unlikely(device_id >= this->_handles.size())){
-            *handle = nullptr;
-            return POS_FAILED_NOT_EXIST;
+        if(device_handle != nullptr){
+            *handle = device_handle;
+        } else {
+            retval = POS_FAILED_NOT_EXIST;
         }
 
-        device_handle = this->_handles[device_id];        
-        POS_ASSERT(device_id == device_handle->device_id);
-
-        *handle = device_handle;
-
-        return POS_SUCCESS;
+        return retval;
     }
 
     /*!

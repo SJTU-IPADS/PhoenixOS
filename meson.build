@@ -267,15 +267,9 @@ sources += [
 ]
 
 if conf_eval_ckpt_opt_level == 0
-    if conf_eval_migr_opt_level == 0
-        sources += ['pos/src/checkpoint_o0.cpp']
-    else
-        sources += ['pos/src/checkpoint_o1.cpp']
-    endif
-elif conf_eval_ckpt_opt_level == 1
-    sources += ['pos/src/checkpoint_o1.cpp']
-elif conf_eval_ckpt_opt_level == 2
-    sources += ['pos/src/checkpoint_o2.cpp']
+    sources += ['pos/src/checkpoint_disable.cpp']
+else
+    sources += ['pos/src/checkpoint_enable.cpp']
 endif
 
 if conf_runtime_target == 'cuda'
@@ -292,9 +286,11 @@ if conf_runtime_target == 'cuda'
         'pos/cuda_impl/src/worker/cuda_driver.cpp',
         'pos/cuda_impl/src/worker/cuda_runtime.cpp',
         'pos/cuda_impl/src/handle/memory.cpp',
+        'pos/cuda_impl/src/handle/module.cpp',
 
         # protobuf generated file
-        'pos/cuda_impl/proto/memory.pb.cc'
+        'pos/cuda_impl/proto/memory.pb.cc',
+        'pos/cuda_impl/proto/module.pb.cc'
     ]
 endif
 

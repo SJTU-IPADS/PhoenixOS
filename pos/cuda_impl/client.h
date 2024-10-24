@@ -165,24 +165,6 @@ class POSClient_CUDA : public POSClient {
      */
     void __TMP__migration_remote_malloc(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandleManager_CUDA_Memory *hm_memory;
-        POSHandle_CUDA_Memory *memory_handle;
-        uint64_t i, nb_handles;
-
-        hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory);
-        POS_CHECK_POINTER(hm_memory);
-
-        nb_handles = hm_memory->get_nb_handles();
-        for(i=0; i<nb_handles; i++){
-            memory_handle = hm_memory->get_handle_by_id(i);
-            POS_CHECK_POINTER(memory_handle);
-            if(unlikely(POS_SUCCESS != memory_handle->remote_restore())){
-                POS_WARN("failed to remotely restore memory handle: server_addr(%p)", memory_handle->server_addr);
-            }
-        }
-
-        // force switch to origin device
-        cudaSetDevice(0);
 
     exit:
         ;
@@ -545,7 +527,7 @@ class POSClient_CUDA : public POSClient {
         case kPOS_ResourceTypeId_CUDA_Module:
             /*!
              *  \note   if the resource is cuda module, then we need to use POSHandleManager with
-             *          specific type, in order to invoke specified init_ckpt_bag for CUDA module, 
+             *          specific type, in order to invoke specified __init_ckpt_bag for CUDA module, 
              *          as CUDA module would contains host-side checkpoint record
              */
             POSHandleManager<POSHandle_CUDA_Module> *hm_module;
@@ -592,7 +574,7 @@ class POSClient_CUDA : public POSClient {
         case kPOS_ResourceTypeId_CUDA_Memory:
             /*!
              *  \note   if the resource is CUDA memory, then we need to use POSHandleManager with
-             *          specific type, in order to invoke specified init_ckpt_bag for CUDA memory 
+             *          specific type, in order to invoke specified __init_ckpt_bag for CUDA memory 
              *          inside the function allocate_mocked_resource_from_binary
              */
             POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;

@@ -11,8 +11,9 @@ message Bin_POSHanlde {
     uint64 client_addr = 3;
     uint64 server_addr = 4;
     uint64 size = 5;
-    repeated uint64 parent_handle_resource_type_idx = 6;
-    repeated uint64 parent_handle_idx = 7;
-    uint64 state_size = 8;
-    bytes state = 9;
+    uint64 nb_parent_handles = 6;
+    repeated uint64 parent_handle_resource_type_idx = 7;
+    repeated uint64 parent_handle_idx = 8;
+    uint64 state_size = 9;
+    bytes state = 10;
 }

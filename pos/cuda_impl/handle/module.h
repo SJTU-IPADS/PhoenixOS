@@ -34,6 +34,10 @@
 #include "pos/cuda_impl/utils/fatbin.h"
 
 
+// forward declaration
+class POSHandleManager_CUDA_Module;
+
+
 /*!
  *  \brief  handle for cuda module
  */
@@ -54,11 +58,12 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
 
         // initialize checkpoint bag
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        if(unlikely(POS_SUCCESS != this->init_ckpt_bag())){
+        if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
             POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
         }
     #endif
     }
+
 
     /*!
      *  \param  hm  handle manager which this handle belongs to
@@ -70,6 +75,7 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
     }
 
+
     /*!
      *  \note   never called, just for passing compilation
      */
@@ -79,56 +85,86 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
 
+
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
     std::string get_resource_name(){ return std::string("CUDA Module"); }
 
-    /*!
-     *  \brief  restore the current handle when it becomes broken state
-     *  \return POS_SUCCESS for successfully restore
-     */
-    pos_retval_t __restore() override {
-        pos_retval_t retval = POS_SUCCESS;
-        CUresult cuda_dv_retval;
-        std::vector<pos_host_ckpt_t> host_ckpts;
-        POSAPIContext_QE_t *wqe;
-        CUmodule module = NULL;
-
-        // the module content comes from the host-side checkpoint
-        POS_CHECK_POINTER(this->ckpt_bag);
-        host_ckpts = this->ckpt_bag->get_host_checkpoint_records();
-        POS_ASSERT(host_ckpts.size() == 1);
-
-        POS_CHECK_POINTER(wqe = host_ckpts[0].wqe);
-
-        cuda_dv_retval = cuModuleLoadData(
-            /* module */ &module,
-            /* image */  pos_api_param_addr(wqe, host_ckpts[0].param_index)
-        );
-
-        if(likely(CUDA_SUCCESS == cuda_dv_retval)){
-            this->set_server_addr((void*)module);
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            POS_WARN_C_DETAIL("failed to restore CUDA module, cuModuleLoadData failed: %d", cuda_dv_retval);
-            retval = POS_FAILED;
-        }
-
-        return retval;
-    }
 
     // function descriptors under this module
     std::vector<POSCudaFunctionDesp*> function_desps;
 
     // pacthed binary, only PTX included
-    std::vector<uint8_t> patched_binary;
+    // std::vector<uint8_t> patched_binary;
 
     // shadow module for the patched kernel binary
-    void *patched_server_addr;
-    
+    // void *patched_server_addr;
+
+
+    /* ==================== checkpoint add/commit/persist ==================== */
  protected:
+    /*!
+     *  \brief  initialize checkpoint bag of this handle
+     *  \note   it must be implemented by different implementations of stateful 
+     *          handle, as they might require different allocators and deallocators
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    pos_retval_t __init_ckpt_bag() override;
+
+
+    /*!
+     *  \brief  add the state of the resource behind this handle to on-device memory
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_sync    whether the commit process should be sync
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __commit(
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
+        bool is_sync=false, std::string ckpt_dir=""
+    ) override;
+
+
+    /*!
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
+     */
+    pos_retval_t __generate_protobuf_binary(
+        google::protobuf::Message** binary,
+        google::protobuf::Message** base_binary
+    ) override;
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+    /* ======================== restore handle & state ======================= */
+ protected:
+    friend class POSHandleManager_CUDA_Module;
+    friend class POSHandleManager<POSHandle_CUDA_Module>;
+
+
+    /*!
+     *  \brief  restore the current handle when it becomes broken state
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t __restore() override;
+
+
     /*!
      *  \brief  reload state of this handle back to the device
      *  \param  data        source data to be reloaded
@@ -137,17 +173,11 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
      *  \param  stream_id   stream for reloading the state
      *  \param  on_device   whether the source data is on device
      */
-    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device) override {
-        pos_retval_t retval = POS_SUCCESS;
+    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device) override;
+    /* ======================== restore handle & state ======================= */
 
-        /*!
-         *  \note   the state is restoring in restore function, so we do nothing here
-         */
 
-    exit:
-        return retval;
-    }
-
+ protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
      *  \return the serilization size of extra fields of POSHandle
@@ -155,6 +185,7 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
     uint64_t __get_extra_serialize_size() override {
         return 0;
     }
+
 
     /*!
      *  \brief  serialize the extra state of current handle into the binary area
@@ -165,30 +196,13 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
         return POS_SUCCESS;
     }
 
+
     /*!
      *  \brief  deserialize extra field of this handle
      *  \param  sraw_data    raw data area that store the serialized data
      *  \return POS_SUCCESS for successfully deserilization
      */
     pos_retval_t __deserialize_extra(void* raw_data) override {
-        return POS_SUCCESS;
-    }
-
-    /*!
-     *  \brief  initialize checkpoint bag of this handle
-     *  \note   it must be implemented by different implementations of stateful 
-     *          handle, as they might require different allocators and deallocators
-     *  \return POS_SUCCESS for successfully initialization
-     */
-    pos_retval_t init_ckpt_bag() override { 
-        this->ckpt_bag = new POSCheckpointBag(
-            /* 0 */ state_size,
-            /* allocator */ nullptr,
-            /* deallocator */ nullptr,
-            /* dev_allocator */ nullptr,
-            /* dev_deallocator */ nullptr
-        );
-        POS_CHECK_POINTER(this->ckpt_bag);
         return POS_SUCCESS;
     }
 };
