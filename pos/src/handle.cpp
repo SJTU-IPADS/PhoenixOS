@@ -142,7 +142,7 @@ exit:
 }
 
 
-pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id){
+pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS, prev_retval;
     std::future<pos_retval_t> persist_future;
 
@@ -171,10 +171,16 @@ pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string& ckp
     this->_persist_promise = new std::promise<pos_retval_t>;
     POS_CHECK_POINTER(this->_persist_promise);
 
-    this->_persist_thread = new std::thread([&](){
-        pos_retval_t retval = this->__persist_async_thread(ckpt_slot, ckpt_dir, stream_id);
-        this->_persist_promise->set_value(retval);
-    });
+    POS_LOG("!!! outside ckpt_dir: %s", ckpt_dir.c_str());
+
+    // persist asynchronously
+    this->_persist_thread = new std::thread(
+        [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
+            pos_retval_t retval = handle->__persist_async_thread(ckpt_slot, ckpt_dir, stream_id);
+            handle->_persist_promise->set_value(retval);
+        },
+        this, ckpt_slot, ckpt_dir, stream_id
+    );
     POS_CHECK_POINTER(this->_persist_thread);
 
 exit:
@@ -191,6 +197,11 @@ pos_retval_t POSHandle::sync_persist(){
         persist_future = this->_persist_promise->get_future();
         persist_future.wait();
         retval = persist_future.get();
+
+        // ref: https://en.cppreference.com/w/cpp/thread/thread/%7Ethread
+        if(this->_persist_thread->joinable()){
+            this->_persist_thread->join();
+        }
 
         delete this->_persist_thread;
         this->_persist_thread = nullptr;

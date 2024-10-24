@@ -771,7 +771,7 @@ class POSClient_CUDA : public POSClient {
         }
 
         output_file.close();
-        POS_LOG("finish dump kernel metadats to %s", this->_cxt.kernel_meta_path.c_str());
+        POS_LOG("finish dump kernel metadata to %s", this->_cxt.kernel_meta_path.c_str());
 
     exit:
         ;
