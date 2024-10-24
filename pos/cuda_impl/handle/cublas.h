@@ -33,7 +33,7 @@
 /*!
  *  \brief  handle for cuBLAS context
  */
-class POSHandle_cuBLAS_Context : public POSHandle {
+class POSHandle_cuBLAS_Context final : public POSHandle_CUDA {
  public:
     /*!
      *  \brief  constructor
@@ -44,7 +44,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \param  state_size      size of resource state behind this handle  
      */
     POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0)
-        : POSHandle(client_addr_, size_, hm, id_, state_size), lastest_used_stream(nullptr)
+        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size), lastest_used_stream(nullptr)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }
@@ -53,7 +53,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *  \note   never called, just for passing compilation
      */
     POSHandle_cuBLAS_Context(size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0) 
-        : POSHandle(size_, hm, id_, state_size), lastest_used_stream(nullptr)
+        : POSHandle_CUDA(size_, hm, id_, state_size), lastest_used_stream(nullptr)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
@@ -64,7 +64,7 @@ class POSHandle_cuBLAS_Context : public POSHandle {
      *          the handle will be resume by deserializing from checkpoint binary
      */
     POSHandle_cuBLAS_Context(void* hm) 
-        : POSHandle(hm), lastest_used_stream(nullptr)
+        : POSHandle_CUDA(hm), lastest_used_stream(nullptr)
     {
         this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
     }

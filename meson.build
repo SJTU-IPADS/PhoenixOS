@@ -280,17 +280,18 @@ endif
 
 if conf_runtime_target == 'cuda'
     sources += [
-        'pos/cuda_impl/api_context.cpp',
-        'pos/cuda_impl/workspace.cpp',
-        'pos/cuda_impl/utils/fatbin.cpp',
-        'pos/cuda_impl/parser/cublas.cpp',
-        'pos/cuda_impl/parser/cuda_driver.cpp',
-        'pos/cuda_impl/parser/cuda_runtime.cpp',
-        'pos/cuda_impl/parser/remoting.cpp',
-        'pos/cuda_impl/worker/cublas.cpp',
-        'pos/cuda_impl/worker/cuda_driver.cpp',
-        'pos/cuda_impl/worker/cuda_runtime.cpp',
-        'pos/cuda_impl/handle/memory.cpp',
+        'pos/cuda_impl/src/api_context.cpp',
+        'pos/cuda_impl/src/workspace.cpp',
+        'pos/cuda_impl/src/handle.cpp',
+        'pos/cuda_impl/src/utils/fatbin.cpp',
+        'pos/cuda_impl/src/parser/cublas.cpp',
+        'pos/cuda_impl/src/parser/cuda_driver.cpp',
+        'pos/cuda_impl/src/parser/cuda_runtime.cpp',
+        'pos/cuda_impl/src/parser/remoting.cpp',
+        'pos/cuda_impl/src/worker/cublas.cpp',
+        'pos/cuda_impl/src/worker/cuda_driver.cpp',
+        'pos/cuda_impl/src/worker/cuda_runtime.cpp',
+        'pos/cuda_impl/src/handle/memory.cpp',
 
         # protobuf generated file
         'pos/cuda_impl/proto/memory.pb.cc'
