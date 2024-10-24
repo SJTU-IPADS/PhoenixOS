@@ -52,7 +52,7 @@ namespace cuda_malloc {
 
         prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
         prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-        prop.location.id = device_handle->device_id;
+        prop.location.id = device_handle->id;
 
         // create physical memory on the device
         wqe->api_cxt->return_code = cuMemCreate(
@@ -716,7 +716,7 @@ namespace cuda_set_device {
         device_handle = (POSHandle_CUDA_Device*)(pos_api_input_handle(wqe, 0));
         POS_CHECK_POINTER(device_handle);
 
-        wqe->api_cxt->return_code = cudaSetDevice(device_handle->device_id);
+        wqe->api_cxt->return_code = cudaSetDevice(device_handle->id);
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
@@ -821,7 +821,7 @@ namespace cuda_get_device_properties {
 
         wqe->api_cxt->return_code = cudaGetDeviceProperties(
             (struct cudaDeviceProp*)wqe->api_cxt->ret_data, 
-            device_handle->device_id
+            device_handle->id
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
@@ -856,7 +856,7 @@ namespace cuda_device_get_attribute {
         wqe->api_cxt->return_code = cudaDeviceGetAttribute(
             /* value */ (int*)(wqe->api_cxt->ret_data), 
             /* attr */ pos_api_param_value(wqe, 0, cudaDeviceAttr),
-            /* device */ device_handle->device_id
+            /* device */ device_handle->id
         );
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 

@@ -1493,7 +1493,7 @@ namespace cuda_get_device {
         POS_CHECK_POINTER(hm_device);
 
         POS_CHECK_POINTER(wqe->api_cxt->ret_data);
-        memcpy(wqe->api_cxt->ret_data, &(hm_device->latest_used_handle->device_id), sizeof(int));
+        memcpy(wqe->api_cxt->ret_data, &(hm_device->latest_used_handle->id), sizeof(int));
 
         // the api is finish, one can directly return
         wqe->status = kPOS_API_Execute_Status_Return_Without_Worker;

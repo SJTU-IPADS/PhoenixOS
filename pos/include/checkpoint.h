@@ -20,13 +20,32 @@
 #include <set>
 #include <unordered_map>
 #include <stdint.h>
-
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
 
 // forward declaration
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+
+
+/*!
+ *  \brief  position of the checkpoint slot,
+ *          i.e., host/device
+ */
+enum pos_ckptslot_position_t : uint8_t {
+    kPOS_CkptSlotPosition_Device = 0,
+    kPOS_CkptSlotPosition_Host
+};
+
+
+/*!
+ *  \brief  type of the checkpoint data,
+ *          i.e., host/device-side state
+ */
+enum pos_ckpt_state_type_t : uint8_t {
+    kPOS_CkptStateType_Device = 0,
+    kPOS_CkptStateType_Host
+};
 
 
 using pos_custom_ckpt_allocate_func_t = void*(*)(uint64_t size);
@@ -128,90 +147,103 @@ class POSCheckpointBag {
  public:
     /*!
      *  \brief  construtor
-     *  \param  state_size      size of the data inside this slot
-     *  \param  allocator       allocator for allocating host-side memory region to store checkpoint
-     *  \param  deallocator     deallocator for deallocating host-side memory region that stores checkpoint
-     *  \param  dev_allocator   allocator for allocating device-side memory region to store checkpoint
-     *  \param  dev_deallocator deallocator for deallocating device-side memory region that stores checkpoint
+     *  \param  fixed_state_size    fixed size of the data stored inside this bag
+     *  \param  allocator           allocator for allocating host-side memory region to store checkpoint
+     *  \param  deallocator         deallocator for deallocating host-side memory region that stores checkpoint
+     *  \param  dev_allocator       allocator for allocating device-side memory region to store checkpoint
+     *  \param  dev_deallocator     deallocator for deallocating device-side memory region that stores checkpoint
      */
     POSCheckpointBag(
-        uint64_t state_size,
+        uint64_t fixed_state_size,
         pos_custom_ckpt_allocate_func_t allocator,
         pos_custom_ckpt_deallocate_func_t deallocator,
         pos_custom_ckpt_allocate_func_t dev_allocator,
         pos_custom_ckpt_deallocate_func_t dev_deallocator
     );
-
     ~POSCheckpointBag() = default;
-    
+
+
     /*!
      *  \brief  clear current checkpoint bag
      */
     void clear();
 
+
     /*!
      *  \brief  allocate a new checkpoint slot inside this bag
-     *  \tparam on_device           whether to apply the slot on the device
+     *  \tparam ckpt_slot_pos       position of the applied checkpoint slot
      *  \param  version             version of this checkpoint
-     *  \param  ptr                 pointer to the checkpoint slot
+     *  \param  ptr                 returned pointer to the checkpoint slot
+     *  \param  dynamic_state_size  dynaimc state size, for those resources (e.g., Module) whose
+     *                              size can only be determined after the creation of handle; for
+     *                              those can be determined at creation, simply set this param as 0
      *  \param  force_overwrite     force to overwrite the oldest checkpoint to save allocation time
      *                              (if no available slot exit)
      *  \return POS_SUCCESS for successfully allocation
      */
-    template<bool on_device>
-    pos_retval_t apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite);
+    template<pos_ckptslot_position_t ckpt_slot_pos>
+    pos_retval_t apply_checkpoint_slot(
+        uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
+    );
+
 
     /*!
      *  \brief  obtain checkpointed data by given checkpoint version
-     *  \tparam on_device   whether the slot to be applied is on the device
+     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
      *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
      *  \param  version     the specified version
      *  \return POS_SUCCESS for successfully obtained
      *          POS_FAILED_NOT_EXIST for no checkpoint is found
      */
-    template<bool on_device>
+    template<pos_ckptslot_position_t ckpt_slot_pos>
     pos_retval_t get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t version);
+
 
     /*!
      *  \brief  obtain the number of recorded checkpoints inside this bag
-     *  \tparam on_device   whether the slot to be applied is on the device
+     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
      *  \return number of recorded checkpoints
      */
-    template<bool on_device>
+    template<pos_ckptslot_position_t ckpt_slot_pos>
     uint64_t get_nb_checkpoint_slots();
+
 
     /*!
      *  \brief  obtain the checkpoint version list
-     *  \tparam on_device   whether the slot to be applied is on the device
+     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
      *  \return the checkpoint version list
      */
-    template<bool on_device>
+    template<pos_ckptslot_position_t ckpt_slot_pos>
     std::set<uint64_t> get_checkpoint_version_set();
+
 
     /*!
      *  \brief  invalidate the checkpoint from this bag
-     *  \tparam on_device   whether the checkpoint is on the device
+     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be invalidated
      *  \param  version version of the checkpoint to be removed
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    template<bool on_device>
+    template<pos_ckptslot_position_t ckpt_slot_pos>
     pos_retval_t invalidate_by_version(uint64_t version);
+
 
     /*!
      *  \brief  invalidate all checkpoint from this bag
-     *  \tparam on_device   whether the checkpoints are on the device
+     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be invalidated
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    template<bool on_deice>
+    template<pos_ckptslot_position_t ckpt_slot_pos>
     pos_retval_t invalidate_all_version();
+
 
     /*!
      *  \brief  obtain overall memory consumption of this checkpoint bag
      *  \return overall memory consumption of this checkpoint bag
      */
     uint64_t get_memory_consumption();
+
 
     /*!
      *  \brief  load binary checkpoint data into this bag
@@ -222,6 +254,7 @@ class POSCheckpointBag {
      */
     pos_retval_t load(uint64_t version, void* ckpt_data);
 
+
     /*!
      *  \brief  record a new host-side checkpoint of this bag
      *  \note   this function is invoked within parser thread
@@ -231,6 +264,7 @@ class POSCheckpointBag {
      */
     pos_retval_t set_host_checkpoint_record(pos_host_ckpt_t ckpt);
 
+
     /*!
      *  \brief  obtain all host-side checkpoint records
      *  \note   this function only return those api context that hasn't been pruned by checkpoint system
@@ -238,17 +272,17 @@ class POSCheckpointBag {
      */
     std::vector<pos_host_ckpt_t> get_host_checkpoint_records();
 
+
     // waitlist of the host-side checkpoint record, populated during restore phrase
     std::vector<std::tuple<
         /* wqe_id */ pos_u64id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
     > host_ckpt_waitlist;
 
+
     // indicate whether the checkpoint has been finished in the latest checkpoint round
     bool is_latest_ckpt_finished;
 
  private:
-
-#if POS_CONF_EVAL_CkptOptLevel == 2
     /*!
      *  \brief  checkpoint version map
      *          key: version
@@ -283,27 +317,8 @@ class POSCheckpointBag {
     // all on-device versions that this bag stored
     std::set<uint64_t> _dev_ckpt_version_set;
 
-#elif POS_CONF_EVAL_CkptOptLevel == 1 || POS_CONF_EVAL_MigrOptLevel > 0
-    /*!
-     *  \brief  indicate which checkpoint slot to use (front / back)
-     */
-    bool _use_front;
-
-    /*!
-     *  \brief  front checkpoint slot
-     */
-    uint64_t _front_version;
-    POSCheckpointSlot* _ckpt_front;
-
-     /*!
-     *  \brief  back checkpoint slot
-     */
-    uint64_t _back_version;
-    POSCheckpointSlot* _ckpt_back;
-
-#endif
-    // state size of each checkpoint
-    uint64_t _state_size;
+    // static state size of each checkpoint
+    uint64_t _fixed_state_size;
 
     // allocator and deallocator of checkpoint memory
     pos_custom_ckpt_allocate_func_t _allocate_func;

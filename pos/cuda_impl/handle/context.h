@@ -85,6 +85,9 @@ class POSHandle_CUDA_Context final : public POSHandle_CUDA {
         CUresult cuda_dv_res;
         CUcontext pctx;
 
+        // TODO: this function is wrong, we need to restore on correct device
+        //      find device id from parent handle
+
         /*!
          *  \note   make sure runtime API is initialized
          *          if we don't do this and use the driver API, it might be unintialized
@@ -109,6 +112,7 @@ class POSHandle_CUDA_Context final : public POSHandle_CUDA {
     exit:
         return retval;
     }
+
 
  protected:
     /*!

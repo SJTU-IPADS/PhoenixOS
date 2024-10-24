@@ -298,7 +298,7 @@ namespace cu_device_primary_ctx_get_state {
         POS_CHECK_POINTER(device_handle);
 
         wqe->api_cxt->return_code = cuDevicePrimaryCtxGetState(
-            device_handle->device_id,
+            device_handle->id,
             (unsigned int*)(wqe->api_cxt->ret_data),
             (int*)(wqe->api_cxt->ret_data + sizeof(unsigned int))
         );
