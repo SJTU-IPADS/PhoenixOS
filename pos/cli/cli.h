@@ -80,7 +80,7 @@ enum pos_cli_arg : int {
     // target process id
     kPOS_CliMeta_Pid,
     // checkpoint file path
-    kPOS_CliMeta_CkptFilePath,
+    kPOS_CliMeta_CkptDir,
     // oob ip
     kPOS_CliMeta_Dip,
     // oob port

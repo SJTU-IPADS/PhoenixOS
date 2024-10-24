@@ -45,7 +45,7 @@ namespace cli_ckpt_predump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
-        cmd->ckpt_dir = std::string(cmd->ckpt_dir) 
+        cmd->ckpt_dir = std::string(payload->ckpt_dir) 
                         + std::string("/")
                         + std::to_string(payload->pid)
                         + std::string("-")
@@ -63,6 +63,7 @@ namespace cli_ckpt_predump {
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
             goto response;
         }
+        POS_LOG("create ckpt dir: %s", cmd->ckpt_dir.c_str());
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);

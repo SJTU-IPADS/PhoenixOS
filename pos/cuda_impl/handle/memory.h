@@ -342,7 +342,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \param  stream_id   index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persist
      */
-    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0) override;
+    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0) override;
 
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
