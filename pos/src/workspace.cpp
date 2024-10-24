@@ -297,15 +297,6 @@ int POSWorkspace::pos_process(
 #endif // POS_CONF_RUNTIME_EnableDebugCheck
 
     POS_CHECK_POINTER(client = _client_map[uuid]);
-
-    // check whether the work queue exists
-#if POS_CONF_RUNTIME_EnableDebugCheck
-    if(unlikely(this->_apicxt_rpc2parser_wqs.count(uuid) == 0)){
-        POS_WARN_C_DETAIL("no work queue with client uuid(%lu) was created", uuid);
-        return POS_FAILED_NOT_EXIST;
-    }
-#endif // POS_CONF_RUNTIME_EnableDebugCheck
-
     
     // check whether the metadata of the API was recorded
 #if POS_CONF_RUNTIME_EnableDebugCheck

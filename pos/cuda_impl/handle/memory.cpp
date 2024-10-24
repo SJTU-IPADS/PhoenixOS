@@ -160,7 +160,7 @@ exit:
 }
 
 
-pos_retval_t POSHandle_CUDA_Memory::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id){
+pos_retval_t POSHandle_CUDA_Memory::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS;
     cudaError_t cuda_rt_retval;
     std::string ckpt_file_path;
@@ -168,6 +168,10 @@ pos_retval_t POSHandle_CUDA_Memory::__persist_async_thread(POSCheckpointSlot* ck
     pos_protobuf::Bin_POSHanlde_CUDA_Memory binary;
     pos_protobuf::Bin_POSHanlde *base_binary = nullptr;
 
+    POS_LOG("!!! ckpt_dir: %s", ckpt_dir.c_str());
+
+    // TODO: we must ensure the ckpt_slot won't be released until this ckpt ends!
+    //      we haven't do that!
     POS_CHECK_POINTER(ckpt_slot);
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
@@ -194,8 +198,8 @@ pos_retval_t POSHandle_CUDA_Memory::__persist_async_thread(POSCheckpointSlot* ck
     POS_CHECK_POINTER(base_binary);
     
     // serialize base binary
-    retval = this->__serialize_protobuf_handle_base(base_binary);
-    if(unlikely(retval = POS_SUCCESS)){
+    retval = this->__serialize_protobuf_handle_base(base_binary, ckpt_slot);
+    if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C(
             "failed to serialize base binry to protobuf: server_addr(%p), retval(%d)",
             this->server_addr, retval

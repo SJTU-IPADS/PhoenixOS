@@ -605,7 +605,7 @@ class POSHandle {
      *  \param  stream_id   index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persist
      */
-    pos_retval_t __persist(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0);
+    pos_retval_t __persist(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0);
 
     /*!
      *  \brief  async thread to persist the checkpoint to file system
@@ -614,7 +614,7 @@ class POSHandle {
      *  \param  stream_id   index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persist
      */
-    virtual pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string& ckpt_dir, uint64_t stream_id=0){
+    virtual pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 

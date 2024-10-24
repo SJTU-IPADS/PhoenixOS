@@ -51,7 +51,7 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         kPOS_CliAction_Migrate,
         kPOS_CliAction_Preserve,
         kPOS_CliMeta_Pid,
-        kPOS_CliMeta_CkptFilePath,
+        kPOS_CliMeta_CkptDir,
         kPOS_CliMeta_Dip,
         kPOS_CliMeta_Dport
     );
@@ -67,7 +67,7 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         
         // metadatas
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
-        {"file",        required_argument,  NULL,   kPOS_CliMeta_CkptFilePath},
+        {"dir",         required_argument,  NULL,   kPOS_CliMeta_CkptDir},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},
         {"dport",       required_argument,  NULL,   kPOS_CliMeta_Dport},
         
