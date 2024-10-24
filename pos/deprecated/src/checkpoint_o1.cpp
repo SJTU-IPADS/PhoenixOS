@@ -29,40 +29,42 @@
 
 
 POSCheckpointBag::POSCheckpointBag(
-    uint64_t state_size,
+    uint64_t fixed_state_size,
     pos_custom_ckpt_allocate_func_t allocator,
     pos_custom_ckpt_deallocate_func_t deallocator,
     pos_custom_ckpt_allocate_func_t dev_allocator,
     pos_custom_ckpt_deallocate_func_t dev_deallocator
 )  : is_latest_ckpt_finished(false) {
-    this->_state_size = state_size;
+    this->_fixed_state_size = fixed_state_size;
     this->_allocate_func = allocator;
     this->_deallocate_func = deallocator;
     this->_dev_allocate_func = dev_allocator;
     this->_dev_deallocate_func = dev_deallocator;
 
     // apply font and back checkpoint slot
-    if(allocator != nullptr && deallocator != nullptr){
-        _ckpt_front = new POSCheckpointSlot(_state_size, allocator, deallocator);
-        POS_CHECK_POINTER(_ckpt_front);
-        _ckpt_back = new POSCheckpointSlot(_state_size, allocator, deallocator);
-        POS_CHECK_POINTER(_ckpt_back);
+    if(allocator != nullptr && deallocator != nullptr && this->_fixed_state_size > 0){
+        this->_ckpt_front = new POSCheckpointSlot(this->_fixed_state_size, allocator, deallocator);
+        POS_CHECK_POINTER(this->_ckpt_front);
+        this->_ckpt_back = new POSCheckpointSlot(this->_fixed_state_size, allocator, deallocator);
+        POS_CHECK_POINTER(this->_ckpt_back);
     }
 
-    _front_version = 0;
-    _back_version = 0;
+    this->_front_version = 0;
+    this->_back_version = 0;
 }
 
 
 void POSCheckpointBag::clear(){
-    _use_front = true;
-    _front_version = 0;
-    _back_version = 0;
+    this->_use_front = true;
+    this->_front_version = 0;
+    this->_back_version = 0;
 }
 
 
 template<bool on_device>
-pos_retval_t POSCheckpointBag::apply_checkpoint_slot(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite){
+pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
+    uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
+){
     pos_retval_t retval = POS_SUCCESS;
 
     POS_CHECK_POINTER(ptr);
@@ -80,8 +82,12 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(uint64_t version, POSCheckp
 exit:
     return retval;
 }
-template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<true>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite); // TODO: for pass compile
-template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<false>(uint64_t version, POSCheckpointSlot** ptr, bool force_overwrite);
+template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<true>(
+    uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
+); // TODO: for pass compile
+template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<false>(
+    uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
+);
 
 
 template<bool on_device>
@@ -137,7 +143,7 @@ template std::set<uint64_t> POSCheckpointBag::get_checkpoint_version_set<false>(
 
 
 uint64_t POSCheckpointBag::get_memory_consumption(){
-    return 2 * _state_size;
+    return 2 * _fixed_state_size;
 }
 
 
@@ -193,14 +199,16 @@ pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
 
     POS_CHECK_POINTER(ckpt_data);
 
-    retval = apply_checkpoint_slot</* on_device */false>(version, &ckpt_slot, /* force_overwrite */ false);
+    retval = apply_checkpoint_slot</* on_device */false>(
+        version, &ckpt_slot, /* dynamic_state_size */ 0, /* force_overwrite */ false
+    );
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to apply new checkpoiont slot while loading in restore: version(%lu)", version);
         goto exit;
     }
     POS_CHECK_POINTER(ckpt_slot);
 
-    memcpy(ckpt_slot->expose_pointer(), ckpt_data, this->_state_size);
+    memcpy(ckpt_slot->expose_pointer(), ckpt_data, this->_fixed_state_size);
 
 exit:
     return retval;

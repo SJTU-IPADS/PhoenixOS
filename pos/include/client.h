@@ -38,6 +38,9 @@ class POSWorkspace;
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
 
 
+/*!
+ *  \brief  direction of the internal queue of POS
+ */
 enum pos_queue_direction_t : uint8_t {
     kPOS_QueueDirection_Rpc2Parser = 0,
     kPOS_QueueDirection_Rpc2Worker,
@@ -47,6 +50,9 @@ enum pos_queue_direction_t : uint8_t {
 };
 
 
+/*!
+ *  \brief  type of the internal queue of POS
+ */
 enum pos_queue_type_t : uint8_t {
     kPOS_Queue_Type_WQ = 0,
     kPOS_Queue_Type_CQ,

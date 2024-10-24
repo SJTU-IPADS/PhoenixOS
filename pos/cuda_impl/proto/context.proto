@@ -5,8 +5,8 @@ package pos_protobuf;
 import "pos/include/proto/handle.proto";
 
 /*!
- *  \brief  binary format of POSHandle_CUDA_Memory
+ *  \brief  binary format of POSHandle_CUDA_Context
  */
- message Bin_POSHanlde_CUDA_Memory {
+ message Bin_POSHandle_CUDA_Context {
     Bin_POSHanlde base = 1;
 }
