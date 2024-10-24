@@ -160,77 +160,24 @@ exit:
 }
 
 
-pos_retval_t POSHandle_CUDA_Memory::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
+pos_retval_t POSHandle_CUDA_Memory::__generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary){
     pos_retval_t retval = POS_SUCCESS;
-    cudaError_t cuda_rt_retval;
-    std::string ckpt_file_path;
-    std::ofstream ckpt_file_stream;
-    pos_protobuf::Bin_POSHanlde_CUDA_Memory binary;
-    pos_protobuf::Bin_POSHanlde *base_binary = nullptr;
+    pos_protobuf::Bin_POSHanlde_CUDA_Memory *cuda_memory_binary;
 
-    POS_LOG("!!! ckpt_dir: %s", ckpt_dir.c_str());
-
-    // TODO: we must ensure the ckpt_slot won't be released until this ckpt ends!
-    //      we haven't do that!
-    POS_CHECK_POINTER(ckpt_slot);
-    POS_ASSERT(std::filesystem::exists(ckpt_dir));
-
-    // form the path to the checkpoint file of this handle
-    ckpt_file_path = ckpt_dir 
-                    + std::string("/sf-")
-                    + std::to_string(this->resource_type_id) 
-                    + std::string("-")
-                    + std::to_string(this->id)
-                    + std::string(".bin");
-
-    // synchronize the commit stream
-    cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
-    if(unlikely(cuda_rt_retval != cudaSuccess)){
-        POS_WARN_C(
-            "failed to synchronize commit stream before persist checkpoint to file system: server_addr(%p), retval(%d)",
-            this->server_addr, cuda_rt_retval
-        );
-        retval = POS_FAILED;
-        goto exit;
-    }
-
-    base_binary = binary.mutable_base();
+    POS_CHECK_POINTER(binary);
     POS_CHECK_POINTER(base_binary);
-    
-    // serialize base binary
-    retval = this->__serialize_protobuf_handle_base(base_binary, ckpt_slot);
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C(
-            "failed to serialize base binry to protobuf: server_addr(%p), retval(%d)",
-            this->server_addr, retval
-        );
-        goto exit;
-    }
 
-    // serialize other fields
+    cuda_memory_binary = new pos_protobuf::Bin_POSHanlde_CUDA_Memory();
+    POS_CHECK_POINTER(cuda_memory_binary);
+
+    *binary = reinterpret_cast<google::protobuf::Message*>(cuda_memory_binary);
+    POS_CHECK_POINTER(*binary);
+    *base_binary = cuda_memory_binary->mutable_base();
+    POS_CHECK_POINTER(*base_binary);
+
+    // serialize handle specific fields
     /* currently nothing */
 
-    // write to file
-    ckpt_file_stream.open(ckpt_file_path, std::ios::binary | std::ios::out);
-    if(!ckpt_file_stream){
-        POS_WARN_C(
-            "failed to dump checkpoint to file, failed to open file: path(%s)",
-            ckpt_file_path.c_str()
-        );
-        retval = POS_FAILED;
-        goto exit;
-    }
-    if(!binary.SerializeToOstream(&ckpt_file_stream)){
-        POS_WARN_C(
-            "failed to dump checkpoint to file, protobuf failed to dump: path(%s)",
-            ckpt_file_path.c_str()
-        );
-        retval = POS_FAILED;
-        goto exit;
-    }
-
-exit:
-    if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
     return retval;
 }
 

@@ -37,7 +37,7 @@
 /*!
  *  \brief  handle for cuda memory
  */
-class POSHandle_CUDA_Memory : public POSHandle {
+class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
  public:
     /*!
      *  \brief  constructor
@@ -47,7 +47,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \param  state_size_     size of the resource state behind this handle
      */
     POSHandle_CUDA_Memory(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle(size_, hm, id_, state_size_)
+        : POSHandle_CUDA(size_, hm, id_, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
 
@@ -64,7 +64,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Memory(void* hm) : POSHandle(hm)
+    POSHandle_CUDA_Memory(void* hm) : POSHandle_CUDA(hm)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
     }
@@ -73,7 +73,7 @@ class POSHandle_CUDA_Memory : public POSHandle {
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, hm, id_, state_size_)
+        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
@@ -336,13 +336,12 @@ class POSHandle_CUDA_Memory : public POSHandle {
     pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
 
     /*!
-     *  \brief  persist the checkpoint to file system
-     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
-     *  \param  ckpt_dir    directory to store the checkpoint
-     *  \param  stream_id   index of the stream on which checkpoint is commited
-     *  \return POS_SUCCESS for successfully persist
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
      */
-    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0) override;
+    pos_retval_t __generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary) override;
 
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type

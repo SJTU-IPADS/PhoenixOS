@@ -44,6 +44,53 @@ enum : pos_resource_typeid_t {
     kPOS_ResourceTypeId_cuBLAS_Context,
 };
 
+
+/*!
+ *  \brief  handle for cuda structs
+ */
+class POSHandle_CUDA : public POSHandle {
+ public:
+    /*!
+     *  \brief  constructor
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
+     *  \param  id_             index of this handle in the handle manager list
+     *  \param  state_size_     size of the resource state behind this handle
+     */
+    POSHandle_CUDA(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
+        : POSHandle(size_, hm, id_, state_size_){}
+
+    /*!
+     *  \brief  constructor
+     *  \param  hm  handle manager which this handle belongs to
+     *  \note   this constructor is invoked during restore process, where the content of 
+     *          the handle will be resume by deserializing from checkpoint binary
+     */
+    POSHandle_CUDA(void* hm) : POSHandle(hm){}
+
+    /*!
+     *  \brief  constructor
+     *  \param  client_addr     the mocked client-side address of the handle
+     *  \param  size_           size of the handle it self
+     *  \param  hm              handle manager which this handle belongs to
+     *  \param  id_             index of this handle in the handle manager list
+     *  \param  state_size_     size of the resource state behind this handle
+     */
+    POSHandle_CUDA(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
+        : POSHandle(client_addr_, size_, hm, id_, state_size_){}
+
+    /* ===================== platform-specific functions ===================== */
+ protected:
+    /*!
+     *  \brief  synchronize a specific device stream
+     *  \param  stream_id   index of the stream to be synchronized
+     *  \return POS_SUCCESS for successfully synchronizing
+     */
+    pos_retval_t __sync_stream(uint64_t stream_id=0) override;
+    /* ===================== platform-specific functions ===================== */
+};
+
+
 // declarations of CUDA handles
 class POSHandle_CUDA_Context;
 class POSHandle_CUDA_Device;
