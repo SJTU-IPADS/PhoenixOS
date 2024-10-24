@@ -20,10 +20,8 @@
 #include <string>
 #include <map>
 #include <type_traits>
-
 #include <stdint.h>
 #include <assert.h>
-
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/serializer.h"
@@ -31,6 +29,7 @@
 #include "pos/include/checkpoint.h"
 #include "pos/include/proto/handle.pb.h"
 
+#include "google/protobuf/port_def.inc"
 
 pos_retval_t POSHandle::set_passthrough_addr(void *addr, POSHandle* handle_ptr){ 
     using handle_type = typename std::decay<decltype(*this)>::type;
@@ -61,6 +60,19 @@ void POSHandle::mark_status(pos_handle_status_t status){
 
 void POSHandle::reset_preserve_counter(){ 
     this->_state_preserve_counter.store(0); 
+}
+
+
+bool POSHandle::is_client_addr_in_range(void *addr, uint64_t *offset){
+    bool result;
+
+    result = ((uint64_t)client_addr <= (uint64_t)addr) && ((uint64_t)addr < (uint64_t)(client_addr)+size);
+
+    if(result && offset != nullptr){
+        *offset = (uint64_t)addr - (uint64_t)client_addr;
+    }
+
+    return result;
 }
 
 
@@ -171,8 +183,6 @@ pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string ckpt
     this->_persist_promise = new std::promise<pos_retval_t>;
     POS_CHECK_POINTER(this->_persist_promise);
 
-    POS_LOG("!!! outside ckpt_dir: %s", ckpt_dir.c_str());
-
     // persist asynchronously
     this->_persist_thread = new std::thread(
         [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
@@ -216,11 +226,39 @@ exit:
 }
 
 
-pos_retval_t POSHandle::__serialize_protobuf_handle_base(pos_protobuf::Bin_POSHanlde* base_binary, POSCheckpointSlot* ckpt_slot){
+pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i;
+    std::string ckpt_file_path;
+    std::ofstream ckpt_file_stream;
+    google::protobuf::Message *handle_binary = nullptr, *_base_binary = nullptr;
+    pos_protobuf::Bin_POSHanlde *base_binary = nullptr;
 
-    POS_CHECK_POINTER(base_binary);
+    // TODO: we must ensure the ckpt_slot won't be released until this ckpt ends!
+    //      we haven't do that!
+    POS_CHECK_POINTER(ckpt_slot);
+    POS_ASSERT(std::filesystem::exists(ckpt_dir));
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->__sync_stream(stream_id)
+    ))){
+        POS_WARN_C(
+            "failed to sync checkpoint commit stream before persisting: server_addr(%p), retval(%u)",
+            this->server_addr, retval
+        );
+        goto exit;
+    }
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->__generate_protobuf_binary(&handle_binary, &_base_binary)
+    ))){
+        POS_WARN_C("failed to generate protobuf binary: server_addr(%p), retval(%u)",
+            this->server_addr, retval
+        );
+        goto exit;
+    }
+    POS_CHECK_POINTER(handle_binary);
+    POS_CHECK_POINTER(base_binary = reinterpret_cast<pos_protobuf::Bin_POSHanlde*>(_base_binary));
 
     // base fields
     base_binary->set_id(this->id);
@@ -246,7 +284,35 @@ pos_retval_t POSHandle::__serialize_protobuf_handle_base(pos_protobuf::Bin_POSHa
         base_binary->set_state(reinterpret_cast<const char*>(ckpt_slot->expose_pointer()), this->state_size);
     }
 
+    // form the path to the checkpoint file of this handle
+    ckpt_file_path = ckpt_dir 
+                    + std::string("/sf-")
+                    + std::to_string(this->resource_type_id) 
+                    + std::string("-")
+                    + std::to_string(this->id)
+                    + std::string(".bin");
+
+    // write to file
+    ckpt_file_stream.open(ckpt_file_path, std::ios::binary | std::ios::out);
+    if(!ckpt_file_stream){
+        POS_WARN_C(
+            "failed to dump checkpoint to file, failed to open file: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+    if(!handle_binary->SerializeToOstream(&ckpt_file_stream)){
+        POS_WARN_C(
+            "failed to dump checkpoint to file, protobuf failed to dump: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
 exit:
+    if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
     return retval;
 }
 

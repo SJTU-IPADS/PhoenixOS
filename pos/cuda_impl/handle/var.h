@@ -34,7 +34,7 @@
 /*!
  *  \brief  handle for cuda variable
  */
-class POSHandle_CUDA_Var : public POSHandle {
+class POSHandle_CUDA_Var final : public POSHandle_CUDA {
  public:
     /*!
      *  \brief  constructor
@@ -45,7 +45,7 @@ class POSHandle_CUDA_Var : public POSHandle {
      *  \param  state_size_     size of the resource state behind this handle
      */
     POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle(client_addr_, size_, hm, state_size_)
+        : POSHandle_CUDA(client_addr_, size_, hm, state_size_)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
     }
@@ -55,7 +55,7 @@ class POSHandle_CUDA_Var : public POSHandle {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Var(void* hm) : POSHandle(hm)
+    POSHandle_CUDA_Var(void* hm) : POSHandle_CUDA(hm)
     {
         this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
     }
@@ -64,7 +64,7 @@ class POSHandle_CUDA_Var : public POSHandle {
      *  \note   never called, just for passing compilation
      */
     POSHandle_CUDA_Var(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle(size_, hm, id_, state_size_)
+        : POSHandle_CUDA(size_, hm, id_, state_size_)
     {
         POS_ERROR_C_DETAIL("shouldn't be called");
     }
