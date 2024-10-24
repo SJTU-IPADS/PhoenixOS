@@ -172,6 +172,7 @@ class POSCheckpointBag {
     /*!
      *  \brief  allocate a new checkpoint slot inside this bag
      *  \tparam ckpt_slot_pos       position of the applied checkpoint slot
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \param  version             version of this checkpoint
      *  \param  ptr                 returned pointer to the checkpoint slot
      *  \param  dynamic_state_size  dynaimc state size, for those resources (e.g., Module) whose
@@ -181,7 +182,7 @@ class POSCheckpointBag {
      *                              (if no available slot exit)
      *  \return POS_SUCCESS for successfully allocation
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     pos_retval_t apply_checkpoint_slot(
         uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
     );
@@ -284,38 +285,49 @@ class POSCheckpointBag {
 
  private:
     /*!
-     *  \brief  checkpoint version map
-     *          key: version
-     *          value: checkpoint slot  
+     *  \brief  map of version to host-side checkpoint slot for device state 
      */
-    std::unordered_map<uint64_t, POSCheckpointSlot*> _ckpt_map;
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _dev_state_host_slot_map;
 
     /*!
-     *  \brief  checkpoint version that has been invalidated
-     *  \note   we store thost invalidated version so that we can reuse their memory
+     *  \brief  map of version to cached host-side checkpoint slot for device state 
+     *  \note   we store thost cached version so that we can reuse their memory
      *          space in the next time we apply for a new checkpoint slot
      */
-    std::unordered_map<uint64_t, POSCheckpointSlot*> _invalidate_ckpt_map;
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _cached_dev_state_host_slot_map;
 
     /*!
-     *  \brief  on-device checkpoint version map
-     *          key: version
-     *          value: checkpoint slot  
+     *  \brief  map of version to device-side checkpoint slot for device state 
      */
-    std::unordered_map<uint64_t, POSCheckpointSlot*> _dev_ckpt_map;
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _dev_state_dev_slot_map;
 
     /*!
-     *  \brief  device-side checkpoint version that has been invalidated
-     *  \note   we store thost invalidated version so that we can reuse their memory
+     *  \brief  map of version to cached device-side checkpoint slot for device state
+     *  \note   we store thost cached version so that we can reuse their memory
      *          space in the next time we apply for a new checkpoint slot
      */
-    std::unordered_map<uint64_t, POSCheckpointSlot*> _invalidate_dev_ckpt_map;
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _cached_dev_state_dev_slot_map;
 
-    // all versions that this bag stored
-    std::set<uint64_t> _ckpt_version_set;
+    /*!
+     *  \brief  map of version to host-side checkpoint slot for host state 
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _host_state_host_slot_map;
 
-    // all on-device versions that this bag stored
-    std::set<uint64_t> _dev_ckpt_version_set;
+    /*!
+     *  \brief  map of version to cached host-side checkpoint slot for host state
+     *  \note   we store thost cached version so that we can reuse their memory
+     *          space in the next time we apply for a new checkpoint slot
+     */
+    std::unordered_map<uint64_t, POSCheckpointSlot*> _cached_host_state_host_slot_map;
+
+    // all versions of host-side checkpoint slots that store device state
+    std::set<uint64_t> _dev_state_host_slot_version_set;
+
+    // all versions of device-side checkpoint slots that store device state
+    std::set<uint64_t> _dev_state_dev_slot_version_set;
+
+    // all versions of host-side checkpoint slots that store host state
+    std::set<uint64_t> _host_state_host_slot_version_set;
 
     // static state size of each checkpoint
     uint64_t _fixed_state_size;
