@@ -51,14 +51,14 @@ pos_retval_t POSHandle_CUDA_Memory::__add(uint64_t version_id, uint64_t stream_i
     POSCheckpointSlot* ckpt_slot;
 
     // apply new on-device checkpoint slot
-    if(unlikely(
-        POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot<kPOS_CkptSlotPosition_Device>(
+    if(unlikely(POS_SUCCESS != (
+        this->ckpt_bag->template apply_checkpoint_slot<kPOS_CkptSlotPosition_Device,kPOS_CkptStateType_Device>(
             /* version */ version_id,
             /* ptr */ &ckpt_slot,
             /* dynamic_state_size */ 0,
             /* force_overwrite */ true
         )
-    )){
+    ))){
         POS_WARN_C("failed to apply checkpoint slot");
         retval = POS_FAILED;
         goto exit;
@@ -105,14 +105,14 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
     cudaSetDevice(0);
 
     // apply new host-side checkpoint slot
-    if(unlikely(
-        POS_SUCCESS != this->ckpt_bag->apply_checkpoint_slot<kPOS_CkptSlotPosition_Host>(
+    if(unlikely(POS_SUCCESS != (
+        this->ckpt_bag->template apply_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
             /* version */ version_id,
             /* ptr */ &ckpt_slot,
             /* dynamic_state_size */ 0,
             /* force_overwrite */ true
         )
-    )){
+    ))){
         POS_WARN_C("failed to apply host-side checkpoint slot");
         retval = POS_FAILED;
         goto exit;
