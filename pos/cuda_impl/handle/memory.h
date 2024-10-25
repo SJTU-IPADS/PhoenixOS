@@ -311,18 +311,23 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
 
     /*!
      *  \brief  allocate new mocked CUDA memory within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles all related handles for helping allocate the mocked resource
-     *                          (note: these related handles might be other types)
-     *  \param  size            size of the newly allocated resource
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
-     *  \param  state_size      size of resource state behind this handle  
+     *  \param  handle              pointer to the mocked handle of the newly allocated resource
+     *  \param  related_handles     all related handles for helping allocate the mocked resource
+     *                              (note: these related handles might be other types)
+     *  \param  size                size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
+     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
+     *  \param  state_size          size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        POSHandle_CUDA_Memory** handle, std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
-        size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr = 0, uint64_t state_size = 0
+        POSHandle_CUDA_Memory** handle,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
+        size_t size=kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
+        uint64_t expected_addr = 0,
+        uint64_t state_size = 0
     ) override;
 
 

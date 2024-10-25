@@ -51,18 +51,7 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Module(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
-
-        // initialize checkpoint bag
-    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
-            POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
-        }
-    #endif
-    }
+    POSHandle_CUDA_Module(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
 
     /*!
@@ -70,20 +59,13 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Module(void* hm) : POSHandle_CUDA(hm)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
-    }
+    POSHandle_CUDA_Module(void* hm);
 
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Module(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(size_, hm, id_, state_size_)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_CUDA_Module(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
 
     /*!
@@ -360,12 +342,13 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
     
     /*!
      *  \brief  allocate new mocked CUDA module within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles all related handles for helping allocate the mocked resource
-     *                          (note: these related handles might be other types)
-     *  \param  size            size of the newly allocated resource
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
-     *  \param  state_size      size of resource state behind this handle  
+     *  \param  handle              pointer to the mocked handle of the newly allocated resource
+     *  \param  related_handles     all related handles for helping allocate the mocked resource
+     *                              (note: these related handles might be other types)
+     *  \param  size                size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
+     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
+     *  \param  state_size          size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
@@ -373,6 +356,7 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
         POSHandle_CUDA_Module** handle,
         std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
@@ -393,7 +377,13 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
         context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
         POS_CHECK_POINTER(context_handle);
 
-        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(
+            /* handle */ handle,
+            /* size */ size,
+            /* use_expected_addr */ use_expected_addr,
+            /* expected_addr */ expected_addr,
+            /* state_size */ state_size
+        );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked CUDA module in the manager");
             goto exit;

@@ -11,6 +11,32 @@
 #include "pos/cuda_impl/proto/module.pb.h"
 
 
+POSHandle_CUDA_Module::POSHandle_CUDA_Module(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
+    : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
+{
+    this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
+
+    // initialize checkpoint bag
+    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
+        if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
+            POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
+        }
+    #endif
+}
+
+
+POSHandle_CUDA_Module::POSHandle_CUDA_Module(void* hm) : POSHandle_CUDA(hm)
+{
+    this->resource_type_id = kPOS_ResourceTypeId_CUDA_Module;
+}
+
+
+POSHandle_CUDA_Module::POSHandle_CUDA_Module(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
+    : POSHandle_CUDA(size_, hm, id_, state_size_)
+{
+    POS_ERROR_C_DETAIL("shouldn't be called");
+}
+
 
 pos_retval_t POSHandle_CUDA_Module::__init_ckpt_bag(){ 
     this->ckpt_bag = new POSCheckpointBag(
