@@ -80,6 +80,7 @@ namespace cuda_malloc {
                 /* handles */ std::vector<POSHandle*>({hm_device->latest_used_handle}) 
             }}),
             /* size */ pos_api_param_value(wqe, 0, size_t),
+            /* use_expected_addr */ false,
             /* expected_addr */ 0,
             /* state_size */ (uint64_t)pos_api_param_value(wqe, 0, size_t)
         );

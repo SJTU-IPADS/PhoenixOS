@@ -725,6 +725,7 @@ class POSHandle {
     virtual pos_retval_t __init_ckpt_bag(){ return POS_FAILED_NOT_IMPLEMENTED; }
 };
 
+
 /*!
  *  \brief   manager for handles of a specific kind of resource
  *  \tparam  T_POSHandle  specific handle class for the resource
@@ -743,11 +744,23 @@ class POSHandleManager {
      *  \param  is_stateful indicate whether the resource behind such handle conatains state
      */
     POSHandleManager(bool passthrough = false, bool is_stateful = false)
-        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough), _is_stateful(is_stateful)
-    {}
+        : _base_ptr(kPOS_ResourceBaseAddr), _passthrough(passthrough), _is_stateful(is_stateful){}
+
 
     ~POSHandleManager() = default;
     
+
+    /*!
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    virtual pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+
     /*!
      *  \brief  allocate and restore handles for provision, for fast restore
      *  \param  amount  amount of handles for pooling
@@ -757,9 +770,9 @@ class POSHandleManager {
         pos_retval_t retval = POS_SUCCESS;
         uint64_t i=0;
         T_POSHandle *handle = nullptr;
-        
+
         for(i=0; i<amount; i++){
-            retval = this->__allocate_mocked_resource(&handle, false);
+            retval = this->__allocate_mocked_resource(&handle);
             POS_CHECK_POINTER(handle);
             if(unlikely(retval != POS_SUCCESS)){
                 POS_WARN_C("failed to preserve %s handle for fast restoring", handle->get_resource_name().c_str());
@@ -780,6 +793,7 @@ class POSHandleManager {
     exit:
         return retval;
     }
+
 
     /*!
      *  \brief  restore handle from pool
@@ -812,19 +826,21 @@ class POSHandleManager {
 
     /*!
      *  \brief  allocate new mocked resource within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles all related handles for helping allocate the mocked resource
-     *                          (note: these related handles might be other types)
-     *  \param  size            size of the newly allocated resource
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
-     *  \param  state_size      size of resource state behind this handle  
+     *  \param  handle              pointer to the mocked handle of the newly allocated resource
+     *  \param  related_handles     all related handles for helping allocate the mocked resource
+     *                              (note: these related handles might be other types)
+     *  \param  size                size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
+     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
+     *  \param  state_size          size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     virtual pos_retval_t allocate_mocked_resource(
         T_POSHandle** handle, 
-        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
+        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size = kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     );
@@ -923,6 +939,16 @@ class POSHandleManager {
      *  \return the number of recorded handles
      */
     inline uint64_t get_nb_handles(){ return _handles.size(); }
+    
+    /*!
+     *  \brief  obtain all handles
+     *  \note   aware of thread safety when use this function
+     *  \return the list of handles
+     */
+    inline std::vector<T_POSHandle*> get_handles(){ 
+        /* here is a snapshot of current handle list */
+        return _handles;
+    }
 
     /*!
      *  \brief  obtain a handle by given index
@@ -1084,16 +1110,21 @@ class POSHandleManager {
 
     /*!
      *  \brief  allocate new mocked resource within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  size            size of the newly allocated resource
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
+     *  \param  handle              pointer to the mocked handle of the newly allocated resource
+     *  \param  size                size of the newly allocated resource
+     *  \param  use_expected_addr   whether to use expected client-side address
+     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
      *  \note   this function should be internally invoked by allocate_mocked_resource, which leave 
      *          to children class to implement
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t __allocate_mocked_resource(
-        T_POSHandle** handle, bool do_put = true, size_t size=kPOS_HandleDefaultSize, uint64_t expected_addr=0, uint64_t state_size = 0
+        T_POSHandle** handle,
+        size_t size=kPOS_HandleDefaultSize, 
+        bool use_expected_addr = false, 
+        uint64_t expected_addr=0,
+        uint64_t state_size = 0
     );
 
     /*!
@@ -1116,11 +1147,12 @@ class POSHandleManager {
 
 /*!
  *  \brief  allocate new mocked resource within the manager
- *  \param  handle          pointer to the mocked handle of the newly allocated resource
- *  \param  size            size of the newly allocated resource
- *  \param  related_handles all related handles for helping allocate the mocked resource
- *                          (note: these related handles might be other types)
- *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
+ *  \param  handle              pointer to the mocked handle of the newly allocated resource
+ *  \param  size                size of the newly allocated resource
+ *  \param  related_handles     all related handles for helping allocate the mocked resource
+ *                              (note: these related handles might be other types)
+ *  \param  use_expected_addr   indicate whether to use expected client-side address
+ *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
  *  \return POS_FAILED_DRAIN for run out of virtual address space; 
  *          POS_SUCCESS for successfully allocation
  */
@@ -1129,17 +1161,20 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
     T_POSHandle** handle,
     std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
     size_t size,
+    bool use_expected_addr,
     uint64_t expected_addr,
     uint64_t state_size
 ){
-    return __allocate_mocked_resource(handle, true, size, state_size);
+    return __allocate_mocked_resource(handle, size, state_size);
 }
+
 
 /*!
  *  \brief  allocate new mocked resource within the manager
- *  \param  handle          pointer to the mocked handle of the newly allocated resource
- *  \param  size            size of the newly allocated resource
- *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
+ *  \param  handle              pointer to the mocked handle of the newly allocated resource
+ *  \param  size                size of the newly allocated resource
+ *  \param  use_expected_addr   whether to use expected client address
+ *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
  *  \note   this function should be internally invoked by allocate_mocked_resource, which leave to children class to implement
  *  \return POS_FAILED_DRAIN for run out of virtual address space;
  *          POS_FAILED_ALREADY_EXIST for duplication failed;
@@ -1148,8 +1183,8 @@ pos_retval_t POSHandleManager<T_POSHandle>::allocate_mocked_resource(
 template<class T_POSHandle>
 pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
     T_POSHandle** handle,
-    bool do_put,
     size_t size,
+    bool use_expected_addr,
     uint64_t expected_addr,
     uint64_t state_size
 ){
@@ -1205,12 +1240,12 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         _base_ptr, size, (*handle)->resource_type_id
     );
 
-    if(do_put)
-        this->_handles.push_back(*handle);
+    this->_handles.push_back(*handle);
 
   exit:
     return retval;
 }
+
 
 /*!
  *  \brief  obtain a handle by given client-side address
@@ -1224,6 +1259,7 @@ template<class T_POSHandle>
 pos_retval_t POSHandleManager<T_POSHandle>::get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset){
     return __get_handle_by_client_addr(client_addr, handle, offset);
 }
+
 
 /*!
  *  \brief  obtain a handle by given client-side address

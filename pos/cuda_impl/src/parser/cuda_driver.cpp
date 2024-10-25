@@ -107,6 +107,7 @@ namespace cu_module_load {
                 /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
+            /* use_expected_addr */ true,
             /* expected_addr */ pos_api_param_value(wqe, 0, uint64_t),
             /* state_size */ pos_api_param_size(wqe, 1)
         );
@@ -285,6 +286,7 @@ namespace cu_module_load_data {
                 /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
+            /* use_expected_addr */ false,
             /* expected_addr */ 0,
             /* state_size */ pos_api_param_size(wqe, 0)
         );
@@ -489,6 +491,7 @@ namespace __register_function {
                 /* handles */ std::vector<POSHandle*>({module_handle}) 
             }}),
             /* size */ kPOS_HandleDefaultSize,
+            /* use_expected_addr */ true,
             /* expected_addr */ pos_api_param_value(wqe, 1, uint64_t)
         );
         if(unlikely(retval != POS_SUCCESS)){
@@ -753,6 +756,7 @@ namespace cu_module_get_global {
                 /* handles */ std::vector<POSHandle*>({module_handle}) 
             }}),
             /* size */ sizeof(CUdeviceptr),
+            /* use_expected_addr */ true,
             /* expected_addr */ pos_api_param_value(wqe, 1, uint64_t)
         );
         if(unlikely(retval != POS_SUCCESS)){

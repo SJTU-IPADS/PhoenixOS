@@ -323,19 +323,21 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
  public:
     /*!
      *  \brief  allocate new mocked CUDA function within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles all related handles for helping allocate the mocked resource
-     *                          (note: these related handles might be other types)
-     *  \param  size            size of the newly allocated resource
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
-     *  \param  state_size      size of resource state behind this handle  
+     *  \param  handle              pointer to the mocked handle of the newly allocated resource
+     *  \param  related_handles     all related handles for helping allocate the mocked resource
+     *                              (note: these related handles might be other types)
+     *  \param  size                size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
+     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
+     *  \param  state_size          size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
         POSHandle_CUDA_Function** handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
+        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
@@ -356,9 +358,16 @@ class POSHandleManager_CUDA_Function : public POSHandleManager<POSHandle_CUDA_Fu
         module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
         POS_CHECK_POINTER(module_handle);
 
-        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
+        // when allocate CUDA function, we would use expected client-side address
+        retval = this->__allocate_mocked_resource(
+            /* handle */ handle,
+            /* size */ size,
+            /* use_expected_addr */ use_expected_addr,
+            /* expected_addr */ expected_addr,
+            /* state_size */ state_size
+        );
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
+            POS_WARN_C("failed to allocate mocked CUDA function in the manager");
             goto exit;
         }
 

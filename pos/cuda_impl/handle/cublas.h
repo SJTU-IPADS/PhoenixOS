@@ -146,6 +146,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
      *  \param  related_handles all related handles for helping allocate the mocked resource
      *                          (note: these related handles might be other types)
      *  \param  size            size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
      *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
      *  \param  state_size      size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
@@ -155,6 +156,7 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
         POSHandle_cuBLAS_Context** handle,
         std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
     ) override {
@@ -173,7 +175,13 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
 
         context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
 
-        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
+        retval = this->__allocate_mocked_resource(
+            /* handle */ handle,
+            /* size */ size,
+            /* use_expected_addr */ use_expected_addr,
+            /* expected_addr */ expected_addr,
+            /* state_size */ state_size
+        );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to allocate mocked cuBLAS context in the manager");
             goto exit;

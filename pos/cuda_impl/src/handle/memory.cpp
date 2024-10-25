@@ -283,8 +283,8 @@ pos_retval_t POSHandle_CUDA_Memory::__restore(){
         }
     } else {
         /*!
-            *  \note   case:   no specified address to restore, randomly assign one
-            */
+         *  \note   case:   no specified address to restore, randomly assign one
+         */
         cuda_rt_retval = cudaMalloc(&rt_ptr, this->state_size);
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             retval = POS_FAILED;
@@ -443,8 +443,11 @@ exit:
 
 pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     POSHandle_CUDA_Memory** handle,
-    std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
-    size_t size, uint64_t expected_addr, uint64_t state_size
+    std::map<uint64_t, std::vector<POSHandle*>> related_handles,
+    size_t size,
+    bool use_expected_addr = false,
+    uint64_t expected_addr,
+    uint64_t state_size
 ){
     pos_retval_t retval = POS_SUCCESS;
     POSHandle_CUDA_Device *device_handle;
@@ -481,7 +484,7 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     POSHandleManager_CUDA_Memory::alloc_ptrs[device_handle->id] += aligned_alloc_size;
 #undef ROUND_UP
 
-    retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, aligned_alloc_size);
+    retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, aligned_alloc_size);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to allocate mocked CUDA memory in the manager");
         goto exit;
