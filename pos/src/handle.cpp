@@ -28,8 +28,8 @@
 #include "pos/include/api_context.h"
 #include "pos/include/checkpoint.h"
 #include "pos/include/proto/handle.pb.h"
-
 #include "google/protobuf/port_def.inc"
+
 
 pos_retval_t POSHandle::set_passthrough_addr(void *addr, POSHandle* handle_ptr){ 
     using handle_type = typename std::decay<decltype(*this)>::type;
@@ -76,12 +76,45 @@ bool POSHandle::is_client_addr_in_range(void *addr, uint64_t *offset){
 }
 
 
-pos_retval_t POSHandle::checkpoint_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) {
+pos_retval_t POSHandle::checkpoint_commit_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) {
     return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
 }
 
 
-pos_retval_t POSHandle::checkpoint_commit(uint64_t version_id, uint64_t stream_id){ 
+pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) { 
+    pos_retval_t retval = POS_SUCCESS;
+    uint8_t old_counter;
+
+    /*!
+        *  \brief  [case]  the adding has been finished, nothing need to do
+        */
+    if(this->_state_preserve_counter >= 2){
+        retval = POS_FAILED_ALREADY_EXIST;
+        goto exit;
+    }
+
+    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
+    if (old_counter == 0) {
+        /*!
+            *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
+            *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
+            */
+        retval = this->__add(version_id, stream_id);
+        this->_state_preserve_counter.store(3, std::memory_order_relaxed);
+    } else if (old_counter == 1) {
+        /*!
+            *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
+            */
+        retval = POS_WARN_ABANDONED;
+        while(this->_state_preserve_counter < 3){}
+    }
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t stream_id){ 
     pos_retval_t retval = POS_SUCCESS;
     
     #if POS_CONF_EVAL_CkptEnablePipeline == 1
@@ -121,33 +154,29 @@ pos_retval_t POSHandle::checkpoint_commit(uint64_t version_id, uint64_t stream_i
 }
 
 
-pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) { 
+pos_retval_t POSHandle::checkpoint_commit_host(uint64_t version_id, void* data, uint64_t size){
     pos_retval_t retval = POS_SUCCESS;
-    uint8_t old_counter;
+    POSCheckpointSlot *ckpt_slot = nullptr;
+    
+    POS_CHECK_POINTER(data);
+    POS_ASSERT(size > 0);
 
-    /*!
-        *  \brief  [case]  the adding has been finished, nothing need to do
-        */
-    if(this->_state_preserve_counter >= 2){
-        retval = POS_FAILED_ALREADY_EXIST;
+    // apply new host-side checkpoint slot for host-side state
+    if(unlikely(POS_SUCCESS != (
+        this->ckpt_bag->template apply_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(
+            /* version */ version_id,
+            /* ptr */ &ckpt_slot,
+            /* dynamic_state_size */ size,
+            /* force_overwrite */ false
+        )
+    ))){
+        POS_WARN_C("failed to apply host-side checkpoint slot");
+        retval = POS_FAILED;
         goto exit;
     }
+    POS_CHECK_POINTER(ckpt_slot);
 
-    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
-    if (old_counter == 0) {
-        /*!
-            *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
-            *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
-            */
-        retval = this->__add(version_id, stream_id);
-        this->_state_preserve_counter.store(3, std::memory_order_relaxed);
-    } else if (old_counter == 1) {
-        /*!
-            *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
-            */
-        retval = POS_WARN_ABANDONED;
-        while(this->_state_preserve_counter < 3){}
-    }
+    memcpy(ckpt_slot->expose_pointer(), data, size);
 
 exit:
     return retval;
@@ -228,7 +257,7 @@ exit:
 
 pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS;
-    uint64_t i;
+    uint64_t i, actual_state_size;
     std::string ckpt_file_path;
     std::ofstream ckpt_file_stream;
     google::protobuf::Message *handle_binary = nullptr, *_base_binary = nullptr;
@@ -260,14 +289,14 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     POS_CHECK_POINTER(handle_binary);
     POS_CHECK_POINTER(base_binary = reinterpret_cast<pos_protobuf::Bin_POSHanlde*>(_base_binary));
 
-    // base fields
+    // ==================== 1. base fields ====================
     base_binary->set_id(this->id);
     base_binary->set_resource_type_id(this->resource_type_id);
     base_binary->set_client_addr((uint64_t)(this->client_addr));
     base_binary->set_server_addr((uint64_t)(this->server_addr));
     base_binary->set_size(this->size);
 
-    // parent information
+    // ==================== 2. parent information ====================
     base_binary->set_nb_parent_handles(parent_handles.size());
     for(i=0; i<parent_handles.size(); i++){
         POS_CHECK_POINTER(this->parent_handles[i]);
@@ -275,14 +304,19 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
         base_binary->add_parent_handle_idx(this->parent_handles[i]->id);
     }
 
-    // state
-    base_binary->set_state_size(this->state_size);
-    if(unlikely(this->state_size > 0 && ckpt_slot == nullptr)){
-        POS_WARN_C("serialize stateful handle without providing checkpoint slot");
-        retval = POS_FAILED_INVALID_INPUT;
-        goto exit;
+    // ==================== 3. state ====================
+    if(ckpt_slot != nullptr){
+        //! \note   we adopt state size inside ckpt slot first, as we might persiting a host-side state
+        //          that have dynamic state size that not recorded inside the handle
+        actual_state_size = ckpt_slot->get_state_size();
+    } else {
+        actual_state_size = this->state_size;
+    }
+    base_binary->set_state_size(actual_state_size);
+    if(unlikely(actual_state_size > 0 && ckpt_slot == nullptr)){
+        POS_ERROR_C("serialize stateful handle without providing checkpoint slot, this is a bug");
     } else if(ckpt_slot != nullptr){
-        base_binary->set_state(reinterpret_cast<const char*>(ckpt_slot->expose_pointer()), this->state_size);
+        base_binary->set_state(reinterpret_cast<const char*>(ckpt_slot->expose_pointer()), actual_state_size);
     }
 
     // form the path to the checkpoint file of this handle

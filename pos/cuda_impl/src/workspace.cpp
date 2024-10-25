@@ -17,9 +17,12 @@ pos_retval_t POSWorkspace_CUDA::__init(){
     this->api_mgnr->init();
 
     // mark all stateful resources
-    this->stateful_handle_type_idx.push_back({
-        kPOS_ResourceTypeId_CUDA_Memory
-    });
+    this->stateful_handle_type_idx.insert(
+        this->stateful_handle_type_idx.end(), {
+            kPOS_ResourceTypeId_CUDA_Memory,
+            kPOS_ResourceTypeId_CUDA_Module
+        }
+    );
 
     dr_retval = cuInit(0);
     if(unlikely(dr_retval != CUDA_SUCCESS)){

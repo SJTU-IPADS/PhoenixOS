@@ -215,22 +215,6 @@ exit:
 }
 
 
-pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
-    pos_retval_t retval = POS_SUCCESS;
-
-    POS_CHECK_POINTER(ckpt.wqe);
-    if(unlikely(_host_ckpt_map.count(ckpt.wqe->id) > 0)){
-        retval = POS_FAILED_ALREADY_EXIST;
-    } else {
-        _host_ckpt_map.insert(
-            std::pair<uint64_t, pos_host_ckpt_t>(ckpt.wqe->id, ckpt)
-        );
-    }
-
-    return retval;
-}
-
-
 std::vector<pos_host_ckpt_t> POSCheckpointBag::get_host_checkpoint_records(){
     std::vector<pos_host_ckpt_t> ret_list;
     typename std::unordered_map<uint64_t, pos_host_ckpt_t>::iterator map_iter;

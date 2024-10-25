@@ -227,7 +227,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
             continue;
         }
 
-        retval = handle->checkpoint_sync(
+        retval = handle->checkpoint_commit_sync(
             /* version_id */ handle->latest_version,
             /* ckpt_dir */ cmd->ckpt_dir,
             /* stream_id */ 0
@@ -521,7 +521,7 @@ void POSWorker::__checkpoint_async_thread() {
          *          ckpt memcpy conflict with normal memcpy, so we sync the execution here to check the memcpy flag
          */
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
-        retval = handle->checkpoint_commit(
+        retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_commit_stream_id
         );
@@ -545,7 +545,7 @@ void POSWorker::__checkpoint_async_thread() {
          *  \note   if the CoW is ongoing or finished, it commit from cache; otherwise it commit from origin buffer
          */
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
-        retval = handle->checkpoint_commit(
+        retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_stream_id
         );

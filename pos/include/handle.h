@@ -480,18 +480,8 @@ class POSHandle {
 
 
     /*!
-     *  \brief  checkpoint the state of the resource behind this handle (sync)
-     *  \note   only handle of stateful resource should implement this method
-     *  \param  version_id  version of this checkpoint
-     *  \param  ckpt_dir    directory to store checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t checkpoint_sync(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0);
-
-
-    /*!
      *  \brief  add the state of the resource behind this handle to another on-device resource syncly
+     *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully added
@@ -501,15 +491,36 @@ class POSHandle {
 
     /*!
      *  \brief  commit the device-side state of the resource behind this handle
+     *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully commited
      */
-    pos_retval_t checkpoint_commit(uint64_t version_id, uint64_t stream_id=0);
+    pos_retval_t checkpoint_commit_async(uint64_t version_id, uint64_t stream_id=0);
+
+
+    /*!
+     *  \brief  checkpoint the state of the resource behind this handle (sync)
+     *  \note   only handle of stateful resource should implement this method
+     *  \note   this function should be called at the worker thread
+     *  \param  version_id  version of this checkpoint
+     *  \param  ckpt_dir    directory to store checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t checkpoint_commit_sync(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0);
 
 
     /*!
      *  \brief  commit the host-side state of the resource behind this handle
+     *  \note   this function should be called at the parser thread
+     *  \note   only one satisfy the following conditions should the state commit via this interface:
+     *          1.  state comes from host to device
+     *          2.  there's no way to checkpoint state from device directly, so we need to record when it
+     *              comes down from host
+     *          example: GPU Modules
+     *  \note   DON'T adopt this function on those resources that can retreive state from device (e.g., 
+     *          GPU memory), as it will downgrade the performance of parser thread
      *  \param  version_id  version of this checkpoint
      *  \param  data        pointer to the host-side state to be commited
      *  \param  size        size of the host-side state to be commited
