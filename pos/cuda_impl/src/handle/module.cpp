@@ -33,7 +33,21 @@ pos_retval_t POSHandle_CUDA_Module::__add(uint64_t version_id, uint64_t stream_i
 pos_retval_t POSHandle_CUDA_Module::__commit(
     uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir
 ){
-    return this->__persist(nullptr, ckpt_dir, stream_id);
+    pos_retval_t retval = POS_SUCCESS;
+    std::vector<POSCheckpointSlot*> ckpt_slots;
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->ckpt_bag->get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(ckpt_slots)
+    ))){
+        POS_WARN_C("failed to obtain host-side checkpoint slot that stores host-side state");
+        goto exit;
+    }
+    POS_ASSERT(ckpt_slots.size() == 1);
+
+    retval = this->__persist(ckpt_slots[0], ckpt_dir, stream_id);
+
+exit:
+    return retval;
 }
 
 

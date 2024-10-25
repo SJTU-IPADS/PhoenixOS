@@ -61,6 +61,7 @@ template pos_retval_t POSCheckpointBag::apply_checkpoint_slot<kPOS_CkptSlotPosit
     uint64_t version, POSCheckpointSlot** ptr, uint64_t dynamic_state_size, bool force_overwrite
 );
 
+
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
 pos_retval_t POSCheckpointBag::get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t version){
     return POS_FAILED_NOT_IMPLEMENTED;
@@ -75,6 +76,20 @@ template pos_retval_t POSCheckpointBag::get_checkpoint_slot<kPOS_CkptSlotPositio
     POSCheckpointSlot** ckpt_slot, uint64_t version
 );
 
+
+template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
+pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots(std::vector<POSCheckpointSlot*>& ckpt_slots){
+    return POS_FAILED_NOT_IMPLEMENTED;
+}
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
+);
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
+);
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
+);
 
 
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
@@ -111,11 +126,6 @@ template pos_retval_t POSCheckpointBag::invalidate_all_version<kPOS_CkptSlotPosi
 
 pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
     return POS_FAILED_NOT_IMPLEMENTED;
-}
-
-
-pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
-   return POS_FAILED_NOT_IMPLEMENTED;
 }
 
 

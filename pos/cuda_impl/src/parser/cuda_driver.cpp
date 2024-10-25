@@ -189,17 +189,12 @@ namespace cu_module_load {
         }
 
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        /*!
-         *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
-         */
-        POS_CHECK_POINTER(module_handle->ckpt_bag);
-        retval = module_handle->ckpt_bag->set_host_checkpoint_record({
-            .wqe = wqe,
-            .param_index = 1,
-            .offset = 0,
-            .size = pos_api_param_size(wqe, 1)
-        });
+        // set host checkpoint record
+        retval = module_handle->checkpoint_commit_host(
+            /* version_id */ wqe->id,
+            /* data */ pos_api_param_addr(wqe, 1),
+            /* size */ pos_api_param_size(wqe, 1)
+        );
     #endif
 
         // mark this sync call can be returned after parsing
@@ -375,17 +370,12 @@ namespace cu_module_load_data {
         }
 
     #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        /*!
-         *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
-         */
-        POS_CHECK_POINTER(module_handle->ckpt_bag);
-        retval = module_handle->ckpt_bag->set_host_checkpoint_record({
-            .wqe = wqe,
-            .param_index = 0,
-            .offset = 0,
-            .size = pos_api_param_size(wqe, 0)
-        });
+        // set host checkpoint record
+        retval = module_handle->checkpoint_commit_host(
+            /* version_id */ wqe->id,
+            /* data */ pos_api_param_addr(wqe, 0),
+            /* size */ pos_api_param_size(wqe, 0)
+        );
     #endif
 
         // mark this sync call can be returned after parsing
