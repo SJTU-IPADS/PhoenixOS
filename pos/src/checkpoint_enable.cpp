@@ -112,6 +112,7 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
     uint64_t old_version;
     std::unordered_map<uint64_t, POSCheckpointSlot*> *cached_map, *active_map;
     std::set<uint64_t> *version_set;
+    uint64_t state_size;
     pos_custom_ckpt_allocate_func_t allocate_func;
     pos_custom_ckpt_deallocate_func_t deallocate_func;
 
@@ -124,6 +125,13 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
     }
 
     POS_CHECK_POINTER(ptr);
+
+    state_size = dynamic_state_size > 0 ? dynamic_state_size : this->_fixed_state_size;
+    if(unlikely(state_size == 0)){
+        POS_WARN_C("failed to apploy checkpoint slot, both dynamic and fixed state size are 0, this is a bug");
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
 
     // obtain corresponding map and set
     if constexpr (ckpt_state_type == kPOS_CkptStateType_Device){
@@ -155,23 +163,24 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
         // TODO:
         // here we select the oldest one but for device slot for device state we need to 
         // implement a memory allocation mechanism to choose the one with closest size
+        // i.e., deal with dynamic_state_size > 0 && force_overwrite == true
         map_iter = cached_map->begin();
         POS_CHECK_POINTER(*ptr = map_iter->second);
         cached_map->erase(map_iter);
     } else {
-        if(unlikely(force_overwrite == false)){
-            POS_CHECK_POINTER(*ptr = new POSCheckpointSlot(_fixed_state_size, allocate_func, deallocate_func));
-        } else {
+        if(force_overwrite == true && active_map->size() > 0){
             map_iter = active_map->begin();
             old_version = map_iter->first;
             POS_CHECK_POINTER(*ptr = map_iter->second);
             active_map->erase(map_iter);
             version_set->erase(old_version);
+        } else { 
+            POS_CHECK_POINTER(*ptr = new POSCheckpointSlot(state_size, allocate_func, deallocate_func));
         }
     }
     active_map->insert(std::pair<uint64_t, POSCheckpointSlot*>(version, *ptr));
     version_set->insert(version);
-    
+
 exit:
     return retval;
 }
@@ -239,6 +248,53 @@ template pos_retval_t POSCheckpointBag::get_checkpoint_slot<kPOS_CkptSlotPositio
 );
 template pos_retval_t POSCheckpointBag::get_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(
     POSCheckpointSlot** ckpt_slot, uint64_t version
+);
+
+
+template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
+pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots(std::vector<POSCheckpointSlot*>& ckpt_slots){
+    pos_retval_t retval = POS_SUCCESS;
+    std::unordered_map<uint64_t, POSCheckpointSlot*> *active_map;
+    typename std::unordered_map<uint64_t, POSCheckpointSlot*>::iterator map_iter;
+
+    // one can't obtain device-side slots that stores host state
+    if constexpr (ckpt_state_type == kPOS_CkptStateType_Host){
+        static_assert(
+            ckpt_slot_pos != kPOS_CkptSlotPosition_Device,
+            "one can't obtain device-side slots that stores host state"
+        );
+    }
+
+    // obtain corresponding map and set
+    if constexpr (ckpt_state_type == kPOS_CkptStateType_Device){
+        if constexpr (ckpt_slot_pos == kPOS_CkptSlotPosition_Device){
+            // case: get device-side slot for device-side state
+            active_map = &this->_dev_state_dev_slot_map;
+        } else { // ckpt_slot_pos == kPOS_CkptSlotPosition_Host
+            // case: get host-side slot for device-side state
+            active_map = &this->_dev_state_host_slot_map;
+        }
+    } else { // ckpt_state_type == kPOS_CkptStateType_Host
+        // case: get host-side slot for host-side state
+        active_map = &this->_host_state_host_slot_map;
+    }
+
+    ckpt_slots.clear();
+    for(map_iter = active_map->begin(); map_iter != active_map->end(); map_iter++){
+        ckpt_slots.push_back(map_iter->second);
+    }
+
+exit:
+    return retval;
+}
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
+);
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
+);
+template pos_retval_t POSCheckpointBag::get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(
+    std::vector<POSCheckpointSlot*>& ckpt_slots
 );
 
 
@@ -338,7 +394,7 @@ uint64_t POSCheckpointBag::get_memory_consumption(){
 
     for(map_iter = active_map->begin(); map_iter != active_map->end(); map_iter++){
         POS_CHECK_POINTER(map_iter->second);
-        size += map_iter->second->_state_size;
+        size += map_iter->second->get_state_size();
     }
 
     return size;
@@ -442,22 +498,6 @@ pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
     memcpy(ckpt_slot->expose_pointer(), ckpt_data, this->_fixed_state_size);
 
 exit:
-    return retval;
-}
-
-
-pos_retval_t POSCheckpointBag::set_host_checkpoint_record(pos_host_ckpt_t ckpt){
-    pos_retval_t retval = POS_SUCCESS;
-
-    POS_CHECK_POINTER(ckpt.wqe);
-    if(unlikely(this->_host_ckpt_map.count(ckpt.wqe->id) > 0)){
-        retval = POS_FAILED_ALREADY_EXIST;
-    } else {
-        this->_host_ckpt_map.insert(
-            std::pair<uint64_t, pos_host_ckpt_t>(ckpt.wqe->id, ckpt)
-        );
-    }
-
     return retval;
 }
 

@@ -26,7 +26,6 @@
 
 // forward declaration
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
-class POSCheckpointBag;
 
 
 /*!
@@ -55,6 +54,7 @@ using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
 
 /*!
  *  \brief  a slot to store one version of checkpoint
+ *  \note   don't consider supporting offset in this class!
  */
 class POSCheckpointSlot {
  public:
@@ -62,13 +62,10 @@ class POSCheckpointSlot {
      *  \brief  construtor
      *  \param  state_size  size of the data inside this slot
      */
-    POSCheckpointSlot(uint64_t state_size) : _state_size(state_size), _custom_deallocator(nullptr) {
-        if(likely(state_size > 0)){
-            POS_CHECK_POINTER(_data = malloc(state_size));
-        } else {
-            POS_WARN_C("try to create checkpoint slot with state size 0, this is a bug");
-            _data = nullptr;
-        }
+    POSCheckpointSlot(uint64_t state_size) 
+        : _state_size(state_size), _custom_deallocator(nullptr) {
+        POS_ASSERT(state_size > 0);
+        POS_CHECK_POINTER(_data = malloc(state_size));
     }
 
     /*!
@@ -82,12 +79,11 @@ class POSCheckpointSlot {
         pos_custom_ckpt_allocate_func_t allocator,
         pos_custom_ckpt_deallocate_func_t deallocator
     ) : _state_size(state_size), _custom_deallocator(deallocator) {
-        POS_CHECK_POINTER(allocator);
-        if(likely(state_size > 0)){
-            POS_CHECK_POINTER(_data = allocator(state_size));
+        POS_ASSERT(state_size > 0);
+        if(likely(allocator != nullptr)){
+            POS_CHECK_POINTER(this->_data = allocator(state_size));
         } else {
-            POS_WARN_C("try to create checkpoint slot with state size 0, this is a bug");
-            _data = nullptr;
+            POS_CHECK_POINTER(this->_data = reinterpret_cast<void*>(new uint8_t[state_size]));
         }
     }
 
@@ -99,21 +95,27 @@ class POSCheckpointSlot {
             _custom_deallocator(_data);
         } else {
             // default deallocate using free
-            if(unlikely(_data != nullptr && _state_size > 0)){
-                free(_data);
+            if(unlikely(this->_data != nullptr && this->_state_size > 0)){
+                uint8_t *data_u8;
+                POS_CHECK_POINTER(data_u8 = reinterpret_cast<uint8_t*>(this->_data));
+                delete[] data_u8;
             }
-        }   
+        }
     }
-    
+
     /*!
      *  \brief  expose the memory pointer of the slot
      *  \return pointer to the checkpoint memory region
      */
-    inline void* expose_pointer(){ return _data; }
+    inline void* expose_pointer(){ return this->_data; }
+
+    /*!
+     *  \brief  obtain the size of the state in this slot
+     *  \return the size of the state in this slot
+     */
+    inline uint64_t get_state_size(){ return this->_state_size; }
 
  protected:
-    friend class POSCheckpointBag;
-
     // size of the data inside this slot
     uint64_t _state_size;
 
@@ -205,6 +207,18 @@ class POSCheckpointBag {
 
 
     /*!
+     *  \brief  obtain all checkpointed slots
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be obtained
+     *  \tparam ckpt_state_type     type of the checkpointed state
+     *  \param  ckpt_slots          pointer to the vector that stores checkpoint slots
+     *  \return POS_SUCCESS for successfully obtained
+     *          POS_FAILED_NOT_EXIST for no checkpoint is found
+     */
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
+    pos_retval_t get_all_scheckpoint_slots(std::vector<POSCheckpointSlot*>& ckpt_slots);
+
+
+    /*!
      *  \brief  obtain the number of recorded checkpoints inside this bag
      *  \tparam ckpt_slot_pos       position of the checkpoint slot to be obtained
      *  \tparam ckpt_state_type     type of the checkpointed state
@@ -265,16 +279,6 @@ class POSCheckpointBag {
      *  \return POS_SUCCESS for successfully loading
      */
     pos_retval_t load(uint64_t version, void* ckpt_data);
-
-
-    /*!
-     *  \brief  record a new host-side checkpoint of this bag
-     *  \note   this function is invoked within parser thread
-     *  \param  ckpt    host-side checkpoint record
-     *  \return POS_SUCCESS for successfully recorded
-     *          POS_FAILED_ALREADY_EXIST for duplicated version
-     */
-    pos_retval_t set_host_checkpoint_record(pos_host_ckpt_t ckpt);
 
 
     /*!

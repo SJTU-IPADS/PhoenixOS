@@ -628,19 +628,6 @@ namespace cuda_memcpy_h2d {
             hm_memory->record_modified_handle(memory_handle);
         }
 
-    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        /*!
-         *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain wqe vertex id after that
-         */
-        POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
-            .wqe = wqe,
-            .param_index = 1,
-            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
-            .size = pos_api_param_size(wqe, 1)
-        });
-    #endif
         hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
@@ -879,19 +866,6 @@ namespace cuda_memcpy_h2d_async {
             wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
-    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        /*!
-         *  \brief  set host checkpoint record
-         *  \note   recording should be called after launch op, as the wqe should obtain vertex id after that
-         */
-        POS_CHECK_POINTER(memory_handle->ckpt_bag);
-        retval = memory_handle->ckpt_bag->set_host_checkpoint_record({
-            .wqe = wqe,
-            .param_index = 1,
-            .offset = pos_api_param_value(wqe, 0, uint64_t) - (uint64_t)(memory_handle->client_addr),
-            .size = pos_api_param_size(wqe, 1)
-        });
-    #endif
         hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:

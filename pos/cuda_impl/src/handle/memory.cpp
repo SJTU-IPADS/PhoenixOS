@@ -104,7 +104,7 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
     
     cudaSetDevice(0);
 
-    // apply new host-side checkpoint slot
+    // apply new host-side checkpoint slot for device-side state
     if(unlikely(POS_SUCCESS != (
         this->ckpt_bag->template apply_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
             /* version */ version_id,

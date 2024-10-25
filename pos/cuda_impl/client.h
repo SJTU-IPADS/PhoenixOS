@@ -451,7 +451,7 @@ class POSClient_CUDA : public POSClient {
                 continue;
             }
 
-            if(unlikely(POS_SUCCESS != memory_handle->checkpoint_sync(
+            if(unlikely(POS_SUCCESS != memory_handle->checkpoint_commit_sync(
                 /* version_id */ memory_handle->latest_version,
                 /* ckpt_dir */ "",
                 /* stream_id */ 0
