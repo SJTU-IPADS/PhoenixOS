@@ -44,11 +44,7 @@ class POSHandle_CUDA_Stream final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Stream(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_), is_capturing(false)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Stream;
-    }
+    POSHandle_CUDA_Stream(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
     /*!
      *  \param  hm  handle manager which this handle belongs to
@@ -75,23 +71,59 @@ class POSHandle_CUDA_Stream final : public POSHandle_CUDA {
      */
     std::string get_resource_name(){ return std::string("CUDA Stream"); }
 
+
+    /* ==================== checkpoint add/commit/persist ==================== */
+ protected:
+    /*!
+     *  \brief  add the state of the resource behind this handle to on-device memory
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_sync    whether the commit process should be sync
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __commit(
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
+        bool is_sync=false, std::string ckpt_dir=""
+    ) override;
+
+
+    /*!
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
+     */
+    pos_retval_t __generate_protobuf_binary(
+        google::protobuf::Message** binary,
+        google::protobuf::Message** base_binary
+    ) override;
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+    /* ======================== restore handle & state ======================= */
+ protected:
+    friend class POSHandleManager_CUDA_Stream;
+    friend class POSHandleManager<POSHandle_CUDA_Stream>;
+
+
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t __restore() override {
-        cudaError_t cuda_rt_res;
-        cudaStream_t stream_addr;
-
-        if((cuda_rt_res = cudaStreamCreate(&stream_addr)) != cudaSuccess){
-            POS_ERROR_C_DETAIL("cudaStreamCreate failed: %d", cuda_rt_res);
-        }
-
-        this->set_server_addr((void*)(stream_addr));
-        this->mark_status(kPOS_HandleStatus_Active);
-
-        return POS_SUCCESS;
-    }
+    pos_retval_t __restore() override;
+    /* ======================== restore handle & state ======================= */
 
     bool is_capturing;
 
@@ -130,6 +162,17 @@ class POSHandle_CUDA_Stream final : public POSHandle_CUDA {
 class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stream> {
  public:
     /*!
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+
+
+    
+
+    /*!
      *  \brief  constructor
      *  \param  ctx_handle      handle of the default CUDA context to create streams
      *  \param  is_restoring    identify whether current client is under restoring
@@ -141,29 +184,7 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
          *  \note  we only create a new stream while NOT restoring
          */
         if(is_restoring == false){
-            // allocate mocked stream for execute computation
-            if(unlikely(POS_SUCCESS != this->allocate_mocked_resource(
-                /* handle */ &stream_handle,
-                /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
-                    { kPOS_ResourceTypeId_CUDA_Context, {ctx_handle} }
-                }),
-                /* size */ sizeof(CUstream),
-                /* use_expected_addr */ true,
-                /* expected_addr */ 0
-            ))){
-                POS_ERROR_C_DETAIL("failed to allocate mocked CUDA stream in the manager");
-            }
-
-            /*!
-            *  \note   we won't use the default stream, and we will create a new non-default stream 
-            *          within the worker thread, so that we can achieve overlap checkpointing
-            */
-            // stream_handle->set_server_addr((void*)(0));
-            // stream_handle->mark_status(kPOS_HandleStatus_Active);
             
-            // record in the manager
-            this->_handles.push_back(stream_handle);
-            this->latest_used_handle = this->_handles[0];
 
         #if POS_CONF_EVAL_RstEnableContextPool == 1
             this->preserve_pooled_handles(8);
