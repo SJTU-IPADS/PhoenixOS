@@ -10,9 +10,12 @@
 #include <cuda_runtime_api.h>
 
 #include "pos/include/common.h"
+#include "pos/include/log.h"
 #include "pos/include/handle.h"
 #include "pos/include/utils/serializer.h"
 #include "pos/cuda_impl/handle.h"
+#include "pos/cuda_impl/handle/device.h"
+#include "pos/cuda_impl/proto/device.pb.h"
 
 
 POSHandle_CUDA_Device::POSHandle_CUDA_Device(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
@@ -41,7 +44,7 @@ pos_retval_t POSHandle_CUDA_Device::__add(uint64_t version_id, uint64_t stream_i
 
 
 pos_retval_t POSHandle_CUDA_Device::__commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir){
-    return this->__persist(nullptr, ckpt_dir, stream_id);;
+    return this->__persist(nullptr, ckpt_dir, stream_id);
 }
 
 
@@ -121,29 +124,6 @@ pos_retval_t POSHandleManager_CUDA_Device::init(std::map<uint64_t, std::vector<P
             POS_ERROR_C_DETAIL("failed to allocate mocked CUDA device in the manager");
         }
         device_handle->mark_status(kPOS_HandleStatus_Active);
-    }
-
-exit:
-    return retval;
-}
-
-
-pos_retval_t POSHandleManager_CUDA_Device::allocate_mocked_resource(
-    POSHandle_CUDA_Device** handle,
-    std::map<uint64_t, std::vector<POSHandle*>> related_handles,
-    size_t size = kPOS_HandleDefaultSize,
-    bool use_expected_addr = false,
-    uint64_t expected_addr = 0,
-    uint64_t state_size = 0
-){
-    pos_retval_t retval = POS_SUCCESS;
-    POSHandle *ctx_handle;
-    POS_CHECK_POINTER(handle);
-
-    retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, state_size);
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C("failed to allocate mocked CUDA device in the manager");
-        goto exit;
     }
 
 exit:

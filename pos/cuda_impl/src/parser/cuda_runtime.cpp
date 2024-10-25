@@ -1774,9 +1774,6 @@ namespace cuda_event_create_with_flags {
             POS_WARN("parse(cuda_event_create_with_flags): failed to allocate mocked resource within the CUDA event handler manager");
             memset(wqe->api_cxt->ret_data, 0, sizeof(cudaEvent_t));
             goto exit;
-        } else {
-            event_handle->flags = pos_api_param_value(wqe, 0, int);
-            memcpy(wqe->api_cxt->ret_data, &(event_handle->client_addr), sizeof(cudaEvent_t));
         }
         
         // record the related handle to QE
@@ -1784,7 +1781,17 @@ namespace cuda_event_create_with_flags {
             /* handle */ event_handle
         });
 
+        #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
+            // set host checkpoint record
+            retval = event_handle->checkpoint_commit_host(
+                /* version_id */ wqe->id,
+                /* data */ pos_api_param_addr(wqe, 0),
+                /* size */ pos_api_param_size(wqe, 0)
+            );
+        #endif
+
         // mark this sync call can be returned after parsing
+        memcpy(wqe->api_cxt->ret_data, &(event_handle->client_addr), sizeof(cudaEvent_t));
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
     exit:

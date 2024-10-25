@@ -30,6 +30,10 @@
 #include "pos/cuda_impl/handle.h"
 
 
+// forward declaration
+class POSHandleManager_CUDA_Device;
+
+
 /*!
  *  \brief  handle for cuda device
  */
@@ -177,28 +181,6 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \return POS_SUCCESS for successfully allocation
      */
     pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
-
-
-    /*!
-     *  \brief  allocate new mocked CUDA device within the manager
-     *  \param  handle          pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles all related handles for helping allocate the mocked resource
-     *                          (note: these related handles might be other types)
-     *  \param  size            size of the newly allocated resource
-     *  \param  use_expected_addr   indicate whether to use expected client-side address
-     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
-     *  \param  state_size      size of resource state behind this handle  
-     *  \return POS_FAILED_DRAIN for run out of virtual address space; 
-     *          POS_SUCCESS for successfully allocation
-     */
-    pos_retval_t allocate_mocked_resource(
-        POSHandle_CUDA_Device** handle,
-        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
-        size_t size=kPOS_HandleDefaultSize,
-        bool use_expected_addr = false,
-        uint64_t expected_addr = 0,
-        uint64_t state_size = 0
-    ) override;
 
 
     /*!
