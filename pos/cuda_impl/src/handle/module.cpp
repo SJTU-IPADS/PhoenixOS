@@ -40,7 +40,7 @@ POSHandle_CUDA_Module::POSHandle_CUDA_Module(size_t size_, void* hm, pos_u64id_t
 
 pos_retval_t POSHandle_CUDA_Module::__init_ckpt_bag(){ 
     this->ckpt_bag = new POSCheckpointBag(
-        /* 0 */ state_size,
+        /* fixed_state_size */ this->state_size,
         /* allocator */ nullptr,
         /* deallocator */ nullptr,
         /* dev_allocator */ nullptr,
@@ -102,30 +102,34 @@ pos_retval_t POSHandle_CUDA_Module::__generate_protobuf_binary(google::protobuf:
 pos_retval_t POSHandle_CUDA_Module::__restore(){
     pos_retval_t retval = POS_SUCCESS;
     CUresult cuda_dv_retval;
-    std::vector<pos_host_ckpt_t> host_ckpts;
-    POSAPIContext_QE_t *wqe;
+    std::vector<POSCheckpointSlot*> ckpt_slots;
+    POSCheckpointSlot *ckpt_slot;
     CUmodule module = NULL;
 
-    // the module content comes from the host-side checkpoint
-    POS_CHECK_POINTER(this->ckpt_bag);
-    host_ckpts = this->ckpt_bag->get_host_checkpoint_records();
-    POS_ASSERT(host_ckpts.size() == 1);
-
-    POS_CHECK_POINTER(wqe = host_ckpts[0].wqe);
+    if(unlikely(POS_SUCCESS != ( retval = (
+        this->ckpt_bag->template get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(ckpt_slots)
+    )))){
+        POS_WARN_C("failed to obtain host-side checkpoint slot that stores host-side state");
+        goto exit;
+    }
+    POS_ASSERT(ckpt_slots.size() == 1);
+    POS_CHECK_POINTER(ckpt_slot = ckpt_slots[0]);
 
     cuda_dv_retval = cuModuleLoadData(
         /* module */ &module,
-        /* image */  pos_api_param_addr(wqe, host_ckpts[0].param_index)
+        /* image */  ckpt_slot->expose_pointer()
     );
 
-    if(likely(CUDA_SUCCESS == cuda_dv_retval)){
-        this->set_server_addr((void*)module);
-        this->mark_status(kPOS_HandleStatus_Active);
-    } else {
+    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
         POS_WARN_C_DETAIL("failed to restore CUDA module, cuModuleLoadData failed: %d", cuda_dv_retval);
         retval = POS_FAILED;
+        goto exit;
     }
 
+    this->set_server_addr((void*)module);
+    this->mark_status(kPOS_HandleStatus_Active);
+
+exit:
     return retval;
 }
 
@@ -141,4 +145,205 @@ pos_retval_t POSHandle_CUDA_Module::__reload_state(
 
 exit:
     return retval;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Module::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+    pos_retval_t retval = POS_SUCCESS;
+
+    /* nothing */
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Module::load_cached_function_metas(std::string &file_path){
+    pos_retval_t retval = POS_SUCCESS;
+    uint64_t i;
+    std::string line, stream;
+    POSCudaFunctionDesp_t *new_desp;
+    char delimiter = '|';
+
+    auto generate_desp_from_meta = [](std::vector<std::string>& metas) -> POSCudaFunctionDesp_t* {
+        uint64_t i;
+        std::vector<uint32_t> param_offsets;
+        std::vector<uint32_t> param_sizes;
+        std::vector<uint32_t> input_pointer_params;
+        std::vector<uint32_t> output_pointer_params;
+        std::vector<uint32_t> inout_pointer_params;
+        std::vector<uint32_t> suspicious_params;
+        std::vector<std::pair<uint32_t,uint64_t>> confirmed_suspicious_params;
+        bool confirmed;
+        uint64_t nb_input_pointer_params, nb_output_pointer_params, nb_inout_pointer_params, 
+                nb_suspicious_params, nb_confirmed_suspicious_params, has_verified_params;
+        uint64_t ptr;
+
+        POSCudaFunctionDesp_t *new_desp = new POSCudaFunctionDesp_t();
+        POS_CHECK_POINTER(new_desp);
+
+        ptr = 0;
+        
+        // mangled name of the kernel
+        new_desp->name = metas[ptr];
+        ptr++;
+
+        // signature of the kernel
+        new_desp->signature = metas[ptr];
+        ptr++;
+
+        // number of paramters
+        new_desp->nb_params = std::stoul(metas[ptr]);
+        ptr++;
+
+        // parameter offsets
+        for(i=0; i<new_desp->nb_params; i++){
+            param_offsets.push_back(std::stoul(metas[ptr+i]));   
+        }
+        ptr += new_desp->nb_params;
+        new_desp->param_offsets = param_offsets;
+
+        // parameter sizes
+        for(i=0; i<new_desp->nb_params; i++){
+            param_sizes.push_back(std::stoul(metas[ptr+i]));
+        }
+        ptr += new_desp->nb_params;
+        new_desp->param_sizes = param_sizes;
+
+        // input paramters
+        nb_input_pointer_params = std::stoul(metas[ptr]);
+        ptr++;
+        for(i=0; i<nb_input_pointer_params; i++){
+            input_pointer_params.push_back(std::stoul(metas[ptr+i]));
+        }
+        ptr += nb_input_pointer_params;
+        new_desp->input_pointer_params = input_pointer_params;
+
+        // output paramters
+        nb_output_pointer_params = std::stoul(metas[ptr]);
+        ptr++;
+        for(i=0; i<nb_output_pointer_params; i++){
+            output_pointer_params.push_back(std::stoul(metas[ptr+i]));
+        }
+        ptr += nb_output_pointer_params;
+        new_desp->output_pointer_params = output_pointer_params;
+
+        // inout paramters
+        nb_inout_pointer_params = std::stoul(metas[ptr]);
+        ptr++;
+        for(i=0; i<nb_inout_pointer_params; i++){
+            inout_pointer_params.push_back(std::stoul(metas[ptr+i]));
+        }
+        ptr += nb_inout_pointer_params;
+        new_desp->inout_pointer_params = inout_pointer_params;
+
+        // suspicious paramters
+        nb_suspicious_params = std::stoul(metas[ptr]);
+        ptr++;
+        for(i=0; i<nb_suspicious_params; i++){
+            suspicious_params.push_back(std::stoul(metas[ptr+i]));
+        }
+        ptr += nb_suspicious_params;
+        new_desp->suspicious_params = suspicious_params;
+
+        // has verified suspicious paramters
+        has_verified_params = std::stoul(metas[ptr]);
+        ptr++;
+        new_desp->has_verified_params = has_verified_params;
+
+        if(has_verified_params == 1){
+            // index of those parameter which is a structure (contains pointers)
+            nb_confirmed_suspicious_params = std::stoul(metas[ptr]);
+            ptr++;
+            for(i=0; i<nb_confirmed_suspicious_params; i++){
+                confirmed_suspicious_params.push_back({
+                    /* param_index */ std::stoul(metas[ptr+2*i]), /* offset */ std::stoul(metas[ptr+2*i+1])
+                });
+            }
+            ptr += nb_confirmed_suspicious_params;
+            new_desp->confirmed_suspicious_params = confirmed_suspicious_params;
+        }
+
+        // cbank parameter size (p.s., what is this?)
+        new_desp->cbank_param_size = std::stoul(metas[ptr].c_str());
+
+        return new_desp;
+    };
+
+    std::ifstream file(file_path.c_str(), std::ios::in);
+    if(likely(file.is_open())){
+        POS_LOG("parsing cached kernel metas from file %s...", file_path.c_str());
+        i = 0;
+        while (std::getline(file, line)) {
+            // split by ","
+            std::stringstream ss(line);
+            std::string segment;
+            std::vector<std::string> metas;
+            while (std::getline(ss, segment, delimiter)) { metas.push_back(segment); }
+
+            // parse
+            new_desp = generate_desp_from_meta(metas);
+            cached_function_desps.insert(
+                std::pair<std::string, POSCudaFunctionDesp_t*>(new_desp->name, new_desp)
+            );
+
+            i++;
+        }
+
+        POS_LOG("parsed %lu of cached kernel metas from file %s", i, file_path.c_str());
+        file.close();
+    } else {
+        retval = POS_FAILED_NOT_EXIST;
+        POS_WARN("failed to load kernel meta file %s, fall back to slow path", file_path.c_str());
+    }
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Module::allocate_mocked_resource(
+    POSHandle_CUDA_Module** handle,
+    std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
+    size_t size=kPOS_HandleDefaultSize,
+    bool use_expected_addr = false,
+    uint64_t expected_addr = 0,
+    uint64_t state_size = 0
+){
+    pos_retval_t retval = POS_SUCCESS;
+    POSHandle *context_handle;
+
+    POS_CHECK_POINTER(handle);
+
+    POS_ASSERT(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 1);
+    POS_ASSERT(related_handles[kPOS_ResourceTypeId_CUDA_Context].size() == 1);
+    POS_CHECK_POINTER(context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
+
+    retval = this->__allocate_mocked_resource(
+        /* handle */ handle,
+        /* size */ size,
+        /* use_expected_addr */ use_expected_addr,
+        /* expected_addr */ expected_addr,
+        /* state_size */ state_size
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to allocate mocked CUDA module in the manager");
+        goto exit;
+    }
+
+    POS_CHECK_POINTER(*handle);
+    (*handle)->record_parent_handle(context_handle);
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Module::preserve_pooled_handles(uint64_t amount){
+    return POS_SUCCESS;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Module::try_restore_from_pool(POSHandle_CUDA_Module* handle){
+    return POS_FAILED;
 }

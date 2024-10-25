@@ -30,6 +30,10 @@
 #include "pos/cuda_impl/handle.h"
 
 
+// forward declaration
+class POSHandleManager_cuBLAS_Context;
+
+
 /*!
  *  \brief  handle for cuBLAS context
  */
@@ -43,31 +47,21 @@ class POSHandle_cuBLAS_Context final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size      size of resource state behind this handle  
      */
-    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size), lastest_used_stream(nullptr)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
-    }
+    POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0);
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_cuBLAS_Context(size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0) 
-        : POSHandle_CUDA(size_, hm, id_, state_size), lastest_used_stream(nullptr)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_cuBLAS_Context(size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size=0);
 
-     /*!
+
+    /*!
      *  \param  hm  handle manager which this handle belongs to
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_cuBLAS_Context(void* hm) 
-        : POSHandle_CUDA(hm), lastest_used_stream(nullptr)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
-    }
+    POSHandle_cuBLAS_Context(void* hm);
+
 
     /*!
      *  \brief  obtain the resource name begind this handle
@@ -75,31 +69,65 @@ class POSHandle_cuBLAS_Context final : public POSHandle_CUDA {
      */
     std::string get_resource_name(){ return std::string("cuBLAS Context"); }
 
+
+    // TODO: remove this field later
+    POSHandle *lastest_used_stream;
+
+
+    /* ==================== checkpoint add/commit/persist ==================== */
+ protected:
+    /*!
+     *  \brief  add the state of the resource behind this handle to on-device memory
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_sync    whether the commit process should be sync
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __commit(
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
+        bool is_sync=false, std::string ckpt_dir=""
+    ) override;
+
+
+    /*!
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
+     */
+    pos_retval_t __generate_protobuf_binary(
+        google::protobuf::Message** binary,
+        google::protobuf::Message** base_binary
+    ) override;
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+    /* ======================== restore handle & state ======================= */
+ protected:
+    friend class POSHandleManager_cuBLAS_Context;
+    friend class POSHandleManager<POSHandle_cuBLAS_Context>;
+
+
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t __restore() override {
-        pos_retval_t retval = POS_SUCCESS;
-        cublasHandle_t actual_handle;
-        cublasStatus_t cublas_retval;
+    pos_retval_t __restore() override;
+    /* ======================== restore handle & state ======================= */
 
-        cublas_retval = cublasCreate_v2(&actual_handle);
-        if(likely(CUBLAS_STATUS_SUCCESS == cublas_retval)){
-            this->set_server_addr((void*)(actual_handle));
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            retval = POS_FAILED;
-            POS_WARN_C_DETAIL("failed to restore cublas context: %d", cublas_retval);
-        }
 
-        // TODO: restore the cuBLAS context on corresponding used stream
-
-        return retval;
-    }
-
-    POSHandle *lastest_used_stream;
-    
  protected:
     /*!
      *  \brief  obtain the serilization size of extra fields of specific POSHandle type
@@ -134,11 +162,14 @@ class POSHandle_cuBLAS_Context final : public POSHandle_CUDA {
  */
 class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS_Context> {
  public:
-    POSHandleManager_cuBLAS_Context() : POSHandleManager() {
-    #if POS_CONF_EVAL_RstEnableContextPool == 1
-        this->preserve_pooled_handles(8);
-    #endif // POS_CONF_EVAL_RstEnableContextPool
-    }
+    /*!
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+
 
     /*!
      *  \brief  allocate new mocked cuBLAS context within the manager
@@ -159,37 +190,22 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
         bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
-    ) override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle *context_handle;
-        POS_CHECK_POINTER(handle);
+    ) override;
 
-        // obtain the context to allocate buffer
-    #if POS_CONF_RUNTIME_EnableDebugCheck
-        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
-            POS_WARN_C("no binded context provided to created the CUDA module");
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
-    #endif
 
-        context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override;
 
-        retval = this->__allocate_mocked_resource(
-            /* handle */ handle,
-            /* size */ size,
-            /* use_expected_addr */ use_expected_addr,
-            /* expected_addr */ expected_addr,
-            /* state_size */ state_size
-        );
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked cuBLAS context in the manager");
-            goto exit;
-        }
-        
-        (*handle)->record_parent_handle(context_handle);
 
-    exit:
-        return retval;
-    }
+    /*!
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
+     */
+    pos_retval_t try_restore_from_pool(POSHandle_cuBLAS_Context* handle) override;
 };

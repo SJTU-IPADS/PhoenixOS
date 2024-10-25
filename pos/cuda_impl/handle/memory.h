@@ -306,7 +306,16 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *  \note   the memory manager is a passthrough manager, which means that the client-side
      *          and server-side handle address are equal
      */
-    POSHandleManager_CUDA_Memory(POSHandle_CUDA_Device* device_handle, bool is_restoring);
+    POSHandleManager_CUDA_Memory();
+
+
+    /*!
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
 
 
     /*!
@@ -336,9 +345,7 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *  \param  amount  amount of handles for pooling
      *  \return POS_SUCCESS for successfully preserving
      */
-    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
-        return POS_SUCCESS;
-    }
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override;
 
 
     /*!
@@ -347,7 +354,5 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *  \return POS_SUCCESS for successfully restoring
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
-    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Memory* handle) override {
-        return POS_FAILED;
-    }
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Memory* handle) override;
 };
