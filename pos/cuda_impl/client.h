@@ -89,16 +89,32 @@ class POSClient_CUDA : public POSClient {
 
         bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
 
+        /*!
+         *  \note   Hierarchy of CUDA Resources
+            ╔══════════════════════════════════════════════════════════════════════╗
+            ║                              CUDA Device                             ║
+            ╠══════════════════════════════════════════════════════════════════════╣
+            ║                             CUDA Context                             ║
+            ╠═════════════════════════════╦══════════════════════════╦═════════════╣
+            ║         CUDA Stream         ║        CUDA Module       ║             ║
+            ╠════════════╦════════════════╬═══════════════╦══════════╣ CUDA Memory ║
+            ║ CUDA Event ║ cuBLAS Context ║ CUDA Function ║ CUDA Var ║             ║
+            ╚════════════╩════════════════╩═══════════════╩══════════╩═════════════╝
+         */
+
+        device_mgr = new POSHandleManager_CUDA_Device(is_restoring);
+        POS_CHECK_POINTER(device_mgr);
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = device_mgr;
+
+        std::vector<POSHandle_CUDA_Device> &device_handles = device_mgr->get_handles();
+        POS_ASSERT(device_handles.size() > 0);
+
         POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context(is_restoring));
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] 
             = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
         POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
-
-        device_mgr = new POSHandleManager_CUDA_Device(ctx_mgr->latest_used_handle, is_restoring);
-        POS_CHECK_POINTER(device_mgr);
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = device_mgr;
 
         module_mgr = new POSHandleManager_CUDA_Module();
         POS_CHECK_POINTER(module_mgr);

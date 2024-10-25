@@ -184,6 +184,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 return retstr;
             };
 
+            // TODO: we need to fix this, add use_expected_addr param
             parser_function->append_content(std::format(
                 "// create handle in the hm\n"
                 "retval = {}->allocate_mocked_resource(\n"

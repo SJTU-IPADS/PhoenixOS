@@ -27,8 +27,8 @@
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
 #include "pos/include/utils/serializer.h"
-
 #include "pos/cuda_impl/handle.h"
+
 
 /*!
  *  \brief  handle for cuda device
@@ -43,11 +43,7 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Device(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
-    }
+    POSHandle_CUDA_Device(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
     
 
     /*!
@@ -55,20 +51,13 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Device(void* hm) : POSHandle_CUDA(hm)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Device;
-    }
+    POSHandle_CUDA_Device(void* hm);
 
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Device(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(size_, hm, id_, state_size_)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_CUDA_Device(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
 
     /*!
@@ -78,27 +67,58 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("CUDA Device"); }
 
 
+    /* ==================== checkpoint add/commit/persist ==================== */
+ protected:
+    /*!
+     *  \brief  add the state of the resource behind this handle to on-device memory
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_sync    whether the commit process should be sync
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __commit(
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
+        bool is_sync=false, std::string ckpt_dir=""
+    ) override;
+
+
+    /*!
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
+     */
+    pos_retval_t __generate_protobuf_binary(
+        google::protobuf::Message** binary,
+        google::protobuf::Message** base_binary
+    ) override;
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+    /* ======================== restore handle & state ======================= */
+ protected:
+    friend class POSHandleManager_CUDA_Device;
+    friend class POSHandleManager<POSHandle_CUDA_Device>;
+
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t __restore() override {
-        pos_retval_t retval = POS_SUCCESS;
-        cudaError_t cuda_rt_retval;
-        cudaDeviceProp prop;
+    pos_retval_t __restore() override;
+    /* ======================== restore handle & state ======================= */
 
-        // invoke cudaGetDeviceProperties here to make sure the device is alright
-        cuda_rt_retval = cudaGetDeviceProperties(&prop, this->id);
-        
-        if(unlikely(cuda_rt_retval == cudaSuccess)){
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            POS_WARN_C_DETAIL("failed to restore CUDA device, cudaGetDeviceProperties failed: %d, device_id(%d)", cuda_rt_retval, this->id);
-            retval = POS_FAILED;
-        } 
-
-        return retval;
-    }
 
  protected:
     /*!
@@ -151,45 +171,13 @@ class POSHandle_CUDA_Device final : public POSHandle_CUDA {
 class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Device> {
  public:
     /*!
-     *  \brief  constructor
-     *  \param  ctx_handle      handle of the default CUDA context to create streams
-     *  \param  is_restoring    identify whether current client is under restoring
-     *  \note   insert actual #device to the device manager
-     *          TBD: mock random number of devices
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
      */
-    POSHandleManager_CUDA_Device(POSHandle_CUDA_Context* ctx_handle, bool is_restoring) : POSHandleManager() {
-        int num_device, i;
-        POSHandle_CUDA_Device *device_handle;
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
 
-        /*!
-         *  \note  we only create new devices while NOT restoring
-         */
-        if(is_restoring == false){
-            // get number of physical devices on the machine
-            if(unlikely(cudaSuccess != cudaGetDeviceCount(&num_device))){
-                POS_ERROR_C_DETAIL("failed to call cudaGetDeviceCount");
-            }
-            if(unlikely(num_device == 0)){
-                POS_ERROR_C_DETAIL("no CUDA device detected");
-            }
-
-            for(i=0; i<num_device; i++){
-                if(unlikely(
-                    POS_SUCCESS != this->allocate_mocked_resource(
-                        &device_handle,
-                        std::map<uint64_t, std::vector<POSHandle*>>({
-                            { kPOS_ResourceTypeId_CUDA_Context, {ctx_handle} }
-                        })
-                    )
-                )){
-                    POS_ERROR_C_DETAIL("failed to allocate mocked CUDA device in the manager");
-                }
-                device_handle->mark_status(kPOS_HandleStatus_Active);
-            }
-
-            this->latest_used_handle = this->_handles[0];
-        }
-    }
 
     /*!
      *  \brief  allocate new mocked CUDA device within the manager
@@ -197,6 +185,7 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \param  related_handles all related handles for helping allocate the mocked resource
      *                          (note: these related handles might be other types)
      *  \param  size            size of the newly allocated resource
+     *  \param  use_expected_addr   indicate whether to use expected client-side address
      *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
      *  \param  state_size      size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
@@ -204,38 +193,13 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      */
     pos_retval_t allocate_mocked_resource(
         POSHandle_CUDA_Device** handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
+        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
+        bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
-    ) override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle *ctx_handle;
-        POS_CHECK_POINTER(handle);
+    ) override;
 
-        // obtain the context to allocate device
-    #if POS_CONF_RUNTIME_EnableDebugCheck
-        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
-            POS_WARN_C("no binded context provided to created the CUDA stream");
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
-    #endif
-
-        ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
-        POS_CHECK_POINTER(ctx_handle);
-
-        retval = this->__allocate_mocked_resource(handle, true, size, expected_addr, state_size);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked CUDA device in the manager");
-            goto exit;
-        }
-
-        (*handle)->record_parent_handle(ctx_handle);
-
-    exit:
-        return retval;
-    }
 
     /*!
      *  \brief  obtain a device handle by given client-side address
@@ -245,29 +209,16 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
      *          POS_SUCCESS for successfully founded
      */
-    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset=nullptr){
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle_CUDA_Device *device_handle = nullptr;
+    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset=nullptr) override;
 
-        device_handle = this->get_handle_by_id((uint64_t)(client_addr));
-
-        if(device_handle != nullptr){
-            *handle = device_handle;
-        } else {
-            retval = POS_FAILED_NOT_EXIST;
-        }
-
-        return retval;
-    }
 
     /*!
      *  \brief  allocate and restore handles for provision, for fast restore
      *  \param  amount  amount of handles for pooling
      *  \return POS_SUCCESS for successfully preserving
      */
-    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
-        return POS_SUCCESS;
-    }
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override;
+
 
     /*!
      *  \brief  restore handle from pool
@@ -275,7 +226,5 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \return POS_SUCCESS for successfully restoring
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
-    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Device* handle) override {
-        return POS_FAILED;
-    }
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Device* handle) override;
 };
