@@ -361,11 +361,11 @@ pos_retval_t POSHandle::reload_state(uint64_t stream_id){
     }
 
     // compare on-device-dumped and host-dumped version
-    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host>();
+    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>();
     if(ckpt_set.size() > 0){
         host_dumped_version = ( *(ckpt_set.rbegin()) );
     }
-    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Device>();
+    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>();
     if(ckpt_set.size() > 0){
         on_device_dumped_version = ( *(ckpt_set.rbegin()) );
     }
@@ -402,12 +402,20 @@ pos_retval_t POSHandle::reload_state(uint64_t stream_id){
          */
         final_dumped_version = host_dumped_version > on_device_dumped_version ? host_dumped_version : on_device_dumped_version;
         if(host_dumped_version > on_device_dumped_version){
-            if(unlikely(POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot<kPOS_CkptSlotPosition_Host>(&ckpt_slot, final_dumped_version))){
+            if(unlikely(POS_SUCCESS != (
+                this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
+                    &ckpt_slot, final_dumped_version
+                )
+            ))){
                 POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
             }
             POS_CHECK_POINTER(ckpt_slot);
         } else {
-            if(unlikely(POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot<kPOS_CkptSlotPosition_Device>(&ckpt_slot, final_dumped_version))){
+            if(unlikely(POS_SUCCESS != (
+                this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
+                    &ckpt_slot, final_dumped_version
+                )
+            ))){
                 POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
             }
             POS_CHECK_POINTER(ckpt_slot);
@@ -549,7 +557,7 @@ uint64_t POSHandle::__get_basic_serialize_size(){
         /*!
          *  \note   for stateful handle, the size of the basic serialized fields is influenced by checkpoint
          */
-        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host>();
+        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>();
         ckpt_serialization_size = ckpt_version_set.size() * (sizeof(uint64_t) + state_size);
 
         host_ckpt_records = this->ckpt_bag->get_host_checkpoint_records();
@@ -621,13 +629,15 @@ pos_retval_t POSHandle::__serialize_basic(void* serialized_area){
         POS_CHECK_POINTER(this->ckpt_bag);
 
         // first part: XPU-side checkpoint
-        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host>();
+        ckpt_version_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>();
         nb_ckpt_version = ckpt_version_set.size();
         POSUtil_Serializer::write_field(&ptr, &nb_ckpt_version, sizeof(uint64_t));
 
         for(set_iter = ckpt_version_set.begin(); set_iter != ckpt_version_set.end(); set_iter++){
             ckpt_version = *set_iter;
-            retval =  this->ckpt_bag->get_checkpoint_slot<kPOS_CkptSlotPosition_Host>(&ckpt_slot, ckpt_version);
+            retval =  this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(
+                &ckpt_slot, ckpt_version
+            );
             if(unlikely(retval != POS_SUCCESS)){
                 POS_ERROR_C(
                     "failed to obtain checkpoint by version within the version set, this's a bug: client_addr(%p), version(%lu)",

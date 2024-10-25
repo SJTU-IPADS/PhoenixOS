@@ -137,9 +137,12 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
         }
     } else {
         // commit from cache buffer
-        if(unlikely(
-            POS_SUCCESS != this->ckpt_bag->get_checkpoint_slot<kPOS_CkptSlotPosition_Device>(/* ptr */ &cow_ckpt_slot, /* version */ version_id)
-        )){
+        if(unlikely(POS_SUCCESS != (
+            this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
+                /* ptr */ &cow_ckpt_slot,
+                /* version */ version_id
+            )
+        ))){
             POS_ERROR_C_DETAIL(
                 "no cache buffer with the version founded, this is a bug: version_id(%lu), server_addr(%p)",
                 version_id, this->server_addr
@@ -174,6 +177,7 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
         }
     }
 
+    // persist the state after commit
     retval = this->__persist(ckpt_slot, ckpt_dir, stream_id);
 
 exit:

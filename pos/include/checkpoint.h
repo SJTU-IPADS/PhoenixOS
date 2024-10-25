@@ -26,6 +26,7 @@
 
 // forward declaration
 typedef struct POSAPIContext_QE POSAPIContext_QE_t;
+class POSCheckpointBag;
 
 
 /*!
@@ -110,7 +111,9 @@ class POSCheckpointSlot {
      */
     inline void* expose_pointer(){ return _data; }
 
- private:
+ protected:
+    friend class POSCheckpointBag;
+
     // size of the data inside this slot
     uint64_t _state_size;
 
@@ -190,59 +193,67 @@ class POSCheckpointBag {
 
     /*!
      *  \brief  obtain checkpointed data by given checkpoint version
-     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be obtained
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \param  ckpt_slot   pointer to the checkpoint slot if successfully obtained
      *  \param  version     the specified version
      *  \return POS_SUCCESS for successfully obtained
      *          POS_FAILED_NOT_EXIST for no checkpoint is found
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     pos_retval_t get_checkpoint_slot(POSCheckpointSlot** ckpt_slot, uint64_t version);
 
 
     /*!
      *  \brief  obtain the number of recorded checkpoints inside this bag
-     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be obtained
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \return number of recorded checkpoints
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     uint64_t get_nb_checkpoint_slots();
 
 
     /*!
      *  \brief  obtain the checkpoint version list
-     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be obtained
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be obtained
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \return the checkpoint version list
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     std::set<uint64_t> get_checkpoint_version_set();
 
 
     /*!
      *  \brief  invalidate the checkpoint from this bag
-     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be invalidated
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be invalidated
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \param  version version of the checkpoint to be removed
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     pos_retval_t invalidate_by_version(uint64_t version);
 
 
     /*!
      *  \brief  invalidate all checkpoint from this bag
-     *  \tparam ckpt_slot_pos   position of the checkpoint slot to be invalidated
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be invalidated
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
-    template<pos_ckptslot_position_t ckpt_slot_pos>
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     pos_retval_t invalidate_all_version();
 
 
     /*!
      *  \brief  obtain overall memory consumption of this checkpoint bag
+     *  \tparam ckpt_slot_pos       position of the checkpoint slot to be quried
+     *  \tparam ckpt_state_type     type of the checkpointed state
      *  \return overall memory consumption of this checkpoint bag
      */
+    template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
     uint64_t get_memory_consumption();
 
 
