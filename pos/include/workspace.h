@@ -215,8 +215,8 @@ class POSWorkspace {
     // api manager
     POSApiManager *api_mgnr;
 
-    // idx of all stateful resources (handles)
-    std::vector<uint64_t> stateful_handle_type_idx;
+    // idx of all resources types (handles)
+    std::vector<uint64_t> handle_type_idx;
 
     // dynamic configuration of this workspace
     POSWorkspaceConf ws_conf;

@@ -17,10 +17,17 @@ pos_retval_t POSWorkspace_CUDA::__init(){
     this->api_mgnr->init();
 
     // mark all stateful resources
-    this->stateful_handle_type_idx.insert(
-        this->stateful_handle_type_idx.end(), {
+    this->handle_type_idx.insert(
+        this->handle_type_idx.end(), {
             kPOS_ResourceTypeId_CUDA_Memory,
-            kPOS_ResourceTypeId_CUDA_Module
+            kPOS_ResourceTypeId_CUDA_Context,
+            kPOS_ResourceTypeId_CUDA_Module,
+            kPOS_ResourceTypeId_CUDA_Function,
+            kPOS_ResourceTypeId_CUDA_Var,
+            kPOS_ResourceTypeId_CUDA_Device,
+            kPOS_ResourceTypeId_CUDA_Stream,
+            kPOS_ResourceTypeId_CUDA_Event,
+            kPOS_ResourceTypeId_cuBLAS_Context
         }
     );
 
@@ -124,7 +131,7 @@ pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param
     POS_CHECK_POINTER(*client);
 
     client_cxt.cxt_base.job_name = param.job_name;
-    client_cxt.cxt_base.stateful_handle_type_idx = this->stateful_handle_type_idx;
+    client_cxt.cxt_base.handle_type_idx = this->handle_type_idx;
     retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeDaemonLogPath, runtime_daemon_log_path);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to obtain runtime daemon log path");

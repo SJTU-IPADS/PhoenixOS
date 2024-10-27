@@ -187,8 +187,6 @@ pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string ckpt
     pos_retval_t retval = POS_SUCCESS, prev_retval;
     std::future<pos_retval_t> persist_future;
 
-    POS_CHECK_POINTER(ckpt_slot);
-
     // no directory specified, skip persisting
     if(ckpt_dir.size() == 0){ goto exit; }
 
@@ -263,9 +261,6 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     google::protobuf::Message *handle_binary = nullptr, *_base_binary = nullptr;
     pos_protobuf::Bin_POSHanlde *base_binary = nullptr;
 
-    // TODO: we must ensure the ckpt_slot won't be released until this ckpt ends!
-    //      we haven't do that!
-    POS_CHECK_POINTER(ckpt_slot);
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
     if(unlikely(POS_SUCCESS != (
@@ -306,6 +301,9 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
 
     // ==================== 3. state ====================
     if(ckpt_slot != nullptr){
+        // TODO: we must ensure the ckpt_slot won't be released until this ckpt ends!
+        //      we haven't do that!
+
         //! \note   we adopt state size inside ckpt slot first, as we might persiting a host-side state
         //          that have dynamic state size that not recorded inside the handle
         actual_state_size = ckpt_slot->get_state_size();
