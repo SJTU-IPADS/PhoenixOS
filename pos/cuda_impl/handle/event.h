@@ -72,17 +72,15 @@ class POSHandle_CUDA_Event final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("CUDA Event"); }
 
 
+    /* ======================== handle specific fields ======================= */
+ public:
+    // flags of the event to create
+    int flags;
+    /* ======================== handle specific fields ======================= */
+
+
     /* ==================== checkpoint add/commit/persist ==================== */
  protected:
-    /*!
-     *  \brief  initialize checkpoint bag of this handle
-     *  \note   it must be implemented by different implementations of stateful 
-     *          handle, as they might require different allocators and deallocators
-     *  \return POS_SUCCESS for successfully initialization
-     */
-    pos_retval_t __init_ckpt_bag() override;
-
-
     /*!
      *  \brief  add the state of the resource behind this handle to on-device memory
      *  \param  version_id  version of this checkpoint

@@ -46,24 +46,20 @@ class POSHandle_CUDA_Stream final : public POSHandle_CUDA {
      */
     POSHandle_CUDA_Stream(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
+
     /*!
      *  \param  hm  handle manager which this handle belongs to
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Stream(void* hm) : POSHandle_CUDA(hm)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Stream;
-    }
+    POSHandle_CUDA_Stream(void* hm);
+
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Stream(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(size_, hm, id_, state_size_), is_capturing(false)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_CUDA_Stream(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
+
 
     /*!
      *  \brief  obtain the resource name begind this handle
@@ -170,92 +166,41 @@ class POSHandleManager_CUDA_Stream : public POSHandleManager<POSHandle_CUDA_Stre
     pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
 
 
-    
-
     /*!
-     *  \brief  constructor
-     *  \param  ctx_handle      handle of the default CUDA context to create streams
-     *  \param  is_restoring    identify whether current client is under restoring
-     */
-    POSHandleManager_CUDA_Stream(POSHandle_CUDA_Context* ctx_handle, bool is_restoring) : POSHandleManager() {
-        POSHandle_CUDA_Stream *stream_handle;
-
-        /*!
-         *  \note  we only create a new stream while NOT restoring
-         */
-        if(is_restoring == false){
-            
-
-        #if POS_CONF_EVAL_RstEnableContextPool == 1
-            this->preserve_pooled_handles(8);
-        #endif // POS_CONF_EVAL_RstEnableContextPool
-        }
-    }
-
-    /*!
-     *  \brief  allocate new mocked CUDA stream within the manager
+     *  \brief  allocate new mocked CUDA module within the manager
      *  \param  handle              pointer to the mocked handle of the newly allocated resource
      *  \param  related_handles     all related handles for helping allocate the mocked resource
      *                              (note: these related handles might be other types)
      *  \param  size                size of the newly allocated resource
      *  \param  use_expected_addr   indicate whether to use expected client-side address
      *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
-     *  \param  state_size          size of resource state behind this handle
+     *  \param  state_size          size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
         POSHandle_CUDA_Stream** handle,
-        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
-    ) override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle *ctx_handle;
+    ) override;
 
-        POS_CHECK_POINTER(handle);
+    
+    /*!
+     *  \brief  allocate and restore handles for provision, for fast restore
+     *  \param  amount  amount of handles for pooling
+     *  \return POS_SUCCESS for successfully preserving
+     */
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override;
 
-        // obtain the context to allocate buffer
-    #if POS_CONF_RUNTIME_EnableDebugCheck
-        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
-            POS_WARN_C("no binded context provided to created the CUDA stream");
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
-    #endif
-
-        ctx_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0];
-        POS_CHECK_POINTER(ctx_handle);
-
-        retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, state_size);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
-            goto exit;
-        }
-
-        (*handle)->record_parent_handle(ctx_handle);
-
-    exit:
-        return retval;
-    }
 
     /*!
-     *  \brief  obtain a stream handle by given client-side address
-     *  \param  client_addr the given client-side address
-     *  \param  handle      the resulted handle
-     *  \param  offset      pointer to store the offset of the given address from the base address
-     *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
-     *          POS_SUCCESS for successfully founded
+     *  \brief  restore handle from pool
+     *  \param  handle  the handle to be restored
+     *  \return POS_SUCCESS for successfully restoring
+     *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
-    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Stream** handle, uint64_t* offset=nullptr){
-        // the client-side address of the default stream would be nullptr in CUDA, we do some hacking here
-        if(likely(client_addr == 0)){
-            *handle = this->_handles[0];
-            return POS_SUCCESS;
-        } else {
-            return this->__get_handle_by_client_addr(client_addr, handle, offset);
-        }
-    }
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Stream* handle) override;
 };

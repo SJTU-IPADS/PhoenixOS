@@ -181,7 +181,7 @@ class POSHandleManager_CUDA_Context : public POSHandleManager<POSHandle_CUDA_Con
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
-        POSHandle_CUDA_Memory** handle,
+        POSHandle_CUDA_Context** handle,
         std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         bool use_expected_addr = false,
