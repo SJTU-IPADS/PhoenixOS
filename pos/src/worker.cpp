@@ -387,8 +387,7 @@ void POSWorker::__daemon_ckpt_async(){
                         POS_TRACE_TICK_START(ckpt, ckpt_cow_wait);
                         tmp_retval = handle->checkpoint_add(
                             /* version_id */ this->async_ckpt_cxt.checkpoint_version_map[handle],
-                            /* stream_id */ // wqe->execution_stream_id
-                                            this->_cow_stream_id
+                            /* stream_id */ this->_cow_stream_id
                         );
                         POS_ASSERT(tmp_retval == POS_SUCCESS || tmp_retval == POS_WARN_ABANDONED || tmp_retval == POS_FAILED_ALREADY_EXIST);
                         if(tmp_retval == POS_SUCCESS){
@@ -413,8 +412,7 @@ void POSWorker::__daemon_ckpt_async(){
                         POS_TRACE_TICK_START(ckpt, ckpt_cow_wait);
                         tmp_retval = handle->checkpoint_add(
                             /* version_id */ this->async_ckpt_cxt.checkpoint_version_map[handle],
-                            /* stream_id */ // wqe->execution_stream_id
-                                            this->_cow_stream_id
+                            /* stream_id */ this->_cow_stream_id
                         );
                         POS_ASSERT(tmp_retval == POS_SUCCESS || tmp_retval == POS_WARN_ABANDONED || tmp_retval == POS_FAILED_ALREADY_EXIST);
                         if(tmp_retval == POS_SUCCESS){

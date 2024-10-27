@@ -70,10 +70,6 @@ class POSHandle_cuBLAS_Context final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("cuBLAS Context"); }
 
 
-    // TODO: remove this field later
-    POSHandle *lastest_used_stream;
-
-
     /* ==================== checkpoint add/commit/persist ==================== */
  protected:
     /*!

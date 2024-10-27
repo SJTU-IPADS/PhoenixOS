@@ -274,23 +274,44 @@ endif
 
 if conf_runtime_target == 'cuda'
     sources += [
+        # common source files
         'pos/cuda_impl/src/api_context.cpp',
         'pos/cuda_impl/src/workspace.cpp',
         'pos/cuda_impl/src/handle.cpp',
         'pos/cuda_impl/src/utils/fatbin.cpp',
+
+        # parser functions
         'pos/cuda_impl/src/parser/cublas.cpp',
         'pos/cuda_impl/src/parser/cuda_driver.cpp',
         'pos/cuda_impl/src/parser/cuda_runtime.cpp',
         'pos/cuda_impl/src/parser/remoting.cpp',
+
+        # worker functions
         'pos/cuda_impl/src/worker/cublas.cpp',
         'pos/cuda_impl/src/worker/cuda_driver.cpp',
         'pos/cuda_impl/src/worker/cuda_runtime.cpp',
+
+        # cuda handles
+        'pos/cuda_impl/src/handle/context.cpp',
+        'pos/cuda_impl/src/handle/cublas.cpp',
+        'pos/cuda_impl/src/handle/device.cpp',
+        'pos/cuda_impl/src/handle/event.cpp',
+        'pos/cuda_impl/src/handle/function.cpp',
         'pos/cuda_impl/src/handle/memory.cpp',
         'pos/cuda_impl/src/handle/module.cpp',
+        'pos/cuda_impl/src/handle/stream.cpp',
+        'pos/cuda_impl/src/handle/var.cpp',
 
         # protobuf generated file
+        'pos/cuda_impl/proto/context.pb.cc',
+        'pos/cuda_impl/proto/cublas.pb.cc',
+        'pos/cuda_impl/proto/device.pb.cc',
+        'pos/cuda_impl/proto/event.pb.cc',
+        'pos/cuda_impl/proto/function.pb.cc',
         'pos/cuda_impl/proto/memory.pb.cc',
-        'pos/cuda_impl/proto/module.pb.cc'
+        'pos/cuda_impl/proto/module.pb.cc',
+        'pos/cuda_impl/proto/stream.pb.cc',
+        'pos/cuda_impl/proto/var.pb.cc'
     ]
 endif
 

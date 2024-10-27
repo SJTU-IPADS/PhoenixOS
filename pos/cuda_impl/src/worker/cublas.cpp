@@ -73,7 +73,7 @@ namespace cublas_set_stream {
     // parser function
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
-        POSHandle *stream_handle, *cublas_context_handle;
+        POSHandle *stream_handle, *cublas_context_handle, *new_parent_handle;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -88,12 +88,16 @@ namespace cublas_set_stream {
             (cublasHandle_t)(cublas_context_handle->server_addr),
             (cudaStream_t)(stream_handle->server_addr)
         );
-
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
             POSWorker::__restore(ws, wqe);
-        } else {
-            POSWorker::__done(ws, wqe);
+            goto exit;
         }
+
+        // confirm parent change
+        POS_ASSERT(cublas_context_handle->parent_handles.size() == 1);
+        POS_CHECK_POINTER(cublas_context_handle->parent_handles[0] = stream_handle);
+
+        POSWorker::__done(ws, wqe);
 
     exit:
         return retval;

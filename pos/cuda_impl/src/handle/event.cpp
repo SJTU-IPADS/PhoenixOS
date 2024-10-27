@@ -19,13 +19,6 @@ POSHandle_CUDA_Event::POSHandle_CUDA_Event(void *client_addr_, size_t size_, voi
     : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
 {
     this->resource_type_id = kPOS_ResourceTypeId_CUDA_Event;
-
-    // initialize checkpoint bag
-    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
-            POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
-        }
-    #endif
 }
 
 
@@ -41,37 +34,13 @@ POSHandle_CUDA_Event::POSHandle_CUDA_Event(size_t size_, void* hm, pos_u64id_t i
 }
 
 
-pos_retval_t POSHandle_CUDA_Event::__init_ckpt_bag(){ 
-    this->ckpt_bag = new POSCheckpointBag(
-        /* fixed_state_size */ sizeof(int),
-        /* allocator */ nullptr,
-        /* deallocator */ nullptr,
-        /* dev_allocator */ nullptr,
-        /* dev_deallocator */ nullptr
-    );
-    POS_CHECK_POINTER(this->ckpt_bag);
-    return POS_SUCCESS;
-}
-
-
 pos_retval_t POSHandle_CUDA_Event::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }
 
 
 pos_retval_t POSHandle_CUDA_Event::__commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir){
-    pos_retval_t retval = POS_SUCCESS;
-    std::vector<POSCheckpointSlot*> ckpt_slots;
-
-    if(unlikely(POS_SUCCESS != (
-        retval = this->ckpt_bag->get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(ckpt_slots)
-    ))){
-        POS_WARN_C("failed to obtain host-side checkpoint slot that stores host-side state");
-        goto exit;
-    }
-    POS_ASSERT(ckpt_slots.size() == 1);
-
-    return this->__persist(ckpt_slots, ckpt_dir, stream_id);
+    return this->__persist(nullptr, ckpt_dir, stream_id);
 }
 
 
@@ -91,7 +60,7 @@ pos_retval_t POSHandle_CUDA_Event::__generate_protobuf_binary(google::protobuf::
     POS_CHECK_POINTER(*base_binary);
 
     // serialize handle specific fields
-    /* currently nothing */
+    cuda_event_binary->set_flags(this->flags);
 
     return retval;
 }
@@ -101,27 +70,8 @@ pos_retval_t POSHandle_CUDA_Event::__restore(){
     pos_retval_t retval = POS_SUCCESS;
     cudaError_t cuda_rt_res;
     cudaEvent_t ptr;
-    std::vector<POSCheckpointSlot*> ckpt_slots;
-    POSCheckpointSlot *ckpt_slot;
-    int flags;
 
-    // TODO: first switch to corresponding context?
-    //      would this be a research topic? accelerate
-    //      context switch?
-
-    if(unlikely(POS_SUCCESS != ( retval = (
-        this->ckpt_bag->template get_all_scheckpoint_slots<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(ckpt_slots)
-    )))){
-        POS_WARN_C("failed to obtain host-side checkpoint slot that stores host-side state");
-        goto exit;
-    }
-    POS_ASSERT(ckpt_slots.size() == 1);
-    POS_CHECK_POINTER(ckpt_slot = ckpt_slots[0]);
-    POS_CHECK_POINTER(ckpt_slot->expose_pointer());
-    
-    flags = *(static_cast<int*>(ckpt_slot->expose_pointer()));
-
-    cuda_rt_res = cudaEventCreateWithFlags(&ptr, flags);
+    cuda_rt_res = cudaEventCreateWithFlags(&ptr, this->flags);
     if(unlikely(cuda_rt_res != cudaSuccess)){
         POS_WARN_C_DETAIL("failed to restore CUDA event, create failed: retval(%d)", cuda_rt_res);
         retval = POS_FAILED;

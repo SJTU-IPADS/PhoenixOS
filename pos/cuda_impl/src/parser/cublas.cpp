@@ -38,7 +38,6 @@ namespace cublas_create {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandle_cuBLAS_Context *cublas_context_handle;
-        POSHandleManager_CUDA_Context* hm_context;
         POSHandleManager_CUDA_Stream *hm_stream;
         POSHandleManager_cuBLAS_Context* hm_cublas_context;
 
@@ -48,11 +47,6 @@ namespace cublas_create {
         client = (POSClient_CUDA*)(wqe->client);
         POS_CHECK_POINTER(client);
 
-        hm_context = pos_get_client_typed_hm(
-            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
-        );
-        POS_CHECK_POINTER(hm_context);
-        
         hm_cublas_context = pos_get_client_typed_hm(
             client, kPOS_ResourceTypeId_cuBLAS_Context, POSHandleManager_cuBLAS_Context
         );
@@ -67,25 +61,23 @@ namespace cublas_create {
         retval = hm_cublas_context->allocate_mocked_resource(
             /* handle */ &cublas_context_handle,
             /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
-                /* id */ kPOS_ResourceTypeId_CUDA_Context, 
-                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
+                /* id */ kPOS_ResourceTypeId_CUDA_Stream, 
+                /* handles */ std::vector<POSHandle*>({hm_stream->default_handle}) 
             }}),
-            /* size */ sizeof(cublasHandle_t)
+            /* size */ sizeof(cublasHandle_t),
+            /* use_expected_addr */ false,
+            /* expected_addr */ 0,
+            /* state_size */ 0
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cublas_create): failed to allocate mocked cublas context within the handler manager");
             memset(wqe->api_cxt->ret_data, 0, sizeof(cublasHandle_t));
             goto exit;
-        } else {
-            POS_DEBUG(
-                "parse(cublas_create): allocate mocked cublas context within the handler manager: addr(%p), size(%lu)",
-                cublas_context_handle->client_addr, cublas_context_handle->size
-            )
-            memcpy(wqe->api_cxt->ret_data, &(cublas_context_handle->client_addr), sizeof(cublasHandle_t));
         }
-
-        // record the used stream as latest used stream
-        cublas_context_handle->lastest_used_stream = hm_stream->latest_used_handle;
+        POS_DEBUG(
+            "parse(cublas_create): allocate mocked cublas context within the handler manager: addr(%p), size(%lu)",
+            cublas_context_handle->client_addr, cublas_context_handle->size
+        );
 
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
@@ -93,6 +85,7 @@ namespace cublas_create {
         });
 
         // mark this sync call can be returned after parsing
+        memcpy(wqe->api_cxt->ret_data, &(cublas_context_handle->client_addr), sizeof(cublasHandle_t));
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
 
     exit:
@@ -100,8 +93,6 @@ namespace cublas_create {
     }
 
 } // namespace cublas_create
-
-
 
 
 /*!
@@ -161,7 +152,6 @@ namespace cublas_set_stream {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
-
         retval = hm_cublas_context->get_handle_by_client_addr(
             /* client_addr */ (void*)pos_api_param_value(wqe, 0, uint64_t),
             /* handle */ &cublas_context_handle
@@ -177,16 +167,9 @@ namespace cublas_set_stream {
             /* handle */ cublas_context_handle
         });
 
-        // record the used stream
-        cublas_context_handle->lastest_used_stream = stream_handle;
-
-        
-        
-
     exit:
         return retval;
     }
-
 } // namespace cublas_set_stream
 
 
@@ -367,12 +350,6 @@ namespace cublas_sgemm {
 
         hm_memory->record_modified_handle(memory_handle_C);
 
-        POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
-        wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
-
-        
-        
-
     exit:
         return retval;
     }
@@ -493,12 +470,6 @@ namespace cublas_sgemm_strided_batched {
         });
 
         hm_memory->record_modified_handle(memory_handle_C);
-
-        POS_CHECK_POINTER(cublas_context_handle->lastest_used_stream);
-        wqe->execution_stream_id = (uint64_t)(cublas_context_handle->lastest_used_stream->server_addr);
-
-        
-        
 
     exit:
         return retval;

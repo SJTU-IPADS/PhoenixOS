@@ -93,6 +93,7 @@ pos_retval_t POSHandleManager_CUDA_Device::init(std::map<uint64_t, std::vector<P
     pos_retval_t retval = POS_SUCCESS;
     int num_device, i;
     cudaError_t cuda_rt_retval;
+    POSHandle_CUDA_Device *device_handle;
 
     POS_ASSERT(related_handles.size() == 0);
 
@@ -113,11 +114,11 @@ pos_retval_t POSHandleManager_CUDA_Device::init(std::map<uint64_t, std::vector<P
     for(i=0; i<num_device; i++){
         if(unlikely(
             POS_SUCCESS != this->allocate_mocked_resource(
-                &device_handle,
-                std::map<uint64_t, std::vector<POSHandle*>>({})
+                /* handle */ &device_handle,
+                /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({}),
                 /* size */ 1,
-                /* use_expected_addr */ true
-                /* expected_addr */ reinterpret_cast<uint64_t>(i),
+                /* use_expected_addr */ true,
+                /* expected_addr */ static_cast<uint64_t>(i),
                 /* state_size */ 0
             )
         )){
@@ -125,24 +126,9 @@ pos_retval_t POSHandleManager_CUDA_Device::init(std::map<uint64_t, std::vector<P
         }
         device_handle->mark_status(kPOS_HandleStatus_Active);
     }
+    this->latest_used_handle = this->_handles[0];
 
 exit:
-    return retval;
-}
-
-
-pos_retval_t POSHandleManager_CUDA_Device::get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset){
-    pos_retval_t retval = POS_SUCCESS;
-    POSHandle_CUDA_Device *device_handle = nullptr;
-
-    device_handle = this->get_handle_by_id((uint64_t)(client_addr));
-
-    if(device_handle != nullptr){
-        *handle = device_handle;
-    } else {
-        retval = POS_FAILED_NOT_EXIST;
-    }
-
     return retval;
 }
 

@@ -77,17 +77,36 @@ class POSClient_CUDA : public POSClient {
     
 
     /*!
-     *  \brief  instantiate handle manager for all used CUDA resources
+     *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
+     *  \return POS_SUCCESS for successfully initialization
      */
-    void init_handle_managers() override {
-        pos_retval_t retval;
-        POSHandleManager_CUDA_Context *ctx_mgr;
-        POSHandleManager_CUDA_Module *module_mgr;
-        POSHandleManager_CUDA_Device *device_mgr;
+    pos_retval_t init_handle_managers() override {
+        pos_retval_t retval = POS_SUCCESS;
+        std::vector<POSHandle_CUDA_Device*> device_handles;
+        std::vector<POSHandle_CUDA_Context*> context_handles;
 
+        POSHandleManager_CUDA_Device *device_mgr;
+        POSHandleManager_CUDA_Context *ctx_mgr;
+        POSHandleManager_CUDA_Stream *stream_mgr;
+        POSHandleManager_cuBLAS_Context *cublas_context_mgr;
+        POSHandleManager_CUDA_Event *event_mgr;
+        POSHandleManager_CUDA_Module *module_mgr;
+        POSHandleManager_CUDA_Function *function_mgr;
+        POSHandleManager_CUDA_Var *var_mgr;
+        POSHandleManager_CUDA_Memory *memory_mgr;
+
+        std::map<uint64_t, std::vector<POSHandle*>> related_handles;
         bool is_restoring = this->_cxt.checkpoint_file_path.size() > 0;
+
+
+        auto __cast_to_base_handle_list = [](auto handle_list) -> std::vector<POSHandle*> {
+            std::vector<POSHandle*> ret_list;
+            for(auto handle : handle_list){ ret_list.push_back(handle); }
+            return ret_list;
+        };
+
 
         /*!
          *  \note   Hierarchy of CUDA Resources
@@ -99,55 +118,132 @@ class POSClient_CUDA : public POSClient {
             ╠════════════════╦════════════╦══════════════════════════╦═════════════╣║
             ║   CUDA Stream  ║            ║        CUDA Module       ║             ║║
             ╠════════════════╣ CUDA Event ╠═══════════════╦══════════╣ CUDA Memory ║║
-            ║ cuBLAS_Context ║            ║ CUDA Function ║ CUDA Var ║             ║╝
+            ║ cuBLAS Context ║            ║ CUDA Function ║ CUDA Var ║             ║╝
             ╚════════════════╩════════════╩═══════════════╩══════════╩═════════════╝
          */
 
-        device_mgr = new POSHandleManager_CUDA_Device(is_restoring);
-        POS_CHECK_POINTER(device_mgr);
+
+        // CUDA device handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(device_mgr = new POSHandleManager_CUDA_Device());
+        if(unlikely(POS_SUCCESS != (
+            retval = device_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA device handle manager, client won't be run");
+            goto exit;
+        }
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = device_mgr;
 
-        std::vector<POSHandle_CUDA_Device> &device_handles = device_mgr->get_handles();
+        // CUDA context handle manager
+        related_handles.clear();
+        device_handles = device_mgr->get_handles();
         POS_ASSERT(device_handles.size() > 0);
-
-        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context(is_restoring));
+        related_handles.insert({ kPOS_ResourceTypeId_CUDA_Device, __cast_to_base_handle_list(device_handles) });
+        POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context());
+        if(unlikely(POS_SUCCESS != (
+            retval = ctx_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA context handle manager, client won't be run");
+            goto exit;
+        }
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] 
-            = new POSHandleManager_CUDA_Stream(ctx_mgr->latest_used_handle, is_restoring);
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream]);
+        // CUDA stream handle manager
+        related_handles.clear();
+        context_handles = ctx_mgr->get_handles();
+        POS_ASSERT(context_handles.size() > 0);
+        related_handles.insert({ kPOS_ResourceTypeId_CUDA_Context, __cast_to_base_handle_list(context_handles) });
+        POS_CHECK_POINTER(stream_mgr = new POSHandleManager_CUDA_Stream());
+        if(unlikely(POS_SUCCESS != (
+            retval = stream_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA stream handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = stream_mgr;
+        
+        // cuBLAS context handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(cublas_context_mgr = new POSHandleManager_cuBLAS_Context());
+        if(unlikely(POS_SUCCESS != (
+            retval = cublas_context_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize cuBLAS context handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context] = cublas_context_mgr;
 
-        module_mgr = new POSHandleManager_CUDA_Module();
-        POS_CHECK_POINTER(module_mgr);
+        // CUDA event handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(event_mgr = new POSHandleManager_CUDA_Event());
+        if(unlikely(POS_SUCCESS != (
+            retval = event_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA event handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Event] = event_mgr;
+
+        // CUDA module handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(module_mgr = new POSHandleManager_CUDA_Module());
+        if(unlikely(POS_SUCCESS != (
+            retval = module_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA module handle manager, client won't be run");
+            goto exit;
+        }
         this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
-
         if(std::filesystem::exists(this->_cxt.kernel_meta_path)){
-            POS_DEBUG_C("loading kernel meta from cache %s...", this->_cxt.kernel_meta_path);
+            POS_DEBUG_C("loading kernel meta from cache %s...", this->_cxt.kernel_meta_path.c_str());
             retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
             if(likely(retval == POS_SUCCESS)){
                 this->_cxt.is_load_kernel_from_cache = true;
                 POS_BACK_LINE
-                POS_DEBUG_C("loading kernel meta from cache %s [done]", this->_cxt.kernel_meta_path);
+                POS_DEBUG_C("loading kernel meta from cache %s [done]", this->_cxt.kernel_meta_path.c_str());
             } else {
-                POS_WARN_C("loading kernel meta from cache %s [failed]", this->_cxt.kernel_meta_path);
+                POS_WARN_C("loading kernel meta from cache %s [failed]", this->_cxt.kernel_meta_path.c_str());
             }
         }
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = new POSHandleManager_CUDA_Function();
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);
+        // CUDA function handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(function_mgr = new POSHandleManager_CUDA_Function());
+        if(unlikely(POS_SUCCESS != (
+            retval = function_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA function handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = function_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Var] = new POSHandleManager_CUDA_Var();
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Var]);
+        // CUDA var handle manager
+        related_handles.clear();
+        POS_CHECK_POINTER(var_mgr = new POSHandleManager_CUDA_Var());
+        if(unlikely(POS_SUCCESS != (
+            retval = var_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA var handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Var] = var_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] 
-            = new POSHandleManager_CUDA_Memory(device_mgr->latest_used_handle, is_restoring);
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory]);
+        // CUDA memory handle manager
+        related_handles.clear();
+        context_handles = ctx_mgr->get_handles();
+        POS_ASSERT(context_handles.size() > 0);
+        related_handles.insert({ kPOS_ResourceTypeId_CUDA_Context, __cast_to_base_handle_list(context_handles) });
+        POS_CHECK_POINTER(memory_mgr = new POSHandleManager_CUDA_Memory());
+        if(unlikely(POS_SUCCESS != (
+            retval = memory_mgr->init(related_handles)
+        ))){
+            POS_WARN_C("failed to initialize CUDA memory handle manager, client won't be run");
+            goto exit;
+        }
+        this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] = memory_mgr;
 
-        this->handle_managers[kPOS_ResourceTypeId_CUDA_Event] = new POSHandleManager_CUDA_Event();
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_CUDA_Event]);
-
-        this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context] = new POSHandleManager_cuBLAS_Context();
-        POS_CHECK_POINTER(this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context]);
+    exit:
+        return retval;
     }
 
 
