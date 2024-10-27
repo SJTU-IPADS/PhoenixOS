@@ -79,7 +79,7 @@ typedef struct pos_client_cxt {
     std::string checkpoint_file_path;
 
     // indices of stateful handle type
-    std::vector<uint64_t> stateful_handle_type_idx;
+    std::vector<uint64_t> handle_type_idx;
 } pos_client_cxt_t;
 #define POS_CLIENT_CXT_HEAD pos_client_cxt cxt_base;
 
