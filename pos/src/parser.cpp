@@ -183,7 +183,7 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
         this->is_checkpointing = true;
 
         // collect all handles at this timespot to be checkpointed
-        for(auto &stateful_handle_id : this->_ws->stateful_handle_type_idx){
+        for(auto &stateful_handle_id : this->_ws->handle_type_idx){
             POS_CHECK_POINTER(
                 hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>)
             );
