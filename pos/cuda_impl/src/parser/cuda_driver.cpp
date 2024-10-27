@@ -770,8 +770,8 @@ namespace cu_module_get_global {
         }
 
         // record the name of the var in the handle
-        var_handle->name = std::string((const char*)(pos_api_param_addr(wqe, 3)));
-        
+        var_handle->global_name = std::string((const char*)(pos_api_param_addr(wqe, 3)));
+
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_Create>({
             /* handle */ var_handle

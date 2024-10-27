@@ -228,8 +228,9 @@ class POSClient {
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
+     *  \return POS_SUCCESS for successfully initialization
      */
-    virtual void init_handle_managers(){}
+    virtual pos_retval_t init_handle_managers(){}
     
 
     /*!

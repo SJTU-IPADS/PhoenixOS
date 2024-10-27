@@ -75,6 +75,8 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("CUDA Module"); }
 
 
+    /* ======================== handle specific fields ======================= */
+ public:
     // function descriptors under this module
     std::vector<POSCudaFunctionDesp*> function_desps;
 
@@ -83,6 +85,7 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
 
     // shadow module for the patched kernel binary
     // void *patched_server_addr;
+    /* ======================== handle specific fields ======================= */
 
 
     /* ==================== checkpoint add/commit/persist ==================== */

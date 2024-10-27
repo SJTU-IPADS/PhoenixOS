@@ -184,17 +184,6 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
 
 
     /*!
-     *  \brief  obtain a device handle by given client-side address
-     *  \param  client_addr the given client-side address
-     *  \param  handle      the resulted handle
-     *  \param  offset      pointer to store the offset of the given address from the base address
-     *  \return POS_FAILED_NOT_EXIST for no corresponding handle exists;
-     *          POS_SUCCESS for successfully founded
-     */
-    pos_retval_t get_handle_by_client_addr(void* client_addr, POSHandle_CUDA_Device** handle, uint64_t* offset=nullptr) override;
-
-
-    /*!
      *  \brief  allocate and restore handles for provision, for fast restore
      *  \param  amount  amount of handles for pooling
      *  \return POS_SUCCESS for successfully preserving

@@ -346,19 +346,6 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
     uint64_t nb_context, i, j;
     POSHandle *context_handle;
     
-    if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
-        retval = POS_FAILED_INVALID_INPUT;
-        POS_WARC_C("failed to init handle manager for CUDA memory, no context provided");
-        goto exit;
-    }
-
-    nb_context = related_handles[kPOS_ResourceTypeId_CUDA_Context].size();
-    if(unlikely(nb_context == 0)){
-        retval = POS_FAILED_INVALID_INPUT;
-        POS_WARC_C("failed to init handle manager for CUDA memory, no context provided");
-        goto exit;
-    }
-
     /*!
      *  \brief  reserve a large portion of virtual memory space on a specified device
      *  \param  context_handle  handle of the context of the specified device
@@ -379,14 +366,14 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
 
         POS_ASSERT(context_handle->parent_handles.size() == 1);
         POS_ASSERT(context_handle->parent_handles[0]->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
-        device_id = static_cast<int>(context_handle->parent_handles[0]->client_addr);
+        device_id = static_cast<int>((uint64_t)(context_handle->parent_handles[0]->client_addr));
 
         POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 0);
         POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 0);
 
         // switch to target device
         if(unlikely(CUDA_SUCCESS != (
-            dv_retval = cuCtxPushCurrent(reinterpret_cast<CUcontext>(context_handle->server_addr))
+            dv_retval = cuCtxPushCurrent(static_cast<CUcontext>(context_handle->server_addr))
         ))){
             POS_WARN(
                 "failed to preserve memory on CUDA device, failed to call cuCtxPushCurrent: retval(%d), device_id(%d)",
@@ -451,9 +438,9 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
         if(do_ctx_switch == true){
             // switch back to old context
             if(unlikely(CUDA_SUCCESS != (
-                dv_retval = cuCtxPopCurrent(&old_ctx);
+                dv_retval = cuCtxPopCurrent(&old_ctx)
             ))){
-                POS_WARN_C("preserved memory on CUDA device, but failed to call cuCtxPopCurrent: retval(%d)", dv_retval);
+                POS_WARN("preserved memory on CUDA device, but failed to call cuCtxPopCurrent: retval(%d)", dv_retval);
                 retval = POS_FAILED_DRIVER;
             } else {
                 cuCtxSynchronize();
@@ -461,6 +448,19 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
         }
         return retval;
     };
+
+    if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
+        retval = POS_FAILED_INVALID_INPUT;
+        POS_WARN_C("failed to init handle manager for CUDA memory, no context provided");
+        goto exit;
+    }
+
+    nb_context = related_handles[kPOS_ResourceTypeId_CUDA_Context].size();
+    if(unlikely(nb_context == 0)){
+        retval = POS_FAILED_INVALID_INPUT;
+        POS_WARN_C("failed to init handle manager for CUDA memory, no context provided");
+        goto exit;
+    }
 
     // no need to conduct reserving if previous hm has already done
     if(this->has_finshed_reserved == true){ goto exit; }
@@ -490,7 +490,7 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     POSHandle_CUDA_Memory** handle,
     std::map<uint64_t, std::vector<POSHandle*>> related_handles,
     size_t size,
-    bool use_expected_addr = false,
+    bool use_expected_addr,
     uint64_t expected_addr,
     uint64_t state_size
 ){
@@ -510,8 +510,8 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     // get device id based on context handle
     POS_ASSERT(context_handle->parent_handles.size() == 1);
     POS_CHECK_POINTER(device_handle = context_handle->parent_handles[0]);
-    POS_CHECK_POINTER(device_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Device);
-    device_id = static_cast<int>(device_handle->client_addr);
+    POS_ASSERT(device_handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
+    device_id = static_cast<int>((uint64_t)(device_handle->client_addr));
 
     POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 1);
     POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 1);

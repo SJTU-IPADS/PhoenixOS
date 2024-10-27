@@ -35,7 +35,7 @@ namespace cuda_malloc {
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
         POSHandle_CUDA_Memory *memory_handle;
-        POSHandleManager_CUDA_Device *hm_device;
+        POSHandleManager_CUDA_Context *hm_context;
         POSHandleManager_CUDA_Memory *hm_memory;
 
         POS_CHECK_POINTER(wqe);
@@ -56,15 +56,15 @@ namespace cuda_malloc {
         }
     #endif
 
-        hm_device = pos_get_client_typed_hm(
-            client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
         );
-        POS_CHECK_POINTER(hm_device);
-        POS_CHECK_POINTER(hm_device->latest_used_handle);
-        
+        POS_CHECK_POINTER(hm_context);
+        POS_CHECK_POINTER(hm_context->latest_used_handle);
+
         // record the related handle to QE
         wqe->record_handle<kPOS_Edge_Direction_In>({
-            /* handle */ hm_device->latest_used_handle
+            /* handle */ hm_context->latest_used_handle
         });
 
         hm_memory = pos_get_client_typed_hm(
@@ -76,8 +76,8 @@ namespace cuda_malloc {
         retval = hm_memory->allocate_mocked_resource(
             /* handle */ &memory_handle,
             /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
-                /* id */ kPOS_ResourceTypeId_CUDA_Device, 
-                /* handles */ std::vector<POSHandle*>({hm_device->latest_used_handle}) 
+                /* id */ kPOS_ResourceTypeId_CUDA_Context, 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
             }}),
             /* size */ pos_api_param_value(wqe, 0, size_t),
             /* use_expected_addr */ false,
@@ -317,7 +317,6 @@ namespace cuda_launch_kernel {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
-        wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
         // the 3rd parameter of the API call contains parameter to launch the kernel
         args = pos_api_param_addr(wqe, 3);
@@ -864,7 +863,6 @@ namespace cuda_memcpy_h2d_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
-            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
         hm_memory->record_host_stateful_handle(memory_handle);
@@ -953,7 +951,6 @@ namespace cuda_memcpy_d2h_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
-            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
     exit:
@@ -1062,7 +1059,6 @@ namespace cuda_memcpy_d2d_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
-            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
     exit:
@@ -1151,7 +1147,6 @@ namespace cuda_memset_async {
             wqe->record_handle<kPOS_Edge_Direction_In>({
                 /* handle */ stream_handle
             });
-            wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
         }
 
     exit:
@@ -1174,6 +1169,10 @@ namespace cuda_set_device {
 
         POSHandleManager_CUDA_Device *hm_device;
         POSHandle_CUDA_Device *device_handle;
+
+        POSHandleManager_CUDA_Context *hm_context;
+        POSHandle_CUDA_Context *context_handle;
+        uint64_t i, nb_context;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1217,10 +1216,31 @@ namespace cuda_set_device {
 
         hm_device->latest_used_handle = device_handle;
 
+
+        // update latest-used context
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
+        POS_CHECK_POINTER(hm_context);
+
+        nb_context = hm_context->get_nb_handles();
+        for(i=0; i<nb_context; i++){
+            POS_CHECK_POINTER(context_handle = hm_context->get_handle_by_id(i));
+            POS_ASSERT(context_handle->parent_handles.size() == 1);
+            POS_ASSERT(context_handle->parent_handles[0]->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
+            if(context_handle->parent_handles[0] == device_handle){
+                hm_context->latest_used_handle = context_handle;
+                break;
+            }
+
+            if(unlikely(i == nb_context-1)){
+                POS_ERROR_DETAIL("failed to update latest context, no context on device, this is a bug");
+            }
+        }
+
     exit:
         return retval;
     }
-
 } // namespace cuda_set_device
 
 
@@ -1452,8 +1472,8 @@ namespace cuda_get_device {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
-
         POSHandleManager_CUDA_Device *hm_device;
+        int latest_device_id;
         
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1466,9 +1486,12 @@ namespace cuda_get_device {
             client, kPOS_ResourceTypeId_CUDA_Device, POSHandleManager_CUDA_Device
         );
         POS_CHECK_POINTER(hm_device);
+        POS_CHECK_POINTER(hm_device->latest_used_handle);
 
         POS_CHECK_POINTER(wqe->api_cxt->ret_data);
-        memcpy(wqe->api_cxt->ret_data, &(hm_device->latest_used_handle->id), sizeof(int));
+
+        latest_device_id = static_cast<int>((uint64_t)(hm_device->latest_used_handle->client_addr));
+        memcpy(wqe->api_cxt->ret_data, &(latest_device_id), sizeof(int));
 
         // the api is finish, one can directly return
         wqe->status = kPOS_API_Execute_Status_Return_Without_Worker;
@@ -1741,6 +1764,7 @@ namespace cuda_event_create_with_flags {
         POSClient_CUDA *client;
         POSHandle_CUDA_Event *event_handle;
         POSHandleManager_CUDA_Event *hm_event;
+        POSHandleManager_CUDA_Context *hm_context;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -1760,6 +1784,12 @@ namespace cuda_event_create_with_flags {
         }
     #endif
 
+        hm_context = pos_get_client_typed_hm(
+            client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
+        );
+        POS_CHECK_POINTER(hm_context);
+        POS_CHECK_POINTER(hm_context->latest_used_handle);
+
         hm_event = pos_get_client_typed_hm(
             client, kPOS_ResourceTypeId_CUDA_Event, POSHandleManager_CUDA_Event
         );
@@ -1768,7 +1798,10 @@ namespace cuda_event_create_with_flags {
         // operate on handler manager
         retval = hm_event->allocate_mocked_resource(
             /* handle */ &event_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>()
+            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
+                /* id */ kPOS_ResourceTypeId_CUDA_Context, 
+                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
+            }})
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("parse(cuda_event_create_with_flags): failed to allocate mocked resource within the CUDA event handler manager");
@@ -1781,14 +1814,7 @@ namespace cuda_event_create_with_flags {
             /* handle */ event_handle
         });
 
-        #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-            // set host checkpoint record
-            retval = event_handle->checkpoint_commit_host(
-                /* version_id */ wqe->id,
-                /* data */ pos_api_param_addr(wqe, 0),
-                /* size */ pos_api_param_size(wqe, 0)
-            );
-        #endif
+        event_handle->flags = pos_api_param_value(wqe, 0, int);
 
         // mark this sync call can be returned after parsing
         memcpy(wqe->api_cxt->ret_data, &(event_handle->client_addr), sizeof(cudaEvent_t));
@@ -1940,7 +1966,6 @@ namespace cuda_event_record {
         wqe->record_handle<kPOS_Edge_Direction_In>({
             /* handle */ stream_handle
         });
-        wqe->execution_stream_id = (uint64_t)(stream_handle->server_addr);
 
     exit:
         return retval;

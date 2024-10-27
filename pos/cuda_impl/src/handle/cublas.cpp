@@ -14,21 +14,21 @@
 
 
 POSHandle_cuBLAS_Context::POSHandle_cuBLAS_Context(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size)
-    : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size), lastest_used_stream(nullptr)
+    : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size)
 {
     this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
 }
 
 
 POSHandle_cuBLAS_Context::POSHandle_cuBLAS_Context(size_t size_, void* hm, pos_u64id_t id_, uint64_t state_size) 
-    : POSHandle_CUDA(size_, hm, id_, state_size), lastest_used_stream(nullptr)
+    : POSHandle_CUDA(size_, hm, id_, state_size)
 {
     POS_ERROR_C_DETAIL("shouldn't be called");
 }
 
 
 POSHandle_cuBLAS_Context::POSHandle_cuBLAS_Context(void* hm) 
-    : POSHandle_CUDA(hm), lastest_used_stream(nullptr)
+    : POSHandle_CUDA(hm)
 {
     this->resource_type_id = kPOS_ResourceTypeId_cuBLAS_Context;
 }

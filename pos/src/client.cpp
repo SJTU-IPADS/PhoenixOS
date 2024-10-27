@@ -52,14 +52,31 @@ POSClient::POSClient()
 
 
 void POSClient::init(){
+    pos_retval_t retval = POS_SUCCESS;
     std::map<pos_u64id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
     std::multimap<pos_u64id_t, POSHandle*> missing_handle_map;
 
-    this->init_handle_managers();
-    this->__create_qgroup();
+    if(unlikely(POS_SUCCESS != (
+        retval = this->init_handle_managers()
+    ))){
+        POS_WARN_C("failed to initialize handle managers");
+        goto exit;
+    }
+    
+    if(unlikely(POS_SUCCESS != (
+        retval = this->__create_qgroup()
+    ))){
+        POS_WARN_C("failed to initialize queue group");
+        goto exit;
+    }
 
-    // enable parser and worker to poll
-    this->status = kPOS_ClientStatus_Active;
+exit:
+    if(unlikely(retval != POS_SUCCESS)){
+        this->status = kPOS_ClientStatus_Hang;
+    } else {
+        // enable parser and worker to poll
+        this->status = kPOS_ClientStatus_Active;
+    }
 }
 
 

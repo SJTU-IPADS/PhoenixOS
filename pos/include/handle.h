@@ -30,6 +30,7 @@
 #include <assert.h>
 #include "pos/include/common.h"
 #include "pos/include/log.h"
+#include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/utils/serializer.h"
 #include "pos/include/checkpoint.h"
 
@@ -215,6 +216,89 @@ class POSHandle {
 
 
     /*!
+     *  \brief  serialize the state of current handle into the binary area
+     *  \param  serialized_area  pointer to the binary area
+     *  \return POS_SUCCESS for successfully serilization
+     */
+    pos_retval_t serialize(void** serialized_area);
+
+
+    /*!
+     *  \brief  obtain the size of the serialize area of this handle
+     *  \return size of the serialize area of this handle
+     */
+    inline uint64_t get_serialize_size(){
+        return (
+            /* size of basic field */   sizeof(uint64_t)
+            /* basic field */           + this->__get_basic_serialize_size() 
+            /* extra field */           + this->__get_extra_serialize_size()
+        );
+    }
+
+
+    /*!
+     *  \brief  deserialize the state of current handle from binary area
+     *  \param  raw_area    raw data area
+     *  \return POS_SUCCESS for successfully serialization
+     */
+    pos_retval_t deserialize(void* raw_area);
+
+
+    /* ======================= basic handle metadata ========================= */
+ public:
+    // index of this handle in the handle list of handle manager
+    pos_u64id_t id;
+
+    /*!
+    *  \brief  the typeid of the resource kind which this handle represents
+    *  \note   the children class of this base class should replace this value
+    *          with their own typeid
+    */
+    pos_resource_typeid_t resource_type_id;
+
+
+    // exitance and state status of the resource behind this handle
+    pos_handle_status_t status;
+    pos_handle_status_t state_status;
+
+    // the mocked client-side address of the handle
+    void *client_addr;
+
+    // the actual server-side address of the handle
+    void *server_addr;
+    
+    // remote sserver address on the backup device
+    void *remote_server_addr;
+
+    /*!
+     *  \brief    size of the resources represented by this handle
+     *  \example  the size of the buffer represented by current handler 
+     *            (i.e., a device memory pointer)
+     *  \note     for some handles (e.g., cudaStream_t), this value should remain
+     *            constant —— kPOS_HandleDefaultSize
+     */
+    size_t size;
+
+    /*!
+     *  \brief  size of the resource state behind this handle
+     */
+    size_t state_size;
+
+    /*!
+     *  \brief  latest modified version of this handle
+     *  \note   this field should be updated after the succesful execution of API within worker thread
+     *          (and the API inout/output this handle)
+     */
+    pos_u64id_t latest_version;
+    
+    /*!
+     *  \brief  identify whether current handle is the latest used handle in the manager
+     *  \note   this field is only used during restore phrase
+     */
+    bool is_lastest_used_handle;
+
+
+    /*!
      *  \brief  setting the server-side address of the handle after finishing allocation
      *  \param  addr  the server-side address of the handle
      */
@@ -233,11 +317,68 @@ class POSHandle {
 
 
     /*!
+     *  \brief  identify whether a given address is located within the resource
+     *          that current handle represents
+     *  \param  addr    the given address
+     *  \param  offset  pointer to store the offset of the given address from the base
+     *                  address, if the given address is located within the resource
+     *                  that current handle represents
+     *  \return identify result
+     */
+    bool is_client_addr_in_range(void *addr, uint64_t *offset=nullptr);
+
+
+    /*!
+     *  \brief  mark the status of this handle
+     *  \param  status the status to mark
+     *  \note   this function would call the inner function within the corresponding handle manager
+     */
+    void mark_status(pos_handle_status_t status);
+
+
+    /*!
+     *  \brief  mark the status of state of the resource behind this handle
+     *  \param  status the state status to mark
+     */
+    inline void mark_state_status(pos_handle_status_t status){
+        POS_ASSERT(status == kPOS_HandleStatus_StateReady || status == kPOS_HandleStatus_StateMiss);
+        this->state_status = status;
+    }
+
+
+    /*!
+     *  \brief  obtain the resource name begind this handle
+     *  \return resource name begind this handle
+     */
+    virtual std::string get_resource_name(){ return std::string("unknown"); }
+    /* ======================= basic handle metadata ========================= */
+
+
+    /* ===================== parent handles management ======================= */
+ public:
+    /*!
+     *  \brief  pointer to the instance of parent handle
+     *  \note   this field is inited by parser thread, updated by worker thread
+     *  \note   we seperate the init and create owner, as the __restore function
+     *          of POSHandle could be executed in worker thread, where parent_handles
+     *          would be accessed; so when we need to change parent handles, we here
+     *          use the worker to update this parent_handles
+     */
+    std::vector<POSHandle*> parent_handles;
+
+    /*!
+     *  \brief  resource type and handle indices of parent handles of this handle
+     *  \note   this field is filled during restore process, for temporily store the indices
+     *          of all parent handles of this handle
+     */
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
+
+
+    /*!
      *  \brief  record a new parent handle of current handle
      */
     inline void record_parent_handle(POSHandle* parent){
-        POS_CHECK_POINTER(parent);
-        parent_handles.push_back(parent);
+        POS_CHECK_POINTER(parent); parent_handles.push_back(parent);
     }
 
 
@@ -274,9 +415,7 @@ class POSHandle {
         inline void reset(){
             uint16_t i;
             for(i=0; i<_broken_handles.size(); i++){
-                if(likely(_broken_handles[i] != nullptr)){
-                    _broken_handles[i]->clear();
-                }
+                if(likely(_broken_handles[i] != nullptr)){ _broken_handles[i]->clear(); }
             }
         }
 
@@ -333,135 +472,9 @@ class POSHandle {
      *  \param  layer_id            index of the layer at this call
      */
     void collect_broken_handles(pos_broken_handle_list_t *broken_handle_list, uint16_t layer_id = 0);
+    /* ===================== parent handles management ======================= */
 
 
-    /*!
-     *  \brief  identify whether a given address is located within the resource
-     *          that current handle represents
-     *  \param  addr    the given address
-     *  \param  offset  pointer to store the offset of the given address from the base
-     *                  address, if the given address is located within the resource
-     *                  that current handle represents
-     *  \return identify result
-     */
-    bool is_client_addr_in_range(void *addr, uint64_t *offset=nullptr);
-
-
-    /*!
-     *  \brief  mark the status of this handle
-     *  \param  status the status to mark
-     *  \note   this function would call the inner function within the corresponding handle manager
-     */
-    void mark_status(pos_handle_status_t status);
-
-
-    /*!
-     *  \brief  mark the status of state of the resource behind this handle
-     *  \param  status the state status to mark
-     */
-    inline void mark_state_status(pos_handle_status_t status){
-        POS_ASSERT(status == kPOS_HandleStatus_StateReady || status == kPOS_HandleStatus_StateMiss);
-        this->state_status = status;
-    }
-
-
-    /*!
-     *  \brief  obtain the resource name begind this handle
-     *  \return resource name begind this handle
-     */
-    virtual std::string get_resource_name(){ return std::string("unknown"); }
-
-
-    /*!
-     *  \brief  serialize the state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t serialize(void** serialized_area);
-
-
-    /*!
-     *  \brief  obtain the size of the serialize area of this handle
-     *  \return size of the serialize area of this handle
-     */
-    inline uint64_t get_serialize_size(){
-        return (
-            /* size of basic field */   sizeof(uint64_t)
-            /* basic field */           + this->__get_basic_serialize_size() 
-            /* extra field */           + this->__get_extra_serialize_size()
-        );
-    }
-
-
-    /*!
-     *  \brief  deserialize the state of current handle from binary area
-     *  \param  raw_area    raw data area
-     *  \return POS_SUCCESS for successfully serialization
-     */
-    pos_retval_t deserialize(void* raw_area);
-
-
-    /*!
-    *  \brief  the typeid of the resource kind which this handle represents
-    *  \note   the children class of this base class should replace this value
-    *          with their own typeid
-    */
-    pos_resource_typeid_t resource_type_id;
-
-
-    // exitance and state status of the resource behind this handle
-    pos_handle_status_t status;
-    pos_handle_status_t state_status;
-
-    // the mocked client-side address of the handle
-    void *client_addr;
-
-    // the actual server-side address of the handle
-    void *server_addr;
-    
-    // remote sserver address on the backup device
-    void *remote_server_addr;
-
-    // pointer to the instance of parent handle
-    std::vector<POSHandle*> parent_handles;
-
-    /*!
-     *  \brief  resource type and handle indices of parent handles of this handle
-     *  \note   this field is filled during restore process, for temporily store the indices
-     *          of all parent handles of this handle
-     */
-    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
-
-    /*!
-     *  \brief    size of the resources represented by this handle
-     *  \example  the size of the buffer represented by current handler 
-     *            (i.e., a device memory pointer)
-     *  \note     for some handles (e.g., cudaStream_t), this value should remain
-     *            constant —— kPOS_HandleDefaultSize
-     */
-    size_t size;
-
-    /*!
-     *  \brief  size of the resource state behind this handle
-     */
-    size_t state_size;
-
-    /*!
-     *  \brief  latest modified version of this handle
-     *  \note   this field should be updated after the succesful execution of API within worker thread
-     *          (and the API inout/output this handle)
-     */
-    pos_u64id_t latest_version;
-    
-    /*!
-     *  \brief  identify whether current handle is the latest used handle in the manager
-     *  \note   this field is only used during restore phrase
-     */
-    bool is_lastest_used_handle;
-
-    // index of this handle in the handle list of handle manager
-    pos_u64id_t id;
- 
 
     /* ==================== checkpoint add/commit/persist ==================== */
  public:
@@ -914,6 +927,7 @@ class POSHandleManager {
         return _modified_handles;
     }
 
+
     /*!
      *  \brief  obtain a handle by given client-side address
      *  \param  client_addr the given client-side address
@@ -924,15 +938,21 @@ class POSHandleManager {
      */
     virtual pos_retval_t get_handle_by_client_addr(void* client_addr, T_POSHandle** handle, uint64_t* offset=nullptr);
 
+
     /*!
-     *  \brief    last-used handle
-     *  \example  for device handle manager, one need to record the last-used device for later usage
-     *            (e.g., cudaGetDevice, cudaMalloc)
+     *  \brief      last-used handle
+     *  \example    for some handle manager (e.g., CUDA device, cuBLAS), one need to record the last-used handle 
+     *              for later usage (e.g., cudaGetDevice, cublasSetStream)
      */
     T_POSHandle* latest_used_handle;
 
-    //! \todo  mock
-    void* backup_base_memory;
+
+    /*!
+     *  \brief    default handle to use
+     *  \example  for some handle manager (e.g., CUDA stream), one need to record the default handle
+     */
+    T_POSHandle* default_handle;
+
 
     /*!
      *  \brief  obtain the number of recorded handles
@@ -1201,12 +1221,12 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         POS_CHECK_POINTER(*handle);
     } else {
         // if one want to create on an expected address, we directly move the pointer forward
-        if(unlikely(expected_addr != 0)){
-            _base_ptr = expected_addr;
+        if(unlikely(use_expected_addr == true)){
+            this->_base_ptr = expected_addr;
         }
 
         // make sure the resource to be allocated won't exceed the range
-        if(unlikely(kPOS_ResourceEndAddr - _base_ptr < size)){
+        if(unlikely(kPOS_ResourceEndAddr - this->_base_ptr < size)){
             POS_WARN_C(
                 "failed to allocate new resource, exceed range: request %lu bytes, yet %lu bytes left",
                 size, kPOS_ResourceEndAddr - _base_ptr
@@ -1217,7 +1237,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         }
 
         *handle = new T_POSHandle(
-            /* client_addr */ (void*)_base_ptr,
+            /* client_addr */ (void*)(this->_base_ptr),
             /* size_ */ size,
             /* hm */ this,
             /* id_ */ this->_handles.size(),
@@ -1226,17 +1246,17 @@ pos_retval_t POSHandleManager<T_POSHandle>::__allocate_mocked_resource(
         POS_CHECK_POINTER(*handle);
 
         // record client-side address to the map
-        retval = record_handle_address((void*)(_base_ptr), *handle);
+        retval = record_handle_address((void*)(this->_base_ptr), *handle);
         if(unlikely(POS_SUCCESS != retval)){
             goto exit;
         }
 
-        _base_ptr += size;
+        this->_base_ptr += size;
     }
 
     POS_DEBUG_C(
         "allocate new resource: _base_ptr(%p), size(%lu), POSHandle.resource_type_id(%u)",
-        _base_ptr, size, (*handle)->resource_type_id
+        this->_base_ptr, size, (*handle)->resource_type_id
     );
 
     this->_handles.push_back(*handle);

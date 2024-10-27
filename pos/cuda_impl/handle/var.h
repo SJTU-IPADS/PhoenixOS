@@ -31,6 +31,10 @@
 #include "pos/cuda_impl/handle.h"
 
 
+// forward declaration
+class POSHandleManager_CUDA_Var;
+
+
 /*!
  *  \brief  handle for cuda variable
  */
@@ -44,71 +48,88 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, state_size_)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
-    }
+    POSHandle_CUDA_Var(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
     /*!
      *  \param  hm  handle manager which this handle belongs to
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Var(void* hm) : POSHandle_CUDA(hm)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Var;
-    }
+    POSHandle_CUDA_Var(void* hm);
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Var(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(size_, hm, id_, state_size_)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_CUDA_Var(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
+    
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
     std::string get_resource_name(){ return std::string("CUDA Var"); }
 
+
+    /* ======================== handle specific fields ======================= */
+ public:
+    // name of the global symbol
+    std::string global_name;
+    /* ======================== handle specific fields ======================= */
+
+
+    /* ==================== checkpoint add/commit/persist ==================== */
+ protected:
+    /*!
+     *  \brief  add the state of the resource behind this handle to on-device memory
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \note   the add process must be sync
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __add(uint64_t version_id, uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief  commit the state of the resource behind this handle
+     *  \param  version_id  version of this checkpoint
+     *  \param  stream_id   index of the stream to do this checkpoint
+     *  \param  from_cow    whether to dump from on-device cow buffer
+     *  \param  is_sync    whether the commit process should be sync
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointed
+     */
+    pos_retval_t __commit(
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
+        bool is_sync=false, std::string ckpt_dir=""
+    ) override;
+
+
+    /*!
+     *  \brief  generate protobuf message for this handle
+     *  \param  binary      pointer to the generated binary
+     *  \param  base_binary pointer to the base field inside the binary
+     *  \return POS_SUCCESS for succesfully generation
+     */
+    pos_retval_t __generate_protobuf_binary(
+        google::protobuf::Message** binary,
+        google::protobuf::Message** base_binary
+    ) override;
+    /* ==================== checkpoint add/commit/persist ==================== */
+
+
+    /* ======================== restore handle & state ======================= */
+ protected:
+    friend class POSHandleManager_CUDA_Var;
+    friend class POSHandleManager<POSHandle_CUDA_Var>;
+
+
     /*!
      *  \brief  restore the current handle when it becomes broken state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t __restore() override {
-        pos_retval_t retval = POS_SUCCESS;
-        CUresult cuda_dv_retval;
-        CUdeviceptr dptr = 0;
-        size_t d_size = 0;
-        POSHandle *module_handle;
+    pos_retval_t __restore() override;
+    /* ======================== restore handle & state ======================= */
 
-        POS_ASSERT(this->parent_handles.size() == 1);
-        POS_CHECK_POINTER(module_handle = this->parent_handles[0]);
-        POS_ASSERT(module_handle->resource_type_id = kPOS_ResourceTypeId_CUDA_Module);
-
-        POS_ASSERT(this->name.size() > 0);
-
-        cuda_dv_retval = cuModuleGetGlobal(
-            &dptr, &d_size, (CUmodule)(module_handle->server_addr), this->name.c_str()
-        );
-
-         if(likely(CUDA_SUCCESS == cuda_dv_retval)){
-            this->set_server_addr((void*)dptr);
-            this->mark_status(kPOS_HandleStatus_Active);
-        } else {
-            retval = POS_FAILED;
-            POS_WARN_C_DETAIL("failed to restore CUDA var: %d", cuda_dv_retval);
-        }
-
-        return retval;
-    }
-
-    // name of the kernel
-    std::string name;
 
  protected:
 
@@ -119,7 +140,7 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
     uint64_t __get_extra_serialize_size() override {
         return (
             /* name_size */     sizeof(uint64_t)
-            /* name */          + (this->name.size() > 0 ? this->name.size() + 1 : 0)
+            /* name */          + (this->global_name.size() > 0 ? this->global_name.size() + 1 : 0)
         );
     }
 
@@ -136,10 +157,10 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
 
         POS_CHECK_POINTER(ptr);
         
-        tmp_size = this->name.size();
+        tmp_size = this->global_name.size();
         POSUtil_Serializer::write_field(&ptr, &(tmp_size), sizeof(uint64_t));
         if(tmp_size > 0){
-            POSUtil_Serializer::write_field(&ptr, this->name.c_str(), tmp_size);
+            POSUtil_Serializer::write_field(&ptr, this->global_name.c_str(), tmp_size);
             POSUtil_Serializer::write_field(&ptr, &(eos), 1);
         }
         
@@ -164,7 +185,7 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
             POS_CHECK_POINTER(temp_str = (char*)malloc(tmp_size+1));
             memset(temp_str, 0, tmp_size+1);
             POSUtil_Deserializer::read_field(temp_str, &ptr, tmp_size);
-            this->name = std::string(static_cast<const char*>(temp_str));
+            this->global_name = std::string(static_cast<const char*>(temp_str));
             free(temp_str);
         }
 
@@ -179,61 +200,42 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
 class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
  public:
     /*!
+     *  \brief  initialize of the handle manager
+     *  \note   pre-allocation of handles, e.g., default stream, device, context handles
+     *  \param  related_handles related handles to allocate new handles in this manager
+     *  \return POS_SUCCESS for successfully allocation
+     */
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+
+    /*!
      *  \brief  allocate new mocked CUDA var within the manager
-     *  \param  handle              pointer to the mocked handle of the newly allocated resource
-     *  \param  related_handles     all related handles for helping allocate the mocked resource
-     *                              (note: these related handles might be other types)
-     *  \param  size                size of the newly allocated resource
+     *  \param  handle          pointer to the mocked handle of the newly allocated resource
+     *  \param  related_handles all related handles for helping allocate the mocked resource
+     *                          (note: these related handles might be other types)
+     *  \param  size            size of the newly allocated resource
      *  \param  use_expected_addr   indicate whether to use expected client-side address
-     *  \param  expected_addr       the expected mock addr to allocate the resource (optional)
-     *  \param  state_size          size of resource state behind this handle  
+     *  \param  expected_addr   the expected mock addr to allocate the resource (optional)
+     *  \param  state_size      size of resource state behind this handle  
      *  \return POS_FAILED_DRAIN for run out of virtual address space; 
      *          POS_SUCCESS for successfully allocation
      */
     pos_retval_t allocate_mocked_resource(
         POSHandle_CUDA_Var** handle,
-        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
+        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
         size_t size=kPOS_HandleDefaultSize,
         bool use_expected_addr = false,
         uint64_t expected_addr = 0,
         uint64_t state_size = 0
-    ) override {
-        pos_retval_t retval = POS_SUCCESS;
-        POSHandle *module_handle;
-        POS_CHECK_POINTER(handle);
+    ) override;
 
-        // obtain the context to allocate buffer
-    #if POS_CONF_RUNTIME_EnableDebugCheck
-        if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Module) == 0)){
-            POS_WARN_C("no binded module provided to create the CUDA var");
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
-    #endif
-
-        module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
-        POS_CHECK_POINTER(module_handle);
-
-        retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, state_size);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to allocate mocked CUDA stream in the manager");
-            goto exit;
-        }
-
-        (*handle)->record_parent_handle(module_handle);
-
-    exit:
-        return retval;
-    }
 
     /*!
      *  \brief  allocate and restore handles for provision, for fast restore
      *  \param  amount  amount of handles for pooling
      *  \return POS_SUCCESS for successfully preserving
      */
-    pos_retval_t preserve_pooled_handles(uint64_t amount) override {
-        return POS_SUCCESS;
-    }
+    pos_retval_t preserve_pooled_handles(uint64_t amount) override;
+
 
     /*!
      *  \brief  restore handle from pool
@@ -241,7 +243,5 @@ class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
      *  \return POS_SUCCESS for successfully restoring
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
-    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Var* handle) override {
-        return POS_FAILED;
-    }
+    pos_retval_t try_restore_from_pool(POSHandle_CUDA_Var* handle) override;
 };

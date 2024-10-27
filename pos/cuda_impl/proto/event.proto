@@ -9,4 +9,5 @@ import "pos/include/proto/handle.proto";
  */
  message Bin_POSHandle_CUDA_Event {
     Bin_POSHanlde base = 1;
+    int32 flags = 2;
 }

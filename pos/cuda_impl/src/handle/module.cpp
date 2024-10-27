@@ -305,10 +305,10 @@ exit:
 pos_retval_t POSHandleManager_CUDA_Module::allocate_mocked_resource(
     POSHandle_CUDA_Module** handle,
     std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
-    size_t size=kPOS_HandleDefaultSize,
-    bool use_expected_addr = false,
-    uint64_t expected_addr = 0,
-    uint64_t state_size = 0
+    size_t size,
+    bool use_expected_addr,
+    uint64_t expected_addr,
+    uint64_t state_size
 ){
     pos_retval_t retval = POS_SUCCESS;
     POSHandle *context_handle;

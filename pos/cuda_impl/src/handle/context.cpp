@@ -31,19 +31,19 @@ POSHandle_CUDA_Context::POSHandle_CUDA_Context(void* hm) : POSHandle_CUDA(hm){
 }
 
 
-POSHandle_CUDA_Context(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
+POSHandle_CUDA_Context::POSHandle_CUDA_Context(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
     : POSHandle_CUDA(size_, hm, id_, state_size_)
 {
     POS_ERROR_C_DETAIL("shouldn't be called");
 }
 
 
-pos_retval_t POSHandle_CUDA_Context::__add(uint64_t version_id, uint64_t stream_id=0){
+pos_retval_t POSHandle_CUDA_Context::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }
 
 
-pos_retval_t __commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir){
+pos_retval_t POSHandle_CUDA_Context::__commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir){
     return this->__persist(nullptr, ckpt_dir, stream_id);
 }
 
@@ -86,11 +86,13 @@ pos_retval_t POSHandle_CUDA_Context::__restore(){
         goto exit;
     }
 
-    POS_ASSERT(this->parent_handles.size() > 0);
+    POS_ASSERT(this->parent_handles.size() == 1);
     POS_CHECK_POINTER(parent_device_handle = this->parent_handles[0]);
     POS_ASSERT(parent_device_handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
 
-    if((cuda_rt_res = cudaSetDevice(static_cast<int>(parent_device_handle->client_addr))) != cudaSuccess){
+    if(unlikely(cudaSuccess != (
+        cuda_rt_res = cudaSetDevice(static_cast<int>((uint64_t)(parent_device_handle->client_addr)))
+    ))){
         retval = POS_FAILED_DRIVER;
         POS_WARN_C_DETAIL("failed to restore CUDA context, cudaSetDevice failed: %d", cuda_rt_res);
         goto exit;
@@ -122,17 +124,18 @@ pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, nb_device;
     POSHandle *device_handle;
+    POSHandle_CUDA_Context *ctx_handle;
     
     if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Device) == 0)){
         retval = POS_FAILED_INVALID_INPUT;
-        POS_WARC_C("failed to init handle manager for CUDA context, no device provided");
+        POS_WARN_C("failed to init handle manager for CUDA context, no device provided");
         goto exit;
     }
 
     nb_device = related_handles[kPOS_ResourceTypeId_CUDA_Device].size();
     if(unlikely(nb_device == 0)){
         retval = POS_FAILED_INVALID_INPUT;
-        POS_WARC_C("failed to init handle manager for CUDA context, no device provided");
+        POS_WARN_C("failed to init handle manager for CUDA context, no device provided");
         goto exit;
     }
 
@@ -143,22 +146,31 @@ pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<
         if(unlikely(POS_SUCCESS != (
             retval = this->allocate_mocked_resource(
                 /* handle */ &ctx_handle,
-                /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>(
-                    { kPOS_ResourceTypeId_CUDA_Device, {device_handle} }
-                ),
+                /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
+                    { kPOS_ResourceTypeId_CUDA_Device, { device_handle } }
+                }),
                 /* size */ sizeof(CUcontext)
             )
         ))){
             POS_WARN_C_DETAIL(
                 "failed to allocate mocked CUDA context in the manager: device_id(%d)",
-                static_cast<int>(device_handle->client_addr)
+                static_cast<int>((uint64_t)(device_handle->client_addr))
             );
             continue;
-        }
+        }        
+    }
+    this->latest_used_handle = this->_handles[0];
 
-        // record in the manager
-        this->_handles.push_back(ctx_handle);
-        this->latest_used_handle = this->_handles[0];
+    // here we need to bind this context to real device context,
+    // which we have alreay created by workspace
+    for(i=0; i<this->_handles.size(); i++){
+        POS_CHECK_POINTER(ctx_handle = this->get_handle_by_id(i));
+        if(unlikely(POS_SUCCESS != (
+            retval = ctx_handle->__restore()
+        ))){
+            POS_WARN_C("failed to bind CUDA context to real device: device_id(%d)", i);
+            goto exit;
+        }
     }
 
 exit:
@@ -168,11 +180,11 @@ exit:
 
 pos_retval_t POSHandleManager_CUDA_Context::allocate_mocked_resource(
     POSHandle_CUDA_Context** handle,
-    std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
-    size_t size=kPOS_HandleDefaultSize,
-    bool use_expected_addr = false,
-    uint64_t expected_addr = 0,
-    uint64_t state_size = 0
+    std::map<uint64_t, std::vector<POSHandle*>> related_handles,
+    size_t size,
+    bool use_expected_addr,
+    uint64_t expected_addr,
+    uint64_t state_size
 ){
     pos_retval_t retval = POS_SUCCESS;
     POSHandle *device_handle;
