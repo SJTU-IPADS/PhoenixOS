@@ -127,11 +127,28 @@ pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param
     pos_retval_t retval = POS_SUCCESS;
     pos_client_cxt_CUDA_t client_cxt;
     std::string runtime_daemon_log_path;
+    std::string conf;
 
     POS_CHECK_POINTER(*client);
 
     client_cxt.cxt_base.job_name = param.job_name;
+    client_cxt.cxt_base.pid = param.pid;
     client_cxt.cxt_base.handle_type_idx = this->handle_type_idx;
+
+    retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeTraceResourceEnabled, conf);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_ERROR_C("failed to obtain resource trace mode in workspace configuration, this is a bug");
+    }
+    if(conf == "1"){ client_cxt.cxt_base.trace_resource = true; }
+    else { client_cxt.cxt_base.trace_resource = false; }
+
+    retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeTracePerformanceEnabled, conf);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_ERROR_C("failed to obtain resource trace mode in workspace configuration, this is a bug");
+    }
+    if(conf == "1"){ client_cxt.cxt_base.trace_performance = true; }
+    else { client_cxt.cxt_base.trace_performance = false; }
+
     retval = this->ws_conf.get(POSWorkspaceConf::ConfigType::kRuntimeDaemonLogPath, runtime_daemon_log_path);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to obtain runtime daemon log path");

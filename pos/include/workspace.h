@@ -48,6 +48,7 @@ namespace oob_functions {
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_register_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_unregister_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_predump);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_trace_resource);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore_signal);
     POS_OOB_DECLARE_SVR_FUNCTIONS(utils_mock_api_call);
@@ -66,6 +67,9 @@ class POSWorkspaceConf {
     // configuration index in this container
     enum ConfigType : uint16_t {
         kRuntimeDaemonLogPath = 0,
+        kRuntimeTraceResourceEnabled,
+        kRuntimeTracePerformanceEnabled,
+        kRuntimeTraceDir,
         kEvalCkptIntervfalMs,
         kUnknown
     }; 
@@ -94,6 +98,10 @@ class POSWorkspaceConf {
     // ====== runtime configurations ======
     // path of the daemon's log
     std::string _runtime_daemon_log_path;
+    // whether the workspace is in trace mode
+    bool _runtime_trace_resource;
+    bool _runtime_trace_performance;
+    std::string _runtime_trace_dir;
 
     // ====== evaluation configurations ======
     // continuous checkpoint interval (ticks)

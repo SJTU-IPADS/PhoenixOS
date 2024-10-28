@@ -22,7 +22,13 @@
 
 POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
     POS_CHECK_POINTER(this->_root_ws = root_ws);
+
+    // runtime configurations
     this->_runtime_daemon_log_path = POS_CONF_RUNTIME_DefaultDaemonLogPath;
+    this->_runtime_trace_resource = false;
+    this->_runtime_trace_performance = false;
+
+    // evaluation configurations
     this->_eval_ckpt_interval_tick = this->_root_ws->tsc_timer.ms_to_tick(
         POS_CONF_EVAL_CkptDefaultIntervalMs
     );
@@ -40,6 +46,30 @@ pos_retval_t POSWorkspaceConf::set(ConfigType conf_type, std::string val){
     {
     case kRuntimeDaemonLogPath:
         // TODO:
+        break;
+
+    case kRuntimeTraceResourceEnabled:
+        if(val == "true"){
+            this->_runtime_trace_resource = true;
+            POS_LOG_C("set workspace resource trace mode as enabled");
+        } else {
+            this->_runtime_trace_resource = false;
+            POS_LOG_C("set workspace resource trace mode as disabled");
+        }
+        break;
+
+    case kRuntimeTracePerformanceEnabled:
+        if(val == "true"){
+            this->_runtime_trace_performance = true;
+            POS_LOG_C("set workspace performance trace mode as enabled");
+        } else {
+            this->_runtime_trace_performance = false;
+            POS_LOG_C("set workspace performance trace mode as disabled");
+        }
+        break;
+
+    case kRuntimeTraceDir:
+        this->_runtime_trace_dir = val;
         break;
 
     case kEvalCkptIntervfalMs:
@@ -81,6 +111,18 @@ pos_retval_t POSWorkspaceConf::get(ConfigType conf_type, std::string& val){
         val = this->_runtime_daemon_log_path;
         break;
 
+    case kRuntimeTraceResourceEnabled:
+        val = std::to_string(this->_runtime_trace_resource);
+        break;
+
+    case kRuntimeTracePerformanceEnabled:
+        val = std::to_string(this->_runtime_trace_performance);
+        break;
+
+    case kRuntimeTraceDir:
+        val = this->_runtime_trace_dir;
+        break;
+
     case kEvalCkptIntervfalMs:
         val = std::to_string(this->_eval_ckpt_interval_ms);
         break;
@@ -106,6 +148,7 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
             {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,          oob_functions::cli_ckpt_predump::sv         },
             {   kPOS_OOB_Msg_CLI_Migration_Signal,      oob_functions::cli_migration_signal::sv     },
             {   kPOS_OOB_Msg_CLI_Restore_Signal,        oob_functions::cli_restore_signal::sv       },
+            {   kPOS_OOB_Msg_CLI_Trace_Resource,        oob_functions::cli_trace_resource::sv       },
         },
         /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
         /* port */ POS_OOB_SERVER_DEFAULT_PORT

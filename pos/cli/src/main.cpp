@@ -42,32 +42,36 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
 
     sprintf(
         short_opt,
-        /* action */    "%d%d%d%d%d%d"
-        /* meta */      "%d:%d:%d:%d:",
+        /* action */    "%d%d%d%d%d%d%d"
+        /* meta */      "%d:%d:%d:%d:%d:",
         kPOS_CliAction_Help,
         kPOS_CliAction_PreDump,
         kPOS_CliAction_Dump,
         kPOS_CliAction_Restore,
+        kPOS_CliAction_TraceResource,
         kPOS_CliAction_Migrate,
         kPOS_CliAction_Preserve,
+        kPOS_CliMeta_SubAction,
         kPOS_CliMeta_Pid,
-        kPOS_CliMeta_CkptDir,
+        kPOS_CliMeta_Dir,
         kPOS_CliMeta_Dip,
         kPOS_CliMeta_Dport
     );
 
     struct option long_opt[] = {
         // action types
-        {"help",        no_argument,        NULL,   kPOS_CliAction_Help},
-        {"pre-dump",    no_argument,        NULL,   kPOS_CliAction_PreDump},
-        {"dump",        no_argument,        NULL,   kPOS_CliAction_Dump},
-        {"restore",     no_argument,        NULL,   kPOS_CliAction_Restore},
-        {"migrate",     no_argument,        NULL,   kPOS_CliAction_Migrate},
-        {"preserve",    no_argument,        NULL,   kPOS_CliAction_Preserve},
-        
+        {"help",            no_argument,        NULL,   kPOS_CliAction_Help},
+        {"pre-dump",        no_argument,        NULL,   kPOS_CliAction_PreDump},
+        {"dump",            no_argument,        NULL,   kPOS_CliAction_Dump},
+        {"restore",         no_argument,        NULL,   kPOS_CliAction_Restore},
+        {"migrate",         no_argument,        NULL,   kPOS_CliAction_Migrate},
+        {"preserve",        no_argument,        NULL,   kPOS_CliAction_Preserve},
+        {"trace-resource",  no_argument,        NULL,   kPOS_CliAction_TraceResource},
+
         // metadatas
+        {"subaction",   required_argument,  NULL,   kPOS_CliMeta_SubAction},
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
-        {"dir",         required_argument,  NULL,   kPOS_CliMeta_CkptDir},
+        {"dir",         required_argument,  NULL,   kPOS_CliMeta_Dir},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},
         {"dport",       required_argument,  NULL,   kPOS_CliMeta_Dport},
         
@@ -92,6 +96,9 @@ inline pos_retval_t __dispatch(pos_cli_options_t &clio){
 
     case kPOS_CliAction_Migrate:
         return handle_migrate(clio);
+
+    case kPOS_CliAction_TraceResource:
+        return handle_trace(clio);
     
     default:
         return POS_FAILED_NOT_IMPLEMENTED;
@@ -107,6 +114,7 @@ namespace oob_functions {
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_ckpt_predump);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_restore_signal);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_trace_resource);
 }; // namespace oob_functions
 
 
@@ -119,6 +127,7 @@ int main(int argc, char *argv[]){
     clio.local_oob_client = new POSOobClient(
         /* req_functions */ {
             {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,      oob_functions::cli_ckpt_predump::clnt       },
+            {   kPOS_OOB_Msg_CLI_Trace_Resource,    oob_functions::cli_trace_resource::clnt     },
             {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::clnt   },
             {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::clnt     },
         },

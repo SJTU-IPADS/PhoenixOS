@@ -34,7 +34,7 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
             /* is_required */ true
         },
         {
-            /* meta_type */ kPOS_CliMeta_CkptDir,
+            /* meta_type */ kPOS_CliMeta_Dir,
             /* meta_name */ "dir",
             /* meta_desp */ "directory to store the checkpoint files",
             /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {

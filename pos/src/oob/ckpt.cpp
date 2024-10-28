@@ -17,8 +17,8 @@
 namespace oob_functions {
 
 /*!
- *  \related    kPOS_OOB_Msg_CLI_Migration_RemotePrepare
- *  \brief      signal for prepare remote migration resources (e.g., create RC QP)
+ *  \related    kPOS_OOB_Msg_CLI_Ckpt_PreDump
+ *  \brief      signal for predump the state of a specific client
  */
 namespace cli_ckpt_predump {
     // server

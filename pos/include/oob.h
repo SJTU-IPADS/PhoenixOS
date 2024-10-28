@@ -81,6 +81,11 @@ enum pos_oob_msg_typeid_t {
     kPOS_OOB_Msg_CLI_Ckpt_Dump,
     kPOS_OOB_Msg_CLI_Ckpt_Restore,
     /*!
+     *  \note   trace
+     */
+    kPOS_OOB_Msg_CLI_Trace_Resource,
+    kPOS_OOB_Msg_CLI_Trace_Performance,
+    /*!
      *  \note   migration
      */
     kPOS_OOB_Msg_CLI_Migration_RemotePrepare,
