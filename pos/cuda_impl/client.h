@@ -271,6 +271,80 @@ class POSClient_CUDA : public POSClient {
         this->__dump_hm_cuda_functions();
     }
 
+
+    /*!
+     *  \brief  deinit: dumping resource tracing result if enabled
+     */
+    void deinit_dump_trace_resource() override {
+        pos_retval_t retval = POS_SUCCESS;
+        std::string trace_dir, apicxt_dir, resource_dir;
+        uint64_t i;
+        POSHandleManager<POSHandle>* hm;
+        POSHandle *handle;
+        POSAPIContext_QE *wqe;
+        std::vector<POSAPIContext_QE*> wqes;
+
+        POS_LOG_C("dumping trace resource result...");
+
+        // create directory
+        retval = this->_ws->ws_conf.get(POSWorkspaceConf::kRuntimeTraceDir, trace_dir);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C("failed to obtain directory to store trace result, failed to dump");
+            goto exit;
+        }
+        trace_dir += std::string("/")
+                    + std::to_string(this->_cxt.pid)
+                    + std::string("-")
+                    + std::to_string(this->_ws->tsc_timer.get_tsc());
+        apicxt_dir = trace_dir + std::string("/apicxt/");
+        resource_dir = trace_dir + std::string("/resource/");
+        if (std::filesystem::exists(trace_dir)) { std::filesystem::remove_all(trace_dir); }
+        try {
+            std::filesystem::create_directories(apicxt_dir);
+            std::filesystem::create_directories(resource_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            POS_WARN_C("failed to create directory to store trace result, failed to dump");
+            goto exit;
+        }
+        POS_BACK_LINE;
+        POS_LOG_C("dumping trace resource result to %s...", trace_dir.c_str());
+
+        // dumping API context
+        wqes.clear();
+        this->template poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(&wqes);
+        for(i=0; i<wqes.size(); i++){
+            POS_CHECK_POINTER(wqe = wqes[i]);
+            wqe->persist(apicxt_dir);
+        }
+
+        // dumping resources
+        for(auto &handle_id : this->_ws->handle_type_idx){
+            POS_CHECK_POINTER(
+                hm = pos_get_client_typed_hm(this, handle_id, POSHandleManager<POSHandle>)
+            );
+            for(i=0; i<hm->get_nb_handles(); i++){
+                POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
+                retval = handle->checkpoint_commit_sync(
+                    /* version_id */ handle->latest_version,
+                    /* ckpt_dir */ resource_dir,
+                    /* stream_id */ 0
+                );
+                if(unlikely(POS_SUCCESS != retval)){
+                    POS_WARN_C("failed to dump status of handle");
+                    retval = POS_FAILED;
+                    goto exit;
+                }
+            }
+        }
+
+        POS_BACK_LINE;
+        POS_LOG_C("dumping trace resource result to %s [done]", trace_dir.c_str());
+
+    exit:
+        ;
+    }
+
+
     #if POS_CONF_EVAL_MigrOptLevel > 0
 
     /*! 

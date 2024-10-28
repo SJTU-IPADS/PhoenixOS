@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package pos_protobuf;
+
+
+message Bin_POSHandleView {
+    uint64 resource_type_id = 1;
+    uint64 id = 2;
+    uint64 param_index = 3;
+    uint64 offset =4;
+}
+
+
+/*!
+ *  \brief  binary format of POSAPIContext
+ */
+message Bin_POSAPIContext {
+    uint64 id = 1;
+    uint64 api_id = 2;
+    repeated Bin_POSHandleView input_handle_views = 3;
+    repeated Bin_POSHandleView output_handle_views = 4;
+    repeated Bin_POSHandleView create_handle_views = 5;
+    repeated Bin_POSHandleView delete_handle_views = 6;
+    repeated Bin_POSHandleView inout_handle_views = 7;
+}

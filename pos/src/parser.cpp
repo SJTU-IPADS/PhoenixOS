@@ -156,6 +156,11 @@ void POSParser::__daemon(){
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
             }
 
+            // launch the wqe to parser trace queue, if in resource trace mode
+            if(this->_client->_cxt.trace_resource == true){
+                this->_client->template push_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(apicxt_wqe);
+            }
+
             // skip those APIs that doesn't need worker support
             if(apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker){ continue; }
 
@@ -183,9 +188,9 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
         this->is_checkpointing = true;
 
         // collect all handles at this timespot to be checkpointed
-        for(auto &stateful_handle_id : this->_ws->handle_type_idx){
+        for(auto &handle_id : this->_ws->handle_type_idx){
             POS_CHECK_POINTER(
-                hm = pos_get_client_typed_hm(this->_client, stateful_handle_id, POSHandleManager<POSHandle>)
+                hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
             );
             for(i=0; i<hm->get_nb_handles(); i++){
                 POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
