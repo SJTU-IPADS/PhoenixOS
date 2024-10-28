@@ -24,6 +24,7 @@
 #include "pos/include/log.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt.h"
+#include "pos/include/oob/trace.h"
 
 
 /*!
@@ -40,22 +41,29 @@ enum pos_cli_arg : int {
     /*!
      *  \brief  pre-dump state of an XPU process, but don't stop the execution
      *  \param  pid     [Required] PID of the process to be migrated
-     *  \param  path    [Required] path to the checkpoint file
+     *  \param  dir     [Required] path to the checkpoint file
      */
     kPOS_CliAction_PreDump,
 
     /*!
      *  \brief  final dump state of an XPU process, and stop the execution
      *  \param  pid     [Required] PID of the process to be migrated
-     *  \param  path    [Required] path to the checkpoint file
+     *  \param  dir     [Required] path to the checkpoint file
      */
     kPOS_CliAction_Dump,
 
     /*!
      *  \brief  restore the state of an XPU process, and continue the execution
-     *  \param  path    [Required] path to the checkpoint file
+     *  \param  dir     [Required] path to the checkpoint file
      */
     kPOS_CliAction_Restore,
+
+    /*!
+     *  \brief  tracing the resource dependecies during execution
+     *  \param  dir         [Required] path to the trace file
+     *  \param  subaction   [Required] start or stop the trace mode
+     */
+    kPOS_CliAction_TraceResource,
 
     /*!
      *  \brief  migrate context of a XPU process to a new process
@@ -77,10 +85,12 @@ enum pos_cli_arg : int {
     kPOS_CliAction_PLACEHOLDER,
     
     /* ============ metadatas ============ */
+    // subaction of the action
+    kPOS_CliMeta_SubAction,
     // target process id
     kPOS_CliMeta_Pid,
-    // checkpoint file path
-    kPOS_CliMeta_CkptDir,
+    // file path for checkpoint / trace, etc.
+    kPOS_CliMeta_Dir,
     // oob ip
     kPOS_CliMeta_Dip,
     // oob port
@@ -118,6 +128,11 @@ typedef struct pos_cli_predump_metas {
     char ckpt_dir[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
 } pos_cli_predump_metas_t;
 
+typedef struct pos_cli_trace_resource_metas {
+    oob_functions::cli_trace_resource::trace_action action;
+    char trace_dir[oob_functions::cli_trace_resource::kTraceFilePathMaxLen];
+} pos_cli_trace_resource_metas_t;
+
 
 typedef struct pos_cli_migrate_metas {
     uint64_t pid;
@@ -146,6 +161,7 @@ typedef struct pos_cli_options {
     union {
         pos_cli_predump_metas_t pre_dump;
         pos_cli_migrate_metas migrate;
+        pos_cli_trace_resource_metas_t trace_resource;
     } metas;
 
     pos_cli_options() : local_oob_client(nullptr), remote_oob_client(nullptr), action_type(kPOS_CliAction_Unknown) {}
@@ -189,3 +205,4 @@ static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_
 
 pos_retval_t handle_predump(pos_cli_options_t &clio);
 pos_retval_t handle_migrate(pos_cli_options_t &clio);
+pos_retval_t handle_trace(pos_cli_options_t &clio);

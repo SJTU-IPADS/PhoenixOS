@@ -83,6 +83,10 @@ exit:
 void POSClient::deinit(){
     this->deinit_dump_handle_managers();
 
+    if(this->_cxt.trace_resource){
+        this->deinit_dump_trace_resource();
+    }
+
     // stop parser and worker to poll
     this->status = kPOS_ClientStatus_Hang;
 
@@ -99,6 +103,7 @@ pos_retval_t POSClient::push_q(void *qe){
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
         ||  qtype == kPOS_QueueType_ApiCxt_CkptDag_WQ
+        ||  qtype == kPOS_QueueType_ApiCxt_Trace_WQ
         ||  qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
         "unknown queue type obtained"
     );
@@ -149,6 +154,18 @@ pos_retval_t POSClient::push_q(void *qe){
         this->_apicxt_workerlocal_ckptdag_wq->push(apictx_qe);
     }
 
+    // api context trace queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_Trace_WQ) {
+        POS_CHECK_POINTER(apictx_qe = reinterpret_cast<POSAPIContext_QE_t*>(qe));
+
+        static_assert(
+            qdir == kPOS_QueueDirection_ParserLocal,
+            "ApiCxt_Trace_WQE can only be pushed to parser local queue"
+        );
+
+        this->_apicxt_parserlocal_trace_wq->push(apictx_qe);
+    }
+
     // command work queue
     if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
         POS_CHECK_POINTER(cmd_qe = reinterpret_cast<POSCommand_QE_t*>(qe));
@@ -189,6 +206,7 @@ template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_Que
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(void *qe);
+template pos_retval_t POSClient::push_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(void *qe);
 template pos_retval_t POSClient::push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(void *qe);
@@ -202,6 +220,7 @@ pos_retval_t POSClient::clear_q(){
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ || qtype == kPOS_QueueType_ApiCxt_CQ
         ||  qtype == kPOS_QueueType_ApiCxt_CkptDag_WQ
+        ||  qtype == kPOS_QueueType_ApiCxt_Trace_WQ
         ||  qtype == kPOS_QueueType_Cmd_WQ || qtype == kPOS_QueueType_Cmd_CQ,
         "unknown queue type obtained"
     );
@@ -241,6 +260,15 @@ pos_retval_t POSClient::clear_q(){
         this->_apicxt_workerlocal_ckptdag_wq->drain();
     }
 
+    // api context trace queue 
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_Trace_WQ) {
+        static_assert(
+            qdir == kPOS_QueueDirection_ParserLocal,
+            "ApiCxt_CkptDag_WQE can only be located within parser local queue"
+        );
+        this->_apicxt_parserlocal_trace_wq->drain();
+    }
+
     // command work queue
     if constexpr (qtype == kPOS_QueueType_Cmd_WQ){
         static_assert(
@@ -277,6 +305,7 @@ template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Rpc2Parser, kPOS_Qu
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>();
+template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>();
 template pos_retval_t POSClient::clear_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>();
@@ -292,7 +321,8 @@ pos_retval_t POSClient::poll_q(std::vector<POSAPIContext_QE*>* qes){
     static_assert(
             qtype == kPOS_QueueType_ApiCxt_WQ 
         ||  qtype == kPOS_QueueType_ApiCxt_CQ 
-        ||  qtype == kPOS_QueueType_ApiCxt_CkptDag_WQ,
+        ||  qtype == kPOS_QueueType_ApiCxt_CkptDag_WQ
+        ||  qtype == kPOS_QueueType_ApiCxt_Trace_WQ,
         "invalid queue type obtained"
     );
 
@@ -333,6 +363,15 @@ pos_retval_t POSClient::poll_q(std::vector<POSAPIContext_QE*>* qes){
         apicxt_q = this->_apicxt_workerlocal_ckptdag_wq;
     }
 
+    // api context trace work queue
+    if constexpr (qtype == kPOS_QueueType_ApiCxt_Trace_WQ){
+        static_assert(
+            qdir == kPOS_QueueDirection_ParserLocal,
+            "ApiCxt_CkptDag_WQE can only be passed within parser local queue"
+        );
+        apicxt_q = this->_apicxt_parserlocal_trace_wq;
+    }
+
     POS_CHECK_POINTER(apicxt_q);
     while(POS_SUCCESS == apicxt_q->dequeue(apicxt_qe)){
         qes->push_back(apicxt_qe);
@@ -344,6 +383,7 @@ exit:
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(std::vector<POSAPIContext_QE*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(std::vector<POSAPIContext_QE*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(std::vector<POSAPIContext_QE*>* qes);
+template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(std::vector<POSAPIContext_QE*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(std::vector<POSAPIContext_QE*>* qes);
 template pos_retval_t POSClient::poll_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(std::vector<POSAPIContext_QE*>* qes);
 
@@ -427,7 +467,12 @@ pos_retval_t POSClient::__create_qgroup(){
     // workerlocal apicxt ckptdag queue
     this->_apicxt_workerlocal_ckptdag_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
     POS_CHECK_POINTER(this->_apicxt_workerlocal_ckptdag_wq);
-    POS_DEBUG_C("created workerlocal ckptdagapicxt WQ: uuid(%lu)", this->id);
+    POS_DEBUG_C("created workerlocal ckptdag apicxt WQ: uuid(%lu)", this->id);
+
+    // parserlocal apicxt trace queue
+    this->_apicxt_parserlocal_trace_wq = new POSLockFreeQueue<POSAPIContext_QE_t*>();
+    POS_CHECK_POINTER(this->_apicxt_parserlocal_trace_wq);
+    POS_DEBUG_C("created parserlocal trace apicxt WQ: uuid(%lu)", this->id);
 
     // parser2worker cmd work queue
     this->_cmd_parser2worker_wq = new POSLockFreeQueue<POSCommand_QE_t*>();
@@ -480,11 +525,17 @@ pos_retval_t POSClient::__destory_qgroup(){
     delete this->_apicxt_rpc2worker_cq;
     POS_DEBUG_C("destoryed rpc2worker apicxt CQ: uuid(%lu)", this->id);
 
-    // workerlocal_ckptdag apicxt work queue
+    // workerlocal ckptdag apicxt work queue
     POS_CHECK_POINTER(this->_apicxt_workerlocal_ckptdag_wq);
     this->_apicxt_workerlocal_ckptdag_wq->lock();
     delete this->_apicxt_workerlocal_ckptdag_wq;
     POS_DEBUG_C("destoryed workerlocal_ckptdag apicxt WQ: uuid(%lu)", this->id);
+
+    // parserlocal trace apicxt work queue
+    POS_CHECK_POINTER(this->_apicxt_parserlocal_trace_wq);
+    this->_apicxt_parserlocal_trace_wq->lock();
+    delete this->_apicxt_parserlocal_trace_wq;
+    POS_DEBUG_C("destoryed parserlocal trace apicxt WQ: uuid(%lu)", this->id);
 
     // parser2worker cmd work queue
     POS_CHECK_POINTER(this->_cmd_parser2worker_wq);

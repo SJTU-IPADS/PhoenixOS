@@ -46,6 +46,7 @@ enum pos_queue_direction_t : uint8_t {
     kPOS_QueueDirection_Rpc2Worker,
     kPOS_QueueDirection_Parser2Worker,
     kPOS_QueueDirection_Oob2Parser,
+    kPOS_QueueDirection_ParserLocal,
     kPOS_QueueDirection_WorkerLocal
 };
 
@@ -59,6 +60,7 @@ enum pos_queue_type_t : uint8_t {
     kPOS_QueueType_ApiCxt_WQ,
     kPOS_QueueType_ApiCxt_CQ,
     kPOS_QueueType_ApiCxt_CkptDag_WQ,
+    kPOS_QueueType_ApiCxt_Trace_WQ,
     kPOS_QueueType_Cmd_WQ,
     kPOS_QueueType_Cmd_CQ
 };
@@ -71,6 +73,9 @@ typedef struct pos_client_cxt {
     // name of the job
     std::string job_name;
 
+    // pid of the client-side process
+    __pid_t pid;
+
     // kernel meta path
     std::string kernel_meta_path;
     bool is_load_kernel_from_cache;
@@ -78,8 +83,13 @@ typedef struct pos_client_cxt {
     // checkpoint file path (if any)
     std::string checkpoint_file_path;
 
-    // indices of stateful handle type
+    // indices of handle type
     std::vector<uint64_t> handle_type_idx;
+
+    // runtime configurations
+    // whether to trace resource
+    bool trace_resource;
+    bool trace_performance;
 } pos_client_cxt_t;
 #define POS_CLIENT_CXT_HEAD pos_client_cxt cxt_base;
 
@@ -241,10 +251,17 @@ class POSClient {
 
 
     /*!
-     *  \brief      deinit handle manager for all used resources
+     *  \brief      deinit: dumping handle manager for all used resources
      *  \example    CUDA function manager should export the metadata of functions
      */
     virtual void deinit_dump_handle_managers(){}
+
+
+    /*!
+     *  \brief  deinit: dumping resource tracing result if enabled
+     */
+    virtual void deinit_dump_trace_resource(){}
+
 
     /*! 
      *  \brief  temp function used by migration
@@ -288,6 +305,8 @@ class POSClient {
     POSWorker *worker;
     
  protected:
+    friend class POSParser;
+
     // api instance pc
     uint64_t _api_inst_pc;
 
@@ -352,8 +371,11 @@ class POSClient {
     // api context work queue from parser to worker
     POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_parser2worker_wq;
 
-    // api context work queue from parser to worker, record during ckpt
+    // api context work queue in worker, record during ckpt
     POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_workerlocal_ckptdag_wq;
+
+    // api context work queue in parser, record during resource trace mode
+    POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_parserlocal_trace_wq;
 
     // api context completion queue from worker to RPC frontend
     POSLockFreeQueue<POSAPIContext_QE_t*> *_apicxt_rpc2worker_cq;

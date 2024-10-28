@@ -459,7 +459,16 @@ typedef struct POSAPIContext_QE {
     ~POSAPIContext_QE(){
         // TODO: release handle views
     }
-    
+
+
+    /*!
+     *  \brief  persist the state of this APIcontext to specified directory
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointing
+     */
+    pos_retval_t persist(std::string ckpt_dir);
+
+
     /*!
      *  \brief  obtain the size of serialize area of this api conetxt
      *  \return size of serialize area of this api conetxt

@@ -247,6 +247,7 @@ endif
 
 # >>>>>>>>>>>>>> setup sources and includes >>>>>>>>>>>>>>
 sources += [
+    # common source files
     'pos/src/agent.cpp',
     'pos/src/handle.cpp',
     'pos/src/api_context.cpp',
@@ -255,15 +256,19 @@ sources += [
     'pos/src/parser.cpp',
     'pos/src/workspace.cpp',
     'pos/src/migration.cpp',
+
+    # oob functions
     'pos/src/oob/agent.cpp',
     'pos/src/oob/cli.cpp',
     'pos/src/oob/utils.cpp',
     'pos/src/oob/ckpt.cpp',
+    'pos/src/oob/trace.cpp',
     'pos/src/oob/migration.cpp',
     'pos/src/oob/mgnt.cpp',
 
     # protobuf generated file
-    'pos/include/proto/handle.pb.cc'
+    'pos/include/proto/handle.pb.cc',
+    'pos/include/proto/apicxt.pb.cc'
 ]
 
 if conf_eval_ckpt_opt_level == 0
