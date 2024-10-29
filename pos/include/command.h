@@ -42,24 +42,28 @@ typedef struct POSCommand_QE {
     std::string ckpt_dir;
 
     // for kPOS_Command_xxx_PreDump and kPOS_Command_xxx_Dump
-    std::set<POSHandle*> checkpoint_handles;
+    std::set<POSHandle*> predump_handles;
+    std::set<POSHandle*> dump_handles;
 
     /*!
      *  \brief  record all handles that need to be checkpointed within this checkpoint op
-     *  \param  id          resource type index
-     *  \param  handle_set  sets of handles
+     *  \param  handle_set  sets of handles to be added
+     *  \param  handle      handle to be added
      */
-    inline void record_checkpoint_handles(std::set<POSHandle*>& handle_set){
-        checkpoint_handles.insert(handle_set.begin(), handle_set.end());
+    inline void record_predump_handles(std::set<POSHandle*>& handle_set){
+        predump_handles.insert(handle_set.begin(), handle_set.end());
+    }
+    inline void record_predump_handles(POSHandle *handle){
+        predump_handles.insert(handle);
+    }
+    inline void record_dump_handles(std::set<POSHandle*>& handle_set){
+        dump_handles.insert(handle_set.begin(), handle_set.end());
+    }
+    inline void record_dump_handles(POSHandle *handle){
+        dump_handles.insert(handle);
     }
 
-    /*!
-     *  \brief  record all handles that need to be checkpointed within this checkpoint op
-     *  \param  handle  the handle to be recorded
-     */
-    inline void record_checkpoint_handles(POSHandle *handle){
-        checkpoint_handles.insert(handle);
-    }
+
     // ============================== payloads ==============================
 
     POSCommand_QE()

@@ -23,7 +23,7 @@
 
 
 POSParser::POSParser(POSWorkspace* ws, POSClient* client) 
-    : is_checkpointing(false), _ws(ws), _client(client), _stop_flag(false)
+    : _ws(ws), _client(client), _stop_flag(false)
 {   
     POS_CHECK_POINTER(ws);
     POS_CHECK_POINTER(client);
@@ -182,35 +182,44 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     switch (cmd->type)
     {
     /* ========== Ckpt WQ Command from OOB thread ========== */
-    case kPOS_Command_Oob2Parser_PreDump:
     case kPOS_Command_Oob2Parser_Dump:
-    #if POS_CONF_EVAL_CkptOptLevel > 0
-        this->is_checkpointing = true;
-
-        // collect all handles at this timespot to be checkpointed
-        for(auto &handle_id : this->_ws->handle_type_idx){
-            POS_CHECK_POINTER(
-                hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
-            );
-            for(i=0; i<hm->get_nb_handles(); i++){
-                POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-                cmd->record_checkpoint_handles(handle);
+        #if POS_CONF_EVAL_CkptOptLevel > 0
+            // collect all stateful handles at this timespot to be dumped
+            for(auto &handle_id : this->_ws->stateless_resource_type_idx){
+                POS_CHECK_POINTER(
+                    hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
+                );
+                for(i=0; i<hm->get_nb_handles(); i++){
+                    POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
+                    cmd->record_dump_handles(handle);
+                }
             }
-        }
-        cmd->type = cmd->type == kPOS_Command_Oob2Parser_PreDump 
-                    ? kPOS_Command_Parser2Worker_PreDump
-                    : kPOS_Command_Parser2Worker_Dump;
-        this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(cmd);
-    #else
-        cmd->retval = POS_FAILED_NOT_ENABLED;
-        this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
-    #endif // POS_CONF_EVAL_CkptOptLevel
+        #endif // POS_CONF_EVAL_CkptOptLevel
+    case kPOS_Command_Oob2Parser_PreDump:
+        #if POS_CONF_EVAL_CkptOptLevel > 0
+            // collect all stateless handles at this timespot to be predumped
+            for(auto &handle_id : this->_ws->stateful_resource_type_idx){
+                POS_CHECK_POINTER(
+                    hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
+                );
+                for(i=0; i<hm->get_nb_handles(); i++){
+                    POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
+                    cmd->record_predump_handles(handle);
+                }
+            }
+            cmd->type = cmd->type == kPOS_Command_Oob2Parser_PreDump 
+                        ? kPOS_Command_Parser2Worker_PreDump
+                        : kPOS_Command_Parser2Worker_Dump;
+            this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(cmd);
+        #else
+            cmd->retval = POS_FAILED_NOT_ENABLED;
+            this->_client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_CQ>(cmd);
+        #endif // POS_CONF_EVAL_CkptOptLevel
         break;
 
     /* ========== Ckpt CQ Command from worker thread ========== */
     case kPOS_Command_Parser2Worker_PreDump:
     case kPOS_Command_Parser2Worker_Dump:
-        this->is_checkpointing = false;
         cmd->type = cmd->type == kPOS_Command_Parser2Worker_PreDump 
                     ? kPOS_Command_Oob2Parser_PreDump
                     : kPOS_Command_Oob2Parser_Dump;

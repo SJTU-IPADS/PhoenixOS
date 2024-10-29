@@ -223,8 +223,14 @@ class POSWorkspace {
     // api manager
     POSApiManager *api_mgnr;
 
-    // idx of all resources types (handles)
-    std::vector<uint64_t> handle_type_idx;
+    // idx of all resources types
+    std::vector<uint64_t> resource_type_idx;
+
+    // idx of resource types whose state should be saved during predump
+    std::vector<uint64_t> stateful_resource_type_idx;
+
+    // idx of resource types whose state could be saved after predump
+    std::vector<uint64_t> stateless_resource_type_idx;
 
     // dynamic configuration of this workspace
     POSWorkspaceConf ws_conf;

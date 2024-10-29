@@ -243,7 +243,7 @@ class POSWorker {
          *  \param  cmd     the checkpoint command
          *  \return POS_SUCCESS for successfully checkpointing
          */
-        pos_retval_t __checkpoint_sync(POSCommand_QE_t *cmd);
+        pos_retval_t __checkpoint_handle_sync(POSCommand_QE_t *cmd);
     #elif POS_CONF_EVAL_CkptOptLevel == 2
         /*!
          *  \brief  worker daemon with ASYNC checkpoint support (checkpoint optimization level 2)

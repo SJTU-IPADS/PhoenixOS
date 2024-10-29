@@ -80,13 +80,6 @@ class POSParser {
      */
     void shutdown();
 
-    /*!
-     *  \brief  identify whether the client is under checkpointing,
-     *          if it's, all parser functions would start recording
-     *          in/out/inout/create/destory edges
-     */
-    bool is_checkpointing;
-
  protected:
     // stop flag to indicate the daemon thread to stop
     bool _stop_flag;
