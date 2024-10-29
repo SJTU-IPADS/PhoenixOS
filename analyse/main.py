@@ -24,7 +24,7 @@ class POSOp:
 
     def __init__(
             self, id:int, api_id:int, return_code:int, 
-            c_tick:int, r_tick:int, runtime_s_tick:int, runtime_e_tick:int, worker_s_tick:int, worker_e_tick:int, queue_len_before_parse:int, tsc_freq:int,
+            c_tick:int, r_tick:int, parser_s_tick:int, parser_e_tick:int, worker_s_tick:int, worker_e_tick:int, queue_len_before_parse:int, tsc_freq:int,
             nb_ckpt_handles:int = 0, ckpt_size:int = 0, nb_abandon_handles:int = 0, abandon_ckpt_size:int = 0, ckpt_memory_consumption:int = 0
     ) -> None:
         self.id = id
@@ -33,19 +33,19 @@ class POSOp:
         self.handle_map : dict[int,int] = {}
         self.c_tick = c_tick
         self.r_tick = r_tick
-        self.runtime_s_tick = runtime_s_tick
-        self.runtime_e_tick = runtime_e_tick
+        self.parser_s_tick = parser_s_tick
+        self.parser_e_tick = parser_e_tick
         self.worker_s_tick = worker_s_tick
         self.worker_e_tick = worker_e_tick
         self.queue_len_before_parse = queue_len_before_parse
         self.tsc_freq = tsc_freq
 
         # durations
-        self.runtime_duration:float = _cast_duration_us_from_ticks(self.runtime_e_tick-self.runtime_s_tick, tsc_freq)
+        self.runtime_duration:float = _cast_duration_us_from_ticks(self.parser_e_tick-self.parser_s_tick, tsc_freq)
         self.worker_duration:float = _cast_duration_us_from_ticks(self.worker_e_tick-self.worker_s_tick, tsc_freq)
         self.physical_duration:float = _cast_duration_us_from_ticks(self.r_tick-self.c_tick, tsc_freq)
-        self.runtime_queue_duration:float = _cast_duration_us_from_ticks(self.runtime_s_tick-self.c_tick, tsc_freq)
-        self.worker_queue_duration:float = _cast_duration_us_from_ticks(self.worker_s_tick-self.runtime_e_tick, tsc_freq)
+        self.runtime_queue_duration:float = _cast_duration_us_from_ticks(self.parser_s_tick-self.c_tick, tsc_freq)
+        self.worker_queue_duration:float = _cast_duration_us_from_ticks(self.worker_s_tick-self.parser_e_tick, tsc_freq)
 
         self.nb_ckpt_handles = nb_ckpt_handles
         self.ckpt_size = ckpt_size
@@ -126,12 +126,12 @@ class POSDag:
             # next self.nb_ops lines: info of ops
             if(id <= self.nb_ops):
                 vid, api_id, return_code,                                                                               \
-                c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse,   \
+                c_tick, r_tick, parser_s_tick, parser_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse,   \
                 nb_ckpt_handles, ckpt_size, nb_abandon_handles, abandon_ckpt_size, ckpt_memory_consumption              \
                     = [int(x.strip()) for x in line.split(',')]
                 op = POSOp(
                     vid, api_id, return_code,
-                    c_tick, r_tick, runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse, self.tsc_freq, 
+                    c_tick, r_tick, parser_s_tick, parser_e_tick, worker_s_tick, worker_e_tick, queue_len_before_parse, self.tsc_freq, 
                     nb_ckpt_handles, ckpt_size, nb_abandon_handles, abandon_ckpt_size, ckpt_memory_consumption
                 )
                 self.ops[vid] = op

@@ -165,7 +165,7 @@ void POSWorker::__daemon_ckpt_sync(){
             POS_CHECK_POINTER(wqe = wqes[i]);
             POS_CHECK_POINTER(wqe->api_cxt);
             
-            wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
+            wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
             
             api_id = wqe->api_cxt->api_id;
             api_meta = _ws->api_mgnr->api_metas[api_id];
@@ -185,7 +185,7 @@ void POSWorker::__daemon_ckpt_sync(){
         #endif
 
             launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
-            wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+            wqe->worker_e_tick = POSUtilTscTimer::get_tsc();
 
             // cast return code
             wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
@@ -201,7 +201,7 @@ void POSWorker::__daemon_ckpt_sync(){
             // check whether we need to return to frontend
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
-                wqe->return_tick = POSUtilTimestamp::get_tsc();
+                wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
@@ -241,7 +241,7 @@ pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
         nb_ckpt_handles += 1;
         ckpt_size += handle->state_size;
     }
-    
+
     // make sure the checkpoint is finished
     retval = this->sync();
     if(unlikely(retval != POS_SUCCESS)){
@@ -339,7 +339,7 @@ void POSWorker::__daemon_ckpt_async(){
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
 
-            wqe->worker_s_tick = POSUtilTimestamp::get_tsc();
+            wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
             
             /*!
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
@@ -428,7 +428,7 @@ void POSWorker::__daemon_ckpt_async(){
             
         
             launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
-            wqe->worker_e_tick = POSUtilTimestamp::get_tsc();
+            wqe->worker_e_tick = POSUtilTscTimer::get_tsc();
 
             // cast return code
             wqe->api_cxt->return_code = _ws->api_mgnr->cast_pos_retval(
@@ -444,7 +444,7 @@ void POSWorker::__daemon_ckpt_async(){
             // check whether we need to return to frontend
             if(wqe->status == kPOS_API_Execute_Status_Init){
                 // we only return the QE back to frontend when it hasn't been returned before
-                wqe->return_tick = POSUtilTimestamp::get_tsc();
+                wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
             }
         }
