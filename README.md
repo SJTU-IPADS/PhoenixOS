@@ -27,6 +27,9 @@
                 <p style="margin:0px; margin-bottom:5px;">
                     👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
                 </p>
+                <p style="margin:0px; margin-bottom:5px;">
+                    We will soon release codes for live migration and multi-GPU support. 
+                </p>                
             </li>
         </ul>
     </div>
