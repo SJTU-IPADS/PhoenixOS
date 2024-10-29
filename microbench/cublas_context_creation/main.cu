@@ -1,25 +1,14 @@
-/*
- * Copyright 2024 The PhoenixOS Authors. All rights reserved.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-#pragma once
-
+#include <iostream>
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <cassert>
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cublas_v2.h>
+#include <cublasLt.h>
+#include <cublas_api.h>
 
-#include "pos/include/common.h"
 
 /*!
  *  \brief  HPET-based timer
@@ -115,7 +104,7 @@ class POSUtilTscTimer {
         for (uint64_t i = 0; i < 1000000; i++) {
             sum += i + (sum + i) * (i % sum);
         }
-        POS_ASSERT(sum == 13580802877818827968ull);
+        assert(sum == 13580802877818827968ull);
         const uint64_t rdtsc_cycles = this->get_tsc() - rdtsc_start;
 
         this->_tsc_freq_g = rdtsc_cycles * 1.0 / hpet.stop_get_ns();
@@ -185,23 +174,32 @@ class POSUtilTscTimer {
 };
 
 
-class POSUtilTimestamp {
- public:
-    /*!
-     *  \brief  ontain TSC tick
-     *  \return TSC tick
-     */
-    static inline uint64_t get_tsc(){
-        uint64_t a, d;
-        __asm__ volatile("rdtsc" : "=a"(a), "=d"(d));
-        return (d << 32) | a;
-    }
+int main(){
+    cublasStatus_t cublas_result = CUBLAS_STATUS_SUCCESS;
+    cublasHandle_t handle = nullptr;
+    cublasLtHandle_t lighthandle;
 
-    /*!
-     *  \brief  delay specified microsecond
-     *  \param  duration_us specified microsecond
-     */
-    static inline void delay_us(uint32_t microseconds){
-        std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
+    uint64_t s_tick, e_tick;
+    POSUtilTscTimer tsc_timer;
+
+    s_tick = POSUtilTscTimer::get_tsc();
+    // cublas_result = cublasCreate_v2(&handle);
+    e_tick = POSUtilTscTimer::get_tsc();
+    if(cublas_result != CUBLAS_STATUS_SUCCESS){
+        printf("failed to create cublas context");
+        return 1;
     }
-};
+    printf("create cublas context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
+
+
+    s_tick = POSUtilTscTimer::get_tsc();
+    cublas_result = cublasLtCreate(&lighthandle);
+    e_tick = POSUtilTscTimer::get_tsc();
+    if(cublas_result != CUBLAS_STATUS_SUCCESS){
+        printf("failed to create cublasLt context");
+        return 1;
+    }
+    printf("create cublasLt context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
+    
+    return 0;
+}

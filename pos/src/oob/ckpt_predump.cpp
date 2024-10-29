@@ -5,7 +5,7 @@
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
-#include "pos/include/oob/ckpt.h"
+#include "pos/include/oob/ckpt_predump.h"
 #include "pos/include/log.h"
 #include "pos/include/api_context.h"
 #include "pos/include/workspace.h"

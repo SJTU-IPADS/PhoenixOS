@@ -94,6 +94,9 @@ inline pos_retval_t __dispatch(pos_cli_options_t &clio){
     case kPOS_CliAction_PreDump:
         return handle_predump(clio);
 
+    case kPOS_CliAction_Dump:
+        return handle_dump(clio);
+
     case kPOS_CliAction_Migrate:
         return handle_migrate(clio);
 
@@ -112,6 +115,7 @@ inline pos_retval_t __dispatch(pos_cli_options_t &clio){
 namespace oob_functions {
     // TODO: define other client-side functions here
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_ckpt_predump);
+    POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_ckpt_dump);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_restore_signal);
     POS_OOB_DECLARE_CLNT_FUNCTIONS(cli_trace_resource);
@@ -127,6 +131,7 @@ int main(int argc, char *argv[]){
     clio.local_oob_client = new POSOobClient(
         /* req_functions */ {
             {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,      oob_functions::cli_ckpt_predump::clnt       },
+            {   kPOS_OOB_Msg_CLI_Ckpt_Dump,         oob_functions::cli_ckpt_dump::clnt          },
             {   kPOS_OOB_Msg_CLI_Trace_Resource,    oob_functions::cli_trace_resource::clnt     },
             {   kPOS_OOB_Msg_CLI_Migration_Signal,  oob_functions::cli_migration_signal::clnt   },
             {   kPOS_OOB_Msg_CLI_Restore_Signal,    oob_functions::cli_restore_signal::clnt     },
