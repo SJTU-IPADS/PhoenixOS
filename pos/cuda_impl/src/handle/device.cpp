@@ -12,7 +12,6 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
-#include "pos/include/utils/serializer.h"
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/handle/device.h"
 #include "pos/cuda_impl/proto/device.pb.h"

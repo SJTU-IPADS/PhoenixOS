@@ -30,7 +30,6 @@
 #include "pos/include/handle.h"
 #include "pos/include/client.h"
 #include "pos/include/utils/timer.h"
-#include "pos/include/utils/serializer.h"
 
 
 /*!
@@ -188,34 +187,6 @@ typedef struct POSAPIContext {
 
     uint64_t retval_size;
 
-    /*!
-     *  \brief  obtain serialize size of current api context
-     *  \return serialize size of current api context
-     */
-    inline uint64_t get_serialize_size(){
-        uint64_t nb_params;
-
-        nb_params = params.size();
-
-        return (
-            /* api id */        sizeof(uint64_t)
-            /* nb_params */     + sizeof(uint64_t)
-            /* param_sizes */   + nb_params * sizeof(uint64_t)
-            /* param_data */    + overall_param_size
-        );
-    }
-
-    /*!
-     *  \brief  serialize the current current api context into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     */
-    void serialize(void* serialized_area);
-
-    /*!
-     *  \brief  deserialize this api context
-     *  \param  raw_data    raw data area that store the serialized data
-     */
-    void deserialize(void* raw_data);
 
     /*!
      *  \brief  constructor
@@ -291,30 +262,6 @@ typedef struct POSHandleView {
      */
     uint64_t offset;
 
-    /*!
-     *  \brief  obtain serialize size of handle view
-     *  \return serialize size of handle view
-     */
-    static inline uint64_t get_serialize_size(){
-        return (
-            /* handle_id */             sizeof(uint64_t)
-            /* handle_resource_typeid*/ + sizeof(pos_resource_typeid_t)
-            /* param_index */           + sizeof(uint64_t)
-            /* offset */                + sizeof(uint64_t)
-        );
-    }
-
-    /*!
-     *  \brief  serialize the current handle view into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     */
-    void serialize(void* serialized_area);
-    
-    /*!
-     *  \brief  deserialize this handle view
-     *  \param  raw_data    raw data area that store the serialized data
-     */
-    void deserialize(void* raw_data);
 
     /*!
      *  \brief  constructor
@@ -336,7 +283,6 @@ typedef struct POSHandleView {
 /*!
  *  \brief  work queue element, as the element within work 
  *          queue between frontend and runtime
- *  TODO:   add type field to wqe
  */
 typedef struct POSAPIContext_QE {
     // uuid of the remote client
@@ -367,10 +313,9 @@ typedef struct POSAPIContext_QE {
     std::vector<POSHandleView_t> delete_handle_views;
     std::vector<POSHandleView_t> inout_handle_views;
 
-    /* =========== profiling fields =========== */
+    /* =========== tracing fields =========== */
     uint64_t create_tick, return_tick;
-    uint64_t runtime_s_tick, runtime_e_tick, worker_s_tick, worker_e_tick;
-    uint64_t queue_len_before_parse;
+    uint64_t parser_s_tick, parser_e_tick, worker_s_tick, worker_e_tick;
     /* ======= end of profiling fields ======== */
 
     /* =========== checkpoint op specific fields =========== */
@@ -411,7 +356,7 @@ typedef struct POSAPIContext_QE {
         api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
         POS_CHECK_POINTER(api_cxt);
         create_tick = POSUtilTimestamp::get_tsc();
-        runtime_s_tick = runtime_e_tick = worker_s_tick = worker_e_tick = 0;
+        parser_s_tick = parser_e_tick = worker_s_tick = worker_e_tick = 0;
 
         // initialization of checkpoint op specific fields
         nb_ckpt_handles = 0;
@@ -468,51 +413,6 @@ typedef struct POSAPIContext_QE {
      */
     pos_retval_t persist(std::string ckpt_dir);
 
-
-    /*!
-     *  \brief  obtain the size of serialize area of this api conetxt
-     *  \return size of serialize area of this api conetxt
-     */
-    inline uint64_t get_serialize_size(){
-        uint64_t nb_handle_views = 0;
-            
-        nb_handle_views += input_handle_views.size();
-        nb_handle_views += output_handle_views.size();
-        nb_handle_views += inout_handle_views.size();
-        nb_handle_views += create_handle_views.size();
-        nb_handle_views += delete_handle_views.size();
-
-        POS_CHECK_POINTER(api_cxt);
-
-        return (
-            // part 1: base fields
-            /* id */                        sizeof(uint64_t)
-
-            // part 2: api context
-            /* size of api_context */       + sizeof(uint64_t)
-            /* api context */               + api_cxt->get_serialize_size()
-
-            // part 3: handle views
-            /* nb of input handle views */  + sizeof(uint64_t)
-            /* nb of output handle views */ + sizeof(uint64_t)
-            /* nb of inout handle views */  + sizeof(uint64_t)
-            /* nb of create handle views */ + sizeof(uint64_t)
-            /* nb of delete handle views */ + sizeof(uint64_t)
-            /* handle_views */              + nb_handle_views * POSHandleView_t::get_serialize_size()
-        );
-    }
-
-    /*!
-     *  \brief  serialize this api context
-     *  \param  serialized_area pointer to the area that stores the serialized data
-     */
-    void serialize(void** serialized_area);
-
-    /*!
-     *  \brief  deserialize this api context
-     *  \param  raw_data    raw data area that store the serialized data
-     */
-    void deserialize(void* raw_data);
 
     /*!
      *  \brief  record involved handles of this API instance

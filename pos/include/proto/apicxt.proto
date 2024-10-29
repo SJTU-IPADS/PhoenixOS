@@ -22,4 +22,10 @@ message Bin_POSAPIContext {
     repeated Bin_POSHandleView create_handle_views = 5;
     repeated Bin_POSHandleView delete_handle_views = 6;
     repeated Bin_POSHandleView inout_handle_views = 7;
+    uint64 create_tick = 8;
+    uint64 return_tick = 9;
+    uint64 parser_s_tick = 10;
+    uint64 parser_e_tick = 11;
+    uint64 worker_s_tick = 12;
+    uint64 worker_e_tick = 13;
 }
