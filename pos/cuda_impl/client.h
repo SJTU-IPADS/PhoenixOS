@@ -314,7 +314,7 @@ class POSClient_CUDA : public POSClient {
         this->template poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(&wqes);
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
-            wqe->persist_without_state_sync(apicxt_dir);
+            wqe->persist</* with_params */ false>(apicxt_dir);
         }
 
         // dumping resources
