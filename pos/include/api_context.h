@@ -83,6 +83,7 @@ typedef struct POSAPIMeta {
     std::string api_name;
 } POSAPIMeta_t;
 
+
 /*!
  *  \brief  manager of XPU APIs
  */
@@ -109,6 +110,7 @@ class POSApiManager {
  protected:
 };
 
+
 /*!
  *  \brief  execution state of an API instance
  */
@@ -119,6 +121,7 @@ enum pos_api_execute_status_t : uint8_t {
     kPOS_API_Execute_Status_Parser_Failed,
     kPOS_API_Execute_Status_Worker_Failed
 };
+
 
 /*!
  *  \brief  descriptor of one parameter of an API call
@@ -148,6 +151,7 @@ typedef struct POSAPIParam {
     }
 } POSAPIParam_t;
 
+
 /*!
  *  \brief  macro to obtain parameter value of an API instance by given index,
  *          and cast to corresponding type
@@ -161,10 +165,12 @@ typedef struct POSAPIParam {
 #define pos_api_param_size(qe_ptr, index)           \
     (qe_ptr->api_cxt->params[index]->param_size)
 
+
 /*!
  *  \brief  descriptor of one parameter of an API call
  */
 typedef struct POSAPIParamDesp { void *value; size_t size; } POSAPIParamDesp_t;
+
 
 /*!
  *  \brief  context of an API call
@@ -279,6 +285,7 @@ typedef struct POSHandleView {
      */
     POSHandleView() : handle(nullptr), param_index(0), offset(0){}
 } POSHandleView_t;
+
 
 /*!
  *  \brief  work queue element, as the element within work 
@@ -407,20 +414,14 @@ typedef struct POSAPIContext_QE {
 
 
     /*!
-     *  \brief  persist the state of this APIcontext to specified directory,
-     *          this function won't persist api parameters
-     *  \note   this function is for tracing functionality
+     *  \brief  persist the state of this APIcontext to specified directory
+     *  \tparam with_params whether to persist with parameter information,
+     *          if this persist is for tracing, then false; otherwise for
+     *          checkpointing, then true   
      *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointing
      */
-    pos_retval_t persist_without_state_sync(std::string ckpt_dir);
-
-
-    /*!
-     *  \brief  persist the state of this APIcontext to specified directory,
-     *  \param  ckpt_dir    directory to store the checkpoint
-     *  \return POS_SUCCESS for successfully checkpointing
-     */
+    template<bool with_params>
     pos_retval_t persist(std::string ckpt_dir);
 
 

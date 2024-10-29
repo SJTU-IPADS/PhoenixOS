@@ -146,6 +146,7 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
             {   kPOS_OOB_Msg_Agent_Unregister_Client,   oob_functions::agent_unregister_client::sv  },
             {   kPOS_OOB_Msg_Utils_MockAPICall,         oob_functions::utils_mock_api_call::sv      },
             {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,          oob_functions::cli_ckpt_predump::sv         },
+            {   kPOS_OOB_Msg_CLI_Ckpt_Dump,             oob_functions::cli_ckpt_dump::sv            },
             {   kPOS_OOB_Msg_CLI_Migration_Signal,      oob_functions::cli_migration_signal::sv     },
             {   kPOS_OOB_Msg_CLI_Restore_Signal,        oob_functions::cli_restore_signal::sv       },
             {   kPOS_OOB_Msg_CLI_Trace_Resource,        oob_functions::cli_trace_resource::sv       },
