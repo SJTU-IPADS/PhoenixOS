@@ -84,7 +84,7 @@ typedef struct pos_client_cxt {
     std::string checkpoint_file_path;
 
     // indices of handle type
-    std::vector<uint64_t> handle_type_idx;
+    std::vector<uint64_t> resource_type_idx;
 
     // runtime configurations
     // whether to trace resource
@@ -115,7 +115,7 @@ typedef struct pos_create_client_param {
 enum pos_client_status_t : uint8_t {
     kPOS_ClientStatus_CreatePending = 0,
     kPOS_ClientStatus_Active,
-    kPOS_ClientStatus_Hang,
+    kPOS_ClientStatus_Hang
 };
 
 

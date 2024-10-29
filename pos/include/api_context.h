@@ -407,7 +407,17 @@ typedef struct POSAPIContext_QE {
 
 
     /*!
-     *  \brief  persist the state of this APIcontext to specified directory
+     *  \brief  persist the state of this APIcontext to specified directory,
+     *          this function won't persist api parameters
+     *  \note   this function is for tracing functionality
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \return POS_SUCCESS for successfully checkpointing
+     */
+    pos_retval_t persist_without_state_sync(std::string ckpt_dir);
+
+
+    /*!
+     *  \brief  persist the state of this APIcontext to specified directory,
      *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointing
      */

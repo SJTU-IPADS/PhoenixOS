@@ -151,7 +151,7 @@ void POSWorker::__daemon_ckpt_sync(){
 
         // step 1: digest cmd from parser work queue
         cmd_wqes.clear();
-        this->_client->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
+        this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
         for(i=0; i<cmd_wqes.size(); i++){
             POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
             this->__process_cmd(cmd_wqe);
@@ -209,14 +209,15 @@ void POSWorker::__daemon_ckpt_sync(){
 }
 
 
-pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
+pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t nb_ckpt_handles = 0, ckpt_size = 0;
     typename std::set<POSHandle*>::iterator set_iter;
 
     POS_CHECK_POINTER(cmd);
 
-    for(set_iter=cmd->checkpoint_handles.begin(); set_iter!=cmd->checkpoint_handles.end(); set_iter++){
+    // for both pre-dump and dump, we need to save pre-dump handles
+    for(set_iter=cmd->predump_handles.begin(); set_iter!=cmd->predump_handles.end(); set_iter++){
         POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
 
@@ -242,6 +243,35 @@ pos_retval_t POSWorker::__checkpoint_sync(POSCommand_QE_t *cmd){
         ckpt_size += handle->state_size;
     }
 
+    // for dump, we also need to save dump handles
+    if(cmd->type == kPOS_Command_Parser2Worker_Dump){
+        for(set_iter=cmd->dump_handles.begin(); set_iter!=cmd->dump_handles.end(); set_iter++){
+            POSHandle *handle = *set_iter;
+            POS_CHECK_POINTER(handle);
+
+            if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
+                        || handle->status == kPOS_HandleStatus_Create_Pending
+                        || handle->status == kPOS_HandleStatus_Broken
+            )){
+                continue;
+            }
+
+            retval = handle->checkpoint_commit_sync(
+                /* version_id */ handle->latest_version,
+                /* ckpt_dir */ cmd->ckpt_dir,
+                /* stream_id */ 0
+            );
+            if(unlikely(POS_SUCCESS != retval)){
+                POS_WARN_C("failed to checkpoint handle");
+                retval = POS_FAILED;
+                goto exit;
+            }
+
+            nb_ckpt_handles += 1;
+            ckpt_size += handle->state_size;
+        }
+    }
+
     // make sure the checkpoint is finished
     retval = this->sync();
     if(unlikely(retval != POS_SUCCESS)){
@@ -264,6 +294,8 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     POSHandleManager<POSHandle>* hm;
     POSHandle *handle;
     uint64_t i;
+    POSAPIContext_QE *wqe;
+    std::vector<POSAPIContext_QE*> wqes;
 
     POS_CHECK_POINTER(cmd);
 
@@ -272,22 +304,26 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     /* ========== Ckpt WQ Command from parser thread ========== */
     case kPOS_Command_Parser2Worker_PreDump:
     case kPOS_Command_Parser2Worker_Dump:
-        if(unlikely(
-            POS_SUCCESS != (retval = this->sync())
-        )){
+        // for both pre-dump and dump, we need to first checkpoint handles
+        if(unlikely(POS_SUCCESS != (retval = this->sync()))){
             POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
             goto reply_parser;
         }
-        if(unlikely(
-            POS_SUCCESS != (retval = this->__checkpoint_sync(cmd))
-        )){
+        if(unlikely(POS_SUCCESS != (retval = this->__checkpoint_handle_sync(cmd)))){
             POS_WARN_C("failed to do checkpointing");
-        }
-
-        // pre-dump won't stop the execution, we just notify parser
-        if(cmd->type == kPOS_Command_Parser2Worker_PreDump){
             goto reply_parser;
         }
+
+        if(cmd->type == kPOS_Command_Parser2Worker_PreDump){ goto reply_parser; }
+
+        // for dump, we also need to save unexecuted APIs
+        for(i=0; i<wqes.size(); i++){
+            POS_CHECK_POINTER(wqe = wqes[i]);
+            POS_CHECK_POINTER(wqe->api_cxt);
+        }
+
+        // for dump, we need to stop client execution
+        this->_client->status = kPOS_ClientStatus_Hang;
 
     reply_parser:
         // reply to parser

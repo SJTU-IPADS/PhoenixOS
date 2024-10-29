@@ -32,7 +32,7 @@
 #include "pos/include/proto/apicxt.pb.h"
 
 
-pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
+pos_retval_t POSAPIContext_QE::persist_without_state_sync(std::string ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     std::string ckpt_file_path;
     pos_protobuf::Bin_POSAPIContext apicxt_binary;
@@ -117,5 +117,17 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
 
 exit:
     if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
+    return retval;
+}
+
+
+pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+
+    POS_ASSERT(std::filesystem::exists(ckpt_dir));
+
+    // TODO:
+
+exit:
     return retval;
 }
