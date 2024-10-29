@@ -28,8 +28,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
-#include "pos/include/utils/serializer.h"
-
 #include "pos/cuda_impl/handle.h"
 #include "pos/cuda_impl/handle/device.h"
 
@@ -239,36 +237,6 @@ class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
      */
     pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device) override;
     /* ======================== restore handle & state ======================= */
-
-
- protected:
-    /*!
-     *  \brief  obtain the serilization size of extra fields of specific POSHandle type
-     *  \return the serilization size of extra fields of POSHandle
-     */
-    uint64_t __get_extra_serialize_size() override {
-        return 0;
-    }
-
-
-    /*!
-     *  \brief  serialize the extra state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t __serialize_extra(void* serialized_area) override {
-        return POS_SUCCESS;
-    }
-
-
-    /*!
-     *  \brief  deserialize extra field of this handle
-     *  \param  sraw_data    raw data area that store the serialized data
-     *  \return POS_SUCCESS for successfully deserilization
-     */
-    pos_retval_t __deserialize_extra(void* raw_data) override {
-        return POS_SUCCESS;
-    }
 };
 
 

@@ -112,9 +112,9 @@ void POSParser::__daemon(){
             }
         #endif
 
-            apicxt_wqe->runtime_s_tick = POSUtilTimestamp::get_tsc();
+            apicxt_wqe->parser_s_tick = POSUtilTscTimer::get_tsc();
             parser_retval = (*(this->_parser_functions[api_id]))(this->_ws, this, apicxt_wqe);
-            apicxt_wqe->runtime_e_tick = POSUtilTimestamp::get_tsc();
+            apicxt_wqe->parser_e_tick = POSUtilTscTimer::get_tsc();
 
             // set the return code
             apicxt_wqe->api_cxt->return_code = this->_ws->api_mgnr->cast_pos_retval(
@@ -128,7 +128,7 @@ void POSParser::__daemon(){
                     apicxt_wqe->client_id, api_id
                 );
                 apicxt_wqe->status = kPOS_API_Execute_Status_Parser_Failed;
-                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();
+                apicxt_wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
                 continue;
             }
@@ -152,7 +152,7 @@ void POSParser::__daemon(){
             if(     apicxt_wqe->status == kPOS_API_Execute_Status_Return_After_Parse 
                 ||  apicxt_wqe->status == kPOS_API_Execute_Status_Return_Without_Worker
             ){
-                apicxt_wqe->return_tick = POSUtilTimestamp::get_tsc();
+                apicxt_wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
             }
 

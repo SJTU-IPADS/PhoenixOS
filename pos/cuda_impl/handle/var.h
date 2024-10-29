@@ -26,8 +26,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
-#include "pos/include/utils/serializer.h"
-
 #include "pos/cuda_impl/handle.h"
 
 
@@ -129,68 +127,6 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
      */
     pos_retval_t __restore() override;
     /* ======================== restore handle & state ======================= */
-
-
- protected:
-
-    /*!
-     *  \brief  obtain the serilization size of extra fields of specific POSHandle type
-     *  \return the serilization size of extra fields of POSHandle
-     */
-    uint64_t __get_extra_serialize_size() override {
-        return (
-            /* name_size */     sizeof(uint64_t)
-            /* name */          + (this->global_name.size() > 0 ? this->global_name.size() + 1 : 0)
-        );
-    }
-
-    /*!
-     *  \brief  serialize the extra state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t __serialize_extra(void* serialized_area) override {
-        pos_retval_t retval = POS_SUCCESS;
-        void *ptr = serialized_area;
-        uint64_t tmp_size;
-        char eos = '\0';
-
-        POS_CHECK_POINTER(ptr);
-        
-        tmp_size = this->global_name.size();
-        POSUtil_Serializer::write_field(&ptr, &(tmp_size), sizeof(uint64_t));
-        if(tmp_size > 0){
-            POSUtil_Serializer::write_field(&ptr, this->global_name.c_str(), tmp_size);
-            POSUtil_Serializer::write_field(&ptr, &(eos), 1);
-        }
-        
-        return retval;
-    }
-
-    /*!
-     *  \brief  deserialize extra field of this handle
-     *  \param  raw_data    raw data area that store the serialized data
-     *  \return POS_SUCCESS for successfully deserilization
-     */
-    pos_retval_t __deserialize_extra(void* raw_data) override {
-        pos_retval_t retval = POS_SUCCESS;
-        uint64_t tmp_size;
-        void *ptr = raw_data;
-        char *temp_str;
-        
-        POS_CHECK_POINTER(ptr);
-
-        POSUtil_Deserializer::read_field(&(tmp_size), &ptr, sizeof(uint64_t));
-        if(likely(tmp_size > 0)){
-            POS_CHECK_POINTER(temp_str = (char*)malloc(tmp_size+1));
-            memset(temp_str, 0, tmp_size+1);
-            POSUtil_Deserializer::read_field(temp_str, &ptr, tmp_size);
-            this->global_name = std::string(static_cast<const char*>(temp_str));
-            free(temp_str);
-        }
-
-        return retval;
-    }
 };
 
 

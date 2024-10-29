@@ -31,10 +31,11 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/utils/lockfree_queue.h"
-#include "pos/include/utils/serializer.h"
 #include "pos/include/checkpoint.h"
 
+
 #define kPOS_HandleDefaultSize   (1<<4)
+
 
 /*!
  *  \brief  idx of base resource types
@@ -213,35 +214,6 @@ class POSHandle {
 
 
     ~POSHandle() = default;
-
-
-    /*!
-     *  \brief  serialize the state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t serialize(void** serialized_area);
-
-
-    /*!
-     *  \brief  obtain the size of the serialize area of this handle
-     *  \return size of the serialize area of this handle
-     */
-    inline uint64_t get_serialize_size(){
-        return (
-            /* size of basic field */   sizeof(uint64_t)
-            /* basic field */           + this->__get_basic_serialize_size() 
-            /* extra field */           + this->__get_extra_serialize_size()
-        );
-    }
-
-
-    /*!
-     *  \brief  deserialize the state of current handle from binary area
-     *  \param  raw_area    raw data area
-     *  \return POS_SUCCESS for successfully serialization
-     */
-    pos_retval_t deserialize(void* raw_area);
 
 
     /* ======================= basic handle metadata ========================= */
@@ -550,6 +522,15 @@ class POSHandle {
     pos_retval_t sync_persist();
 
 
+    /*!
+     *  \brief  synchronously persist this handle without checkpointing state
+     *  \note   this function is for tracing system which need checkpoint without state
+     *  \param  ckpt_dir    directory to store checkpoint files
+     *  \return POS_SUCCESS for successfully persisting  
+     */
+    pos_retval_t persist_without_state_sync(std::string ckpt_dir);
+
+
  protected:
     // counter for exclude copy-on-write and checkpoint process
     std::atomic<uint8_t> _state_preserve_counter;
@@ -682,55 +663,6 @@ class POSHandle {
 
 
     /*!
-     *  \brief  obtain the serilization size of basic fields of POSHandle
-     *  \return the serilization size of basic fields of POSHandle
-     */
-    uint64_t __get_basic_serialize_size();
-
-
-    /*!
-     *  \brief  obtain the serilization size of extra fields of specific POSHandle type
-     *  \return the serilization size of extra fields of POSHandle
-     */
-    virtual uint64_t __get_extra_serialize_size(){ return 0; }
-
-
-    /*!
-     *  \brief  serialize the basic state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t __serialize_basic(void* serialized_area);
-
-
-    /*!
-     *  \brief  serialize the extra state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    virtual pos_retval_t __serialize_extra(void* serialized_area){
-        return POS_SUCCESS;
-    }
-
-
-    /*!
-     *  \brief  deserialize basic field of this handle
-     *  \param  raw_data    raw data area that store the serialized data
-     *  \return POS_SUCCESS for successfully deserialize
-     */
-    pos_retval_t __deserialize_basic(void* raw_data);
-
-
-    /*!
-     *  \brief  deserialize extra field of this handle
-     *  \param  sraw_data    raw data area that store the serialized data
-     *  \return POS_SUCCESS for successfully deserilization
-     */
-    virtual pos_retval_t __deserialize_extra(void* raw_data){
-        return POS_SUCCESS;
-    }
-
-    /*!
      *  \brief  initialize checkpoint bag of this handle
      *  \note   it must be implemented by different implementations of stateful 
      *          handle, as they might require different allocators and deallocators
@@ -858,38 +790,6 @@ class POSHandleManager {
         uint64_t state_size = 0
     );
 
-    /*!
-     *  \brief  allocate new mocked resource within the manager, based on checkpoint in the binary
-     *  \note   this function is invoked during restore process
-     *  \param  ckpt_raw_data   pointer to the checkpoint binary
-     *  \return pointer to the newly allocated handle if successfully allocated
-     *          nullptr is failed to allocate
-     */
-    T_POSHandle* allocate_mocked_resource_from_binary(void* ckpt_raw_data){
-        T_POSHandle *handle = nullptr;
-
-        POS_CHECK_POINTER(ckpt_raw_data);
-
-        handle = new T_POSHandle(this);
-        POS_CHECK_POINTER(handle);
-
-        if(likely(handle->deserialize(ckpt_raw_data) == POS_SUCCESS)){
-            this->_handles.push_back(handle);
-            if(likely((uint64_t)(handle->client_addr) > this->_base_ptr)){
-                this->_base_ptr = (uint64_t)(handle->client_addr);
-            }
-        } else {
-            POS_WARN_C("failed to deserialize handle");
-            delete handle;
-        }
-        
-        if(handle->is_lastest_used_handle){
-            this->latest_used_handle = handle;
-        }
-
-    exit:
-        return handle;
-    }
     
     /*!
      *  \brief  record a new handle that will be modified

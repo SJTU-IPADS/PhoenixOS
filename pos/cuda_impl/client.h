@@ -324,11 +324,7 @@ class POSClient_CUDA : public POSClient {
             );
             for(i=0; i<hm->get_nb_handles(); i++){
                 POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-                retval = handle->checkpoint_commit_sync(
-                    /* version_id */ handle->latest_version,
-                    /* ckpt_dir */ resource_dir,
-                    /* stream_id */ 0
-                );
+                retval = handle->persist_without_state_sync(resource_dir);
                 if(unlikely(POS_SUCCESS != retval)){
                     POS_WARN_C("failed to dump status of handle");
                     retval = POS_FAILED;
@@ -686,127 +682,6 @@ class POSClient_CUDA : public POSClient {
 
  protected:
     /*!
-     *  \brief  allocate mocked resource in the handle manager according to given type
-     *  \note   this function is used during restore phrase
-     *  \param  type_id specified resource type index
-     *  \param  bin_ptr pointer to the binary area
-     *  \return POS_SUCCESS for successfully allocated
-     */
-    pos_retval_t __allocate_typed_resource_from_binary(pos_resource_typeid_t type_id, void* bin_ptr) override {
-        pos_retval_t retval = POS_SUCCESS;
-        
-        if(unlikely(this->handle_managers.count(type_id) == 0)){
-            POS_ERROR_C_DETAIL(
-                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
-            );
-        }
-
-        switch (type_id)
-        {
-        case kPOS_ResourceTypeId_CUDA_Context:
-            POSHandleManager<POSHandle_CUDA_Context> *hm_context;
-            POS_CHECK_POINTER(
-                hm_context = (POSHandleManager<POSHandle_CUDA_Context>*)(this->handle_managers[type_id])
-            );
-            hm_context->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Module:
-            /*!
-             *  \note   if the resource is cuda module, then we need to use POSHandleManager with
-             *          specific type, in order to invoke specified __init_ckpt_bag for CUDA module, 
-             *          as CUDA module would contains host-side checkpoint record
-             */
-            POSHandleManager<POSHandle_CUDA_Module> *hm_module;
-            POS_CHECK_POINTER(
-                hm_module = (POSHandleManager<POSHandle_CUDA_Module>*)(this->handle_managers[type_id])
-            );
-            hm_module->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Function:
-            POSHandleManager<POSHandle_CUDA_Function> *hm_function;
-            POS_CHECK_POINTER(
-                hm_function = (POSHandleManager<POSHandle_CUDA_Function>*)(this->handle_managers[type_id])
-            );
-            hm_function->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Var:
-            POSHandleManager<POSHandle_CUDA_Var> *hm_var;
-            POS_CHECK_POINTER(
-                hm_var = (POSHandleManager<POSHandle_CUDA_Var>*)(this->handle_managers[type_id])
-            );
-            hm_var->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Device:
-            /*!
-             *  \note   if the resource is cuda device, then we need to use POSHandleManager with
-             *          specific type, as we need to setup the lastest-used handle inside the
-             *          handle manager
-             */
-            POSHandleManager<POSHandle_CUDA_Device> *hm_device;
-            POSHandle_CUDA_Device *device_handle;
-            POS_CHECK_POINTER(
-                hm_device = (POSHandleManager<POSHandle_CUDA_Device>*)(this->handle_managers[type_id])
-            );
-            POS_CHECK_POINTER(device_handle = hm_device->allocate_mocked_resource_from_binary(bin_ptr));
-
-            if(device_handle->is_lastest_used_handle == true){
-                hm_device->latest_used_handle = device_handle;
-            }
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Memory:
-            /*!
-             *  \note   if the resource is CUDA memory, then we need to use POSHandleManager with
-             *          specific type, in order to invoke specified __init_ckpt_bag for CUDA memory 
-             *          inside the function allocate_mocked_resource_from_binary
-             */
-            POSHandleManager<POSHandle_CUDA_Memory> *hm_memory;
-            POS_CHECK_POINTER(
-                hm_memory = (POSHandleManager<POSHandle_CUDA_Memory>*)(this->handle_managers[type_id])
-            );
-            hm_memory->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Stream:
-            POSHandleManager<POSHandle_CUDA_Stream> *hm_stream;
-            POS_CHECK_POINTER(
-                hm_stream = (POSHandleManager<POSHandle_CUDA_Stream>*)(this->handle_managers[type_id])
-            );
-            hm_stream->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_CUDA_Event:
-            POSHandleManager<POSHandle_CUDA_Event> *hm_event;
-            POS_CHECK_POINTER(
-                hm_event = (POSHandleManager<POSHandle_CUDA_Event>*)(this->handle_managers[type_id])
-            );
-            hm_event->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        case kPOS_ResourceTypeId_cuBLAS_Context:
-            POSHandleManager<POSHandle_cuBLAS_Context> *hm_cublas_cxt;
-            POS_CHECK_POINTER(
-                hm_cublas_cxt = (POSHandleManager<POSHandle_cuBLAS_Context>*)(this->handle_managers[type_id])
-            );
-            hm_cublas_cxt->allocate_mocked_resource_from_binary(bin_ptr);
-            break;
-
-        default:
-            POS_ERROR_C_DETAIL(
-                "no handle manager with specified type registered, this is a bug: type_id(%lu)", type_id
-            );
-        }
-
-    exit:
-        return retval;
-    }
-
-
-    /*!
      *  \brief  obtain all resource type indices of this client
      *  \return all resource type indices of this client
      */
@@ -923,9 +798,9 @@ class POSClient_CUDA : public POSClient {
         };
 
         // if we have already save the kernels, we can skip
-        if(likely(this->_cxt.is_load_kernel_from_cache == true)){
-            goto exit;
-        }
+        // if(likely(this->_cxt.is_load_kernel_from_cache == true)){
+        //     goto exit;
+        // }
 
         hm_function 
             = (POSHandleManager_CUDA_Function*)(this->handle_managers[kPOS_ResourceTypeId_CUDA_Function]);

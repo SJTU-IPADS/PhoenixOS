@@ -26,8 +26,6 @@
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
-#include "pos/include/utils/serializer.h"
-
 #include "pos/cuda_impl/handle.h"
 
 
@@ -131,50 +129,6 @@ class POSHandle_CUDA_Event final : public POSHandle_CUDA {
      */
     pos_retval_t __restore() override;
     /* ======================== restore handle & state ======================= */
-
-
- protected:
-    /*!
-     *  \brief  obtain the serilization size of extra fields of specific POSHandle type
-     *  \return the serilization size of extra fields of POSHandle
-     */
-    uint64_t __get_extra_serialize_size() override {
-        return (
-            /* flags */         sizeof(int)
-        );
-    }
-
-    /*!
-     *  \brief  serialize the extra state of current handle into the binary area
-     *  \param  serialized_area  pointer to the binary area
-     *  \return POS_SUCCESS for successfully serilization
-     */
-    pos_retval_t __serialize_extra(void* serialized_area) override {
-        pos_retval_t retval = POS_SUCCESS;
-        void *ptr = serialized_area;
-
-        POS_CHECK_POINTER(ptr);
-
-        POSUtil_Serializer::write_field(&ptr, &(this->flags), sizeof(int));
-
-        return retval;
-    }
-
-    /*!
-     *  \brief  deserialize extra field of this handle
-     *  \param  sraw_data    raw data area that store the serialized data
-     *  \return POS_SUCCESS for successfully deserilization
-     */
-    pos_retval_t __deserialize_extra(void* raw_data) override {
-        pos_retval_t retval = POS_SUCCESS;
-        void *ptr = raw_data;
-
-        POS_CHECK_POINTER(ptr);
-
-        POSUtil_Deserializer::read_field(&(this->flags), &ptr, sizeof(int));
-
-        return retval;
-    }
 };
 
 
