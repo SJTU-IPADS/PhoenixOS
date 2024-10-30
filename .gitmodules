@@ -15,3 +15,6 @@
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://github.com/protocolbuffers/protobuf.git
+[submodule "third_party/criu"]
+	path = third_party/criu
+	url = https://github.com/SJTU-IPADS/PhoenixOS-CRIU.git

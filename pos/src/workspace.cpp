@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 #include <iostream>
+#include <string>
 #include <filesystem>
-
 #include "pos/include/workspace.h"
 #include "pos/include/proto/handle.pb.h"
+
+
+// generated in https://patorjk.com/software/taag/#p=display&f=Big&t=PhoenixOS
+const std::string __pos_banner =
+    std::string(" _____  _                      _       ____   _____\n") +
+    std::string("|  __ \\| |                    (_)     / __ \\ / ____|\n") +
+    std::string("| |__) | |__   ___   ___ _ __  ___  _| |  | | (___\n") +
+    std::string("|  ___/| '_ \\ / _ \\ / _ \\ '_ \\| \\ \\/ / |  | |\\___ \\\n") +
+    std::string("| |    | | | | (_) |  __/ | | | |>  <| |__| |____) |\n") +
+    std::string("|_|    |_| |_|\\___/ \\___|_| |_|_/_/\\_\\\\____/|_____/");
 
 
 POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
@@ -175,8 +185,10 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
     // make sure the protobuf is working
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+    POS_LOG(">>>>>>>>>> PhOS Workspace <<<<<<<<<<\n%s\n", __pos_banner.c_str());
+
     POS_LOG(
-        "workspace created:                             \n"
+        "PhoenixOS workspace created, welcome!          \n"
         "   common configurations:                      \n"
         "       =>  enable_context_pool(%s)             \n"
         "   ckpt configirations:                        \n"
@@ -329,7 +341,7 @@ int POSWorkspace::pos_process(
     std::vector<POSAPIContext_QE*> cqes;
     POSAPIContext_QE* cqe;
 
-    // TODO: we assume always be client 0 here, for debugging under cricket
+    // TODO: we assume always be client 0 here, for debugging
     uuid = 0;
 
 #if POS_CONF_RUNTIME_EnableDebugCheck
@@ -402,15 +414,6 @@ int POSWorkspace::pos_process(
 
                     // setup return code
                     retval = has_prev_error ? prev_error_code : cqe->api_cxt->return_code;
-
-                    /*!
-                     *  \brief  setup return data
-                     *  \note   avoid this copy!
-                     *          then we assume only sync call would have return data
-                     */
-                    // if(unlikely(ret_data_len > 0 && ret_data != nullptr)){
-                    //     memcpy(ret_data, cqe->api_cxt->ret_data, ret_data_len);
-                    // }
 
                     goto exit;
                 }
