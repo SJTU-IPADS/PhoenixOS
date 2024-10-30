@@ -293,9 +293,10 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
     POSHandleManager<POSHandle>* hm;
     POSHandle *handle;
-    uint64_t i;
+    uint64_t i, nb_ckpt_wqes;
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
+    pos_u64id_t max_wqe_id = 0;
 
     POS_CHECK_POINTER(cmd);
 
@@ -310,20 +311,30 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             goto reply_parser;
         }
         if(unlikely(POS_SUCCESS != (retval = this->__checkpoint_handle_sync(cmd)))){
-            POS_WARN_C("failed to do checkpointing");
+            POS_WARN_C("failed to do checkpointing of handles");
             goto reply_parser;
         }
 
+        // pre-dump is done here
         if(cmd->type == kPOS_Command_Parser2Worker_PreDump){ goto reply_parser; }
 
-        // for dump, we also need to save unexecuted APIs
-        for(i=0; i<wqes.size(); i++){
-            POS_CHECK_POINTER(wqe = wqes[i]);
-            POS_CHECK_POINTER(wqe->api_cxt);
+        //for dump, we also need to save unexecuted APIs
+        nb_ckpt_wqes = 0;
+        while(max_wqe_id < this->_client->_api_inst_pc - 1){ // we need to make sure we drain all unexecuted APIs
+            wqes.clear();
+            this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
+            for(i=0; i<wqes.size(); i++){
+                POS_CHECK_POINTER(wqe = wqes[i]);
+                POS_CHECK_POINTER(wqe->api_cxt);
+                if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true>(cmd->ckpt_dir)))){
+                    POS_WARN_C("failed to do checkpointing of unexecuted APIs");
+                    goto reply_parser;
+                }
+                nb_ckpt_wqes += 1;
+                max_wqe_id = (wqe->id > max_wqe_id) ? wqe->id : max_wqe_id;
+            }
         }
-
-        // for dump, we need to stop client execution
-        this->_client->status = kPOS_ClientStatus_Hang;
+        POS_LOG_C("finished dumping unexecuted APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
 
     reply_parser:
         // reply to parser
