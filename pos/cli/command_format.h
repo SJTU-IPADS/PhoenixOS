@@ -18,7 +18,6 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/oob.h"
-#include "pos/include/migration.h"
 
 /* ========= migration related commands ========= */
 /*!

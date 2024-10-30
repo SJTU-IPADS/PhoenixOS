@@ -238,6 +238,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 	// ==================== CRIB Dependencies ====================
 	if cmdOpt.WithThirdParty {
 		logger.Infof("building dependencies...")
+		CRIB_LibUuid(cmdOpt, buildConf, logger)
 		CRIB_Criu(cmdOpt, buildConf, logger)
 		CRIB_LibProtobuf(cmdOpt, buildConf, logger)
 		CRIB_LibYamlCpp(cmdOpt, buildConf, logger)

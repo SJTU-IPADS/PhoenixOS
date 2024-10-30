@@ -18,7 +18,9 @@
 #include <filesystem>
 #include "pos/include/workspace.h"
 #include "pos/include/proto/handle.pb.h"
+#include "pos/include/proto/client.pb.h"
 
+#include "uuid.h"
 
 // generated in https://patorjk.com/software/taag/#p=display&f=Big&t=PhoenixOS
 const std::string __pos_banner =
@@ -154,11 +156,9 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
         /* callback_handlers */ {
             {   kPOS_OOB_Msg_Agent_Register_Client,     oob_functions::agent_register_client::sv    },
             {   kPOS_OOB_Msg_Agent_Unregister_Client,   oob_functions::agent_unregister_client::sv  },
-            {   kPOS_OOB_Msg_Utils_MockAPICall,         oob_functions::utils_mock_api_call::sv      },
             {   kPOS_OOB_Msg_CLI_Ckpt_PreDump,          oob_functions::cli_ckpt_predump::sv         },
             {   kPOS_OOB_Msg_CLI_Ckpt_Dump,             oob_functions::cli_ckpt_dump::sv            },
-            {   kPOS_OOB_Msg_CLI_Migration_Signal,      oob_functions::cli_migration_signal::sv     },
-            {   kPOS_OOB_Msg_CLI_Restore_Signal,        oob_functions::cli_restore_signal::sv       },
+            {   kPOS_OOB_Msg_CLI_Restore,               oob_functions::cli_restore::sv              },
             {   kPOS_OOB_Msg_CLI_Trace_Resource,        oob_functions::cli_trace_resource::sv       },
         },
         /* ip_str */ POS_OOB_SERVER_DEFAULT_IP,
@@ -248,8 +248,23 @@ pos_retval_t POSWorkspace::deinit(){
 
 pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSClient** clnt){
     pos_retval_t retval = POS_SUCCESS;
+    uuid_t uuid;
 
-    param.id = this->_current_max_uuid;
+    auto __uuid_to_uint64 = [](const uuid_t uuid) -> uint64_t {
+        static bool is_first = true;
+        uint64_t value = 0;
+
+        // TODO: comment out this once we enable piggyback support of uuid
+        //      in remoting framework
+        if(is_first == true){ is_first = false; return 0; }
+
+        for (int i = 0; i < 8; ++i) { value = (value << 8) | uuid[i]; }
+        return value;
+    };
+
+    // generate uuid for this client
+    uuid_generate_random(uuid);
+    param.id = __uuid_to_uint64(uuid);
 
     // create client
     retval = this->__create_client(param, clnt);
@@ -257,7 +272,6 @@ pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSCl
         POS_WARN_C("failed to create platform-specific client");
         goto exit;
     }
-    this->_current_max_uuid += 1;
     this->_client_map[(*clnt)->id] = (*clnt);
     this->_pid_client_map[param.pid] = (*clnt);
     POS_DEBUG_C("create client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, param.pid);
@@ -307,6 +321,59 @@ exit:
 }
 
 
+pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** clnt){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSClient client_binary;
+    std::ifstream input;
+    pos_create_client_param create_param;
+    pos_client_uuid_t client_uuid;
+    pid_t client_pid;
+    std::string client_job_name;
+
+    POS_CHECK_POINTER(clnt);
+    
+    input.open(ckpt_file, std::ios::in | std::ios::binary);
+    if(!input){
+        POS_WARN_C("failed to open client ckpt file");
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    if (!client_binary.ParseFromIstream(&input)) {
+        POS_WARN_C("failed to deserialize client ckpt");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    create_param.id = client_binary.uuid();
+    create_param.pid = client_binary.pid();
+    create_param.job_name = client_binary.job_name();
+
+    if(unlikely(this->_client_map.count(create_param.id) > 0)){
+        POS_WARN_C("confliction of client uuid, %s", POS_BUG_REPORT);
+        retval = POS_FAILED;
+        goto exit;
+    }
+    if(unlikely(this->_pid_client_map.count(create_param.pid) > 0)){
+        POS_WARN_C("confliction of client pid, %s", POS_BUG_REPORT);
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // create client
+    retval = this->__create_client(create_param, clnt);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to create platform-specific client");
+        goto exit;
+    }
+    this->_client_map[(*clnt)->id] = (*clnt);
+    this->_pid_client_map[(*clnt)->pid] = (*clnt);
+    POS_DEBUG_C("restore client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, (*clnt)->pid);
+
+exit:
+    return retval;
+}
+
+
 POSClient* POSWorkspace::get_client_by_pid(__pid_t pid){
     POSClient *retval = nullptr;
 
@@ -341,7 +408,8 @@ int POSWorkspace::pos_process(
     std::vector<POSAPIContext_QE*> cqes;
     POSAPIContext_QE* cqe;
 
-    // TODO: we assume always be client 0 here, for debugging
+    // TODO: comment out this once we enable piggyback support of uuid
+    //      in remoting framework
     uuid = 0;
 
 #if POS_CONF_RUNTIME_EnableDebugCheck

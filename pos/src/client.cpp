@@ -18,7 +18,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
-
+#include <filesystem>
 #include <stdint.h>
 #include <assert.h>
 
@@ -27,24 +27,23 @@
 #include "pos/include/handle.h"
 #include "pos/include/client.h"
 #include "pos/include/api_context.h"
+#include "pos/include/proto/client.pb.h"
 
 
-POSClient::POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
+POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws) 
     :   id(id),
-        migration_ctx(this),
+        pid(pid),
         status(kPOS_ClientStatus_CreatePending),
         _api_inst_pc(0), 
         _cxt(cxt),
-        _last_ckpt_tick(0),
         _ws(ws)
 {}
 
 
 POSClient::POSClient() 
     :   id(0),
-        migration_ctx(this),
+        pid(0),
         status(kPOS_ClientStatus_CreatePending),
-        _last_ckpt_tick(0),
         _ws(nullptr)
 {
     POS_ERROR_C("shouldn't call, just for passing compilation");
@@ -91,6 +90,57 @@ void POSClient::deinit(){
     this->status = kPOS_ClientStatus_Hang;
 
     this->__destory_qgroup();
+}
+
+
+pos_retval_t POSClient::persist(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSClient client_binary;
+    std::ofstream ckpt_file_stream;
+    std::string ckpt_file_path;
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+
+    // verify the path exists
+    if(unlikely(!std::filesystem::exists(ckpt_dir))){
+        POS_WARN_C(
+            "failed to persist client state, no ckpt directory exists, this is a bug: ckpt_dir(%s)",
+            ckpt_dir.c_str()
+        );
+        retval = POS_FAILED_NOT_EXIST;
+        goto exit;
+    }
+
+    // record client state
+    client_binary.set_uuid(this->id);
+    client_binary.set_pid(this->pid);
+    client_binary.set_job_name(this->_cxt.job_name);
+
+    // form the path to the checkpoint file of this handle
+    ckpt_file_path = ckpt_dir + std::string("/c.bin");
+
+    // write to file
+    ckpt_file_stream.open(ckpt_file_path, std::ios::binary | std::ios::out);
+    if(!ckpt_file_stream){
+        POS_WARN_C(
+            "failed to dump client to file, failed to open file: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+    if(!client_binary.SerializeToOstream(&ckpt_file_stream)){
+        POS_WARN_C(
+            "failed to dump client to file, protobuf failed to dump: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+exit:
+    if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
+    return retval;
 }
 
 

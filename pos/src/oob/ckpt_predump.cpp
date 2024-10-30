@@ -11,8 +11,8 @@
 #include "pos/include/workspace.h"
 #include "pos/include/agent.h"
 #include "pos/include/command.h"
-
 #include "pos/cuda_impl/client.h"
+
 
 namespace oob_functions {
 
@@ -131,6 +131,6 @@ namespace cli_ckpt_predump {
     exit:
         return retval;
     }
-}
+} // namespace cli_ckpt_predump
 
 } // namespace oob_functions

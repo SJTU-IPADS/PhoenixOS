@@ -396,3 +396,4 @@ _POS_PRINT_POSITION(stdout)     \
 #endif
 
 #define POS_BACK_LINE   fprintf(stdout, "\033[F\033[K");
+#define POS_BUG_REPORT  "please submit bug report to https://github.com/SJTU-IPADS/PhoenixOS/issues/new/choose"

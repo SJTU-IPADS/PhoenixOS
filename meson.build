@@ -255,7 +255,6 @@ sources += [
     'pos/src/worker.cpp',
     'pos/src/parser.cpp',
     'pos/src/workspace.cpp',
-    'pos/src/migration.cpp',
 
     # oob functions
     'pos/src/oob/agent.cpp',
@@ -263,11 +262,13 @@ sources += [
     'pos/src/oob/utils.cpp',
     'pos/src/oob/ckpt_predump.cpp',
     'pos/src/oob/ckpt_dump.cpp',
+    'pos/src/oob/restore.cpp',
     'pos/src/oob/trace.cpp',
     'pos/src/oob/migration.cpp',
     'pos/src/oob/mgnt.cpp',
 
     # protobuf generated file
+    'pos/include/proto/client.pb.cc',
     'pos/include/proto/handle.pb.cc',
     'pos/include/proto/apicxt.pb.cc'
 ]
@@ -327,6 +328,7 @@ inc_dirs += ['./']
 ld_args += ['-lyaml-cpp']                   # for loading client-side configurations
 ld_args += ['-pthread']                     # for support pthread_x
 ld_args += ['-libverbs']                    # for migration
+ld_args += ['-luuid']                       # for uuid support
 
 # for protobuf
 ld_args += ['-lprotobuf', '-lprotobuf-lite', '-lprotoc']                   

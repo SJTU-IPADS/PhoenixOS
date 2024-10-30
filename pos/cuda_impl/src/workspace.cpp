@@ -175,7 +175,14 @@ pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param
                                                 + param.job_name + std::string("_kernel_metas.txt");
     }
 
-    POS_CHECK_POINTER(*client = new POSClient_CUDA(/* ws */ this, /* id */ param.id, /* cxt */ client_cxt));
+    POS_CHECK_POINTER(
+        *client = new POSClient_CUDA(
+            /* id */ param.id,
+            /* pid */ param.pid,
+            /* cxt */ client_cxt,
+            /* ws */ this
+        )
+    );
     (*client)->init();
 
 exit:

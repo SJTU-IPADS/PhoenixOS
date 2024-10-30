@@ -207,3 +207,4 @@ pos_retval_t handle_predump(pos_cli_options_t &clio);
 pos_retval_t handle_dump(pos_cli_options_t &clio);
 pos_retval_t handle_migrate(pos_cli_options_t &clio);
 pos_retval_t handle_trace(pos_cli_options_t &clio);
+pos_retval_t handle_restore(pos_cli_options_t &clio);
