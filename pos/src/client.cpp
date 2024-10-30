@@ -80,16 +80,21 @@ exit:
 
 
 void POSClient::deinit(){
-    this->deinit_dump_handle_managers();
+    this->deinit_handle_managers();
 
     if(this->_cxt.trace_resource){
-        this->deinit_dump_trace_resource();
+        if(unlikely(POS_SUCCESS != this->persist_handles(/* with_state */false))){
+            POS_WARN_C("failed to persist handle for tracing");
+        }
     }
 
     // stop parser and worker to poll
     this->status = kPOS_ClientStatus_Hang;
 
     this->__destory_qgroup();
+
+exit:
+    ;
 }
 
 
@@ -140,6 +145,49 @@ pos_retval_t POSClient::persist(std::string& ckpt_dir){
 
 exit:
     if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
+    return retval;
+}
+
+
+pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+    std::tuple<pos_resource_typeid_t, pos_u64id_t> handle_info;
+
+    auto __deassemble_file_name = [](const std::string& filename) -> std::tuple<pos_resource_typeid_t, pos_u64id_t> {
+        std::string baseName = filename.substr(0, filename.find_last_of('.'));
+        std::stringstream ss(baseName);
+        std::string part;
+        std::vector<std::string> parts;
+
+        while (std::getline(ss, part, '-')) { parts.push_back(part); }
+        POS_ASSERT(parts.size() == 3);
+        POS_ASSERT(parts[0] == std::string("h"));
+        
+        return std::make_tuple(
+            std::stoul(parts[1]),
+            std::stoull(parts[2])
+        );
+    };
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+
+    if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
+        POS_WARN_C("failed to restore handles, ckpt directory not exist: %s", ckpt_dir.c_str())
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+        if (    entry.is_regular_file() 
+            &&  entry.path().extension() == ".bin"
+            &&  entry.path().filename().string().rfind("h-", 0) == 0
+        ){
+            handle_info = __deassemble_file_name(entry.path().filename().string());
+            POS_DEBUG_C("restored handle: resource_type_id(%lu), handle_id(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
+        }
+    }
+
+exit:
     return retval;
 }
 

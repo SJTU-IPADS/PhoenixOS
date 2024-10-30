@@ -252,17 +252,25 @@ exit:
 }
 
 
-pos_retval_t POSHandle::persist_without_state_sync(std::string ckpt_dir){
+pos_retval_t POSHandle::persist_sync(std::string ckpt_dir, bool with_state){
     pos_retval_t retval = POS_SUCCESS;
 
     POS_ASSERT(ckpt_dir.size() > 0);
 
+    if(with_state == true){
+        // try persist with state
+        if(this->status == kPOS_HandleStatus_Active){
+            retval = this->__commit(this->latest_version, /* stream_id */ 0, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
+            goto exit;
+        }
+    }
+
+    // persist without state
     retval = this->__persist(nullptr, ckpt_dir, 0);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to run persist thread");
         goto exit;
     }
-
     retval = this->sync_persist();
 
 exit:

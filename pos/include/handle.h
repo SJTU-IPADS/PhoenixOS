@@ -523,12 +523,13 @@ class POSHandle {
 
 
     /*!
-     *  \brief  synchronously persist this handle without checkpointing state
+     *  \brief  synchronously persist this handle
      *  \note   this function is for tracing system which need checkpoint without state
      *  \param  ckpt_dir    directory to store checkpoint files
+     *  \param  with_state  whether to persist with state
      *  \return POS_SUCCESS for successfully persisting  
      */
-    pos_retval_t persist_without_state_sync(std::string ckpt_dir);
+    pos_retval_t persist_sync(std::string ckpt_dir, bool with_state);
 
 
  protected:

@@ -49,14 +49,20 @@ namespace cli_restore {
             retmsg = std::string("ckpt corrupted: no client data");
             goto response;
         }
+        if(unlikely(POS_SUCCESS != (payload->retval = ws->restore_client(client_ckpt_path, &client)))){
+            retmsg = std::string("see posd log for more details");
+            goto response;
+        }
+        POS_CHECK_POINTER(client);
+
+        // restore handle in the client handle manager
         if(unlikely(POS_SUCCESS != (
-            payload->retval = ws->restore_client(client_ckpt_path, &client)
+            payload->retval = client->restore_handles(ckpt_dir)
         ))){
             retmsg = std::string("see posd log for more details");
             goto response;
         }
 
-        // restore handle in the client handle manager
         // if on-demand, we just record the file name (maybe some async thread to reload)
         // if not on-demand, we reload the handle immediately
 

@@ -272,7 +272,7 @@ class POSClient {
     /* ====================== basic ====================== */
    
 
-    /* =============== checkpoint / persist ============== */
+    /* =============== checkpoint / restore ============== */
  public:
     /*!
      *  \brief  persist the state of this client
@@ -282,13 +282,49 @@ class POSClient {
     pos_retval_t persist(std::string& ckpt_dir);
 
 
+    /*!
+     *  \brief  persist handle to specific checkpoint files
+     *  \note   this function is currently called by the trace system,
+     *          normal checkpoint routine would persist handles with
+     *          API provided by POSHandle
+     *  \param  with_state  whether to persist with handle state
+     *  \return POS_SUCCESS for successfully persist
+     */
+    virtual pos_retval_t persist_handles(bool with_state){}
+
+
+    /*!
+     *  \brief  restore handles into this client
+     *  \note   if on-demand restore is disabled, this function won't
+     *          return until all handles (including its device state)
+     *          were restored; if on-demand restore is disabled, this
+     *          function would be asynchronous and restore handles on
+     *          demand
+     *  \param  ckpt_dir    directory of checkpoing files of handles
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore_handles(std::string& ckpt_dir);
+
+
+    /*!
+     *  \brief  restore a single handle with specific type
+     *  \note   this function is called by POSClient::restore_handles
+     *  \param  ckpt_file   path to the checkpoint file of the handle
+     *  \param  rid         resource type index of the handle
+     *  \param  hid         index of the handle
+     *  \return POS_SUCCESS for successfully restore
+     */
+    virtual pos_retval_t restore_single_handle(std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
  private: 
     /*!
      *  \brief  station of the checkpoint data, might be dumpped to file, or transmit via network
      *          to other machine
      */
     pos_client_ckpt_station_t __ckpt_station;
-    /* =============== checkpoint / persist ============== */
+    /* =============== checkpoint / restore ============== */
 
 
     /* ==================== migration ==================== */
@@ -309,15 +345,6 @@ class POSClient {
     // transport endpoint
     POSTransport</* is_server */ false> *_transport;
     /* ==================== transport ==================== */
-
-
-    /* ================== trace support ================== */
- public:
-    /*!
-     *  \brief  deinit: dumping resource tracing result if enabled
-     */
-    virtual void deinit_dump_trace_resource(){}
-    /* ================== trace support ================== */
 
 
     /* =============== asynchronous queues =============== */
@@ -428,7 +455,7 @@ class POSClient {
      *  \brief      deinit: dumping handle manager for all used resources
      *  \example    CUDA function manager should export the metadata of functions
      */
-    virtual void deinit_dump_handle_managers(){}
+    virtual void deinit_handle_managers(){}
 
 
  protected:

@@ -285,6 +285,7 @@ if conf_runtime_target == 'cuda'
         'pos/cuda_impl/src/api_context.cpp',
         'pos/cuda_impl/src/workspace.cpp',
         'pos/cuda_impl/src/handle.cpp',
+        'pos/cuda_impl/src/client.cpp',
         'pos/cuda_impl/src/utils/fatbin.cpp',
 
         # parser functions
