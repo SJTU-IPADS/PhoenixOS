@@ -306,6 +306,7 @@ class POSClient {
     
  protected:
     friend class POSParser;
+    friend class POSWorker;
 
     // api instance pc
     uint64_t _api_inst_pc;

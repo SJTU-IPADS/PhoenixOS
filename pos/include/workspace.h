@@ -48,6 +48,7 @@ namespace oob_functions {
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_register_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_unregister_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_predump);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_dump);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_trace_resource);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_migration_signal);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore_signal);

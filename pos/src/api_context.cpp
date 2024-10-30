@@ -32,11 +32,13 @@
 #include "pos/include/proto/apicxt.pb.h"
 
 
-pos_retval_t POSAPIContext_QE::persist_without_state_sync(std::string ckpt_dir){
+template<bool with_params>
+pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     std::string ckpt_file_path;
     pos_protobuf::Bin_POSAPIContext apicxt_binary;
     pos_protobuf::Bin_POSHandleView *hv_binary;
+    pos_protobuf::Bin_POSAPIParam *param_binary;
     std::ofstream ckpt_file_stream;
 
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
@@ -90,6 +92,15 @@ pos_retval_t POSAPIContext_QE::persist_without_state_sync(std::string ckpt_dir){
     apicxt_binary.set_worker_s_tick(this->worker_s_tick);
     apicxt_binary.set_worker_e_tick(this->worker_e_tick);
 
+    if constexpr (with_params) {
+        for(POSAPIParam_t * &param : this->api_cxt->params){
+            POS_CHECK_POINTER(param_binary = apicxt_binary.add_params());
+            POS_ASSERT(param->param_size > 0);
+            param_binary->set_size(param->param_size);
+            param_binary->set_state(reinterpret_cast<const char*>(param->param_value), param->param_size);
+        }
+    }
+
     // form the path to the checkpoint file of this handle
     ckpt_file_path = ckpt_dir 
                     + std::string("/a-")
@@ -119,15 +130,5 @@ exit:
     if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
     return retval;
 }
-
-
-pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
-    pos_retval_t retval = POS_SUCCESS;
-
-    POS_ASSERT(std::filesystem::exists(ckpt_dir));
-
-    // TODO:
-
-exit:
-    return retval;
-}
+template pos_retval_t POSAPIContext_QE::persist<true>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<false>(std::string ckpt_dir);

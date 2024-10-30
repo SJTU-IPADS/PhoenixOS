@@ -23,7 +23,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/oob.h"
-#include "pos/include/oob/ckpt.h"
+#include "pos/include/oob/ckpt_predump.h"
 #include "pos/include/oob/trace.h"
 
 
@@ -123,10 +123,10 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
     }
 }
 
-typedef struct pos_cli_predump_metas {
+typedef struct pos_cli_ckpt_metas {
     uint64_t pid;
     char ckpt_dir[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
-} pos_cli_predump_metas_t;
+} pos_cli_ckpt_metas_t;
 
 typedef struct pos_cli_trace_resource_metas {
     oob_functions::cli_trace_resource::trace_action action;
@@ -159,7 +159,7 @@ typedef struct pos_cli_options {
 
     // metadata of corresponding cli option
     union {
-        pos_cli_predump_metas_t pre_dump;
+        pos_cli_ckpt_metas_t ckpt;
         pos_cli_migrate_metas migrate;
         pos_cli_trace_resource_metas_t trace_resource;
     } metas;
@@ -204,5 +204,6 @@ static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_
 }
 
 pos_retval_t handle_predump(pos_cli_options_t &clio);
+pos_retval_t handle_dump(pos_cli_options_t &clio);
 pos_retval_t handle_migrate(pos_cli_options_t &clio);
 pos_retval_t handle_trace(pos_cli_options_t &clio);
