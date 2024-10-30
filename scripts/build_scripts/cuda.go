@@ -101,7 +101,7 @@ func CRIB_PhOS_CUDA_KernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, log
 	)
 
 	unitOpt := UnitOptions{
-		Name:          "PhOS-CUDA-KernelPatcher",
+		Name:          "PhOS-CUDA-PTXPatcher",
 		BuildScript:   build_script,
 		RunScript:     "",
 		InstallScript: "", // is it correct that we don't have any system installation?
