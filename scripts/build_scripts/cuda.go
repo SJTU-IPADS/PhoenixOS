@@ -180,15 +180,15 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
     if cmdOpt.DoBuild {
         // ==================== Prepare ====================
         logger.Infof("pre-build check...")
-        utils.CheckAndInstallCommand("git", "git", nil, logger)
-        utils.CheckAndInstallCommand("gcc", "build-essential", nil, logger)
-        utils.CheckAndInstallCommand("g++", "build-essential", nil, logger)
-        utils.CheckAndInstallCommand("add-apt-repository", "software-properties-common", nil, logger)
-        utils.CheckAndInstallCommand("yes", "yes", nil, logger)
-        utils.CheckAndInstallCommand("cmake", "cmake", nil, logger)
-        utils.CheckAndInstallCommand("curl", "curl", nil, logger)
-        utils.CheckAndInstallCommand("tar", "tar", nil, logger)
-        utils.CheckAndInstallCommand("tmux", "tmux", nil, logger)
+        utils.CheckAndInstallPackage("git", "git", nil, logger)
+        utils.CheckAndInstallPackage("gcc", "build-essential", nil, logger)
+        utils.CheckAndInstallPackage("g++", "build-essential", nil, logger)
+        utils.CheckAndInstallPackage("add-apt-repository", "software-properties-common", nil, logger)
+        utils.CheckAndInstallPackage("yes", "yes", nil, logger)
+        utils.CheckAndInstallPackage("cmake", "cmake", nil, logger)
+        utils.CheckAndInstallPackage("curl", "curl", nil, logger)
+        utils.CheckAndInstallPackage("tar", "tar", nil, logger)
+        utils.CheckAndInstallPackage("tmux", "tmux", nil, logger)
 
         // we require g++-13 to use C++20 format for auto-generation
         utils.SwitchGccVersion(13, logger)
@@ -203,7 +203,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             )
             return err
         }
-        utils.CheckAndInstallCommand("meson", "", install_meson, logger)
+        utils.CheckAndInstallPackage("meson", "", install_meson, logger)
 
         install_ninja := func() error {
             _, err := utils.BashScriptGetOutput(`
@@ -214,7 +214,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             )
             return err
         }
-        utils.CheckAndInstallCommand("ninja", "", install_ninja, logger)
+        utils.CheckAndInstallPackage("ninja", "", install_ninja, logger)
 
         build_cargo := func() error {
             _, err := utils.BashScriptGetOutput(`
@@ -232,16 +232,17 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             )
             return err
         }
-        utils.CheckAndInstallCommand("cargo", "", build_cargo, logger)
+        utils.CheckAndInstallPackage("cargo", "", build_cargo, logger)
     }
 	
 	// ==================== CRIB Dependencies ====================
 	if cmdOpt.WithThirdParty {
 		logger.Infof("building dependencies...")
+		CRIB_Criu(cmdOpt, buildConf, logger)
 		CRIB_LibProtobuf(cmdOpt, buildConf, logger)
 		CRIB_LibYamlCpp(cmdOpt, buildConf, logger)
 		CRIB_LibClang(cmdOpt, buildConf, logger)
-
+		
 		// TODO: just for fast compilation of PhOS, remove later
 		CRIB_PhOS_CUDA_KernelPatcher(cmdOpt, buildConf, logger)
 	}

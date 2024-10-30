@@ -3,14 +3,71 @@ package main
 import (
 	"fmt"
 
+	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
 )
 
 const (
+	KCriuPath 		= "third_party/criu"
+	KGoogleTestPath = "third_party/googletest"
 	KLibClangPath   = "third_party/libclang-static-build"
 	KLibYamlCppPath = "third_party/yaml-cpp"
 	kProtobufPath   = "third_party/protobuf"
 )
+
+func CRIB_Criu(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	if cmdOpt.DoBuild {
+		// see https://criu.org/Installation
+		utils.CheckAndInstallPackageViaOsPkgManager(
+			"libprotobuf-dev libprotobuf-c-dev protobuf-c-compiler " +
+			"protobuf-compiler python3-protobuf libnet1-dev libcap-dev",
+		logger)
+	}
+
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		{{.CMD_EXPRORT_ENV_VAR__}}
+		cd %s/%s
+		make clean
+		make -j										>>{{.LOG_PATH__}} 2>&1
+		cp ./criu/criu {{.LOCAL_BIN_PATH__}}/criu	>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, KCriuPath,
+	)
+
+	install_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		cd %s/%s
+		make install								>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, KCriuPath,
+	)
+
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+		cd %s/%s
+		make uninstall								>>{{.LOG_PATH__}} 2>&1
+		# remove local installation
+		rm -rf {{.LOCAL_BIN_PATH__}}/criu 			>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, KCriuPath,
+	)
+
+	unitOpt := UnitOptions{
+		Name:          "CRIU",
+		BuildScript:   build_script,
+		RunScript:     "",
+		InstallScript: install_script,
+		CleanScript:   clean_script,
+		DoBuild:       cmdOpt.DoBuild,
+		DoRun:         false,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
+	}
+	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
+}
 
 func CRIB_LibGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	build_script := fmt.Sprintf(`
@@ -66,17 +123,6 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		cmdOpt.RootDir, kProtobufPath,
 	)
 
-	install_script := fmt.Sprintf(`
-		#!/bin/bash
-		set -e
-		cd %s/%s
-		cp -r ./libproto*.so* {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
-		cp -r ./protoc {{.SYSTEM_BIN_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
-		cp -r ./protoc-3.21.12.0 {{.SYSTEM_BIN_PATH__}} >>{{.LOG_PATH__}} 2>&1
-		`,
-		cmdOpt.RootDir, kProtobufPath,
-	)
-
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
@@ -85,10 +131,6 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		rm -rf {{.LOCAL_LIB_PATH__}}/libproto*.so*		>>{{.LOG_PATH__}} 2>&1
 		rm -rf {{.LOCAL_BIN_PATH__}}/protoc 			>>{{.LOG_PATH__}} 2>&1
 		rm -rf {{.LOCAL_BIN_PATH__}}/protoc-3.21.12.0 	>>{{.LOG_PATH__}} 2>&1
-		# clean system installation
-		rm -rf {{.SYSTEM_LIB_PATH__}}/libproto*.so* 	>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_BIN_PATH__}}/protoc 			>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_BIN_PATH__}}/protoc-3.21.12.0 	>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, kProtobufPath,
 	)
@@ -97,7 +139,7 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		Name:          "Protobuf",
 		BuildScript:   build_script,
 		RunScript:     "",
-		InstallScript: install_script,
+		InstallScript: "", // don't install it, it would conflict with CRIU build
 		CleanScript:   clean_script,
 		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,

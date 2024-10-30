@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	KGoogleTestPath = "third_party/googletest"
-
 	// generated directories path
 	KLogPath      = "build_log"
 	KBuildLibPath = "lib"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"time"
-
+	
 	"github.com/charmbracelet/log"
 )
 
@@ -19,6 +19,7 @@ func GetPkgInstallCmd(pkgName string, logger *log.Logger) string {
 		if !isOSPkgMgrUpdate {
 			logger.Infof("updating apt-get...")
 			BashCommandGetOutput("apt-get update", true, logger)
+			ClearLastLine()
 			isOSPkgMgrUpdate = true
 		}
 		return fmt.Sprintf("apt-get install -y %s", pkgName)
@@ -56,7 +57,7 @@ func CheckGppVersion(desiredVersion int, logger *log.Logger) error {
 
 func SwitchGccVersion(desiredVersion int, logger *log.Logger) {
 	if err := CheckGppVersion(desiredVersion, logger); err != nil {
-		logger.Infof("no g++-%v installed, installing...", desiredVersion)
+		logger.Infof("no g++-%v installed, installing (this might a bit long)...", desiredVersion)
 		install_script := fmt.Sprintf(`
 				#!/bin/bash
 				add-apt-repository -y ppa:ubuntu-toolchain-r/test
@@ -91,7 +92,7 @@ func SwitchGccVersion(desiredVersion int, logger *log.Logger) {
 
 type CustormInstallFunc func() error
 
-func CheckAndInstallCommand(command string, pkgName string, custorm_install CustormInstallFunc, logger *log.Logger) {
+func CheckAndInstallPackage(command string, pkgName string, custorm_install CustormInstallFunc, logger *log.Logger) {
 	err := CheckCommandExists(command, logger)
 	if err != nil {
 		if len(pkgName) == 0 && custorm_install == nil {
@@ -114,6 +115,21 @@ func CheckAndInstallCommand(command string, pkgName string, custorm_install Cust
 				logger.Fatalf("failed to install pkg %s via custom script: %s", command, err)
 			}
 		}
+		ClearLastLine()
 		logger.Infof("installed %s", command)
 	}
+}
+
+func CheckAndInstallPackageViaOsPkgManager(pkgName string, logger *log.Logger) {
+	if len(pkgName) == 0 {
+		logger.Fatalf("no package name provided")
+	}
+
+	logger.Infof("installing %s via OS pkg manager...", pkgName)
+	installCmd := GetPkgInstallCmd(pkgName, logger)
+	if _, err := BashCommandGetOutput(installCmd, false, logger); err != nil {
+		logger.Fatalf("failed to install pkg %s via OS pkg manager: %s", pkgName, err)
+	}
+	ClearLastLine()
+	logger.Infof("installed %s", pkgName)
 }
