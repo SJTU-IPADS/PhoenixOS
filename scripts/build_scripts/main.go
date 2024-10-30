@@ -33,8 +33,8 @@ func main() {
 		PrintHelp:      flag.Bool("h", false, "Print help message"),
 		WithThirdParty: flag.Bool("3", false, "Build/clean with 3rd parties"),
 		DoInstall:      flag.Bool("i", false, "Do installation"),
-		DoCleaning:     flag.Bool("c", false, "Do cleanning"),
-		DoUnitTest:     flag.Bool("u", false, "Do unit-testing after build"),
+		DoClean:        flag.Bool("c", false, "Do cleanning"),
+		WithUnitTest:   flag.Bool("u", false, "Do unit-testing after build"),
 		Target:         flag.String("t", "cuda", "Specify target platform"),
 	}
 	flag.Usage = printHelp
@@ -65,9 +65,17 @@ func main() {
 		os.Exit(0)
 	}
 
+	// make sure we won't build/install when clean
+	if *cmdOpt.DoClean {
+		*cmdOpt.DoBuild = false
+		*cmdOpt.DoInstall = false
+	} else {
+		*cmdOpt.DoBuild = true
+	}
+
 	if *cmdOpt.Target == "cuda" {
-		if *cmdOpt.DoCleaning {
-			CleanTarget_CUDA(cmdOpt, logger)
+		if *cmdOpt.DoClean {
+			CleanTarget_CUDA(cmdOpt, buildConf, logger)
 		} else {
 			BuildTarget_CUDA(cmdOpt, buildConf, logger)
 		}
