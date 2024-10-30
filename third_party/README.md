@@ -2,9 +2,9 @@
 
 PhoenixOS uses the following projects as third parties, we thank all their authors.
 
-1. `libclang-static-build`
+1. `libclang-static-build` (need downloaded from assets)
 
-    PhoenixOS `libclang` for parsing the signature of kernels, and we also use it for auto-generating code of parsers and workers. Note that this repo is from [deech/libclang-static-build](https://github.com/deech/libclang-static-build), we conducted some modification on it, so we cast it as part of local repository instead of submodule here.
+    PhoenixOS uses `libclang` for parsing the signature of kernels, and we also use it for auto-generating code of parsers and workers. Note that this repo is from [deech/libclang-static-build](https://github.com/deech/libclang-static-build), we conducted some modification on it, so we cast it as part of local repository instead of submodule here. Due to the large size of pre-built libs, we maintain them as assets at <a href="https://github.com/SJTU-IPADS/PhoenixOS-Assets">SJTU-IPADS/PhoenixOS-Assets</a>.
 
 2. `criu`
 
@@ -21,3 +21,7 @@ PhoenixOS uses the following projects as third parties, we thank all their autho
 5. `yaml-cpp`
 
     PhoenixOS uses `yaml-cpp` for parsing configurations when auto-generating code of parsers and workers.
+
+6. `cuda-checkpoint`
+
+    PhoenixOS uses `cuda-checkpoint` as baseline for performance evaluation.
