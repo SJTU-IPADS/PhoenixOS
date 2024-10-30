@@ -28,7 +28,7 @@ const (
 	// PhOS path
 	KPhOSPath         = "pos"
 	KPhOSCLIPath      = "pos/cli"
-	kPhOSUnitTestPath = "test"
+	kPhOSUnitTestPath = "unittest"
 )
 
 type UnitOptions struct {
