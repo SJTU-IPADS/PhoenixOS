@@ -6,10 +6,6 @@
 	path = third_party/cuda-checkpoint
     url = https://github.com/NVIDIA/cuda-checkpoint.git
 	branch = main
-[submodule "third_party/criu"]
-	path = third_party/criu
-    url = https://github.com/PhoenixGPU/criu.git
-	branch = criu-dev
 [submodule "third_party/googletest"]
 	path = third_party/googletest
     url = https://github.com/google/googletest.git
