@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"strings"
 	"text/template"
@@ -44,13 +45,13 @@ type UnitOptions struct {
 
 type CmdOptions struct {
 	RootDir        string
-	WithThirdParty *bool
-	WithUnitTest   *bool
-	Target         *string
-	PrintHelp      *bool
-	DoBuild        *bool
-	DoInstall      *bool
-	DoClean        *bool
+	WithThirdParty bool
+	WithUnitTest   bool
+	Target         string
+	PrintHelp      bool
+	DoBuild        bool
+	DoInstall      bool
+	DoClean        bool
 }
 
 func (cmdOpt *CmdOptions) print(logger *log.Logger) {
@@ -65,12 +66,12 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 			- WithUnitTest: %v
 		`,
 		cmdOpt.RootDir,
-		*cmdOpt.WithThirdParty,
-		*cmdOpt.Target,
-		*cmdOpt.PrintHelp,
-		*cmdOpt.DoClean,
-		*cmdOpt.DoInstall,
-		*cmdOpt.WithUnitTest,
+		cmdOpt.WithThirdParty,
+		cmdOpt.Target,
+		cmdOpt.PrintHelp,
+		cmdOpt.DoClean,
+		cmdOpt.DoInstall,
+		cmdOpt.WithUnitTest,
 	)
 	logger.Infof("Commandline options: %s", print_str)
 }
@@ -228,18 +229,18 @@ func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions,
 			logger.Fatalf("failed to generate template")
 		}
 		script_data := struct {
-			__CMD_EXPRORT_ENV_VAR__    string
-			__CMD_COPY_COMMON_HEADER__ string
-			__LOG_PATH__               string
-			__LOCAL_LIB_PATH__         string
-			__LOCAL_BIN_PATH__         string
-			__LOCAL_INC_PATH__         string
-			__SYSTEM_LIB_PATH__        string
-			__SYSTEM_BIN_PATH__        string
-			__SYSTEM_INC_PATH__        string
+			CMD_EXPRORT_ENV_VAR__    string
+			CMD_COPY_COMMON_HEADER__ string
+			LOG_PATH__               string
+			LOCAL_LIB_PATH__         string
+			LOCAL_BIN_PATH__         string
+			LOCAL_INC_PATH__         string
+			SYSTEM_LIB_PATH__        string
+			SYSTEM_BIN_PATH__        string
+			SYSTEM_INC_PATH__        string
 		}{
-			__CMD_EXPRORT_ENV_VAR__: buildConf.export_string(),
-			__CMD_COPY_COMMON_HEADER__: fmt.Sprintf(`
+			CMD_EXPRORT_ENV_VAR__: buildConf.export_string(),
+			CMD_COPY_COMMON_HEADER__: fmt.Sprintf(`
 				cp -r %s/%s/include/eval_configs.h.in ./pos/include/
 				cp -r %s/%s/include/log.h.in ./pos/include/
 				cp -r %s/%s/include/meson.build ./pos/include/
@@ -249,19 +250,26 @@ func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions,
 				cmdOpt.RootDir, KPhOSPath,
 				cmdOpt.RootDir, KPhOSPath,
 			),
-			__LOG_PATH__:        logPath,
-			__LOCAL_LIB_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
-			__LOCAL_BIN_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath),
-			__LOCAL_INC_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath),
-			__SYSTEM_LIB_PATH__: KInstallLibPath,
-			__SYSTEM_BIN_PATH__: KInstallBinPath,
-			__SYSTEM_INC_PATH__: KInstallIncPath,
+			LOG_PATH__:        logPath,
+			LOCAL_LIB_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+			LOCAL_BIN_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath),
+			LOCAL_INC_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath),
+			SYSTEM_LIB_PATH__: KInstallLibPath,
+			SYSTEM_BIN_PATH__: KInstallBinPath,
+			SYSTEM_INC_PATH__: KInstallIncPath,
 		}
 		if err := t.Execute(&builder, script_data); err != nil {
-			logger.Fatalf("failed to generate build script from template")
+			logger.Fatalf("failed to generate build script from template: %v", err)
+		}
+		
+		// clean log file
+		clean_log_script := fmt.Sprintf("echo \"\" > %s", logPath)
+		_, err = utils.BashScriptGetOutput(clean_log_script, false, logger)
+		if err != nil {
+			logger.Fatalf("failed, failed to clean log content at %s before executing script", logName)
 		}
 
-		// execute
+		// execute script
 		start := time.Now()
 		_, err = utils.BashScriptGetOutput(builder.String(), false, logger)
 		if err != nil {
@@ -298,5 +306,33 @@ func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions,
 		duration := doPartial(unitOpt.CleanScript, fmt.Sprintf("clean_%s.log", unitOpt.Name))
 		utils.ClearLastLine()
 		logger.Infof("cleaned %s: %.2fs", unitOpt.Name, duration)
+	}
+}
+
+func CRIB_PhOS(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	buildLogPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KLogPath)
+	if err := utils.CreateDir(buildLogPath, true, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
+	}
+
+	libPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath)
+	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built lib at %s", libPath)
+	}
+
+	includePath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath)
+	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built headers at %s", includePath)
+	}
+
+	binPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath)
+	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built binary at %s", binPath)
+	}
+
+	if cmdOpt.Target == "cuda" {
+		CRIB_PhOS_CUDA(cmdOpt, buildConf, logger)
+	} else {
+		log.Fatalf("Unsupported target %s", cmdOpt.Target)
 	}
 }

@@ -54,7 +54,7 @@ func CheckGppVersion(desiredVersion int, logger *log.Logger) error {
 	return nil
 }
 
-func SwitchGppVersion(desiredVersion int, logger *log.Logger) {
+func SwitchGccVersion(desiredVersion int, logger *log.Logger) {
 	if err := CheckGppVersion(desiredVersion, logger); err != nil {
 		logger.Infof("no g++-%v installed, installing...", desiredVersion)
 		install_script := fmt.Sprintf(`
