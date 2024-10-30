@@ -16,13 +16,13 @@ func CRIB_LibGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		{{.__CMD_EXPRORT_ENV_VAR__}}
+		{{.CMD_EXPRORT_ENV_VAR__}}
 		cd %s/%s
 		if [ ! -d "./build" ] || [ ! -e "./build/lib/libgtest.a" ] || [ ! -e "./build/lib/libgtest_main.a" ]; then
 			rm -rf build
 			mkdir build && cd build
-			cmake .. >{{.__LOG_PATH__}} 2>&1
-			make -j >{{.__LOG_PATH__}} 2>&1
+			cmake .. 	>>{{.LOG_PATH__}} 2>&1
+			make -j 	>>{{.LOG_PATH__}} 2>&1
 		fi
 		`,
 		cmdOpt.RootDir, KGoogleTestPath,
@@ -31,7 +31,7 @@ func CRIB_LibGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
-		rm -rf build >{{.__LOG_PATH__}} 2>&1
+		rm -rf build 	>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KGoogleTestPath,
 	)
@@ -42,10 +42,10 @@ func CRIB_LibGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 		RunScript:     "",
 		InstallScript: "",
 		CleanScript:   clean_script,
-		DoBuild:       *cmdOpt.DoBuild,
+		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
-		DoInstall:     *cmdOpt.DoInstall,
-		DoClean:       *cmdOpt.DoClean,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
 	}
 	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
 }
@@ -54,14 +54,14 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		{{.__CMD_EXPRORT_ENV_VAR__}}
+		{{.CMD_EXPRORT_ENV_VAR__}}
 		# build protobuf
 		cd %s/%s
-		cmake . -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_SHARED_LIBS=ON -Dprotobuf_BUILD_TESTS=OFF >{{.__LOG_PATH__}} 2>&1
-		cmake --build . --config Release -- -j >{{.__LOG_PATH__}} 2>&1
-		cp -r ./libproto*.so* {{.__LOCAL_LIB_PATH__}}
-		cp -r ./protoc {{.__LOCAL_BIN_PATH__}}
-		cp -r ./protoc-3.21.12.0 {{.__LOCAL_BIN_PATH__}}
+		cmake . -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_SHARED_LIBS=ON -Dprotobuf_BUILD_TESTS=OFF >>{{.LOG_PATH__}} 2>&1
+		cmake --build . --config Release -- -j 			>>{{.LOG_PATH__}} 2>&1
+		cp -r ./libproto*.so* {{.LOCAL_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc {{.LOCAL_BIN_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc-3.21.12.0 {{.LOCAL_BIN_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, kProtobufPath,
 	)
@@ -70,9 +70,9 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp -r ./libproto*.so* {{.__SYSTEM_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp -r ./protoc {{.__SYSTEM_BIN_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp -r ./protoc-3.21.12.0 {{.__SYSTEM_BIN_PATH__}} >{{.__LOG_PATH__}} 2>&1
+		cp -r ./libproto*.so* {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc {{.SYSTEM_BIN_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc-3.21.12.0 {{.SYSTEM_BIN_PATH__}} >>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, kProtobufPath,
 	)
@@ -80,15 +80,15 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
-		cmake --build . --target clean >{{.__LOG_PATH__}} 2>&1
+		cmake --build . --target clean 					>>{{.LOG_PATH__}} 2>&1
 		# clean local installation
-		rm -rf {{.__LOCAL_LIB_PATH__}}/libproto*.so*
-		rm -rf {{.__LOCAL_BIN_PATH__}}/protoc
-		rm -rf {{.__LOCAL_BIN_PATH__}}/protoc-3.21.12.0
+		rm -rf {{.LOCAL_LIB_PATH__}}/libproto*.so*		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_BIN_PATH__}}/protoc 			>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_BIN_PATH__}}/protoc-3.21.12.0 	>>{{.LOG_PATH__}} 2>&1
 		# clean system installation
-		rm -rf {{.__SYSTEM_LIB_PATH__}}/libproto*.so*
-		rm -rf {{.__SYSTEM_BIN_PATH__}}/protoc
-		rm -rf {{.__SYSTEM_BIN_PATH__}}/protoc-3.21.12.0
+		rm -rf {{.SYSTEM_LIB_PATH__}}/libproto*.so* 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_BIN_PATH__}}/protoc 			>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_BIN_PATH__}}/protoc-3.21.12.0 	>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, kProtobufPath,
 	)
@@ -99,10 +99,10 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		RunScript:     "",
 		InstallScript: install_script,
 		CleanScript:   clean_script,
-		DoBuild:       *cmdOpt.DoBuild,
+		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
-		DoInstall:     *cmdOpt.DoInstall,
-		DoClean:       *cmdOpt.DoClean,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
 	}
 	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
 }
@@ -111,17 +111,17 @@ func CRIB_LibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logg
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		{{.__CMD_EXPRORT_ENV_VAR__}}
+		{{.CMD_EXPRORT_ENV_VAR__}}
 		cd %s/%s
 		rm -rf build
 		mkdir build && cd build
-		cmake -DYAML_BUILD_SHARED_LIBS=on .. >{{.__LOG_PATH__}} 2>&1
-		make -j >{{.__LOG_PATH__}} 2>&1
+		cmake -DYAML_BUILD_SHARED_LIBS=on .. 						>>{{.LOG_PATH__}} 2>&1
+		make -j 													>>{{.LOG_PATH__}} 2>&1
 		# local installation
-		cp ./libyaml-cpp.so {{.__LOCAL_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8 {{.__LOCAL_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8.0 {{.__LOCAL_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp -r ../include/yaml-cpp {{.__LOCAL_INC_PATH__}}/yaml-cpp >{{.__LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so {{.LOCAL_LIB_PATH__}} 					>>{{.LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so.0.8 {{.LOCAL_LIB_PATH__}} 				>>{{.LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so.0.8.0 {{.LOCAL_LIB_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp -r ../include/yaml-cpp {{.LOCAL_INC_PATH__}}/yaml-cpp	>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibYamlCppPath,
 	)
@@ -130,10 +130,10 @@ func CRIB_LibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logg
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./libyaml-cpp.so {{.__SYSTEM_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8 {{.__SYSTEM_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8.0 {{.__SYSTEM_LIB_PATH__}} >{{.__LOG_PATH__}} 2>&1
-		cp -r ./include {{.__SYSTEM_INC_PATH__}} >{{.__LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so {{.SYSTEM_LIB_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so.0.8 {{.SYSTEM_LIB_PATH__}} 		>>{{.LOG_PATH__}} 2>&1
+		cp ./libyaml-cpp.so.0.8.0 {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
+		cp -r ./include {{.SYSTEM_INC_PATH__}} 				>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibYamlCppPath,
 	)
@@ -141,17 +141,17 @@ func CRIB_LibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logg
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
-		rm -rf build >{{.__LOG_PATH__}} 2>&1
+		rm -rf build 										>>{{.LOG_PATH__}} 2>&1
 		# clean local installation
-		rm -rf {{.__LOCAL_LIB_PATH__}}/libyaml-cpp.so >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__LOCAL_LIB_PATH__}}/libyaml-cpp.so.0.8 >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__LOCAL_LIB_PATH__}}/libyaml-cpp.so.0.8.0 >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__LOCAL_INC_PATH__}}/yaml-cpp
+		rm -rf {{.LOCAL_LIB_PATH__}}/libyaml-cpp.so 		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_LIB_PATH__}}/libyaml-cpp.so.0.8 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_LIB_PATH__}}/libyaml-cpp.so.0.8.0 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_INC_PATH__}}/yaml-cpp
 		# clean system installation
-		rm -rf {{.__SYSTEM_LIB_PATH__}}/libyaml-cpp.so >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__SYSTEM_LIB_PATH__}}/libyaml-cpp.so.0.8 >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__SYSTEM_LIB_PATH__}}/libyaml-cpp.so.0.8.0 >{{.__LOG_PATH__}} 2>&1
-		rm -rf {{.__SYSTEM_INC_PATH__}}/yaml-cpp
+		rm -rf {{.SYSTEM_LIB_PATH__}}/libyaml-cpp.so 		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_LIB_PATH__}}/libyaml-cpp.so.0.8 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_LIB_PATH__}}/libyaml-cpp.so.0.8.0 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_INC_PATH__}}/yaml-cpp
 		`,
 		cmdOpt.RootDir, KLibYamlCppPath,
 	)
@@ -162,10 +162,10 @@ func CRIB_LibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logg
 		RunScript:     "",
 		InstallScript: install_script,
 		CleanScript:   clean_script,
-		DoBuild:       *cmdOpt.DoBuild,
+		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
-		DoInstall:     *cmdOpt.DoInstall,
-		DoClean:       *cmdOpt.DoClean,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
 	}
 	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
 }
@@ -174,17 +174,17 @@ func CRIB_LibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		{{.__CMD_EXPRORT_ENV_VAR__}}
+		{{.CMD_EXPRORT_ENV_VAR__}}
 		cd %s/%s
 		if [ ! -d "./build" ]; then
 			mkdir build && cd build
-			cmake .. -DCMAKE_INSTALL_PREFIX=.. >{{.__LOG_PATH__}} 2>&1
-			make install -j >{{.__LOG_PATH__}} 2>&1
+			cmake .. -DCMAKE_INSTALL_PREFIX=.. 									>>{{.LOG_PATH__}} 2>&1
+			make install -j 													>>{{.LOG_PATH__}} 2>&1
 		fi
-		cp ../lib/libclang.so {{.__LOCAL_LIB_PATH__}}/libclang.so >{{.__LOG_PATH__}} 2>&1
-		cp ../lib/libclang.so.13 {{.__LOCAL_LIB_PATH__}}/libclang.so.13 >{{.__LOG_PATH__}} 2>&1
-		cp ../lib/libclang.so.VERSION {{.__LOCAL_LIB_PATH__}}/libclang.so.VERSION >{{.__LOG_PATH__}} 2>&1
-		cp -r ../include/clang-c {{.__LOCAL_INC_PATH__}}/clang-c >{{.__LOG_PATH__}} 2>&1
+		cp ../lib/libclang.so {{.LOCAL_LIB_PATH__}}/libclang.so 				>>{{.LOG_PATH__}} 2>&1
+		cp ../lib/libclang.so.13 {{.LOCAL_LIB_PATH__}}/libclang.so.13 			>>{{.LOG_PATH__}} 2>&1
+		cp ../lib/libclang.so.VERSION {{.LOCAL_LIB_PATH__}}/libclang.so.VERSION >>{{.LOG_PATH__}} 2>&1
+		cp -r ../include/clang-c {{.LOCAL_INC_PATH__}}/clang-c 					>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibClangPath,
 	)
@@ -193,10 +193,10 @@ func CRIB_LibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./lib/libclang.so {{.__SYSTEM_LIB_PATH__}}/libclang.so
-		cp ./lib/libclang.so.13 {{.__SYSTEM_LIB_PATH__}}/libclang.so.13
-		cp ./lib/libclang.so.VERSION {{.__SYSTEM_LIB_PATH__}}/libclang.so.VERSION
-		cp -r ./include/clang-c {{.__SYSTEM_INC_PATH__}}/clang-c
+		cp ./lib/libclang.so {{.SYSTEM_LIB_PATH__}}/libclang.so 				>>{{.LOG_PATH__}} 2>&1
+		cp ./lib/libclang.so.13 {{.SYSTEM_LIB_PATH__}}/libclang.so.13 			>>{{.LOG_PATH__}} 2>&1
+		cp ./lib/libclang.so.VERSION {{.SYSTEM_LIB_PATH__}}/libclang.so.VERSION >>{{.LOG_PATH__}} 2>&1
+		cp -r ./include/clang-c {{.SYSTEM_INC_PATH__}}/clang-c 					>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibClangPath,
 	)
@@ -204,20 +204,20 @@ func CRIB_LibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
-		rm -rf build
-		rm -rf include
-		rm -rf lib
-		rm -rf share
+		rm -rf build										>>{{.LOG_PATH__}} 2>&1
+		rm -rf include										>>{{.LOG_PATH__}} 2>&1
+		rm -rf lib											>>{{.LOG_PATH__}} 2>&1
+		rm -rf share										>>{{.LOG_PATH__}} 2>&1
 		# clean local installation
-		rm -f {{.__LOCAL_LIB_PATH__}}/libclang.so
-		rm -f {{.__LOCAL_LIB_PATH__}}/libclang.so.13
-		rm -f {{.__LOCAL_LIB_PATH__}}/libclang.so.VERSION
-		rm -rf {{.__LOCAL_INC_PATH__}}/clang-c
+		rm -f {{.LOCAL_LIB_PATH__}}/libclang.so				>>{{.LOG_PATH__}} 2>&1
+		rm -f {{.LOCAL_LIB_PATH__}}/libclang.so.13			>>{{.LOG_PATH__}} 2>&1
+		rm -f {{.LOCAL_LIB_PATH__}}/libclang.so.VERSION		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_INC_PATH__}}/clang-c				>>{{.LOG_PATH__}} 2>&1
 		# clean system installation
-		rm -f {{.__SYSTEM_LIB_PATH__}}/libclang.so
-		rm -f {{.__SYSTEM_LIB_PATH__}}/libclang.so.13
-		rm -f {{.__SYSTEM_LIB_PATH__}}/libclang.so.VERSION
-		rm -rf {{.__SYSTEM_INC_PATH__}}/clang-c
+		rm -f {{.SYSTEM_LIB_PATH__}}/libclang.so			>>{{.LOG_PATH__}} 2>&1
+		rm -f {{.SYSTEM_LIB_PATH__}}/libclang.so.13			>>{{.LOG_PATH__}} 2>&1
+		rm -f {{.SYSTEM_LIB_PATH__}}/libclang.so.VERSION	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_INC_PATH__}}/clang-c				>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibClangPath,
 	)
@@ -228,10 +228,10 @@ func CRIB_LibClang(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger
 		RunScript:     "",
 		InstallScript: install_script,
 		CleanScript:   clean_script,
-		DoBuild:       *cmdOpt.DoBuild,
+		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
-		DoInstall:     *cmdOpt.DoInstall,
-		DoClean:       *cmdOpt.DoClean,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
 	}
 	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
 }
