@@ -28,17 +28,25 @@ func printHelp() {
 func main() {
 	logger := log.New(os.Stdout)
 
-	// load command line options
-	cmdOpt := CmdOptions{
-		PrintHelp:      flag.Bool("h", false, "Print help message"),
-		WithThirdParty: flag.Bool("3", false, "Build/clean with 3rd parties"),
-		DoInstall:      flag.Bool("i", false, "Do installation"),
-		DoCleaning:     flag.Bool("c", false, "Do cleanning"),
-		DoUnitTest:     flag.Bool("u", false, "Do unit-testing after build"),
-		Target:         flag.String("t", "cuda", "Specify target platform"),
-	}
+	var __PrintHelp *bool = flag.Bool("h", false, "Print help message")
+	var __WithThirdParty *bool = flag.Bool("3", false, "Build/clean with 3rd parties")
+	var __DoInstall *bool = flag.Bool("i", false, "Do installation")
+	var __DoClean *bool = flag.Bool("c", false, "Do cleanning")
+	var __WithUnitTest *bool = flag.Bool("u", false, "Do unit-testing after build")
+	var __Target *string = flag.String("t", "cuda", "Specify target platform")
+
 	flag.Usage = printHelp
 	flag.Parse()
+
+	// load command line options
+	cmdOpt := CmdOptions{
+		PrintHelp:      *__PrintHelp,
+		WithThirdParty: *__WithThirdParty,
+		DoInstall:      *__DoInstall,
+		DoClean:        *__DoClean,
+		WithUnitTest:   *__WithUnitTest,
+		Target:         *__Target,
+	}
 
 	// load build options
 	var buildConf BuildConfigs
@@ -60,18 +68,18 @@ func main() {
 	cmdOpt.print(logger)
 	buildConf.print(logger)
 
-	if *cmdOpt.PrintHelp {
+	if cmdOpt.PrintHelp {
 		printHelp()
 		os.Exit(0)
 	}
 
-	if *cmdOpt.Target == "cuda" {
-		if *cmdOpt.DoCleaning {
-			CleanTarget_CUDA(cmdOpt, logger)
-		} else {
-			BuildTarget_CUDA(cmdOpt, buildConf, logger)
-		}
+	// make sure we won't build/install when clean
+	if cmdOpt.DoClean {
+		cmdOpt.DoBuild = false
+		cmdOpt.DoInstall = false
 	} else {
-		log.Fatalf("Unsupported target %s", *cmdOpt.Target)
+		cmdOpt.DoBuild = true
 	}
+
+	CRIB_PhOS(cmdOpt, buildConf, logger)
 }

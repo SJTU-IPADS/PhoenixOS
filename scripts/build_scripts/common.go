@@ -1,7 +1,11 @@
 package main
 
 import (
+	"os"
 	"fmt"
+	"strings"
+	"text/template"
+	"time"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
@@ -9,16 +13,45 @@ import (
 
 const (
 	KGoogleTestPath = "third_party/googletest"
+
+	// generated directories path
+	KLogPath      = "build_log"
+	KBuildLibPath = "lib"
+	KBuildIncPath = "lib/pos/include"
+	KBuildBinPath = "bin"
+
+	// system path
+	KInstallLibPath = "/lib/x86_64-linux-gnu"
+	KInstallIncPath = "/usr/local/include"
+	KInstallBinPath = "/usr/local/bin"
+
+	// PhOS path
+	KPhOSPath         = "pos"
+	KPhOSCLIPath      = "pos/cli"
+	kPhOSUnitTestPath = "test"
 )
+
+type UnitOptions struct {
+	Name          string
+	BuildScript   string
+	InstallScript string
+	RunScript     string
+	CleanScript   string
+	DoBuild       bool
+	DoRun         bool
+	DoInstall     bool
+	DoClean       bool
+}
 
 type CmdOptions struct {
 	RootDir        string
-	WithThirdParty *bool
-	Target         *string
-	PrintHelp      *bool
-	DoCleaning     *bool
-	DoInstall      *bool
-	DoUnitTest     *bool
+	WithThirdParty bool
+	WithUnitTest   bool
+	Target         string
+	PrintHelp      bool
+	DoBuild        bool
+	DoInstall      bool
+	DoClean        bool
 }
 
 func (cmdOpt *CmdOptions) print(logger *log.Logger) {
@@ -28,17 +61,17 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 			- WithThirdParty: %v
 			- Target: %v
 			- PrintHelp: %v
-			- DoCleaning: %v
+			- DoClean: %v
 			- DoInstall: %v
-			- DoUnitTest: %v
+			- WithUnitTest: %v
 		`,
 		cmdOpt.RootDir,
-		*cmdOpt.WithThirdParty,
-		*cmdOpt.Target,
-		*cmdOpt.PrintHelp,
-		*cmdOpt.DoCleaning,
-		*cmdOpt.DoInstall,
-		*cmdOpt.DoUnitTest,
+		cmdOpt.WithThirdParty,
+		cmdOpt.Target,
+		cmdOpt.PrintHelp,
+		cmdOpt.DoClean,
+		cmdOpt.DoInstall,
+		cmdOpt.WithUnitTest,
 	)
 	logger.Infof("Commandline options: %s", print_str)
 }
@@ -180,145 +213,126 @@ func (buildConf *BuildConfigs) export_string() string {
 	)
 }
 
-func (buildConf *BuildConfigs) export_autogen_string() string {
-	// we use different configurations on auxiliaries (autogen)
-	return fmt.Sprintf(
-		`
-		# platform configs
-		export POS_BUILD_CONF_PlatformProjectRoot=%v
+func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions, logger *log.Logger) {
+	doPartial := func(script, logName string) float64 {
+		var builder strings.Builder
+
+		// check log file path
+		if len(logName) == 0 {
+			panic(fmt.Errorf("no log file name provided"))
+		}
+		logPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KLogPath, logName)
+
+		// setup template
+		t, err := template.New("").Parse(script)
+		if err != nil {
+			logger.Fatalf("failed to generate template")
+		}
+		script_data := struct {
+			CMD_EXPRORT_ENV_VAR__    string
+			CMD_COPY_COMMON_HEADER__ string
+			LOG_PATH__               string
+			LOCAL_LIB_PATH__         string
+			LOCAL_BIN_PATH__         string
+			LOCAL_INC_PATH__         string
+			SYSTEM_LIB_PATH__        string
+			SYSTEM_BIN_PATH__        string
+			SYSTEM_INC_PATH__        string
+		}{
+			CMD_EXPRORT_ENV_VAR__: buildConf.export_string(),
+			CMD_COPY_COMMON_HEADER__: fmt.Sprintf(`
+				cp -r %s/%s/include/eval_configs.h.in ./pos/include/
+				cp -r %s/%s/include/log.h.in ./pos/include/
+				cp -r %s/%s/include/meson.build ./pos/include/
+				cp -r %s/%s/include/runtime_configs.h.in ./pos/include/`,
+				cmdOpt.RootDir, KPhOSPath,
+				cmdOpt.RootDir, KPhOSPath,
+				cmdOpt.RootDir, KPhOSPath,
+				cmdOpt.RootDir, KPhOSPath,
+			),
+			LOG_PATH__:        logPath,
+			LOCAL_LIB_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath),
+			LOCAL_BIN_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath),
+			LOCAL_INC_PATH__:  fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath),
+			SYSTEM_LIB_PATH__: KInstallLibPath,
+			SYSTEM_BIN_PATH__: KInstallBinPath,
+			SYSTEM_INC_PATH__: KInstallIncPath,
+		}
+		if err := t.Execute(&builder, script_data); err != nil {
+			logger.Fatalf("failed to generate build script from template: %v", err)
+		}
 		
-		# runtime build configs
-		export POS_BUILD_CONF_RuntimeTarget=%v
-		export POS_BUILD_CONF_RuntimeTargetVersion=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintError=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintWarn=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintLog=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintDebug=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintWithColor=0
-		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
-		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
-		export POS_BUILD_CONF_RuntimeEnableTrace=%v
-		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
-		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
+		// clean log file
+		clean_log_script := fmt.Sprintf("echo \"\" > %s", logPath)
+		_, err = utils.BashScriptGetOutput(clean_log_script, false, logger)
+		if err != nil {
+			logger.Fatalf("failed, failed to clean log content at %s before executing script", logName)
+		}
 
-		# PhOS core build configs
-		export POS_BUILD_CONF_EvalCkptOptLevel=%v
-		export POS_BUILD_CONF_EvalCkptEnableIncremental=%v
-		export POS_BUILD_CONF_EvalCkptEnablePipeline=%v
-		export POS_BUILD_CONF_EvalCkptDefaultIntervalMs=%v
-		export POS_BUILD_CONF_EvalMigrOptLevel=%v
-		export POS_BUILD_CONF_EvalRstEnableContextPool=%v
-		`,
-		buildConf.PlatformProjectRoot,
+		// execute script
+		start := time.Now()
+		_, err = utils.BashScriptGetOutput(builder.String(), false, logger)
+		if err != nil {
+			logger.Fatalf("failed, please see log at %s", logName)
+		}
+		elapsed := time.Since(start)
 
-		buildConf.RuntimeTarget,
-		buildConf.RuntimeTargetVersion,
-		buildConf.RuntimeEnablePrintError,
-		buildConf.RuntimeEnablePrintWarn,
-		buildConf.RuntimeEnablePrintLog,
-		buildConf.RuntimeEnablePrintDebug,
-		buildConf.RuntimeEnableDebugCheck,
-		buildConf.RuntimeEnableHijackApiCheck,
-		buildConf.RuntimeEnableTrace,
-		buildConf.RuntimeDefaultDaemonLogPath,
-		buildConf.RuntimeDefaultClientLogPath,
-
-		buildConf.EvalCkptOptLevel,
-		buildConf.EvalCkptEnableIncremental,
-		buildConf.EvalCkptEnablePipeline,
-		buildConf.EvalCkptDefaultIntervalMs,
-		buildConf.EvalMigrOptLevel,
-		buildConf.EvalRstEnableContextPool,
-	)
-}
-
-func (buildConf *BuildConfigs) export_unittest_string() string {
-	// we use different configurations on auxiliaries (unit test)
-	return fmt.Sprintf(
-		`
-		# platform configs
-		export POS_BUILD_CONF_PlatformProjectRoot=%v
-		
-		# runtime build configs
-		export POS_BUILD_CONF_RuntimeTarget=%v
-		export POS_BUILD_CONF_RuntimeTargetVersion=%v
-		export POS_BUILD_CONF_RuntimeEnablePrintError=0
-		export POS_BUILD_CONF_RuntimeEnablePrintWarn=0
-		export POS_BUILD_CONF_RuntimeEnablePrintLog=0
-		export POS_BUILD_CONF_RuntimeEnablePrintDebug=0
-		export POS_BUILD_CONF_RuntimeEnablePrintWithColor=0
-		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
-		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
-		export POS_BUILD_CONF_RuntimeEnableTrace=%v
-		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
-		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
-
-		# PhOS core build configs
-		export POS_BUILD_CONF_EvalCkptOptLevel=%v
-		export POS_BUILD_CONF_EvalCkptEnableIncremental=%v
-		export POS_BUILD_CONF_EvalCkptEnablePipeline=%v
-		export POS_BUILD_CONF_EvalCkptDefaultIntervalMs=%v
-		export POS_BUILD_CONF_EvalMigrOptLevel=%v
-		export POS_BUILD_CONF_EvalRstEnableContextPool=%v
-		`,
-		buildConf.PlatformProjectRoot,
-
-		buildConf.RuntimeTarget,
-		buildConf.RuntimeTargetVersion,
-		buildConf.RuntimeEnableDebugCheck,
-		buildConf.RuntimeEnableHijackApiCheck,
-		buildConf.RuntimeEnableTrace,
-		buildConf.RuntimeDefaultDaemonLogPath,
-		buildConf.RuntimeDefaultClientLogPath,
-
-		buildConf.EvalCkptOptLevel,
-		buildConf.EvalCkptEnableIncremental,
-		buildConf.EvalCkptEnablePipeline,
-		buildConf.EvalCkptDefaultIntervalMs,
-		buildConf.EvalMigrOptLevel,
-		buildConf.EvalRstEnableContextPool,
-	)
-}
-
-func BuildGoogleTest(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
-	logger.Infof("building googletest...")
-
-	buildLogPath := fmt.Sprintf("%s/%s/%s", cmdOpt.RootDir, KBuildLogPath, "build_googletest.log")
-	build_script := fmt.Sprintf(`
-		#!/bin/bash
-		set -e
-		cd %s/%s
-		if [ ! -d "./build" ] || [ ! -e "./build/lib/libgtest.a" ] || [ ! -e "./build/lib/libgtest_main.a" ]; then
-			rm -rf build
-			mkdir build && cd build
-			cmake .. >%s 2>&1
-			make -j >%s 2>&1
-		fi
-		`,
-		cmdOpt.RootDir, KGoogleTestPath,
-		buildLogPath,
-		buildLogPath,
-	)
-
-	_, err := utils.BashScriptGetOutput(build_script, false, logger)
-	if err != nil {
-		logger.Fatalf("failed to build googletest, please see log at %s", buildLogPath)
+		return elapsed.Seconds()
 	}
-	logger.Infof("built googletest")
+
+	if unitOpt.DoBuild && len(unitOpt.BuildScript) > 0 {
+		logger.Infof("building %s...", unitOpt.Name)
+		duration := doPartial(unitOpt.BuildScript, fmt.Sprintf("build_%s.log", unitOpt.Name))
+		utils.ClearLastLine()
+		logger.Infof("built %s: %.2fs", unitOpt.Name, duration)
+
+		if unitOpt.DoRun && len(unitOpt.RunScript) > 0 {
+			logger.Infof("running %s...", unitOpt.Name)
+			duration := doPartial(unitOpt.CleanScript, fmt.Sprintf("run_%s.log", unitOpt.Name))
+			utils.ClearLastLine()
+			logger.Infof("ran %s: %.2fs", unitOpt.Name, duration)
+		}
+	}
+
+	if unitOpt.DoInstall && len(unitOpt.InstallScript) > 0 {
+		logger.Infof("installing %s...", unitOpt.Name)
+		duration := doPartial(unitOpt.InstallScript, fmt.Sprintf("install_%s.log", unitOpt.Name))
+		utils.ClearLastLine()
+		logger.Infof("installed %s: %.2fs", unitOpt.Name, duration)
+	}
+
+	if unitOpt.DoClean && len(unitOpt.CleanScript) > 0 {
+		logger.Infof("cleaning %s...", unitOpt.Name)
+		duration := doPartial(unitOpt.CleanScript, fmt.Sprintf("clean_%s.log", unitOpt.Name))
+		utils.ClearLastLine()
+		logger.Infof("cleaned %s: %.2fs", unitOpt.Name, duration)
+	}
 }
 
-func CleanGoogleTest(cmdOpt CmdOptions, logger *log.Logger) {
-	logger.Infof("cleaning googletest...")
-	clean_script := fmt.Sprintf(`
-		#!/bin/bash
-		cd %s/%s
-		rm -rf build
-		`,
-		cmdOpt.RootDir, KGoogleTestPath,
-	)
-	_, err := utils.BashScriptGetOutput(clean_script, true, logger)
-	if err != nil {
-		logger.Warnf("failed to clean googletest")
+func CRIB_PhOS(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	buildLogPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KLogPath)
+	if err := utils.CreateDir(buildLogPath, true, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for build logs at %s", buildLogPath)
 	}
-	logger.Infof("done")
+
+	libPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildLibPath)
+	if err := utils.CreateDir(libPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built lib at %s", libPath)
+	}
+
+	includePath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildIncPath)
+	if err := utils.CreateDir(includePath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built headers at %s", includePath)
+	}
+
+	binPath := fmt.Sprintf("%s/%s", cmdOpt.RootDir, KBuildBinPath)
+	if err := utils.CreateDir(binPath, false, 0775, logger); err != nil && !os.IsExist(err) {
+		logger.Fatalf("failed to create directory for built binary at %s", binPath)
+	}
+
+	if cmdOpt.Target == "cuda" {
+		CRIB_PhOS_CUDA(cmdOpt, buildConf, logger)
+	} else {
+		log.Fatalf("Unsupported target %s", cmdOpt.Target)
+	}
 }
