@@ -224,7 +224,7 @@ func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions,
 		// setup template
 		t, err := template.New("").Parse(script)
 		if err != nil {
-			logger.Fatalf("failed to generate template")
+			logger.Fatalf("failed to generate template: %v", err)
 		}
 		script_data := struct {
 			CMD_EXPRORT_ENV_VAR__    string

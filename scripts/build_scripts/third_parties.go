@@ -8,12 +8,69 @@ import (
 )
 
 const (
+	KUuidPath 		= "third_party/util-linux"
 	KCriuPath 		= "third_party/criu"
 	KGoogleTestPath = "third_party/googletest"
 	KLibClangPath   = "third_party/libclang-static-build"
 	KLibYamlCppPath = "third_party/yaml-cpp"
 	kProtobufPath   = "third_party/protobuf"
 )
+
+func CRIB_LibUuid(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	if cmdOpt.DoBuild {
+		utils.CheckAndInstallPackage("autopoint", "autopoint", nil, logger)
+		utils.CheckAndInstallPackage("autoconf", "autoconf", nil, logger)
+		utils.CheckAndInstallPackage("flex", "flex", nil, logger)
+		utils.CheckAndInstallPackage("bison", "bison", nil, logger)
+		utils.CheckAndInstallPackage("automake", "automake", nil, logger)
+		utils.CheckAndInstallPackageViaOsPkgManager("libtool-bin", logger)
+	}
+
+	// see following guidance:
+	// 1. https://github.com/util-linux/util-linux/blob/master/Documentation/howto-compilation.txt
+	// 2. https://github.com/util-linux/util-linux/issues/1372#issuecomment-911713740
+	build_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+		{{.CMD_EXPRORT_ENV_VAR__}}
+		cd %s/%s
+		./autogen.sh 														>>{{.LOG_PATH__}} 2>&1
+		./configure --disable-all-programs --enable-libuuid --disable-nls	>>{{.LOG_PATH__}} 2>&1
+		make -j																>>{{.LOG_PATH__}} 2>&1
+		cp ./.libs/libuuid.so {{.LOCAL_LIB_PATH__}}/libuuid.so 				>>{{.LOG_PATH__}} 2>&1
+		cp ./.libs/libuuid.so.1 {{.LOCAL_LIB_PATH__}}/libuuid.so.1 			>>{{.LOG_PATH__}} 2>&1
+		cp ./.libs/libuuid.so.1.3.0 {{.LOCAL_LIB_PATH__}}/libuuid.so.1.3.0 	>>{{.LOG_PATH__}} 2>&1
+		cp ./libuuid/src/uuid.h {{.LOCAL_INC_PATH__}}/uuid.h 				>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, KUuidPath,
+	)
+
+	clean_script := fmt.Sprintf(`
+		#!/bin/bash
+		cd %s/%s
+		make clean										>>{{.LOG_PATH__}} 2>&1
+		# remove local installation
+		rm -rf {{.LOCAL_LIB_PATH__}}/libuuid.so 		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_LIB_PATH__}}/libuuid.so.1		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_LIB_PATH__}}/libuuid.so.1.3.0	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_INC_PATH__}}/uuid.h				>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, KUuidPath,
+	)
+
+	unitOpt := UnitOptions{
+		Name:          "libuuid",
+		BuildScript:   build_script,
+		RunScript:     "",
+		InstallScript: "",
+		CleanScript:   clean_script,
+		DoBuild:       cmdOpt.DoBuild,
+		DoRun:         false,
+		DoInstall:     cmdOpt.DoInstall,
+		DoClean:       cmdOpt.DoClean,
+	}
+	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
+}
 
 func CRIB_Criu(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	if cmdOpt.DoBuild {

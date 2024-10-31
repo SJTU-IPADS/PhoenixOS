@@ -252,17 +252,27 @@ exit:
 }
 
 
-pos_retval_t POSHandle::persist_without_state_sync(std::string ckpt_dir){
+pos_retval_t POSHandle::persist_sync(std::string ckpt_dir, bool with_state){
     pos_retval_t retval = POS_SUCCESS;
 
     POS_ASSERT(ckpt_dir.size() > 0);
 
+    if(with_state == true){
+        // try persist with state
+        if(this->status == kPOS_HandleStatus_Active){
+            retval = this->__commit(this->latest_version, /* stream_id */ 0, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
+            goto exit;
+        } else {
+            POS_WARN_C("failed to persist with state, hanlde isn't active, omit state");
+        }
+    }
+
+    // persist without state
     retval = this->__persist(nullptr, ckpt_dir, 0);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to run persist thread");
         goto exit;
     }
-
     retval = this->sync_persist();
 
 exit:
@@ -276,7 +286,7 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     std::string ckpt_file_path;
     std::ofstream ckpt_file_stream;
     google::protobuf::Message *handle_binary = nullptr, *_base_binary = nullptr;
-    pos_protobuf::Bin_POSHanlde *base_binary = nullptr;
+    pos_protobuf::Bin_POSHandle *base_binary = nullptr;
 
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
@@ -299,7 +309,7 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
         goto exit;
     }
     POS_CHECK_POINTER(handle_binary);
-    POS_CHECK_POINTER(base_binary = reinterpret_cast<pos_protobuf::Bin_POSHanlde*>(_base_binary));
+    POS_CHECK_POINTER(base_binary = reinterpret_cast<pos_protobuf::Bin_POSHandle*>(_base_binary));
 
     // ==================== 1. base fields ====================
     base_binary->set_id(this->id);
@@ -309,7 +319,6 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     base_binary->set_size(this->size);
 
     // ==================== 2. parent information ====================
-    base_binary->set_nb_parent_handles(parent_handles.size());
     for(i=0; i<parent_handles.size(); i++){
         POS_CHECK_POINTER(this->parent_handles[i]);
         base_binary->add_parent_handle_resource_type_idx(this->parent_handles[i]->resource_type_id);
@@ -334,6 +343,7 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     }
     
     if(ckpt_slot != nullptr){
+        base_binary->set_state_type(static_cast<uint32_t>(ckpt_slot->state_type));
         base_binary->set_state(reinterpret_cast<const char*>(ckpt_slot->expose_pointer()), actual_state_size);
     }
 
@@ -392,17 +402,11 @@ exit:
 
 pos_retval_t POSHandle::reload_state(uint64_t stream_id){
     pos_retval_t retval = POS_FAILED_NOT_EXIST;
-    uint64_t on_device_dumped_version = 0, host_dumped_version = 0, final_dumped_version = 0;
-    std::set<uint64_t> ckpt_set;
-    POSCheckpointSlot *ckpt_slot = nullptr;
-
-    uint64_t i;
-    std::vector<pos_host_ckpt_t> records;
-    void *data;
 
     POS_ASSERT(this->state_size > 0);
-    POS_CHECK_POINTER(this->ckpt_bag);
-    
+    POS_CHECK_POINTER(this->restore_binary_mapped);
+    POS_ASSERT(this->restore_binary_mapped_size > 0);
+
     if(unlikely(this->status != kPOS_HandleStatus_Active)){
         POS_WARN(
             "failed to reload handle state as the handle isn't active yet: server_addr(%p), status(%d)",
@@ -412,84 +416,11 @@ pos_retval_t POSHandle::reload_state(uint64_t stream_id){
         goto exit;
     }
 
-    // compare on-device-dumped and host-dumped version
-    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>();
-    if(ckpt_set.size() > 0){
-        host_dumped_version = ( *(ckpt_set.rbegin()) );
-    }
-    ckpt_set = this->ckpt_bag->get_checkpoint_version_set<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>();
-    if(ckpt_set.size() > 0){
-        on_device_dumped_version = ( *(ckpt_set.rbegin()) );
-    }
-    
-    if(host_dumped_version == 0 && on_device_dumped_version == 0){
-        /*!
-         *  \note   [option 1]  nothing have been dumped, reload from host origin,
-                                try reload from origin host value in order
-         */
-        records = this->ckpt_bag->get_host_checkpoint_records();
-        for(i=0; i<records.size(); i++){
-            pos_host_ckpt_t &record = records[i];
-            POS_CHECK_POINTER(record.wqe);
-            if(unlikely(POS_SUCCESS != this->__reload_state(
-                    /* data */ pos_api_param_addr(record.wqe, record.param_index),
-                    /* offset */ record.offset,
-                    /* size */ record.size,
-                    /* stream_id */ stream_id,
-                    /* on_device */ false
-            ))){
-                POS_WARN_DETAIL(
-                    "failed to reload state from origin host value: "
-                    "server_addr(%p), host_record_id(%lu), offset(%lu), size(%lu)",
-                    this->server_addr, i, record.offset, record.size
-                );
-                retval = POS_FAILED;
-            } else {
-                retval = POS_SUCCESS;
-            }
-        }
-    } else {
-        /*!
-         *  \note   [option 2]  reload from dumped result
-         */
-        final_dumped_version = host_dumped_version > on_device_dumped_version ? host_dumped_version : on_device_dumped_version;
-        if(host_dumped_version > on_device_dumped_version){
-            if(unlikely(POS_SUCCESS != (
-                this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
-                    &ckpt_slot, final_dumped_version
-                )
-            ))){
-                POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
-            }
-            POS_CHECK_POINTER(ckpt_slot);
-        } else {
-            if(unlikely(POS_SUCCESS != (
-                this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
-                    &ckpt_slot, final_dumped_version
-                )
-            ))){
-                POS_ERROR_C_DETAIL("failed to obtain ckpt slot during reload, this is a bug");
-            }
-            POS_CHECK_POINTER(ckpt_slot);
-        }
-
-        if(unlikely(POS_SUCCESS != this->__reload_state(
-            /* data */ ckpt_slot->expose_pointer(),
-            /* offset */ 0,
-            /* size */ this->state_size,
-            /* stream_id */ stream_id,
-            /* on_device */ on_device_dumped_version >= host_dumped_version
-        ))){
-            POS_WARN_DETAIL(
-                "failed to reload state from dumpped value: "
-                "server_addr(%p), version_id(%lu)",
-                this->server_addr, final_dumped_version
-            );
-            retval = POS_FAILED;
-        } else {
-            retval = POS_SUCCESS;
-        }
-    }
+    return this->__reload_state(
+        /* mapped */ this->restore_binary_mapped,
+        /* ckpt_file_size */ this->restore_binary_mapped_size,
+        /* stream_id */ stream_id
+    );
 
 exit:
     return retval;

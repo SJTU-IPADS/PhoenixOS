@@ -79,7 +79,7 @@ enum pos_oob_msg_typeid_t {
      */
     kPOS_OOB_Msg_CLI_Ckpt_PreDump,
     kPOS_OOB_Msg_CLI_Ckpt_Dump,
-    kPOS_OOB_Msg_CLI_Ckpt_Restore,
+    kPOS_OOB_Msg_CLI_Restore,
     /*!
      *  \note   trace
      */
@@ -91,7 +91,6 @@ enum pos_oob_msg_typeid_t {
     kPOS_OOB_Msg_CLI_Migration_RemotePrepare,
     kPOS_OOB_Msg_CLI_Migration_LocalPrepare,
     kPOS_OOB_Msg_CLI_Migration_Signal,
-    kPOS_OOB_Msg_CLI_Restore_Signal,
 
     // ========== util message ==========
     kPOS_OOB_Msg_Utils_MockAPICall

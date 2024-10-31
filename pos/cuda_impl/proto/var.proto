@@ -8,6 +8,6 @@ import "pos/include/proto/handle.proto";
  *  \brief  binary format of POSHandle_CUDA_Var
  */
  message Bin_POSHandle_CUDA_Var {
-    Bin_POSHanlde base = 1;
+    Bin_POSHandle base = 1;
     string global_name = 2;
 }

@@ -18,7 +18,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
-
+#include <filesystem>
 #include <stdint.h>
 #include <assert.h>
 
@@ -27,37 +27,37 @@
 #include "pos/include/handle.h"
 #include "pos/include/client.h"
 #include "pos/include/api_context.h"
+#include "pos/include/proto/client.pb.h"
+#include "pos/include/proto/apicxt.pb.h"
 
 
-POSClient::POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws) 
+POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws) 
     :   id(id),
-        migration_ctx(this),
+        pid(pid),
         status(kPOS_ClientStatus_CreatePending),
         _api_inst_pc(0), 
         _cxt(cxt),
-        _last_ckpt_tick(0),
         _ws(ws)
 {}
 
 
 POSClient::POSClient() 
     :   id(0),
-        migration_ctx(this),
+        pid(0),
         status(kPOS_ClientStatus_CreatePending),
-        _last_ckpt_tick(0),
         _ws(nullptr)
 {
     POS_ERROR_C("shouldn't call, just for passing compilation");
 }
 
 
-void POSClient::init(){
+void POSClient::init(bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
     std::map<pos_u64id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
     std::multimap<pos_u64id_t, POSHandle*> missing_handle_map;
 
     if(unlikely(POS_SUCCESS != (
-        retval = this->init_handle_managers()
+        retval = this->init_handle_managers(is_restoring)
     ))){
         POS_WARN_C("failed to initialize handle managers");
         goto exit;
@@ -74,23 +74,233 @@ exit:
     if(unlikely(retval != POS_SUCCESS)){
         this->status = kPOS_ClientStatus_Hang;
     } else {
-        // enable parser and worker to poll
-        this->status = kPOS_ClientStatus_Active;
+        /*!
+         *  \brief  enable parser and worker to poll
+         *  \note   we won't enable client to be active while restoring,
+         *          this should be done after all unexecuted API are loaded
+         *          again to parser2worker apicxt queues.
+         */
+        if(is_restoring == false){
+            this->status = kPOS_ClientStatus_Active;
+        }
     }
 }
 
 
 void POSClient::deinit(){
-    this->deinit_dump_handle_managers();
+    this->deinit_handle_managers();
 
     if(this->_cxt.trace_resource){
-        this->deinit_dump_trace_resource();
+        if(unlikely(POS_SUCCESS != this->persist_handles(/* with_state */false))){
+            POS_WARN_C("failed to persist handle for tracing");
+        }
     }
 
     // stop parser and worker to poll
     this->status = kPOS_ClientStatus_Hang;
 
     this->__destory_qgroup();
+
+exit:
+    ;
+}
+
+
+pos_retval_t POSClient::persist(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSClient client_binary;
+    std::ofstream ckpt_file_stream;
+    std::string ckpt_file_path;
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+
+    // verify the path exists
+    if(unlikely(!std::filesystem::exists(ckpt_dir))){
+        POS_WARN_C(
+            "failed to persist client state, no ckpt directory exists, this is a bug: ckpt_dir(%s)",
+            ckpt_dir.c_str()
+        );
+        retval = POS_FAILED_NOT_EXIST;
+        goto exit;
+    }
+
+    // record client state
+    client_binary.set_uuid(this->id);
+    client_binary.set_pid(this->pid);
+    client_binary.set_job_name(this->_cxt.job_name);
+
+    // form the path to the checkpoint file of this handle
+    ckpt_file_path = ckpt_dir + std::string("/c.bin");
+
+    // write to file
+    ckpt_file_stream.open(ckpt_file_path, std::ios::binary | std::ios::out);
+    if(!ckpt_file_stream){
+        POS_WARN_C(
+            "failed to dump client to file, failed to open file: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+    if(!client_binary.SerializeToOstream(&ckpt_file_stream)){
+        POS_WARN_C(
+            "failed to dump client to file, protobuf failed to dump: path(%s)",
+            ckpt_file_path.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+exit:
+    if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
+    return retval;
+}
+
+
+pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
+    uint64_t i;
+    std::tuple<pos_resource_typeid_t, pos_u64id_t> handle_info;
+    std::map<pos_resource_typeid_t, std::vector<pos_u64id_t>> handle_map;
+
+    std::vector<POSHandle*> handle_list;
+    typename std::map<pos_resource_typeid_t, std::vector<pos_u64id_t>>::iterator map_iter;
+    POSHandle *handle;
+
+    auto __deassemble_file_name = [](const std::string& filename) -> std::tuple<pos_resource_typeid_t, pos_u64id_t> {
+        std::string baseName = filename.substr(0, filename.find_last_of('.'));
+        std::stringstream ss(baseName);
+        std::string part;
+        std::vector<std::string> parts;
+
+        while (std::getline(ss, part, '-')) { parts.push_back(part); }
+        POS_ASSERT(parts.size() == 3);
+        POS_ASSERT(parts[0] == std::string("h"));
+        
+        return std::make_tuple(
+            std::stoul(parts[1]),
+            std::stoull(parts[2])
+        );
+    };
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+    if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
+        POS_WARN_C("failed to restore handles, ckpt directory not exist: %s", ckpt_dir.c_str())
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
+
+    // reallocate handles in the handle manager
+    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+        if (    entry.is_regular_file() 
+            &&  entry.path().extension() == ".bin"
+            &&  entry.path().filename().string().rfind("h-", 0) == 0
+        ){
+            handle_info = __deassemble_file_name(entry.path().filename().string());
+            retval = this->__reallocate_single_handle(
+                /* ckpt_file */ entry.path().string(),
+                /* rid */ std::get<0>(handle_info),
+                /* hid */ std::get<1>(handle_info)
+            );
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C(
+                    "failed to restore handle: rid(%u), hid(%lu), retval(%u)",
+                    std::get<0>(handle_info),
+                    std::get<1>(handle_info),
+                    retval
+                );
+                continue;
+            }
+            handle_map[std::get<0>(handle_info)].push_back(std::get<1>(handle_info));
+            POS_DEBUG_C("restored handle: rid(%lu), hid(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
+        }
+    }
+
+    // reassign each handle's parent handles
+    for(map_iter = handle_map.begin(); map_iter != handle_map.end(); map_iter++){
+        POS_CHECK_POINTER(this->handle_managers[map_iter->first]);
+        for(i=0; i<map_iter->second.size(); i++){
+            handle = this->handle_managers[map_iter->first]->get_handle_by_id(map_iter->second[i]);
+            if(unlikely(handle == nullptr)){
+                continue;
+            }
+            retval = this->__reassign_handle_parents(handle);
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C("failed to reassign handle parents: rid(%u), hid(%lu)", map_iter->first, map_iter->second);
+                goto exit;
+            }
+            handle_list.push_back(handle);
+        }
+    }
+    
+    // restore handle and its state
+    // TODO: this part can be async and on-demand
+    for(i=0; i<handle_list.size(); i++){
+        POS_CHECK_POINTER(handle = handle_list[i]);
+
+        // restore handle
+        retval = handle->restore();
+        if(unlikely(retval != POS_SUCCESS)){
+            dirty_retval = retval;
+            POS_WARN_C(
+                "failed to restore resource on device: client_addr(%p), rid(%u)",
+                handle->client_addr,
+                handle->resource_type_id
+            );
+            goto exit;
+        }
+
+        // restore state
+        if(handle->state_size > 0){
+            retval = handle->reload_state( /* stream_id */ 0);
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C(
+                    "failed to restore resource state on device: client_addr(%p), rid(%u)",
+                    handle->client_addr,
+                    handle->resource_type_id
+                );
+                goto exit;
+            }
+        }
+    }
+
+exit:
+    return dirty_retval;
+}
+
+
+pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_u64id_t apicxt_id;
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+    if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
+        POS_WARN_C("failed to restore api contexts, ckpt directory not exist: %s", ckpt_dir.c_str())
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+        if (    entry.is_regular_file() 
+            &&  entry.path().extension() == ".bin"
+            &&  entry.path().filename().string().rfind("a-", 0) == 0
+        ){
+            retval = this->__reload_apicxt(entry.path().string());
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C(
+                    "failed to reload api context: ckpt_file(%s)",
+                    entry.path().string().c_str()
+                );
+                goto exit;
+            }
+        }
+    }
+
+exit:
+    return retval;
 }
 
 
@@ -560,6 +770,71 @@ pos_retval_t POSClient::__destory_qgroup(){
     this->_cmd_oob2parser_cq->lock();
     delete this->_cmd_oob2parser_cq;
     POS_DEBUG_C("destoryed oob2parser cmd CQ: uuid(%lu)", this->id);
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file){
+    pos_retval_t retval = POS_SUCCESS;
+    POSAPIContext_QE_t *apicxt;
+    uint64_t i;
+    pos_resource_typeid_t rid;
+    pos_u64id_t hid;
+    POSHandle *handle;
+
+    POS_ASSERT(ckpt_file.size() > 0);
+    
+    POS_CHECK_POINTER(apicxt = new POSAPIContext_QE_t(this, ckpt_file));
+    if(unlikely(apicxt->client == nullptr)){
+        POS_WARN_C(
+            "failed to restore apicxt from binary checkpoint file: ckpt_file(%s)",
+            ckpt_file.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // restore handle pointer inside handle views
+    for(i=0; i<apicxt->input_handle_views.size(); i++){
+        rid = apicxt->input_handle_views[i].resource_type_id;
+        hid = apicxt->input_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->input_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->output_handle_views.size(); i++){
+        rid = apicxt->output_handle_views[i].resource_type_id;
+        hid = apicxt->output_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->output_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->inout_handle_views.size(); i++){
+        rid = apicxt->inout_handle_views[i].resource_type_id;
+        hid = apicxt->inout_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->inout_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->create_handle_views.size(); i++){
+        rid = apicxt->create_handle_views[i].resource_type_id;
+        hid = apicxt->create_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->create_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->delete_handle_views.size(); i++){
+        rid = apicxt->delete_handle_views[i].resource_type_id;
+        hid = apicxt->delete_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->delete_handle_views[i].handle = handle;
+    }
+
+    // push this wqe to worker
+    this->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt);
 
 exit:
     return retval;

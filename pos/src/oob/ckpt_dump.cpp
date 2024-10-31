@@ -30,7 +30,7 @@ namespace cli_ckpt_dump {
         POSCommand_QE_t* cmd;
         std::vector<POSCommand_QE_t*> cmds;
 
-        payload = (oob_payload_t*)msg->payload;
+        POS_CHECK_POINTER(payload = (oob_payload_t*)msg->payload);
         
         // obtain client with specified pid
         client = ws->get_client_by_pid(payload->pid);
@@ -83,17 +83,25 @@ namespace cli_ckpt_dump {
         POS_ASSERT(cmds[0]->type == kPOS_Command_Oob2Parser_Dump);
 
         // transfer error status
+        payload->retval = cmds[0]->retval;
         if(unlikely(cmds[0]->retval != POS_SUCCESS)){
             if(cmds[0]->retval == POS_FAILED_NOT_ENABLED){
                 retmsg = "posd doesn't enable ckpt support";
             } else if (cmds[0]->retval == POS_FAILED_ALREADY_EXIST){
-                retmsg = "pre-dump too frequent, conflict";
+                retmsg = "dump too frequent, conflict";
             } else {
                 retmsg = "see posd log for more details";
             }
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
+            goto response;
         }
-        payload->retval = cmds[0]->retval;
+        
+        // before remove client, we persist the state of the client
+        if(unlikely(POS_SUCCESS != (payload->retval = client->persist(cmd->ckpt_dir)))){
+            POS_WARN("failed to persist the state of client");
+            retmsg = "see posd log for more details";
+            memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
+        }
 
         // remove client
         if(likely(cmds[0]->retval == POS_SUCCESS)){

@@ -52,6 +52,7 @@
     one can build on official CUDA images
     (e.g., [`nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-459c130c94363099b02706b9b25d9fe5822ea233203ce9fbf8dfd276a55e7e95))
 
+
     ```bash
     # start container
     docker run -dit --gpus all -v.:/root --name phos nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
@@ -60,7 +61,9 @@
     docker exec -it phos /bin/bash
     ```
 
-    Note that currently *PhOS* is only fully tested under CUDA 11.3, we will support other latest CUDA version soon!
+    > **System Dependencies Declaration**
+    > 1. PhOS require libc6 >= 2.29 for compiling CRIU from source;
+    > 2. Currently *PhOS* is currently fully tested under CUDA 11.3, we will support other latest CUDA version soon
 
 
 2. **[Downloading Necesssary Assets]**

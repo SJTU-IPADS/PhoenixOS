@@ -114,7 +114,7 @@ exit:
 }
 
 
-pos_retval_t POSHandleManager_CUDA_Function::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Function::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
 
     /* nothing */
@@ -171,4 +171,91 @@ pos_retval_t POSHandleManager_CUDA_Function::preserve_pooled_handles(uint64_t am
 
 pos_retval_t POSHandleManager_CUDA_Function::try_restore_from_pool(POSHandle_CUDA_Function* handle){
     return POS_FAILED;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Function::__reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_CUDA_Function** handle){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSHandle_CUDA_Function cuda_function_binary;
+    pos_protobuf::Bin_Suspicious_Param_Pair sus_param_pair;
+    int i, nb_parent_handles, nb_parent_handles_;
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
+    pos_resource_typeid_t parent_handle_rid;
+    pos_u64id_t parent_handle_hid;
+
+    POS_CHECK_POINTER(mapped);
+    POS_CHECK_POINTER(handle);
+
+    if(!cuda_function_binary.ParseFromArray(mapped, ckpt_file_size)){
+        POS_WARN_C("failed to restore handle, failed to deserialize from mmap area");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    POS_CHECK_POINTER(cuda_function_binary.mutable_base());
+
+    // form parent handles waitlist
+    nb_parent_handles = cuda_function_binary.mutable_base()->parent_handle_resource_type_idx_size();
+    nb_parent_handles_ = cuda_function_binary.mutable_base()->parent_handle_idx_size();
+    POS_ASSERT(nb_parent_handles == nb_parent_handles_);
+    for (i=0; i<nb_parent_handles; i++) {
+        parent_handle_rid = cuda_function_binary.mutable_base()->parent_handle_resource_type_idx(i);
+        parent_handle_hid = cuda_function_binary.mutable_base()->parent_handle_idx(i);
+        parent_handles_waitlist.push_back({ parent_handle_rid, parent_handle_hid });
+    }
+
+    // create resource shell in this handle manager
+    retval = this->__restore_mocked_resource(
+        /* handle */ handle,
+        /* id */ cuda_function_binary.mutable_base()->id(),
+        /* client_addr */ cuda_function_binary.mutable_base()->client_addr(),
+        /* server_addr */ cuda_function_binary.mutable_base()->server_addr(),
+        /* size */ cuda_function_binary.mutable_base()->size(),
+        /* parent_handles_waitlist */ parent_handles_waitlist,
+        /* state_size */ cuda_function_binary.mutable_base()->state_size()
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to restore mocked resource in handle manager: client_addr(%p)",
+            cuda_function_binary.mutable_base()->client_addr()
+        );
+        goto exit;
+    }
+    POS_CHECK_POINTER(*handle);
+
+    (*handle)->name = cuda_function_binary.name();
+    (*handle)->signature = cuda_function_binary.signature();
+    (*handle)->nb_params = cuda_function_binary.nb_params();
+
+    for (i=0; i<cuda_function_binary.param_offsets_size(); i++) {
+        (*handle)->param_offsets.push_back(cuda_function_binary.param_offsets(i));
+    }
+    for (i=0; i<cuda_function_binary.param_sizes_size(); i++) {
+        (*handle)->param_sizes.push_back(cuda_function_binary.param_sizes(i));
+    }
+    for (i=0; i<cuda_function_binary.input_pointer_params_size(); i++) {
+        (*handle)->input_pointer_params.push_back(cuda_function_binary.input_pointer_params(i));
+    }
+    for (i=0; i<cuda_function_binary.inout_pointer_params_size(); i++) {
+        (*handle)->inout_pointer_params.push_back(cuda_function_binary.inout_pointer_params(i));
+    }
+    for (i=0; i<cuda_function_binary.output_pointer_params_size(); i++) {
+        (*handle)->output_pointer_params.push_back(cuda_function_binary.output_pointer_params(i));
+    }
+    for (i=0; i<cuda_function_binary.suspicious_params_size(); i++) {
+        (*handle)->suspicious_params.push_back(cuda_function_binary.suspicious_params(i));
+    }
+
+    (*handle)->has_verified_params = cuda_function_binary.has_verified_params();
+
+    for (i=0; i<cuda_function_binary.confirmed_suspicious_params_size(); i++) {
+        sus_param_pair = cuda_function_binary.confirmed_suspicious_params(i);
+        (*handle)->confirmed_suspicious_params.push_back(
+            std::pair<pos_resource_typeid_t, pos_u64id_t>(sus_param_pair.index(), sus_param_pair.offset())
+        );
+    }
+
+    (*handle)->cbank_param_size = cuda_function_binary.cbank_param_size();
+
+exit:
+    return retval;
 }

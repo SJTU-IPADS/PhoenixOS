@@ -28,7 +28,6 @@
 #include "pos/include/handle.h"
 #include "pos/include/command.h"
 #include "pos/include/transport.h"
-#include "pos/include/migration.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/utils/timer.h"
 
@@ -106,6 +105,11 @@ typedef struct pos_create_client_param {
 
     // id of the newly created client
     pos_client_uuid_t id;
+
+    // identify whether we're restoring a client,
+    // if it's, we won't initialize initial handles
+    // inside each handle manager
+    bool is_restoring;
 } pos_create_client_param_t;
 
 
@@ -206,14 +210,16 @@ typedef struct pos_client_ckpt_station {
  *  \brief  base state of a remote client
  */
 class POSClient {
+    /* ====================== basic ====================== */
  public:
     /*!
      *  \brief  constructor
      *  \param  id  client identifier
+     *  \param  pid client pid
      *  \param  cxt context to initialize this client
      *  \param  ws  pointer to the global workspace
      */
-    POSClient(pos_client_uuid_t id, pos_client_cxt_t cxt, POSWorkspace *ws);
+    POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws);
     POSClient();
     ~POSClient(){}
     
@@ -222,8 +228,11 @@ class POSClient {
      *  \brief  initialize of the client
      *  \note   this part can't be in the constructor as we will invoke functions
      *          that implemented by derived class
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      */
-    void init();
+    void init(bool is_restoring);
 
 
     /*!
@@ -235,67 +244,19 @@ class POSClient {
 
 
     /*!
-     *  \brief  instantiate handle manager for all used resources
-     *  \note   the children class should replace this method to initialize their 
-     *          own needed handle managers
-     *  \return POS_SUCCESS for successfully initialization
-     */
-    virtual pos_retval_t init_handle_managers(){}
-    
-
-    /*!
-     *  \brief  initialization of transport utilities for migration  
-     *  \return POS_SUCCESS for successfully initialization
-     */
-    virtual pos_retval_t init_transport(){}
-
-
-    /*!
-     *  \brief      deinit: dumping handle manager for all used resources
-     *  \example    CUDA function manager should export the metadata of functions
-     */
-    virtual void deinit_dump_handle_managers(){}
-
-
-    /*!
-     *  \brief  deinit: dumping resource tracing result if enabled
-     */
-    virtual void deinit_dump_trace_resource(){}
-
-
-    /*! 
-     *  \brief  temp function used by migration
-     */
-    virtual void __TMP__migration_remote_malloc(){}
-    virtual void __TMP__migration_precopy(){}
-    virtual void __TMP__migration_deltacopy(){}
-    virtual void __TMP__migration_tear_context(bool do_tear_module){}
-    virtual void __TMP__migration_restore_context(bool do_restore_module){}
-    virtual void __TMP__migration_ondemand_reload(){}
-    virtual void __TMP__migration_allcopy(){}
-    virtual void __TMP__migration_allreload(){}
-
-
-    /*!
      *  \brief  obtain the current pc, and update it
      *  \return the current pc
      */
     inline uint64_t get_and_move_api_inst_pc(){ _api_inst_pc++; return (_api_inst_pc-1); }
-    
-    
-    /*!
-     *  \brief  all hande managers of this client
-     *  \note   key:    typeid of the resource represented by the handle
-     *          value:  pointer to the corresponding hande manager
-     */
-    std::map<pos_resource_typeid_t, void*> handle_managers;
+
 
     // client identifier
     pos_client_uuid_t id;
-    
-    // context of migration
-    POSMigrationCtx migration_ctx;
 
+    // pid of the client
+    __pid_t pid;
+
+    // state of this client
     pos_client_status_t status;
 
     // parser thread handle
@@ -303,7 +264,7 @@ class POSClient {
 
     // worker thread handle
     POSWorker *worker;
-    
+
  protected:
     friend class POSParser;
     friend class POSWorker;
@@ -314,11 +275,109 @@ class POSClient {
     // context to initialize this client
     pos_client_cxt_t _cxt;
 
-    // transport endpoint
-    POSTransport</* is_server */ false> *_transport;
-
     // the global workspace
     POSWorkspace *_ws;
+    /* ====================== basic ====================== */
+   
+
+    /* =============== checkpoint / restore ============== */
+ public:
+    /*!
+     *  \brief  persist the state of this client
+     *  \param  ckpt_dir    checkpoint file path
+     *  \return POS_SUCCESS for successfully persist
+     */
+    pos_retval_t persist(std::string& ckpt_dir);
+
+
+    /*!
+     *  \brief  persist handle to specific checkpoint files
+     *  \note   this function is currently called by the trace system,
+     *          normal checkpoint routine would persist handles with
+     *          API provided by POSHandle
+     *  \param  with_state  whether to persist with handle state
+     *  \return POS_SUCCESS for successfully persist
+     */
+    virtual pos_retval_t persist_handles(bool with_state){}
+
+
+    /*!
+     *  \brief  restore handles into this client
+     *  \param  ckpt_dir    directory of checkpoing files of handles
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore_handles(std::string& ckpt_dir);
+
+    
+    /*!
+     *  \brief  restore unexecuted API context into this client
+     *  \param  ckpt_dir    directory of checkpoing files of unexecuted API context
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore_apicxts(std::string& ckpt_dir);
+
+
+ protected:
+    /*!
+     *  \brief  reallocate a single handle with specific type in the handle manager
+     *  \note   this function is called by POSClient::restore_handles
+     *  \param  ckpt_file   path to the checkpoint file of the handle
+     *  \param  rid         resource type index of the handle
+     *  \param  hid         index of the handle
+     *  \return POS_SUCCESS for successfully restore
+     */
+    virtual pos_retval_t __reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+
+    /*!
+     *  \brief  reassign handle's parent from waitlist
+     *  \param  handle  pointer to the handle to be processed
+     *  \return POS_SUCCESS for successfully reassigned
+     */
+    virtual pos_retval_t __reassign_handle_parents(POSHandle* handle){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
+
+    /*!
+     *  \brief  reload unexecuted API context from checkpoint file
+     *  \note   this function is called by POSClient::restore_apicxts
+     *  \param  ckpt_file   path to the checkpoint file of the handle
+     *  
+     */
+    pos_retval_t __reload_apicxt(const std::string& ckpt_file);
+
+
+ private: 
+    /*!
+     *  \brief  station of the checkpoint data, might be dumpped to file, or transmit via network
+     *          to other machine
+     */
+    pos_client_ckpt_station_t __ckpt_station;
+    /* =============== checkpoint / restore ============== */
+
+
+    /* ==================== migration ==================== */
+    // TODO: to be added
+    /* ==================== migration ==================== */
+
+
+    /* ==================== transport ==================== */
+ public:
+    /*!
+     *  \brief  initialization of transport utilities for migration  
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    virtual pos_retval_t init_transport(){}
+
+
+ protected:
+    // transport endpoint
+    POSTransport</* is_server */ false> *_transport;
+    /* ==================== transport ==================== */
+
 
     /* =============== asynchronous queues =============== */
  public:
@@ -396,12 +455,43 @@ class POSClient {
      */
     pos_retval_t __create_qgroup();
 
+
     /*!
      *  \brief  destory queue group of this client
      *  \return POS_SUCCESS for successfully destory
      */
     pos_retval_t __destory_qgroup();
     /* =============== asynchronous queues =============== */
+
+
+    /* =============== resource management =============== */
+ public:
+    /*!
+     *  \brief  all hande managers of this client
+     *  \note   key:    typeid of the resource represented by the handle
+     *          value:  pointer to the corresponding hande manager
+     */
+    std::map<pos_resource_typeid_t, POSHandleManager<POSHandle>*> handle_managers;
+
+
+    /*!
+     *  \brief  instantiate handle manager for all used resources
+     *  \note   the children class should replace this method to initialize their 
+     *          own needed handle managers
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
+     *  \return POS_SUCCESS for successfully initialization
+     */
+    virtual pos_retval_t init_handle_managers(bool is_restoring){}
+
+
+    /*!
+     *  \brief      deinit: dumping handle manager for all used resources
+     *  \example    CUDA function manager should export the metadata of functions
+     */
+    virtual void deinit_handle_managers(){}
+
 
  protected:
     /*!
@@ -415,6 +505,7 @@ class POSClient {
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
+
     /*!
      *  \brief  obtain all resource type indices of this client
      *  \return all resource type indices of this client
@@ -422,6 +513,7 @@ class POSClient {
     virtual std::set<pos_resource_typeid_t> __get_resource_idx(){
         return std::set<pos_resource_typeid_t>();
     }
+
 
     /*!
      *  \brief  get handle manager by given resource index
@@ -434,20 +526,9 @@ class POSClient {
                 "no handle manager with specified type registered, this is a bug: type_id(%lu)", rid
             );
         }
-        return static_cast<POSHandleManager<POSHandle>*>(this->handle_managers[rid]);
+        return this->handle_managers[rid];
     }
-
- private:
-    /*!
-     *  \brief  station of the checkpoint data, might be dumpped to file, or transmit via network
-     *          to other machine
-     */
-    pos_client_ckpt_station_t __ckpt_station;
-
-    /*!
-     *  \brief  last time to do ckpt of this client
-     */
-    uint64_t _last_ckpt_tick;
+    /* =============== resource management =============== */
 };
 
 #define pos_get_client_typed_hm(client, resource_id, hm_type)  \

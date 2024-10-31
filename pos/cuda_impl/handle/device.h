@@ -133,9 +133,12 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *  \brief  initialize of the handle manager
      *  \note   pre-allocation of handles, e.g., default stream, device, context handles
      *  \param  related_handles related handles to allocate new handles in this manager
+     *  \param  is_restoring    is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring) override;
 
 
     /*!
@@ -153,4 +156,17 @@ class POSHandleManager_CUDA_Device : public POSHandleManager<POSHandle_CUDA_Devi
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
     pos_retval_t try_restore_from_pool(POSHandle_CUDA_Device* handle) override;
+
+
+ private:
+    /*!
+     *  \brief  restore the extra fields of handle with specific type
+     *  \note   this function is called by reallocate_single_handle, and implemented by
+     *          specific handle type
+     *  \param  mapped          mmap handle of the file
+     *  \param  ckpt_file_size  size of the checkpoint size (mmap area)
+     *  \param  handle          pointer to the restored handle
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t __reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_CUDA_Device** handle) override;
 };

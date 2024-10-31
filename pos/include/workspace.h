@@ -49,10 +49,8 @@ namespace oob_functions {
     POS_OOB_DECLARE_SVR_FUNCTIONS(agent_unregister_client);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_predump);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_ckpt_dump);
+    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore);
     POS_OOB_DECLARE_SVR_FUNCTIONS(cli_trace_resource);
-    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_migration_signal);
-    POS_OOB_DECLARE_SVR_FUNCTIONS(cli_restore_signal);
-    POS_OOB_DECLARE_SVR_FUNCTIONS(utils_mock_api_call);
 }; // namespace oob_functions
 
 
@@ -161,6 +159,14 @@ class POSWorkspace {
      *          POS_SUCCESS for successfully removing
      */
     pos_retval_t remove_client(pos_client_uuid_t uuid);
+
+    /*!
+     *  \brief  restore a client to the workspace, based on given ckpt file
+     *  \param  ckpt_file   path to the checkpoint file of the client
+     *  \param  clnt        pointer to the restored client
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore_client(std::string& ckpt_file, POSClient** clnt);
 
     /*!
      *  \brief  obtain client by given uuid

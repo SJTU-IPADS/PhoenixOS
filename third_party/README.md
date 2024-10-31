@@ -8,7 +8,7 @@ PhoenixOS uses the following projects as third parties, we thank all their autho
 
 2. `criu`
 
-    PhoenixOS leverages CRIU to checkpoint and restore the program state on CPU side. Currently we're maintaining our downstream at <a href="https://github.com/SJTU-IPADS/PhoenixOS-CRIU">SJTU-IPADS/PhoenixOS-CRIU</a>.
+    PhoenixOS leverages CRIU to checkpoint and restore the program state on CPU side. Currently we're maintaining our downstream at <a href="https://github.com/SJTU-IPADS/PhoenixOS-CRIU">SJTU-IPADS/PhoenixOS-CRIU</a>. Note that we didn't conduct any modification on origin CRIU.
 
 3. `googletest`
 
@@ -22,6 +22,11 @@ PhoenixOS uses the following projects as third parties, we thank all their autho
 
     PhoenixOS uses `yaml-cpp` for parsing configurations when auto-generating code of parsers and workers.
 
-6. `cuda-checkpoint`
+6. `util-linux`
+
+    PhoenixOS uses the following libraries / binaries from `util-linux`:
+    * `libuuid` for generating unique index of GPU program
+
+7. `cuda-checkpoint`
 
     PhoenixOS uses `cuda-checkpoint` as baseline for performance evaluation.

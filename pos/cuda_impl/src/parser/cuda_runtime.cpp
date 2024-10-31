@@ -628,7 +628,6 @@ namespace cuda_memcpy_h2d {
             hm_memory->record_modified_handle(memory_handle);
         }
 
-        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;
@@ -864,8 +863,6 @@ namespace cuda_memcpy_h2d_async {
                 /* handle */ stream_handle
             });
         }
-
-        hm_memory->record_host_stateful_handle(memory_handle);
 
     exit:
         return retval;

@@ -318,7 +318,7 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
         // pre-dump is done here
         if(cmd->type == kPOS_Command_Parser2Worker_PreDump){ goto reply_parser; }
 
-        //for dump, we also need to save unexecuted APIs
+        // for dump, we also need to save unexecuted APIs
         nb_ckpt_wqes = 0;
         while(max_wqe_id < this->_client->_api_inst_pc - 1){ // we need to make sure we drain all unexecuted APIs
             wqes.clear();

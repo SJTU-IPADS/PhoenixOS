@@ -8,5 +8,5 @@ import "pos/include/proto/handle.proto";
  *  \brief  binary format of POSHandle_cuBLAS_Context
  */
  message Bin_POSHandle_cuBLAS_Context {
-    Bin_POSHanlde base = 1;
+    Bin_POSHandle base = 1;
 }

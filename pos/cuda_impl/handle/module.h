@@ -150,13 +150,11 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
 
     /*!
      *  \brief  reload state of this handle back to the device
-     *  \param  data        source data to be reloaded
-     *  \param  offset      offset from the base address of this handle to be reloaded
-     *  \param  size        reload size
-     *  \param  stream_id   stream for reloading the state
-     *  \param  on_device   whether the source data is on device
+     *  \param  mapped          mmap area of the checkpoint file of this handle
+     *  \param  ckpt_file_size  size of the checkpoint size (mmap area)
+     *  \param  stream_id       stream for reloading the state
      */
-    pos_retval_t __reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device) override;
+    pos_retval_t __reload_state(void* mapped, uint64_t ckpt_file_size, uint64_t stream_id) override;
     /* ======================== restore handle & state ======================= */
 };
 
@@ -172,9 +170,12 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
      *  \brief  initialize of the handle manager
      *  \note   pre-allocation of handles, e.g., default stream, device, context handles
      *  \param  related_handles related handles to allocate new handles in this manager
+     *  \param  is_restoring    is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring) override;
 
 
     /*!
@@ -223,4 +224,16 @@ class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Modu
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
     pos_retval_t try_restore_from_pool(POSHandle_CUDA_Module* handle) override;
+
+ private:
+    /*!
+     *  \brief  restore the extra fields of handle with specific type
+     *  \note   this function is called by reallocate_single_handle, and implemented by
+     *          specific handle type
+     *  \param  mapped          mmap handle of the file
+     *  \param  ckpt_file_size  size of the checkpoint size (mmap area)
+     *  \param  handle          pointer to the restored handle
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t __reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_CUDA_Module** handle) override;
 };

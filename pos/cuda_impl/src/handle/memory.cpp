@@ -188,12 +188,12 @@ exit:
 
 pos_retval_t POSHandle_CUDA_Memory::__generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary){
     pos_retval_t retval = POS_SUCCESS;
-    pos_protobuf::Bin_POSHanlde_CUDA_Memory *cuda_memory_binary;
+    pos_protobuf::Bin_POSHandle_CUDA_Memory *cuda_memory_binary;
 
     POS_CHECK_POINTER(binary);
     POS_CHECK_POINTER(base_binary);
 
-    cuda_memory_binary = new pos_protobuf::Bin_POSHanlde_CUDA_Memory();
+    cuda_memory_binary = new pos_protobuf::Bin_POSHandle_CUDA_Memory();
     POS_CHECK_POINTER(cuda_memory_binary);
 
     *binary = reinterpret_cast<google::protobuf::Message*>(cuda_memory_binary);
@@ -307,17 +307,26 @@ exit:
 }
 
 
-pos_retval_t POSHandle_CUDA_Memory::__reload_state(void* data, uint64_t offset, uint64_t size, uint64_t stream_id, bool on_device){
+
+pos_retval_t POSHandle_CUDA_Memory::__reload_state(void* mapped, uint64_t ckpt_file_size, uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSHandle_CUDA_Memory memory_binary;
     cudaError_t cuda_rt_retval;
 
-    POS_CHECK_POINTER(data);
+    POS_CHECK_POINTER(mapped);
+
+    if(!memory_binary.ParseFromArray(mapped, ckpt_file_size)){
+        POS_WARN_C("failed to restore handle state, failed to deserialize from mmap area");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    POS_CHECK_POINTER(memory_binary.mutable_base());
 
     cuda_rt_retval = cudaMemcpyAsync(
         /* dst */ this->server_addr,
-        /* src */ data,
-        /* count */ size,
-        /* kind */ on_device == false ? cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice,
+        /* src */ reinterpret_cast<const void*>(memory_binary.mutable_base()->state().c_str()),
+        /* count */ this->state_size,
+        /* kind */ cudaMemcpyHostToDevice,
         /* stream */ (cudaStream_t)(stream_id)
     );
     if(unlikely(cuda_rt_retval != cudaSuccess)){
@@ -334,6 +343,8 @@ pos_retval_t POSHandle_CUDA_Memory::__reload_state(void* data, uint64_t offset, 
     }
 
 exit:
+    // this should be the end of using this mmap area, so we release it here
+    munmap(mapped, ckpt_file_size);
     return retval;
 }
 
@@ -341,11 +352,11 @@ exit:
 POSHandleManager_CUDA_Memory::POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true) {}
 
 
-pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t nb_context, i, j;
     POSHandle *context_handle;
-    
+
     /*!
      *  \brief  reserve a large portion of virtual memory space on a specified device
      *  \param  context_handle  handle of the context of the specified device
@@ -555,4 +566,56 @@ pos_retval_t POSHandleManager_CUDA_Memory::preserve_pooled_handles(uint64_t amou
 
 pos_retval_t POSHandleManager_CUDA_Memory::try_restore_from_pool(POSHandle_CUDA_Memory* handle){
     return POS_FAILED;
+}
+
+
+pos_retval_t POSHandleManager_CUDA_Memory::__reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_CUDA_Memory** handle){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSHandle_CUDA_Memory cuda_memory_binary;
+    int i, nb_parent_handles, nb_parent_handles_;
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
+    pos_resource_typeid_t parent_handle_rid;
+    pos_u64id_t parent_handle_hid;
+
+    POS_CHECK_POINTER(mapped);
+    POS_CHECK_POINTER(handle);
+
+    if(!cuda_memory_binary.ParseFromArray(mapped, ckpt_file_size)){
+        POS_WARN_C("failed to restore handle, failed to deserialize from mmap area");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    POS_CHECK_POINTER(cuda_memory_binary.mutable_base());
+
+    // form parent handles waitlist
+    nb_parent_handles = cuda_memory_binary.mutable_base()->parent_handle_resource_type_idx_size();
+    nb_parent_handles_ = cuda_memory_binary.mutable_base()->parent_handle_idx_size();
+    POS_ASSERT(nb_parent_handles == nb_parent_handles_);
+    for (i=0; i<nb_parent_handles; i++) {
+        parent_handle_rid = cuda_memory_binary.mutable_base()->parent_handle_resource_type_idx(i);
+        parent_handle_hid = cuda_memory_binary.mutable_base()->parent_handle_idx(i);
+        parent_handles_waitlist.push_back({ parent_handle_rid, parent_handle_hid });
+    }
+
+    // create resource shell in this handle manager
+    retval = this->__restore_mocked_resource(
+        /* handle */ handle,
+        /* id */ cuda_memory_binary.mutable_base()->id(),
+        /* client_addr */ cuda_memory_binary.mutable_base()->client_addr(),
+        /* server_addr */ cuda_memory_binary.mutable_base()->server_addr(),
+        /* size */ cuda_memory_binary.mutable_base()->size(),
+        /* parent_handles_waitlist */ parent_handles_waitlist,
+        /* state_size */ cuda_memory_binary.mutable_base()->state_size()
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to restore mocked resource in handle manager: client_addr(%p)",
+            cuda_memory_binary.mutable_base()->client_addr()
+        );
+        goto exit;
+    }
+    POS_CHECK_POINTER(*handle);
+
+exit:
+    return retval;
 }

@@ -2,3 +2,12 @@ syntax = "proto3";
 
 package pos_protobuf;
 
+
+/*!
+ *  \brief  binary format of POSClient
+ */
+message Bin_POSClient {
+    uint64 uuid = 1;
+    uint64 pid = 2;
+    string job_name = 3;
+}
