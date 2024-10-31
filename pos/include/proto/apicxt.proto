@@ -4,7 +4,7 @@ package pos_protobuf;
 
 
 message Bin_POSHandleView {
-    uint64 resource_type_id = 1;
+    uint32 resource_type_id = 1;
     uint64 id = 2;
     uint64 param_index = 3;
     uint64 offset = 4;

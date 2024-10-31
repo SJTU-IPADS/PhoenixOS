@@ -372,6 +372,7 @@ pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** cl
     POS_DEBUG_C("restore client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, (*clnt)->pid);
 
 exit:
+    if(input.is_open()){ input.close(); }
     return retval;
 }
 

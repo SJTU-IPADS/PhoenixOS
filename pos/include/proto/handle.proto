@@ -7,7 +7,7 @@ package pos_protobuf;
  */
 message Bin_POSHandle {
     uint64 id = 1;
-    uint64 resource_type_id = 2;
+    uint32 resource_type_id = 2;
     uint64 client_addr = 3;
     uint64 server_addr = 4;
     uint64 size = 5;

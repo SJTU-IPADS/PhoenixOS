@@ -303,15 +303,18 @@ class POSClient {
 
     /*!
      *  \brief  restore handles into this client
-     *  \note   if on-demand restore is disabled, this function won't
-     *          return until all handles (including its device state)
-     *          were restored; if on-demand restore is disabled, this
-     *          function would be asynchronous and restore handles on
-     *          demand
      *  \param  ckpt_dir    directory of checkpoing files of handles
      *  \return POS_SUCCESS for successfully restore
      */
     pos_retval_t restore_handles(std::string& ckpt_dir);
+
+    
+    /*!
+     *  \brief  restore unexecuted API context into this client
+     *  \param  ckpt_dir    directory of checkpoing files of unexecuted API context
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t restore_apicxts(std::string& ckpt_dir);
 
 
  protected:
@@ -336,6 +339,15 @@ class POSClient {
     virtual pos_retval_t __reassign_handle_parents(POSHandle* handle){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
+
+
+    /*!
+     *  \brief  reload unexecuted API context from checkpoint file
+     *  \note   this function is called by POSClient::restore_apicxts
+     *  \param  ckpt_file   path to the checkpoint file of the handle
+     *  
+     */
+    pos_retval_t __reload_apicxt(const std::string& ckpt_file);
 
 
  private: 

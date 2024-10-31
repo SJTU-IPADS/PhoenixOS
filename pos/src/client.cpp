@@ -28,6 +28,7 @@
 #include "pos/include/client.h"
 #include "pos/include/api_context.h"
 #include "pos/include/proto/client.pb.h"
+#include "pos/include/proto/apicxt.pb.h"
 
 
 POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws) 
@@ -73,8 +74,15 @@ exit:
     if(unlikely(retval != POS_SUCCESS)){
         this->status = kPOS_ClientStatus_Hang;
     } else {
-        // enable parser and worker to poll
-        this->status = kPOS_ClientStatus_Active;
+        /*!
+         *  \brief  enable parser and worker to poll
+         *  \note   we won't enable client to be active while restoring,
+         *          this should be done after all unexecuted API are loaded
+         *          again to parser2worker apicxt queues.
+         */
+        if(is_restoring == false){
+            this->status = kPOS_ClientStatus_Active;
+        }
     }
 }
 
@@ -176,7 +184,6 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
     };
 
     POS_ASSERT(ckpt_dir.size() > 0);
-
     if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
         POS_WARN_C("failed to restore handles, ckpt directory not exist: %s", ckpt_dir.c_str())
         retval = POS_FAILED_INVALID_INPUT;
@@ -262,6 +269,38 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
 
 exit:
     return dirty_retval;
+}
+
+
+pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_u64id_t apicxt_id;
+
+    POS_ASSERT(ckpt_dir.size() > 0);
+    if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
+        POS_WARN_C("failed to restore api contexts, ckpt directory not exist: %s", ckpt_dir.c_str())
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+        if (    entry.is_regular_file() 
+            &&  entry.path().extension() == ".bin"
+            &&  entry.path().filename().string().rfind("a-", 0) == 0
+        ){
+            retval = this->__reload_apicxt(entry.path().string());
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C(
+                    "failed to reload api context: ckpt_file(%s)",
+                    entry.path().string().c_str()
+                );
+                goto exit;
+            }
+        }
+    }
+
+exit:
+    return retval;
 }
 
 
@@ -731,6 +770,71 @@ pos_retval_t POSClient::__destory_qgroup(){
     this->_cmd_oob2parser_cq->lock();
     delete this->_cmd_oob2parser_cq;
     POS_DEBUG_C("destoryed oob2parser cmd CQ: uuid(%lu)", this->id);
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file){
+    pos_retval_t retval = POS_SUCCESS;
+    POSAPIContext_QE_t *apicxt;
+    uint64_t i;
+    pos_resource_typeid_t rid;
+    pos_u64id_t hid;
+    POSHandle *handle;
+
+    POS_ASSERT(ckpt_file.size() > 0);
+    
+    POS_CHECK_POINTER(apicxt = new POSAPIContext_QE_t(this, ckpt_file));
+    if(unlikely(apicxt->client == nullptr)){
+        POS_WARN_C(
+            "failed to restore apicxt from binary checkpoint file: ckpt_file(%s)",
+            ckpt_file.c_str()
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // restore handle pointer inside handle views
+    for(i=0; i<apicxt->input_handle_views.size(); i++){
+        rid = apicxt->input_handle_views[i].resource_type_id;
+        hid = apicxt->input_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->input_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->output_handle_views.size(); i++){
+        rid = apicxt->output_handle_views[i].resource_type_id;
+        hid = apicxt->output_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->output_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->inout_handle_views.size(); i++){
+        rid = apicxt->inout_handle_views[i].resource_type_id;
+        hid = apicxt->inout_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->inout_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->create_handle_views.size(); i++){
+        rid = apicxt->create_handle_views[i].resource_type_id;
+        hid = apicxt->create_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->create_handle_views[i].handle = handle;
+    }
+    for(i=0; i<apicxt->delete_handle_views.size(); i++){
+        rid = apicxt->delete_handle_views[i].resource_type_id;
+        hid = apicxt->delete_handle_views[i].id;
+        POS_CHECK_POINTER(this->handle_managers[rid]);
+        POS_CHECK_POINTER(handle = this->handle_managers[rid]->get_handle_by_id(hid));
+        apicxt->delete_handle_views[i].handle = handle;
+    }
+
+    // push this wqe to worker
+    this->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt);
 
 exit:
     return retval;

@@ -219,7 +219,7 @@ typedef struct POSAPIContext {
 
     /*!
      *  \brief  constructor
-     *  \note   this constructor is for checkpointing ops
+     *  \note   this constructor is for restoring
      *  \param  api_id_ specialized API index of the checkpointing op
      */
     POSAPIContext(uint64_t api_id_) : api_id(api_id_), overall_param_size(0) {}
@@ -243,7 +243,10 @@ typedef struct POSHandleView {
     // pointer to the used handle
     POSHandle *handle;
 
-    // id of the handle inside handle manager list
+    /*!
+     *  \brief  id of the handle inside handle manager list
+     *  \note   this field is only used during restoring phrase
+     */
     pos_u64id_t id;
 
     /*!
@@ -267,7 +270,6 @@ typedef struct POSHandleView {
      *              within the worker launching function
      */
     uint64_t offset;
-
 
     /*!
      *  \brief  constructor
@@ -360,8 +362,8 @@ typedef struct POSAPIContext_QE {
         status(kPOS_API_Execute_Status_Init), id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);
-        api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
-        POS_CHECK_POINTER(api_cxt);
+        this->api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
+        POS_CHECK_POINTER(this->api_cxt);
         create_tick = POSUtilTimestamp::get_tsc();
         parser_s_tick = parser_e_tick = worker_s_tick = worker_e_tick = 0;
 
@@ -404,6 +406,16 @@ typedef struct POSAPIContext_QE {
      */
     POSAPIContext_QE(POSClient* pos_client) 
         : client(pos_client), ckpt_mark(false), is_ckpt_pruned(false){}
+
+
+    /*!
+     *  \brief  constructor
+     *  \note   this constructor is for restoring from binary checkpoint file
+     *  \param  client      pointer to the POSClient instance
+     *  \param  ckpt_file   path to the checkpoint file
+     */
+    POSAPIContext_QE(POSClient* client, const std::string& ckpt_file);
+
 
     /*!
      *  \brief  deconstructor

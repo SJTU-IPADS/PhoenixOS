@@ -63,10 +63,16 @@ namespace cli_restore {
             goto response;
         }
 
-        // if on-demand, we just record the file name (maybe some async thread to reload)
-        // if not on-demand, we reload the handle immediately
-
         // reload unexecuted APIs in the client queue (async thread)
+        if(unlikely(POS_SUCCESS != (
+            payload->retval = client->restore_apicxts(ckpt_dir)
+        ))){
+            retmsg = std::string("see posd log for more details");
+            goto response;
+        }
+
+        // now it's time to let client start to work
+        client->status = kPOS_ClientStatus_Active;
 
     response:
         POS_ASSERT(retmsg.size() < kServerRetMsgMaxLen);

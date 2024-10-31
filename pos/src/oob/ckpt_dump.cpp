@@ -88,7 +88,7 @@ namespace cli_ckpt_dump {
             if(cmds[0]->retval == POS_FAILED_NOT_ENABLED){
                 retmsg = "posd doesn't enable ckpt support";
             } else if (cmds[0]->retval == POS_FAILED_ALREADY_EXIST){
-                retmsg = "pre-dump too frequent, conflict";
+                retmsg = "dump too frequent, conflict";
             } else {
                 retmsg = "see posd log for more details";
             }
