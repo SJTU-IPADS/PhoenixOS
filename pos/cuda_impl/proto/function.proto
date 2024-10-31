@@ -19,7 +19,7 @@ message Bin_Suspicious_Param_Pair {
  *  \brief  binary format of POSHandle_CUDA_Function
  */
 message Bin_POSHandle_CUDA_Function {
-    Bin_POSHanlde base = 1;
+    Bin_POSHandle base = 1;
     string name = 2;
     string signature = 3;
     uint32 nb_params = 4;

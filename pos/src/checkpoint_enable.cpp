@@ -175,7 +175,7 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
             active_map->erase(map_iter);
             version_set->erase(old_version);
         } else { 
-            POS_CHECK_POINTER(*ptr = new POSCheckpointSlot(state_size, allocate_func, deallocate_func));
+            POS_CHECK_POINTER(*ptr = new POSCheckpointSlot(state_size, allocate_func, deallocate_func, ckpt_slot_pos, ckpt_state_type));
         }
     }
     active_map->insert(std::pair<uint64_t, POSCheckpointSlot*>(version, *ptr));

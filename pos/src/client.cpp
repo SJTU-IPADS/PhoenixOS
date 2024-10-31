@@ -150,7 +150,7 @@ exit:
 
 
 pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
-    pos_retval_t retval = POS_SUCCESS;
+    pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
     std::tuple<pos_resource_typeid_t, pos_u64id_t> handle_info;
 
     auto __deassemble_file_name = [](const std::string& filename) -> std::tuple<pos_resource_typeid_t, pos_u64id_t> {
@@ -183,12 +183,27 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
             &&  entry.path().filename().string().rfind("h-", 0) == 0
         ){
             handle_info = __deassemble_file_name(entry.path().filename().string());
-            POS_DEBUG_C("restored handle: resource_type_id(%lu), handle_id(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
+            retval = this->__reallocate_single_handle(
+                /**/ entry.path().string(),
+                /**/ std::get<0>(handle_info),
+                /**/ std::get<1>(handle_info)
+            );
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C(
+                    "failed to restore handle: rid(%u), hid(%lu), retval(%u)",
+                    std::get<0>(handle_info),
+                    std::get<1>(handle_info),
+                    retval
+                );
+                continue;
+            }
+            POS_DEBUG_C("restored handle: rid(%lu), hid(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
         }
     }
 
 exit:
-    return retval;
+    return dirty_retval;
 }
 
 

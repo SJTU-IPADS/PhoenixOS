@@ -89,6 +89,7 @@ class POSClient_CUDA : public POSClient {
      */
     pos_retval_t persist_handles(bool with_state) override;
 
+ protected:
     /*!
      *  \brief  restore a single handle with specific type
      *  \note   this function is called by POSClient::restore_handles
@@ -97,7 +98,7 @@ class POSClient_CUDA : public POSClient {
      *  \param  hid         index of the handle
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t restore_single_handle(std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid) override;
+    pos_retval_t __reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid) override;
     /* =============== checkpoint / restore ============== */
 
 

@@ -306,15 +306,16 @@ class POSClient {
     pos_retval_t restore_handles(std::string& ckpt_dir);
 
 
+ protected:
     /*!
-     *  \brief  restore a single handle with specific type
+     *  \brief  reallocate a single handle with specific type in the handle manager
      *  \note   this function is called by POSClient::restore_handles
      *  \param  ckpt_file   path to the checkpoint file of the handle
      *  \param  rid         resource type index of the handle
      *  \param  hid         index of the handle
      *  \return POS_SUCCESS for successfully restore
      */
-    virtual pos_retval_t restore_single_handle(std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
+    virtual pos_retval_t __reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
@@ -439,7 +440,7 @@ class POSClient {
      *  \note   key:    typeid of the resource represented by the handle
      *          value:  pointer to the corresponding hande manager
      */
-    std::map<pos_resource_typeid_t, void*> handle_managers;
+    std::map<pos_resource_typeid_t, POSHandleManager<POSHandle>*> handle_managers;
 
 
     /*!
@@ -491,7 +492,7 @@ class POSClient {
                 "no handle manager with specified type registered, this is a bug: type_id(%lu)", rid
             );
         }
-        return static_cast<POSHandleManager<POSHandle>*>(this->handle_managers[rid]);
+        return this->handle_managers[rid];
     }
     /* =============== resource management =============== */
 };

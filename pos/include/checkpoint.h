@@ -58,27 +58,33 @@ using pos_custom_ckpt_deallocate_func_t = void(*)(void* ptr);
  */
 class POSCheckpointSlot {
  public:
-    /*!
-     *  \brief  construtor
-     *  \param  state_size  size of the data inside this slot
-     */
-    POSCheckpointSlot(uint64_t state_size) 
-        : _state_size(state_size), _custom_deallocator(nullptr) {
-        POS_ASSERT(state_size > 0);
-        POS_CHECK_POINTER(_data = malloc(state_size));
-    }
+    // position of this checkpoint slot (device/host)
+    pos_ckptslot_position_t ckpt_position;
+
+
+    // type of state stored inside this checkpoint slot (device/host)
+    pos_ckpt_state_type_t state_type;
+
 
     /*!
      *  \brief  construtor
-     *  \param  state_size  size of the data inside this slot
-     *  \param  allocator   allocator for allocating host-side memory region to store checkpoint
-     *  \param  deallocator deallocator for deallocating host-side memory region that stores checkpoint
+     *  \param  state_size      size of the data inside this slot
+     *  \param  allocator       allocator for allocating host-side memory region to store checkpoint
+     *  \param  deallocator     deallocator for deallocating host-side memory region that stores checkpoint
+     *  \param  ckpt_position   position of this checkpoint slot (device/host)
+     *  \param  state_type      type of state stored inside this checkpoint slot (device/host)
      */
     POSCheckpointSlot(
         uint64_t state_size,
         pos_custom_ckpt_allocate_func_t allocator,
-        pos_custom_ckpt_deallocate_func_t deallocator
-    ) : _state_size(state_size), _custom_deallocator(deallocator) {
+        pos_custom_ckpt_deallocate_func_t deallocator,
+        pos_ckptslot_position_t ckpt_position,
+        pos_ckpt_state_type_t state_type
+    ) : _state_size(state_size),
+        _custom_deallocator(deallocator),
+        ckpt_position(ckpt_position),
+        state_type(state_type)
+    {
         POS_ASSERT(state_size > 0);
         if(likely(allocator != nullptr)){
             POS_CHECK_POINTER(this->_data = allocator(state_size));

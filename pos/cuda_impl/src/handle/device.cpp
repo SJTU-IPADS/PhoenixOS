@@ -140,3 +140,55 @@ pos_retval_t POSHandleManager_CUDA_Device::preserve_pooled_handles(uint64_t amou
 pos_retval_t POSHandleManager_CUDA_Device::try_restore_from_pool(POSHandle_CUDA_Device* handle){
     return POS_FAILED;
 }
+
+
+pos_retval_t POSHandleManager_CUDA_Device::__reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_CUDA_Device** handle){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSHandle_CUDA_Device device_binary;
+    int i, nb_parent_handles, nb_parent_handles_;
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
+    pos_resource_typeid_t parent_handle_rid;
+    pos_u64id_t parent_handle_hid;
+
+    POS_CHECK_POINTER(mapped);
+    POS_CHECK_POINTER(handle);
+
+    if(!device_binary.ParseFromArray(mapped, ckpt_file_size)){
+        POS_WARN_C("failed to restore handle, failed to deserialize from mmap area");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    POS_CHECK_POINTER(device_binary.mutable_base());
+
+    // form parent handles waitlist
+    nb_parent_handles = device_binary.mutable_base()->parent_handle_resource_type_idx_size();
+    nb_parent_handles_ = device_binary.mutable_base()->parent_handle_idx_size();
+    POS_ASSERT(nb_parent_handles == nb_parent_handles_);
+    for (i=0; i<nb_parent_handles; i++) {
+        parent_handle_rid = device_binary.mutable_base()->parent_handle_resource_type_idx(i);
+        parent_handle_hid = device_binary.mutable_base()->parent_handle_idx(i);
+        parent_handles_waitlist.push_back({ parent_handle_rid, parent_handle_hid });
+    }
+
+    // create resource shell in this handle manager
+    retval = this->__restore_mocked_resource(
+        /* handle */ handle,
+        /* id */ device_binary.mutable_base()->id(),
+        /* client_addr */ device_binary.mutable_base()->client_addr(),
+        /* server_addr */ device_binary.mutable_base()->server_addr(),
+        /* size */ device_binary.mutable_base()->size(),
+        /* parent_handles_waitlist */ parent_handles_waitlist,
+        /* state_size */ device_binary.mutable_base()->state_size()
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to restore mocked resource in handle manager: client_addr(%p)",
+            device_binary.mutable_base()->client_addr()
+        );
+        goto exit;
+    }
+    POS_CHECK_POINTER(*handle);
+
+exit:
+    return retval;
+}

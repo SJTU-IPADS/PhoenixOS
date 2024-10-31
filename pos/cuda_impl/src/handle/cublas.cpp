@@ -151,3 +151,55 @@ pos_retval_t POSHandleManager_cuBLAS_Context::preserve_pooled_handles(uint64_t a
 pos_retval_t POSHandleManager_cuBLAS_Context::try_restore_from_pool(POSHandle_cuBLAS_Context* handle){
     return POS_FAILED;
 }
+
+
+pos_retval_t POSHandleManager_cuBLAS_Context::__reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_cuBLAS_Context** handle){
+    pos_retval_t retval = POS_SUCCESS;
+    pos_protobuf::Bin_POSHandle_cuBLAS_Context cublas_context_binary;
+    int i, nb_parent_handles, nb_parent_handles_;
+    std::vector<std::pair<pos_resource_typeid_t, pos_u64id_t>> parent_handles_waitlist;
+    pos_resource_typeid_t parent_handle_rid;
+    pos_u64id_t parent_handle_hid;
+
+    POS_CHECK_POINTER(mapped);
+    POS_CHECK_POINTER(handle);
+
+    if(!cublas_context_binary.ParseFromArray(mapped, ckpt_file_size)){
+        POS_WARN_C("failed to restore handle, failed to deserialize from mmap area");
+        retval = POS_FAILED;
+        goto exit;
+    }
+    POS_CHECK_POINTER(cublas_context_binary.mutable_base());
+
+    // form parent handles waitlist
+    nb_parent_handles = cublas_context_binary.mutable_base()->parent_handle_resource_type_idx_size();
+    nb_parent_handles_ = cublas_context_binary.mutable_base()->parent_handle_idx_size();
+    POS_ASSERT(nb_parent_handles == nb_parent_handles_);
+    for (i=0; i<nb_parent_handles; i++) {
+        parent_handle_rid = cublas_context_binary.mutable_base()->parent_handle_resource_type_idx(i);
+        parent_handle_hid = cublas_context_binary.mutable_base()->parent_handle_idx(i);
+        parent_handles_waitlist.push_back({ parent_handle_rid, parent_handle_hid });
+    }
+
+    // create resource shell in this handle manager
+    retval = this->__restore_mocked_resource(
+        /* handle */ handle,
+        /* id */ cublas_context_binary.mutable_base()->id(),
+        /* client_addr */ cublas_context_binary.mutable_base()->client_addr(),
+        /* server_addr */ cublas_context_binary.mutable_base()->server_addr(),
+        /* size */ cublas_context_binary.mutable_base()->size(),
+        /* parent_handles_waitlist */ parent_handles_waitlist,
+        /* state_size */ cublas_context_binary.mutable_base()->state_size()
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to restore mocked resource in handle manager: client_addr(%p)",
+            cublas_context_binary.mutable_base()->client_addr()
+        );
+        goto exit;
+    }
+    POS_CHECK_POINTER(*handle);
+
+exit:
+    return retval;
+}

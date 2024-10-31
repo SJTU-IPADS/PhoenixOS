@@ -88,7 +88,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA device handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = device_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Device] = (POSHandleManager<POSHandle>*)(device_mgr);
 
     // CUDA context handle manager
     related_handles.clear();
@@ -102,7 +102,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA context handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = ctx_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Context] = (POSHandleManager<POSHandle>*)(ctx_mgr);
 
     // CUDA stream handle manager
     related_handles.clear();
@@ -116,7 +116,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA stream handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = stream_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Stream] = (POSHandleManager<POSHandle>*)(stream_mgr);
     
     // cuBLAS context handle manager
     related_handles.clear();
@@ -127,7 +127,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize cuBLAS context handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context] = cublas_context_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_cuBLAS_Context] = (POSHandleManager<POSHandle>*)(cublas_context_mgr);
 
     // CUDA event handle manager
     related_handles.clear();
@@ -138,7 +138,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA event handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Event] = event_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Event] = (POSHandleManager<POSHandle>*)(event_mgr);
 
     // CUDA module handle manager
     related_handles.clear();
@@ -149,7 +149,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA module handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = module_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = (POSHandleManager<POSHandle>*)(module_mgr);
     if(std::filesystem::exists(this->_cxt.kernel_meta_path)){
         POS_DEBUG_C("loading kernel meta from cache %s...", this->_cxt.kernel_meta_path.c_str());
         retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
@@ -171,7 +171,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA function handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = function_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Function] = (POSHandleManager<POSHandle>*)(function_mgr);
 
     // CUDA var handle manager
     related_handles.clear();
@@ -182,7 +182,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA var handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Var] = var_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Var] = (POSHandleManager<POSHandle>*)(var_mgr);
 
     // CUDA memory handle manager
     related_handles.clear();
@@ -196,7 +196,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(){
         POS_WARN_C("failed to initialize CUDA memory handle manager, client won't be run");
         goto exit;
     }
-    this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] = memory_mgr;
+    this->handle_managers[kPOS_ResourceTypeId_CUDA_Memory] = (POSHandleManager<POSHandle>*)(memory_mgr);
 
 exit:
     return retval;
@@ -290,10 +290,11 @@ exit:
 }
 
 
-pos_retval_t POSClient_CUDA::restore_single_handle(std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
+pos_retval_t POSClient_CUDA::__reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
     pos_retval_t retval = POS_SUCCESS;
+    POSHandle *restored_handle = nullptr;
 
-    POS_ASSERT(ckpt_dir.size() > 0);
+    POS_ASSERT(ckpt_file.size() > 0);
     POS_ASSERT(
         std::find(
             this->_ws->resource_type_idx.begin(),
@@ -301,16 +302,17 @@ pos_retval_t POSClient_CUDA::restore_single_handle(std::string& ckpt_file, pos_r
             rid
         ) != this->_ws->resource_type_idx.end()
     );
+    POS_CHECK_POINTER(this->handle_managers[rid]);
 
-    switch (rid)
-    {
-    case kPOS_ResourceTypeId_CUDA_Memory:
-        break;
-
-    default:
-        POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
-        break;
+    retval = this->handle_managers[rid]->reallocate_single_handle(ckpt_file, hid, &restored_handle);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C(
+            "failed to restore single handle from file: rid(%u), hid(%lu), ckpt_file(%s), retval(%u)",
+            rid, hid, ckpt_file.c_str(), retval
+        );
+        goto exit;
     }
+    POS_CHECK_POINTER(restored_handle);
 
 exit:
     return retval;

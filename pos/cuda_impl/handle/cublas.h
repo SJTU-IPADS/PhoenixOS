@@ -175,4 +175,17 @@ class POSHandleManager_cuBLAS_Context : public POSHandleManager<POSHandle_cuBLAS
      *          POS_FAILED for failed pooled restoring, should fall back to normal path
      */
     pos_retval_t try_restore_from_pool(POSHandle_cuBLAS_Context* handle) override;
+
+
+ private:
+    /*!
+     *  \brief  restore the extra fields of handle with specific type
+     *  \note   this function is called by reallocate_single_handle, and implemented by
+     *          specific handle type
+     *  \param  mapped          mmap handle of the file
+     *  \param  ckpt_file_size  size of the checkpoint size (mmap area)
+     *  \param  handle          pointer to the restored handle
+     *  \return POS_SUCCESS for successfully restore
+     */
+    pos_retval_t __reallocate_single_handle(void* mapped, uint64_t ckpt_file_size, POSHandle_cuBLAS_Context** handle) override;
 };

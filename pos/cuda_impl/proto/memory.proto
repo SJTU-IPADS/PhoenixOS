@@ -7,6 +7,6 @@ import "pos/include/proto/handle.proto";
 /*!
  *  \brief  binary format of POSHandle_CUDA_Memory
  */
- message Bin_POSHanlde_CUDA_Memory {
-    Bin_POSHanlde base = 1;
+ message Bin_POSHandle_CUDA_Memory {
+    Bin_POSHandle base = 1;
 }
