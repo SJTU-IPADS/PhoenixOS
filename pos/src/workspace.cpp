@@ -265,6 +265,7 @@ pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSCl
     // generate uuid for this client
     uuid_generate_random(uuid);
     param.id = __uuid_to_uint64(uuid);
+    param.is_restoring = false;
 
     // create client
     retval = this->__create_client(param, clnt);
@@ -347,6 +348,7 @@ pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** cl
     create_param.id = client_binary.uuid();
     create_param.pid = client_binary.pid();
     create_param.job_name = client_binary.job_name();
+    create_param.is_restoring = true;
 
     if(unlikely(this->_client_map.count(create_param.id) > 0)){
         POS_WARN_C("confliction of client uuid, %s", POS_BUG_REPORT);

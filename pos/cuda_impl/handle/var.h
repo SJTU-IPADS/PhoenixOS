@@ -139,9 +139,12 @@ class POSHandleManager_CUDA_Var : public POSHandleManager<POSHandle_CUDA_Var> {
      *  \brief  initialize of the handle manager
      *  \note   pre-allocation of handles, e.g., default stream, device, context handles
      *  \param  related_handles related handles to allocate new handles in this manager
+     *  \param  is_restoring    is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully allocation
      */
-    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles) override;
+    pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring) override;
 
     /*!
      *  \brief  allocate new mocked CUDA var within the manager

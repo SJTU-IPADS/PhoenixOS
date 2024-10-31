@@ -86,7 +86,7 @@ exit:
 }
 
 
-pos_retval_t POSHandleManager_CUDA_Event::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Event::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
 
     /* nothing */

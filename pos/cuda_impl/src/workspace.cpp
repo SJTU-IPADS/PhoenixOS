@@ -183,7 +183,7 @@ pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param
             /* ws */ this
         )
     );
-    (*client)->init();
+    (*client)->init(param.is_restoring);
 
 exit:
     return retval;

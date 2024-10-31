@@ -723,9 +723,12 @@ class POSHandleManager {
      *  \brief  initialize of the handle manager
      *  \note   pre-allocation of handles, e.g., default stream, device, context handles
      *  \param  related_handles related handles to allocate new handles in this manager
+     *  \param  is_restoring    is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully allocation
      */
-    virtual pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+    virtual pos_retval_t init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
     
@@ -1348,22 +1351,32 @@ pos_retval_t POSHandleManager<T_POSHandle>::__restore_mocked_resource(
 
     // resize vector on-demand
     if(this->_handles.size() <= id){
-        this->_handles.resize(id+1);
+        this->_handles.resize(id+1, nullptr);
     }
 
-    // check conflict on handle index
+    /*!
+     *  \brief  check conflict on handle index
+     *  \note   wo tolerate conflict handle index, as some initialized handles might be created while handle manager be initialized
+     */
+    // if(unlikely(this->_handles[id] != nullptr)){
+    //     POS_WARN_C("failed to allocate mocked resource, conflict handle index: id(%lu)", id);
+    //     retval = POS_FAILED_ALREADY_EXIST;
+    //     goto exit;
+    // }
     if(unlikely(this->_handles[id] != nullptr)){
-        POS_WARN_C("failed to allocate mocked resource, conflict handle index: id(%lu)", id);
-        retval = POS_FAILED_ALREADY_EXIST;
+        *handle = this->_handles[id];
         goto exit;
     }
 
-    // check conflict on handle address
-    if(unlikely(this->_handle_address_map.count(client_addr) > 0)){
-        POS_WARN_C("failed to allocate mocked resource, conflict client address: id(%lu), client_addr(%p)", id, client_addr);
-        retval = POS_FAILED_ALREADY_EXIST;
-        goto exit;
-    }
+    /*!
+     *  \brief  check conflict on handle address
+     *  \note   wo tolerate conflict client address, as some handle types are designed in this way (e.g., CUfunction)
+     */
+    // if(unlikely(this->_handle_address_map.count(client_addr) > 0)){
+    //     POS_WARN_C("failed to allocate mocked resource, conflict client address: id(%lu), client_addr(%p)", id, client_addr);
+    //     retval = POS_FAILED_ALREADY_EXIST;
+    //     goto exit;
+    // }
 
     if(this->_passthrough){
         *handle = new T_POSHandle(
@@ -1403,7 +1416,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__restore_mocked_resource(
     }
 
     // record client-side address to the map
-    retval = record_handle_address((void*)(client_addr), *handle);
+    retval = this->record_handle_address((void*)(client_addr), *handle);
     if(unlikely(POS_SUCCESS != retval)){
         goto exit;
     }
@@ -1416,7 +1429,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::__restore_mocked_resource(
     (*handle)->parent_handles_waitlist = parent_handles_waitlist;
 
     POS_DEBUG_C("allocated mocked resource: client_addr(%p), size(%lu)", client_addr, size);
-    this->_handles.push_back(*handle);
+    this->_handles[id] = (*handle);
 
 exit:
     return retval;
@@ -1477,25 +1490,6 @@ pos_retval_t POSHandleManager<T_POSHandle>::reallocate_single_handle(const std::
         (*handle)->restore_binary_mapped = mapped;
         (*handle)->restore_binary_mapped_size = sb.st_size;
     }
-
-    // =============== TODO: below could be on-demand restored ===============
-    // TODO: move the below part to client function
-    // restore this handle on driver / device
-    retval = (*handle)->restore();
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C("failed to restore resource on device: client_addr(%p)", (*handle)->client_addr);
-        goto exit;
-    }
-
-    // restore the state behind this handle
-    if((*handle)->state_size > 0){
-        retval = (*handle)->reload_state( /* stream_id */ 0);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C("failed to restore resource state on device: client_addr(%p)", (*handle)->client_addr);
-            goto exit;
-        }
-    }
-    goto exit;
 
 exit:
     if(unlikely(retval != POS_SUCCESS) || (*handle != nullptr && (*handle)->state_size == 0)){ 

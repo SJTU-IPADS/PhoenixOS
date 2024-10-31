@@ -105,6 +105,11 @@ typedef struct pos_create_client_param {
 
     // id of the newly created client
     pos_client_uuid_t id;
+
+    // identify whether we're restoring a client,
+    // if it's, we won't initialize initial handles
+    // inside each handle manager
+    bool is_restoring;
 } pos_create_client_param_t;
 
 
@@ -223,8 +228,11 @@ class POSClient {
      *  \brief  initialize of the client
      *  \note   this part can't be in the constructor as we will invoke functions
      *          that implemented by derived class
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      */
-    void init();
+    void init(bool is_restoring);
 
 
     /*!
@@ -318,6 +326,17 @@ class POSClient {
     virtual pos_retval_t __reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
+
+
+    /*!
+     *  \brief  reassign handle's parent from waitlist
+     *  \param  handle  pointer to the handle to be processed
+     *  \return POS_SUCCESS for successfully reassigned
+     */
+    virtual pos_retval_t __reassign_handle_parents(POSHandle* handle){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
 
  private: 
     /*!
@@ -447,9 +466,12 @@ class POSClient {
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully initialization
      */
-    virtual pos_retval_t init_handle_managers(){}
+    virtual pos_retval_t init_handle_managers(bool is_restoring){}
 
 
     /*!

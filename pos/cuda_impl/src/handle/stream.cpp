@@ -88,13 +88,11 @@ exit:
 }
 
 
-pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
-
     POSHandle_CUDA_Stream *stream_handle;
 
     POS_ASSERT(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 1);
-    std::vector<POSHandle*> &context_handles = related_handles[kPOS_ResourceTypeId_CUDA_Context];
 
     /*!
      *  \note   we won't use the default stream, and we will create a new non-default stream
@@ -106,7 +104,7 @@ pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<P
     if(unlikely(POS_SUCCESS != this->allocate_mocked_resource(
         /* handle */ &stream_handle,
         /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
-            { kPOS_ResourceTypeId_CUDA_Context, context_handles }
+            { kPOS_ResourceTypeId_CUDA_Context, related_handles[kPOS_ResourceTypeId_CUDA_Context] }
         }),
         /* size */ sizeof(CUstream),
         /* use_expected_addr */ true,

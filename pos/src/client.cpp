@@ -50,13 +50,13 @@ POSClient::POSClient()
 }
 
 
-void POSClient::init(){
+void POSClient::init(bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
     std::map<pos_u64id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
     std::multimap<pos_u64id_t, POSHandle*> missing_handle_map;
 
     if(unlikely(POS_SUCCESS != (
-        retval = this->init_handle_managers()
+        retval = this->init_handle_managers(is_restoring)
     ))){
         POS_WARN_C("failed to initialize handle managers");
         goto exit;
@@ -151,7 +151,13 @@ exit:
 
 pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
     pos_retval_t retval = POS_SUCCESS, dirty_retval = POS_SUCCESS;
+    uint64_t i;
     std::tuple<pos_resource_typeid_t, pos_u64id_t> handle_info;
+    std::map<pos_resource_typeid_t, std::vector<pos_u64id_t>> handle_map;
+
+    std::vector<POSHandle*> handle_list;
+    typename std::map<pos_resource_typeid_t, std::vector<pos_u64id_t>>::iterator map_iter;
+    POSHandle *handle;
 
     auto __deassemble_file_name = [](const std::string& filename) -> std::tuple<pos_resource_typeid_t, pos_u64id_t> {
         std::string baseName = filename.substr(0, filename.find_last_of('.'));
@@ -177,6 +183,7 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
         goto exit;
     }
 
+    // reallocate handles in the handle manager
     for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
         if (    entry.is_regular_file() 
             &&  entry.path().extension() == ".bin"
@@ -184,9 +191,9 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
         ){
             handle_info = __deassemble_file_name(entry.path().filename().string());
             retval = this->__reallocate_single_handle(
-                /**/ entry.path().string(),
-                /**/ std::get<0>(handle_info),
-                /**/ std::get<1>(handle_info)
+                /* ckpt_file */ entry.path().string(),
+                /* rid */ std::get<0>(handle_info),
+                /* hid */ std::get<1>(handle_info)
             );
             if(unlikely(retval != POS_SUCCESS)){
                 dirty_retval = retval;
@@ -198,7 +205,58 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
                 );
                 continue;
             }
+            handle_map[std::get<0>(handle_info)].push_back(std::get<1>(handle_info));
             POS_DEBUG_C("restored handle: rid(%lu), hid(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
+        }
+    }
+
+    // reassign each handle's parent handles
+    for(map_iter = handle_map.begin(); map_iter != handle_map.end(); map_iter++){
+        POS_CHECK_POINTER(this->handle_managers[map_iter->first]);
+        for(i=0; i<map_iter->second.size(); i++){
+            handle = this->handle_managers[map_iter->first]->get_handle_by_id(map_iter->second[i]);
+            if(unlikely(handle == nullptr)){
+                continue;
+            }
+            retval = this->__reassign_handle_parents(handle);
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C("failed to reassign handle parents: rid(%u), hid(%lu)", map_iter->first, map_iter->second);
+                goto exit;
+            }
+            handle_list.push_back(handle);
+        }
+    }
+    
+    // restore handle and its state
+    // TODO: this part can be async and on-demand
+    for(i=0; i<handle_list.size(); i++){
+        POS_CHECK_POINTER(handle = handle_list[i]);
+
+        // restore handle
+        retval = handle->restore();
+        if(unlikely(retval != POS_SUCCESS)){
+            dirty_retval = retval;
+            POS_WARN_C(
+                "failed to restore resource on device: client_addr(%p), rid(%u)",
+                handle->client_addr,
+                handle->resource_type_id
+            );
+            goto exit;
+        }
+
+        // restore state
+        if(handle->state_size > 0){
+            retval = handle->reload_state( /* stream_id */ 0);
+            if(unlikely(retval != POS_SUCCESS)){
+                dirty_retval = retval;
+                POS_WARN_C(
+                    "failed to restore resource state on device: client_addr(%p), rid(%u)",
+                    handle->client_addr,
+                    handle->resource_type_id
+                );
+                goto exit;
+            }
         }
     }
 

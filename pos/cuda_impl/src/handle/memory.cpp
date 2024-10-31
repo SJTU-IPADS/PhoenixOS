@@ -352,11 +352,11 @@ exit:
 POSHandleManager_CUDA_Memory::POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true) {}
 
 
-pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t nb_context, i, j;
     POSHandle *context_handle;
-    
+
     /*!
      *  \brief  reserve a large portion of virtual memory space on a specified device
      *  \param  context_handle  handle of the context of the specified device

@@ -60,9 +60,12 @@ class POSClient_CUDA : public POSClient {
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          we won't initialize initial handles inside each 
+     *                          handle manager
      *  \return POS_SUCCESS for successfully initialization
      */
-    pos_retval_t init_handle_managers() override;
+    pos_retval_t init_handle_managers(bool is_restoring) override;
 
 
     /*!
@@ -99,6 +102,14 @@ class POSClient_CUDA : public POSClient {
      *  \return POS_SUCCESS for successfully restore
      */
     pos_retval_t __reallocate_single_handle(const std::string& ckpt_file, pos_resource_typeid_t rid, pos_u64id_t hid) override;
+
+
+    /*!
+     *  \brief  reassign handle's parent from waitlist
+     *  \param  handle  pointer to the handle to be processed
+     *  \return POS_SUCCESS for successfully reassigned
+     */
+    pos_retval_t __reassign_handle_parents(POSHandle* handle) override;
     /* =============== checkpoint / restore ============== */
 
 

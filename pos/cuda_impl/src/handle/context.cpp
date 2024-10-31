@@ -120,7 +120,7 @@ exit:
 }
 
 
-pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles){
+pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, nb_device;
     POSHandle *device_handle;
