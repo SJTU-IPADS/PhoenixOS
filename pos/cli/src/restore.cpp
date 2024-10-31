@@ -45,14 +45,16 @@ pos_retval_t handle_restore(pos_cli_options_t &clio){
             /* is_required */ true
         }
     });
+    
 
-    // send dump request
+    
+
+    // send restore request to posd
     memcpy(
         call_data.ckpt_dir,
         clio.metas.ckpt.ckpt_dir,
         oob_functions::cli_restore::kCkptFilePathMaxLen
     );
-
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Restore, &call_data);
     if(POS_SUCCESS != call_data.retval){
         POS_WARN("restore failed, %s", call_data.retmsg);

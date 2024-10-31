@@ -37,7 +37,7 @@ start_server() {
 
     if [ $mount = false ] ; then
         $SUDO docker run --gpus all -dit --privileged --network=pos_net \
-                        --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
+                        --ip $ip_addr --ipc=host --name $container_name zobinhuang/pytorch:1.13.1-v2-criu-transformers
         cd $script_dir && cd .. && cd ..
         $SUDO docker cp . $container_name:/root
         $SUDO docker exec -it $container_name bash
@@ -45,7 +45,7 @@ start_server() {
         cd $script_dir && cd .. && cd ..
         # $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --network=pos_net \
         #                 --ip $ip_addr --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
-        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
+        $SUDO docker run --gpus all -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pytorch:1.13.1-v2-criu-transformers
         # $SUDO docker run -dit -v $PWD:/root --privileged --ipc=host --name $container_name zobinhuang/pos_svr_base:11.3
         $SUDO docker exec -it $container_name bash
     fi

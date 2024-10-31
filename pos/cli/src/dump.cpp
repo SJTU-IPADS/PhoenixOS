@@ -58,7 +58,10 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
         }
     });
 
-    // send dump request
+    // call criu
+    
+
+    // send dump request to posd
     call_data.pid = clio.metas.ckpt.pid;
     memcpy(
         call_data.ckpt_dir,
