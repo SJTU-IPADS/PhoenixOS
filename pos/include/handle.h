@@ -613,12 +613,18 @@ class POSHandle {
 
     /*!
      *  \brief  reload the state behind current handle to the device
-     *  \param  mapped          mmap area of the checkpoint file of this handle
-     *  \param  ckpt_file_size  size of the checkpoint size (mmap area)
      *  \param  stream_id       stream for reloading the state
      *  \return POS_SUCCESS for successfully restore
      */
-    pos_retval_t reload_state(void* mapped, uint64_t ckpt_file_size, uint64_t stream_id=0);
+    pos_retval_t reload_state(uint64_t stream_id=0);
+
+
+    /*!
+     *  \note   binary area that mmap the checkpoint file of this handle,
+     *          this field is used during restore phrase
+     */
+    void* restore_binary_mapped;
+    uint64_t restore_binary_mapped_size;
 
 
  protected:
@@ -1422,9 +1428,11 @@ pos_retval_t POSHandleManager<T_POSHandle>::reallocate_single_handle(const std::
     pos_retval_t retval = POS_SUCCESS;
     int fd;
     struct stat sb;
-    void* mapped;
+    void* mapped = nullptr;
 
     POS_CHECK_POINTER(handle);
+    *handle = nullptr;
+
     POS_ASSERT(ckpt_file.size() > 0);
     
     if (unlikely(!std::filesystem::exists(ckpt_file))) {
@@ -1464,6 +1472,12 @@ pos_retval_t POSHandleManager<T_POSHandle>::reallocate_single_handle(const std::
     }
     POS_CHECK_POINTER(*handle);
 
+    // record mmaped area for later reload state
+    if((*handle)->state_size > 0){
+        (*handle)->restore_binary_mapped = mapped;
+        (*handle)->restore_binary_mapped_size = sb.st_size;
+    }
+
     // =============== TODO: below could be on-demand restored ===============
     // TODO: move the below part to client function
     // restore this handle on driver / device
@@ -1475,11 +1489,7 @@ pos_retval_t POSHandleManager<T_POSHandle>::reallocate_single_handle(const std::
 
     // restore the state behind this handle
     if((*handle)->state_size > 0){
-        retval = (*handle)->reload_state(
-            /* mapped */ mapped,
-            /* ckpt_file_size */ sb.st_size,
-            /* stream_id */ 0
-        );
+        retval = (*handle)->reload_state( /* stream_id */ 0);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C("failed to restore resource state on device: client_addr(%p)", (*handle)->client_addr);
             goto exit;
@@ -1488,7 +1498,9 @@ pos_retval_t POSHandleManager<T_POSHandle>::reallocate_single_handle(const std::
     goto exit;
 
 exit:
-    if(unlikely(retval != POS_SUCCESS)){ munmap(mapped, sb.st_size); }
+    if(unlikely(retval != POS_SUCCESS) || (*handle != nullptr && (*handle)->state_size == 0)){ 
+        if(mapped != nullptr && mapped != MAP_FAILED){ munmap(mapped, sb.st_size); }
+    }
     close(fd);
     return retval;
 }

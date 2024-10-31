@@ -400,10 +400,13 @@ exit:
 }
 
 
-pos_retval_t POSHandle::reload_state(void* mapped, uint64_t ckpt_file_size, uint64_t stream_id){
+pos_retval_t POSHandle::reload_state(uint64_t stream_id){
     pos_retval_t retval = POS_FAILED_NOT_EXIST;
 
     POS_ASSERT(this->state_size > 0);
+    POS_CHECK_POINTER(this->restore_binary_mapped);
+    POS_ASSERT(this->restore_binary_mapped_size > 0);
+
     if(unlikely(this->status != kPOS_HandleStatus_Active)){
         POS_WARN(
             "failed to reload handle state as the handle isn't active yet: server_addr(%p), status(%d)",
@@ -414,8 +417,8 @@ pos_retval_t POSHandle::reload_state(void* mapped, uint64_t ckpt_file_size, uint
     }
 
     return this->__reload_state(
-        /* mapped */ mapped,
-        /* ckpt_file_size */ ckpt_file_size,
+        /* mapped */ this->restore_binary_mapped,
+        /* ckpt_file_size */ this->restore_binary_mapped_size,
         /* stream_id */ stream_id
     );
 
