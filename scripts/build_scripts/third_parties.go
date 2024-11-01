@@ -77,7 +77,8 @@ func CRIB_Criu(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 		// see https://criu.org/Installation
 		utils.CheckAndInstallPackageViaOsPkgManager(
 			"libprotobuf-dev libprotobuf-c-dev protobuf-c-compiler " +
-			"protobuf-compiler python3-protobuf libnet1-dev libcap-dev",
+			"protobuf-compiler python3-protobuf libnet1-dev libcap-dev " +
+			"libnl-3-dev libnl-genl-3-dev ",
 		logger)
 	}
 

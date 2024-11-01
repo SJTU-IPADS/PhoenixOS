@@ -189,6 +189,8 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
         utils.CheckAndInstallPackage("curl", "curl", nil, logger)
         utils.CheckAndInstallPackage("tar", "tar", nil, logger)
         utils.CheckAndInstallPackage("tmux", "tmux", nil, logger)
+		utils.CheckAndInstallPackage("pkg-config", "pkg-config", nil, logger)
+		utils.CheckAndInstallPackageViaOsPkgManager("libibverbs-dev", logger)
 
         // we require g++-13 to use C++20 format for auto-generation
         utils.SwitchGccVersion(13, logger)

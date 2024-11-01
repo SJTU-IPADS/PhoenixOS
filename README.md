@@ -61,7 +61,7 @@
     docker exec -it phos /bin/bash
     ```
 
-    > **System Dependencies Declaration**
+    > **Dependencies Declaration**
     > 1. PhOS require libc6 >= 2.29 for compiling CRIU from source;
     > 2. Currently *PhOS* is currently fully tested under CUDA 11.3, we will support other latest CUDA version soon
 
