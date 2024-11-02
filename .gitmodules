@@ -1,7 +1,3 @@
-[submodule "remoting/cuda"]
-	path = remoting/cuda
-    url = https://github.com/PhoenixGPU/cricket.git
-	branch = pos/add_stub
 [submodule "third_party/cuda-checkpoint"]
 	path = third_party/cuda-checkpoint
     url = https://github.com/NVIDIA/cuda-checkpoint.git
@@ -21,3 +17,7 @@
 [submodule "third_party/util-linux"]
 	path = third_party/util-linux
 	url = https://github.com/util-linux/util-linux.git
+[submodule "remoting"]
+	path = remoting
+	url = https://github.com/SJTU-IPADS/PhoenixOS-Remoting.git
+	branch = v0.10-cricket
