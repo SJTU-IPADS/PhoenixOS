@@ -17,3 +17,7 @@
 [submodule "third_party/util-linux"]
 	path = third_party/util-linux
 	url = https://github.com/util-linux/util-linux.git
+[submodule "remoting"]
+	path = remoting
+	url = https://github.com/SJTU-IPADS/PhoenixOS-Remoting.git
+	branch = v0.10-cricket

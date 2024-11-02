@@ -41,7 +41,7 @@ func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	)
 
 	clean_script := fmt.Sprintf(`
-		set -e
+		# set -e
 		cd %s/%s
 		make clean 											>>{{.LOG_PATH__}} 2>&1
 		cd cpu
