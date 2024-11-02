@@ -8,10 +8,8 @@ import (
 )
 
 const (
-	// PhOS CUDA path
 	kPhOSAutoGenPath     = "autogen"
 	KPhOSCudaPatcherPath = "pos/cuda_impl/patcher"
-	KRemotingPath        = "remoting/cuda"
 )
 
 func CRIB_PhOS_CUDA_Autogen(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
@@ -105,68 +103,6 @@ func CRIB_PhOS_CUDA_KernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, log
 		BuildScript:   build_script,
 		RunScript:     "",
 		InstallScript: "", // is it correct that we don't have any system installation?
-		CleanScript:   clean_script,
-		DoBuild:       cmdOpt.DoBuild,
-		DoRun:         false,
-		DoInstall:     cmdOpt.DoInstall,
-		DoClean:       cmdOpt.DoClean,
-	}
-	ExecuteCRIB(cmdOpt, buildConf, unitOpt, logger)
-}
-
-func CRIB_PhOS_CUDA_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
-	build_script := fmt.Sprintf(`
-		#!/bin/bash
-		set -e
-		{{.CMD_EXPRORT_ENV_VAR__}}
-		export POS_ENABLE=true
-		cd %s/%s
-		make libtirpc -j 																	>>{{.LOG_PATH__}} 2>&1
-		cp ./submodules/libtirpc/install/lib/libtirpc.so {{.LOCAL_LIB_PATH__}}/libtirpc.so	>>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		make clean 																			>>{{.LOG_PATH__}} 2>&1
-		LOG=INFO make cricket-rpc-server cricket-client.so -j 								>>{{.LOG_PATH__}} 2>&1
-		cp cricket-rpc-server {{.LOCAL_BIN_PATH__}}/cricket-rpc-server 						>>{{.LOG_PATH__}} 2>&1
-		cp cricket-client.so {{.LOCAL_LIB_PATH__}}/cricket-client.so 						>>{{.LOG_PATH__}} 2>&1
-		`,
-		cmdOpt.RootDir, KRemotingPath,
-	)
-
-	install_script := fmt.Sprintf(`
-		#!/bin/bash
-		set -e
-		cd %s/%s
-		cp ./submodules/libtirpc/install/lib/libtirpc.so {{.SYSTEM_LIB_PATH__}}/libtirpc.so >>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		cp cricket-rpc-server {{.SYSTEM_BIN_PATH__}}/cricket-rpc-server >>{{.LOG_PATH__}} 2>&1
-		cp cricket-client.so {{.SYSTEM_LIB_PATH__}}/cricket-client.so >>{{.LOG_PATH__}} 2>&1
-		`,
-		cmdOpt.RootDir, KRemotingPath,
-	)
-
-	clean_script := fmt.Sprintf(`
-		set -e
-		cd %s/%s
-		make clean 											>>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		make clean	 										>>{{.LOG_PATH__}} 2>&1
-		# clean local installcation
-		rm -rf {{.LOCAL_BIN_PATH__}}/cricket-rpc-server 	>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.LOCAL_LIB_PATH__}}/libtirpc.so 			>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.LOCAL_LIB_PATH__}}/cricket-client.so 		>>{{.LOG_PATH__}} 2>&1
-		# clean system installation
-		rm -rf {{.SYSTEM_BIN_PATH__}}/cricket-rpc-server 	>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_LIB_PATH__}}/libtirpc.so			>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_LIB_PATH__}}/cricket-client.so 	>>{{.LOG_PATH__}} 2>&1
-		`,
-		cmdOpt.RootDir, KRemotingPath,
-	)
-
-	unitOpt := UnitOptions{
-		Name:          "PhOS-CUDA-Remoting",
-		BuildScript:   build_script,
-		RunScript:     "",
-		InstallScript: install_script,
 		CleanScript:   clean_script,
 		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
@@ -275,7 +211,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
     if cmdOpt.DoBuild {
         utils.SwitchGccVersion(9, logger)
     }
-	CRIB_PhOS_CUDA_Remoting(cmdOpt, buildConf, logger)
+	CRIB_PhOS_Remoting(cmdOpt, buildConf, logger)
 
 	// ==================== CRIB UnitTest ====================
 	if cmdOpt.WithUnitTest || cmdOpt.DoClean {
