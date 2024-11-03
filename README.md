@@ -13,24 +13,29 @@
     <p>
     <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
     <p>
-    Note that <i>PhOS</i> is aimming to be a generic framework that takes no assumption on underlying hardware, by providing a set of interfaces which should be implemented by different hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
+    Note that <i>PhOS</i> is aimming to be a generic framework that towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by different hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
     <div style="margin:20px 0px;">
         <b>📢 <i>PhOS</i> is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a>.</b>
     </div>
-    <div style="padding: 0px 10px; border: 1px solid grey">
+    <div style="padding: 0px 10px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
         <ul>
-            <li>
-                <p style="margin:0px; margin-bottom:5px;">
-                    <b>[Nov.4 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+            <li style="margin:0px; margin-bottom:8px;">
+                <p style="margin:0px; margin-bottom:1px;">
+                    <b>[Nov.4 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
                 </p>
-                <p style="margin:0px; margin-bottom:5px;">
+                <p style="margin:0px; margin-bottom:1px;">
                     👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore
                 </p>
-                <p style="margin:0px; margin-bottom:5px;">
+                <p style="margin:0px; margin-bottom:1px;">
                     👉 We will soon release codes for live migration and multi-GPU support :)
                 </p>                
+            </li>
+            <li>
+                <p style="margin:0px; margin-bottom:5px;">
+                    <b>[May 20 2024]</b> <i>PhOS</i> paper is now released on arXiv [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                </p>       
             </li>
         </ul>
     </div>
