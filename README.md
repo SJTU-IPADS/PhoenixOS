@@ -16,13 +16,16 @@
     <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
     <p>
     Note that <i>PhOS</i> is aimming to be a generic framework that takes no assumption on underlying hardware, by providing a set of interfaces which should be implemented by different hardware platforms. We currently provide the implementation on CUDA platform, ROCm and Ascend are under development.
+    <div style="margin:10px;">
+    <b>PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a>.</b>
+    </div>
     <div style="padding: 0px 5px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
         <ul>
             <li>
                 <p style="margin:0px; margin-bottom:5px;">
-                    <b>[Oct.20 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                    <b>[Nov.4 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>] [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
                 </p>
                 <p style="margin:0px; margin-bottom:5px;">
                     👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
@@ -33,10 +36,6 @@
             </li>
         </ul>
     </div>
-    <div align="center">
-    <b>PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a>.</b>
-    </div>
-
 </div>
 
 
