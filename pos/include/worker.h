@@ -280,4 +280,7 @@ class POSWorker {
      *  \return POS_SUCCESS for successfully checking and restoring
      */
     pos_retval_t __restore_broken_handles(POSAPIContext_QE_t* wqe, POSAPIMeta_t *api_meta); 
+
+    // maximum index of processed wqe index
+    uint64_t _max_wqe_id;
 };

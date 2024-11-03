@@ -243,7 +243,7 @@ class POSUtil_CUDA_Fatbin {
         fat_elf_header_t *fatbin_elf_hdr;
         fat_text_header_t *fatbin_text_hdr;
 
-    #define __POS_DUMP_FATBIN 1
+    #define __POS_DUMP_FATBIN 0
     #if __POS_DUMP_FATBIN
         std::ofstream cubin_file("/tmp/ptx.txt", std::ios::out);
         if(unlikely(!cubin_file)){
@@ -326,10 +326,10 @@ class POSUtil_CUDA_Fatbin {
                     /*!
                      *  \note   contains PTX code only
                      */
-                    POS_LOG("skip this text section as it doesn't contain any device code");
+                    POS_DEBUG("skip this text section as it doesn't contain any device code");
                     
                 #if __POS_DUMP_FATBIN
-                    POS_LOG("addr: %p, len: %lu", input_pos, fatbin_text_hdr->size);
+                    // POS_LOG("addr: %p, len: %lu", input_pos, fatbin_text_hdr->size);
                     cubin_file.write((const char*)(input_pos), fatbin_text_hdr->size);
                     cubin_file.flush();
                     cubin_file.close();

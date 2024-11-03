@@ -35,6 +35,42 @@ POSHandle_CUDA_Stream::POSHandle_CUDA_Stream(size_t size_, void* hm, pos_u64id_t
 }
 
 
+pos_retval_t POSHandle_CUDA_Stream::tear_down(){
+    pos_retval_t retval = POS_SUCCESS;
+    CUresult cuda_dv_retval;
+    CUcontext pctx;
+
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
+
+    cuda_dv_retval = cuCtxGetCurrent(&pctx);
+    if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+        POS_WARN_C("failed to get cu context: retval(%d)", cuda_dv_retval);
+    }
+
+    cuda_dv_retval = cuStreamSynchronize((CUstream)(this->server_addr));
+    if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+        POS_WARN_C(
+            "failed to tear down CUDA stream, failed to call cuStreamSynchronize: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    cuda_dv_retval = cuStreamDestroy((CUstream)(this->server_addr));
+    if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+        POS_WARN_C(
+            "failed to tear down CUDA stream, failed to call cuStreamDestroy: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle_CUDA_Stream::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }
@@ -72,11 +108,17 @@ pos_retval_t POSHandle_CUDA_Stream::__generate_protobuf_binary(google::protobuf:
 
 pos_retval_t POSHandle_CUDA_Stream::__restore(){
     pos_retval_t retval = POS_SUCCESS;
-    cudaError_t cuda_rt_res;
-    cudaStream_t stream_addr;
+    CUresult cuda_dv_res;
+    CUstream stream_addr;
 
-    if((cuda_rt_res = cudaStreamCreate(&stream_addr)) != cudaSuccess){
-        POS_WARN_C("cudaStreamCreate failed: %d", cuda_rt_res);
+    CUcontext pctx;
+    cuda_dv_res = cuCtxGetCurrent(&pctx);
+    if(unlikely(cuda_dv_res != CUDA_SUCCESS)){
+        POS_WARN_C("failed to get cu context: retval(%d)", cuda_dv_res);
+    }
+
+    if((cuda_dv_res = cuStreamCreate(&stream_addr, CU_STREAM_DEFAULT)) != CUDA_SUCCESS){
+        POS_WARN_C("cuStreamCreate failed: %d", cuda_dv_res);
         retval = POS_FAILED_DRIVER;
         goto exit;
     }
@@ -106,7 +148,7 @@ pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<P
         /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
             { kPOS_ResourceTypeId_CUDA_Context, related_handles[kPOS_ResourceTypeId_CUDA_Context] }
         }),
-        /* size */ sizeof(CUstream),
+        /* size */ sizeof(cudaStream_t),
         /* use_expected_addr */ true,
         /* expected_addr */ 0
     ))){
@@ -114,7 +156,6 @@ pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<P
     }
 
     // record in the manager
-    this->_handles.push_back(stream_handle);
     this->latest_used_handle = this->_handles[0];
     this->default_handle = this->_handles[0];
 
@@ -140,7 +181,7 @@ pos_retval_t POSHandleManager_CUDA_Stream::allocate_mocked_resource(
     POS_ASSERT(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 1);
 
     // TODO: set to == 1 when we have context control
-    POS_ASSERT(related_handles[kPOS_ResourceTypeId_CUDA_Context].size() > 1);
+    POS_ASSERT(related_handles[kPOS_ResourceTypeId_CUDA_Context].size() >= 1);
 
     POS_CHECK_POINTER(context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
 

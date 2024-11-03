@@ -306,8 +306,8 @@ typedef struct POSAPIContext_QE {
     // context of the called API
     POSAPIContext *api_cxt;
     
-    // identify whether this apicxt is a checkpoint mark
-    bool ckpt_mark;
+    // mark whether current WQE has returned to RPC thread
+    bool has_return;
 
     // execution status of the API call
     pos_api_execute_status_t status;
@@ -358,7 +358,7 @@ typedef struct POSAPIContext_QE {
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
         uint64_t inst_id, void* retval_data, uint64_t retval_size, POSClient* pos_client
-    ) : client_id(uuid), client(pos_client), ckpt_mark(false),
+    ) : client_id(uuid), client(pos_client), has_return(false),
         status(kPOS_API_Execute_Status_Init), id(inst_id), is_ckpt_pruned(false)
     {
         POS_CHECK_POINTER(pos_client);
@@ -381,23 +381,7 @@ typedef struct POSAPIContext_QE {
         create_handle_views.reserve(1);
         delete_handle_views.reserve(1);
     }
-    
-    /*!
-     *  \brief  constructor
-     *  \note   this constructor is for checkpointing ops
-     *  \param  ckpt_mark_  identify whether this is a ckpt mark
-     *  \param  pos_client  pointer to the POSClient instance
-     */
-    POSAPIContext_QE(bool ckpt_mark_, POSClient* pos_client) 
-        : client(pos_client), ckpt_mark(ckpt_mark_), is_ckpt_pruned(false)
-    {
-        // initialization of checkpoint op specific fields
-        nb_ckpt_handles = 0;
-        nb_abandon_handles = 0;
-        ckpt_size = 0;
-        abandon_ckpt_size = 0;
-        ckpt_memory_consumption = 0;
-    }
+
 
     /*!
      *  \brief  constructor
@@ -405,7 +389,7 @@ typedef struct POSAPIContext_QE {
      *  \param  pos_client          pointer to the POSClient instance
      */
     POSAPIContext_QE(POSClient* pos_client) 
-        : client(pos_client), ckpt_mark(false), is_ckpt_pruned(false){}
+        : client(pos_client), has_return(false), is_ckpt_pruned(false){}
 
 
     /*!

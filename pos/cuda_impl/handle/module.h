@@ -73,6 +73,15 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("CUDA Module"); }
 
 
+    /*!
+     *  \brief  tear down the resource behind this handle, recycle it back to handle manager
+     *  \note   this function is invoked when a client is dumped, and posd should tear down all resources
+     *          it allocates on GPU
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    pos_retval_t tear_down() override;
+
+
     /* ======================== handle specific fields ======================= */
  public:
     // function descriptors under this module
@@ -160,7 +169,7 @@ class POSHandle_CUDA_Module final : public POSHandle_CUDA {
 
 
 /*!
- *  \brief   manager for handles of POSHandle_CUDA_Stream
+ *  \brief   manager for handles of POSHandle_CUDA_Module
  */
 class POSHandleManager_CUDA_Module : public POSHandleManager<POSHandle_CUDA_Module> {
  public:

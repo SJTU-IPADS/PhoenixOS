@@ -58,6 +58,7 @@ POSAPIContext_QE::POSAPIContext_QE(POSClient* client, const std::string& ckpt_fi
     this->client = client;
     this->client_id = client->id;
     this->id = apicxt_binary.id();
+    this->has_return = apicxt_binary.has_return();
 
     this->api_cxt = new POSAPIContext_t(apicxt_binary.api_id());
     POS_CHECK_POINTER(this->api_cxt);
@@ -149,6 +150,7 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
     apicxt_binary.set_id(this->id);
+    apicxt_binary.set_has_return(this->has_return);
     apicxt_binary.set_api_id(this->api_cxt->api_id);
 
     for(POSHandleView_t &hv : this->input_handle_views){

@@ -34,6 +34,26 @@ POSHandle_cuBLAS_Context::POSHandle_cuBLAS_Context(void* hm)
 }
 
 
+pos_retval_t POSHandle_cuBLAS_Context::tear_down(){
+    pos_retval_t retval = POS_SUCCESS;
+    cublasStatus_t cublas_retval;
+
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
+
+    cublas_retval = cublasDestroy((cublasHandle_t)(this->server_addr));
+    if(unlikely(cublas_retval != CUBLAS_STATUS_SUCCESS)){
+        POS_WARN_C(
+            "failed to tear down cuBLAS context: id(%lu), client_addr(%p), server_addr(%p)",
+            this->id, this->client_addr, this->server_addr
+        );
+        retval = POS_FAILED;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle_cuBLAS_Context::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }

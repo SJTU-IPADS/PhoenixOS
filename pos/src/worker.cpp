@@ -32,7 +32,7 @@
 #include "pos/include/trace.h"
 
 
-POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) {
+POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) : _max_wqe_id(0) {
     POS_CHECK_POINTER(this->_ws = ws);
     POS_CHECK_POINTER(this->_client = client);
     this->_stop_flag = false;
@@ -168,7 +168,7 @@ void POSWorker::__daemon_ckpt_sync(){
             wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
             
             api_id = wqe->api_cxt->api_id;
-            api_meta = _ws->api_mgnr->api_metas[api_id];
+            api_meta = this->_ws->api_mgnr->api_metas[api_id];
 
             // check and restore broken handles
             if(unlikely(POS_SUCCESS != __restore_broken_handles(wqe, &api_meta))){
@@ -177,14 +177,14 @@ void POSWorker::__daemon_ckpt_sync(){
             }
 
         #if POS_CONF_RUNTIME_EnableDebugCheck
-            if(unlikely(_launch_functions.count(api_id) == 0)){
+            if(unlikely(this->_launch_functions.count(api_id) == 0)){
                 POS_ERROR_C_DETAIL(
                     "runtime has no worker launch function for api %lu, need to implement", api_id
                 );
             }
         #endif
 
-            launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
+            launch_retval = (*(this->_launch_functions[api_id]))(this->_ws, wqe);
             wqe->worker_e_tick = POSUtilTscTimer::get_tsc();
 
             // cast return code
@@ -199,11 +199,15 @@ void POSWorker::__daemon_ckpt_sync(){
             }
 
             // check whether we need to return to frontend
-            if(wqe->status == kPOS_API_Execute_Status_Init){
+            if(wqe->has_return == false){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                wqe->has_return = true;
             }
+
+            POS_ASSERT(wqe->id >= this->_max_wqe_id);
+            this->_max_wqe_id = wqe->id;
         }
     }
 }
@@ -320,7 +324,9 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
 
         // for dump, we also need to save unexecuted APIs
         nb_ckpt_wqes = 0;
-        while(max_wqe_id < this->_client->_api_inst_pc - 1){ // we need to make sure we drain all unexecuted APIs
+        while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
+            // we need to make sure we drain all unexecuted APIs
+            // POS_LOG("max_wqe_id: %lu, _api_inst_pc-1:%lu", max_wqe_id, this->_client->_api_inst_pc - 1);
             wqes.clear();
             this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
             for(i=0; i<wqes.size(); i++){
@@ -335,6 +341,11 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             }
         }
         POS_LOG_C("finished dumping unexecuted APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
+
+        // tear down all handles inside the client
+        if(unlikely(POS_SUCCESS != (retval = this->_client->tear_down_all_handles()))){
+            POS_WARN_C("failed to tear down handles while dumping");
+        }
 
     reply_parser:
         // reply to parser
@@ -489,10 +500,11 @@ void POSWorker::__daemon_ckpt_async(){
             }
 
             // check whether we need to return to frontend
-            if(wqe->status == kPOS_API_Execute_Status_Init){
+            if(wqe->has_return == false){
                 // we only return the QE back to frontend when it hasn't been returned before
                 wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Worker, kPOS_QueueType_ApiCxt_CQ>(wqe);
+                wqe->has_return = true;
             }
         }
     }

@@ -33,6 +33,12 @@ POSHandle_CUDA_Var::POSHandle_CUDA_Var(size_t size_, void* hm, pos_u64id_t id_, 
 }
 
 
+pos_retval_t POSHandle_CUDA_Var::tear_down(){
+    return POS_FAILED_NOT_IMPLEMENTED;
+}
+
+
+
 pos_retval_t POSHandle_CUDA_Var::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }

@@ -33,6 +33,81 @@ bool                        POSHandleManager_CUDA_Memory::has_finshed_reserved;
 const uint64_t              POSHandleManager_CUDA_Memory::reserved_vm_base = 0x7facd0000000;
 
 
+POSHandle_CUDA_Memory::POSHandle_CUDA_Memory(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
+    : POSHandle_CUDA(size_, hm, id_, state_size_)
+{
+    this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
+
+#if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
+    // initialize checkpoint bag
+    if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
+        POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
+    }
+#endif
+}
+
+
+POSHandle_CUDA_Memory::POSHandle_CUDA_Memory(void* hm) : POSHandle_CUDA(hm)
+{
+    this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
+}
+
+
+POSHandle_CUDA_Memory::POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
+    : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
+{
+    POS_ERROR_C_DETAIL("shouldn't be called");
+}
+
+
+pos_retval_t POSHandle_CUDA_Memory::tear_down(){
+    pos_retval_t retval = POS_SUCCESS;
+    CUresult cuda_dv_retval;
+    CUmemGenericAllocationHandle hdl;
+
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
+
+    // obtain the physical memory handle
+    cuda_dv_retval = cuMemRetainAllocationHandle(&hdl, this->server_addr);
+    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+        POS_WARN_DETAIL(
+            "failed to tear down CUDA memory, failed to call cuMemRetainAllocationHandle: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // ummap the virtual memory
+    cuda_dv_retval = cuMemUnmap(
+        /* ptr */ (CUdeviceptr)(this->server_addr),
+        /* size */ this->state_size
+    );
+    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+        POS_WARN_DETAIL(
+            "failed to tear down CUDA memory, failed to call cuMemUnmap: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // release the physical memory
+    cuda_dv_retval = cuMemRelease(hdl);
+    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+        POS_WARN_DETAIL(
+            "failed to tear down CUDA memory, failed to call cuMemRelease: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle_CUDA_Memory::__init_ckpt_bag(){ 
     this->ckpt_bag = new POSCheckpointBag(
         this->state_size,

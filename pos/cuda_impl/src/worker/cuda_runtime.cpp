@@ -150,6 +150,20 @@ namespace cuda_free {
             goto exit;
         }
 
+        // ummap the virtual memory
+        wqe->api_cxt->return_code = cuMemUnmap(
+            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
+            /* size */ memory_handle->state_size
+        );
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
+            POS_WARN_DETAIL(
+                "failed to execute cuMemUnmap: client_addr(%p), retval(%d)",
+                memory_handle->client_addr, wqe->api_cxt->return_code
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
         // release the physical memory
         wqe->api_cxt->return_code = cuMemRelease(hdl);
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
@@ -1040,11 +1054,6 @@ namespace cuda_stream_is_capturing {
         }
 
         return retval;
-
-        // we launch this op just for debug
-        // POSWorker::__done(ws, wqe);
-
-        // return POS_SUCCESS;
     }
 } // namespace cuda_stream_is_capturing
 

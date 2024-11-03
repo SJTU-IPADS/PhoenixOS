@@ -38,6 +38,12 @@ POSHandle_CUDA_Context::POSHandle_CUDA_Context(size_t size_, void* hm, pos_u64id
 }
 
 
+
+pos_retval_t POSHandle_CUDA_Context::tear_down(){
+    return POS_FAILED_NOT_IMPLEMENTED;
+}
+
+
 pos_retval_t POSHandle_CUDA_Context::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }

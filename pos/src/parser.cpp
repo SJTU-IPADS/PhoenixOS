@@ -154,6 +154,7 @@ void POSParser::__daemon(){
             ){
                 apicxt_wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
+                apicxt_wqe->has_return = true;
             }
 
             // launch the wqe to parser trace queue, if in resource trace mode

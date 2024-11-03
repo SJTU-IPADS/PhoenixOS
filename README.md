@@ -1,18 +1,21 @@
 # PhoenixOS (PhOS)
 
 [![build passing](https://img.shields.io/badge/build-passed-green)](https://github.com/PhoenixOS-IPADS/PhoenixOS)
+[![slack](https://img.shields.io/badge/slack-PhoenixOS-brightgreen.svg?logo=slack)](https://phoenixoshq.slack.com/archives/C07V2QWVB8Q)
 [![build passing](https://img.shields.io/badge/supported-CUDA-blue)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/cuda_gsg/index.html)
 [![build passing](https://img.shields.io/badge/TODO-ROCm-lightgrey)]()
 [![build passing](https://img.shields.io/badge/TODO-Ascend-lightgrey)]()
 [![doc](https://img.shields.io/badge/docs-green)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/index.html)
 
 <div align="center">
-    <img src="./docs/docs/source/_static/images/home/pos_logo.gif" height="150px" />
+    <img src="./docs/docs/source/_static/images/home/logo.jpg" height="200px" />
 </div>
 
 <div>
     <p>
-    <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Moreover, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
+    <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
+    <p>
+    Note that <i>PhOS</i> is aimming to be a generic framework that takes no assumption on underlying hardware, by providing a set of interfaces which should be implemented by different hardware platforms. We currently provide the implementation on CUDA platform, ROCm and Ascend are under development.
     <div style="padding: 0px 5px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">Latest News</h3>
@@ -25,20 +28,16 @@
                     👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore, the feature of near-seamless migration would come soon :)
                 </p>
                 <p style="margin:0px; margin-bottom:5px;">
-                    👉 <i>PhOS</i> is now supporting CUDA platform, ROCm and Ascend is also on the road.
-                </p>
-                <p style="margin:0px; margin-bottom:5px;">
-                    We will soon release codes for live migration and multi-GPU support. 
+                    👉 We will soon release codes for live migration and multi-GPU support. 
                 </p>                
             </li>
         </ul>
     </div>
+    <div align="center">
+    <b>PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a>.</b>
+    </div>
+
 </div>
-
-
-> [!NOTE]  
-> Contributions from community are very welcomed!<br />
-> See all potential cool features could be built on *PhOS* at [<a href="">Roadmap</a>] and [<a href="">Contribution</a>]
 
 
 ## I. What *PhOS* Does?

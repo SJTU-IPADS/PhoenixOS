@@ -913,9 +913,6 @@ namespace cu_get_error_string {
         }
     #endif
 
-        
-        
-
     exit:   
         return retval;
     }

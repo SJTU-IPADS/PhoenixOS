@@ -68,6 +68,15 @@ class POSHandle_CUDA_Var final : public POSHandle_CUDA {
     std::string get_resource_name(){ return std::string("CUDA Var"); }
 
 
+    /*!
+     *  \brief  tear down the resource behind this handle, recycle it back to handle manager
+     *  \note   this function is invoked when a client is dumped, and posd should tear down all resources
+     *          it allocates on GPU
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    pos_retval_t tear_down() override;
+
+
     /* ======================== handle specific fields ======================= */
  public:
     // name of the global symbol

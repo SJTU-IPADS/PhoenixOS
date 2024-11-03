@@ -177,7 +177,7 @@ class POSHandle {
         id(id_),
         resource_type_id(kPOS_ResourceTypeId_Unknown),
         status(kPOS_HandleStatus_Create_Pending),
-        state_status(kPOS_HandleStatus_StateReady), 
+        state_status(kPOS_HandleStatus_StateReady),
         state_size(state_size_),
         latest_version(0),
         ckpt_bag(nullptr),
@@ -217,7 +217,7 @@ class POSHandle {
     ~POSHandle() = default;
 
 
-    /* ======================= basic handle metadata ========================= */
+    /* ====================== basic handle management ======================== */
  public:
     // index of this handle in the handle list of handle manager
     pos_u64id_t id;
@@ -324,7 +324,16 @@ class POSHandle {
      *  \return resource name begind this handle
      */
     virtual std::string get_resource_name(){ return std::string("unknown"); }
-    /* ======================= basic handle metadata ========================= */
+
+
+    /*!
+     *  \brief  tear down the resource behind this handle, recycle it back to handle manager
+     *  \note   this function is invoked when a client is dumped, and posd should tear down all resources
+     *          it allocates on GPU
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    virtual pos_retval_t tear_down(){ return POS_FAILED_NOT_IMPLEMENTED; }
+    /* ====================== basic handle management ======================== */
 
 
     /* ===================== parent handles management ======================= */
@@ -804,7 +813,7 @@ class POSHandleManager {
      *  \brief  obtain the number of recorded handles
      *  \return the number of recorded handles
      */
-    inline uint64_t get_nb_handles(){ return _handles.size(); }
+    inline uint64_t get_nb_handles(){ return this->_handles.size(); }
 
 
     /*!
@@ -814,7 +823,7 @@ class POSHandleManager {
      */
     inline std::vector<T_POSHandle*> get_handles(){ 
         /* here is a snapshot of current handle list */
-        return _handles;
+        return this->_handles;
     }
 
 
@@ -827,7 +836,7 @@ class POSHandleManager {
         if(unlikely(id >= this->get_nb_handles())){
             return nullptr;
         } else {
-            return _handles[id];
+            return this->_handles[id];
         }
     }
 

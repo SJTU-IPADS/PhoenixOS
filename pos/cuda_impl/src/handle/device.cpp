@@ -37,6 +37,11 @@ POSHandle_CUDA_Device::POSHandle_CUDA_Device(size_t size_, void* hm, pos_u64id_t
 }
 
 
+pos_retval_t POSHandle_CUDA_Device::tear_down(){
+    return POS_FAILED_NOT_IMPLEMENTED;
+}
+
+
 pos_retval_t POSHandle_CUDA_Device::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }

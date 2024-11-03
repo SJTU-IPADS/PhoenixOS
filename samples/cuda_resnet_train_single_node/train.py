@@ -89,7 +89,7 @@ def run_train():
             print(f"itetration {nb_iteration} duration: {int(round((end_t-start_t) * 1000))} ms")
             iter_durations.append(int(round((end_t-start_t) * 1000)))
 
-            if nb_iteration == 32:
+            if nb_iteration == 64:
                 print(f"reach {nb_iteration}, break")
                 break
         

@@ -38,6 +38,26 @@ POSHandle_CUDA_Module::POSHandle_CUDA_Module(size_t size_, void* hm, pos_u64id_t
 }
 
 
+pos_retval_t POSHandle_CUDA_Module::tear_down(){
+    pos_retval_t retval = POS_SUCCESS;
+    CUresult cuda_dv_retval;
+
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
+
+    cuda_dv_retval = cuModuleUnload((CUmodule)(this->server_addr));
+    if(unlikely(cuda_dv_retval != CUDA_SUCCESS)){
+        POS_WARN_C(
+            "failed to tear down CUDA module: id(%lu), client_addr(%p), server_addr(%p)",
+            this->id, this->client_addr, this->server_addr
+        );
+        retval = POS_FAILED;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle_CUDA_Module::__init_ckpt_bag(){ 
     this->ckpt_bag = new POSCheckpointBag(
         /* fixed_state_size */ this->state_size,

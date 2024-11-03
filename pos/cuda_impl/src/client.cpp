@@ -64,7 +64,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
 
     /*!
      *  \note   Hierarchy of CUDA Resources
-            ╔══════════════════════════════════════════════════════════════════════╗
+         ╔══════════════════════════════════════════════════════════════════════╗
         ╔══════════════════════════════════════════════════════════════════════╗║
         ║                              CUDA Device                             ║║
         ╠══════════════════════════════════════════════════════════════════════╣║
@@ -356,6 +356,84 @@ std::set<pos_resource_typeid_t> POSClient_CUDA::__get_resource_idx(){
         kPOS_ResourceTypeId_CUDA_Event,
         kPOS_ResourceTypeId_cuBLAS_Context
     });
+}
+
+
+pos_retval_t POSClient_CUDA::tear_down_all_handles(){
+    pos_retval_t retval = POS_SUCCESS;
+    
+    auto __tear_down_all_typed_handles = [&](pos_resource_typeid_t rid) -> pos_retval_t {
+        pos_retval_t dirty_retval = POS_SUCCESS, tmp_retval;
+        uint64_t i, nb_handles;
+        POSHandle *handle;
+        POSHandleManager<POSHandle>* hm;
+
+        POS_CHECK_POINTER(hm = this->handle_managers[rid]);
+
+        nb_handles = hm->get_nb_handles();
+        for(i=0; i<nb_handles; i++){
+            if(likely(nullptr != (handle = hm->get_handle_by_id(i)))){
+                tmp_retval = handle->tear_down();
+                if(unlikely(POS_SUCCESS != tmp_retval)){
+                    POS_WARN_C(
+                        "failed to tear down handle: rid(%u), hid(%lu), retval(%u)",
+                        rid, handle->id, tmp_retval
+                    );
+                    dirty_retval = tmp_retval;
+                    continue;
+                }
+            }
+        }
+        return dirty_retval;
+    };
+
+    /*!
+     *  \note   Hierarchy of CUDA Resources
+         ╔══════════════════════════════════════════════════════════════════════╗
+        ╔══════════════════════════════════════════════════════════════════════╗║
+        ║                              CUDA Device                             ║║
+        ╠══════════════════════════════════════════════════════════════════════╣║
+        ║                             CUDA Context                             ║║
+        ╠════════════════╦════════════╦══════════════════════════╦═════════════╣║
+        ║   CUDA Stream  ║            ║        CUDA Module       ║             ║║
+        ╠════════════════╣ CUDA Event ╠═══════════════╦══════════╣ CUDA Memory ║║
+        ║ cuBLAS Context ║            ║ CUDA Function ║ CUDA Var ║             ║╝
+        ╚════════════════╩════════════╩═══════════════╩══════════╩═════════════╝
+     */
+
+    retval = __tear_down_all_typed_handles(kPOS_ResourceTypeId_CUDA_Memory);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to tear down CUDA memories");
+    }
+
+    retval = __tear_down_all_typed_handles(kPOS_ResourceTypeId_CUDA_Event);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to tear down CUDA events");
+    }
+
+    retval = __tear_down_all_typed_handles(kPOS_ResourceTypeId_cuBLAS_Context);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to tear down cuBLAS contexts");
+    }
+
+    retval = __tear_down_all_typed_handles(kPOS_ResourceTypeId_CUDA_Stream);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to tear down CUDA streams");
+    }
+
+    retval = __tear_down_all_typed_handles(kPOS_ResourceTypeId_CUDA_Module);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN_C("failed to tear down CUDA modules");
+    }
+
+    // Omit: 
+    // CUDA function:   which are deleted when delete CUDA module
+    // CUDA var:        which are deleted when delete CUDA module
+    // CUDA context:    which are global shared by multiple client
+    // CUDA device:     which are global shared by multiple client
+
+exit:
+    return retval;
 }
 
 

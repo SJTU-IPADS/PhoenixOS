@@ -34,6 +34,26 @@ POSHandle_CUDA_Event::POSHandle_CUDA_Event(size_t size_, void* hm, pos_u64id_t i
 }
 
 
+pos_retval_t POSHandle_CUDA_Event::tear_down(){
+    pos_retval_t retval = POS_SUCCESS;
+    cudaError_t cuda_rt_retval;
+
+    if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
+
+    cuda_rt_retval = cudaEventDestroy((cudaEvent_t)(this->server_addr));
+    if(unlikely(cuda_rt_retval != cudaSuccess)){
+        POS_WARN_C(
+            "failed to tear down CUDA event: id(%lu), client_addr(%p), server_addr(%p)",
+            this->id, this->client_addr, this->server_addr
+        );
+        retval = POS_FAILED;
+    }
+
+exit:
+    return retval;
+}
+
+
 pos_retval_t POSHandle_CUDA_Event::__add(uint64_t version_id, uint64_t stream_id){
     return POS_SUCCESS;
 }

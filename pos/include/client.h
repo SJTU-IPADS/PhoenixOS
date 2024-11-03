@@ -493,6 +493,14 @@ class POSClient {
     virtual void deinit_handle_managers(){}
 
 
+    /*!
+     *  \brief  tear down all handles
+     *  \note   
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    virtual pos_retval_t tear_down_all_handles(){ return POS_FAILED_NOT_IMPLEMENTED; }
+
+
  protected:
     /*!
      *  \brief  allocate mocked resource in the handle manager according to given type

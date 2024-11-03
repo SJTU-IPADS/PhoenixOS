@@ -48,18 +48,7 @@ class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
      *  \param  id_             index of this handle in the handle manager list
      *  \param  state_size_     size of the resource state behind this handle
      */
-    POSHandle_CUDA_Memory(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(size_, hm, id_, state_size_)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
-
-    #if POS_CONF_EVAL_CkptOptLevel > 0 || POS_CONF_EVAL_MigrOptLevel > 0
-        // initialize checkpoint bag
-        if(unlikely(POS_SUCCESS != this->__init_ckpt_bag())){
-            POS_ERROR_C_DETAIL("failed to inilialize checkpoint bag");
-        }
-    #endif
-    }
+    POSHandle_CUDA_Memory(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
 
     /*!
@@ -67,27 +56,29 @@ class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
      *  \note   this constructor is invoked during restore process, where the content of 
      *          the handle will be resume by deserializing from checkpoint binary
      */
-    POSHandle_CUDA_Memory(void* hm) : POSHandle_CUDA(hm)
-    {
-        this->resource_type_id = kPOS_ResourceTypeId_CUDA_Memory;
-    }
+    POSHandle_CUDA_Memory(void* hm);
 
 
     /*!
      *  \note   never called, just for passing compilation
      */
-    POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0)
-        : POSHandle_CUDA(client_addr_, size_, hm, id_, state_size_)
-    {
-        POS_ERROR_C_DETAIL("shouldn't be called");
-    }
+    POSHandle_CUDA_Memory(void *client_addr_, size_t size_, void* hm, pos_u64id_t id_, size_t state_size_=0);
 
-    
+
     /*!
      *  \brief  obtain the resource name begind this handle
      *  \return resource name begind this handle
      */
     std::string get_resource_name(){ return std::string("CUDA Memory"); }
+
+
+    /*!
+     *  \brief  tear down the resource behind this handle, recycle it back to handle manager
+     *  \note   this function is invoked when a client is dumped, and posd should tear down all resources
+     *          it allocates on GPU
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    pos_retval_t tear_down() override;
 
 
     /* ==================== checkpoint add/commit/persist ==================== */

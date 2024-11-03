@@ -124,6 +124,14 @@ class POSClient_CUDA : public POSClient {
 
     
     /* =============== resource management =============== */
+ public:
+    /*!
+     *  \brief  tear down all handles
+     *  \note   
+     *  \return POS_SUCCESS for successfully tear down
+     */
+    pos_retval_t tear_down_all_handles() override;
+
  protected:
     /*!
      *  \brief  obtain all resource type indices of this client
@@ -134,6 +142,7 @@ class POSClient_CUDA : public POSClient {
  private:
     /*!
      *  \brief  export the metadata of functions
+     *  \note   this function is called in deinit_handle_managers
      */
     void __dump_hm_cuda_functions();
     /* =============== resource management =============== */
