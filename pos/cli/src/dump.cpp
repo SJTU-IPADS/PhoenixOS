@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "pos/include/common.h"
+#include "pos/include/utils/command_caller.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_dump.h"
 
@@ -19,6 +20,7 @@
 pos_retval_t handle_dump(pos_cli_options_t &clio){
     pos_retval_t retval = POS_SUCCESS;
     oob_functions::cli_ckpt_dump::oob_call_data_t call_data;
+    std::string criu_cmd, criu_output;
 
     validate_and_cast_args(clio, {
         {
@@ -59,7 +61,20 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
     });
 
     // call criu
-    
+    criu_cmd = std::string("/root/bin/criu dump")
+                +   std::string(" --images-dir ") + std::string(clio.metas.ckpt.ckpt_dir)
+                +   std::string(" --shell-job --display-stats")
+                +   std::string(" --tree ") + std::to_string(clio.metas.ckpt.pid);
+    retval = POSUtil_Command_Caller::exec(criu_cmd, criu_output);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN(
+            "failed to execute CRIU\n"
+            "cmd: %s\n"
+            "output: %s",
+            criu_cmd.c_str(), criu_output.c_str()
+        );
+        goto exit;
+    }
 
     // send dump request to posd
     call_data.pid = clio.metas.ckpt.pid;
@@ -76,5 +91,6 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
         POS_LOG("dump done");
     }
 
+exit:
     return retval;
 }
