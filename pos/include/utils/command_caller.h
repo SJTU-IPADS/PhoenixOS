@@ -27,13 +27,14 @@ class POSUtil_Command_Caller {
  public:
     /*!
      *  \brief  execute a specified command and obtain its result
-     *  \param  cmd     the command to execute
-     *  \param  result  the result of the executed command
+     *  \param  cmd             the command to execute
+     *  \param  result          the result of the executed command
+     *  \param  do_rt_output    whether to do real-time output, default to be false
      *  \todo   this function should support timeout option
      *  \return POS_SUCCESS once the command is successfully executed
      *          POS_FAILED if failed
      */
-    static inline pos_retval_t exec(std::string& cmd, std::string& result){
+    static inline pos_retval_t exec(std::string& cmd, std::string& result, bool do_rt_output = false){
         pos_retval_t retval = POS_SUCCESS;
         std::array<char, 8192> buffer;
         int exit_code = -1;
@@ -48,6 +49,7 @@ class POSUtil_Command_Caller {
         result.clear();
         while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
             result += buffer.data();
+            if(do_rt_output){ fprintf(stdout, buffer.data()); }
         }
 
         // remove \n and \r
