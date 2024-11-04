@@ -33,6 +33,10 @@ func GetOS(logger *log.Logger) string {
 	return ""
 }
 
+func GetThisCommand() string {
+	return strings.Join(os.Args, " ")
+}
+
 func ClearLastLine() {
 	fmt.Print("\033[F\033[K")
 }

@@ -18,11 +18,11 @@ const (
 
 func CRIB_LibUuid(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	if cmdOpt.DoBuild {
-		utils.CheckAndInstallPackage("autopoint", "autopoint", nil, logger)
-		utils.CheckAndInstallPackage("autoconf", "autoconf", nil, logger)
-		utils.CheckAndInstallPackage("flex", "flex", nil, logger)
-		utils.CheckAndInstallPackage("bison", "bison", nil, logger)
-		utils.CheckAndInstallPackage("automake", "automake", nil, logger)
+		utils.CheckAndInstallPackage("autopoint", "autopoint", nil, nil, logger)
+		utils.CheckAndInstallPackage("autoconf", "autoconf", nil, nil, logger)
+		utils.CheckAndInstallPackage("flex", "flex", nil, nil, logger)
+		utils.CheckAndInstallPackage("bison", "bison", nil, nil, logger)
+		utils.CheckAndInstallPackage("automake", "automake", nil, nil, logger)
 		utils.CheckAndInstallPackageViaOsPkgManager("libtool-bin", logger)
 	}
 

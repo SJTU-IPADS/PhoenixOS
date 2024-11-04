@@ -92,7 +92,7 @@ func SwitchGccVersion(desiredVersion int, logger *log.Logger) {
 
 type CustormInstallFunc func() error
 
-func CheckAndInstallPackage(command string, pkgName string, custorm_install CustormInstallFunc, logger *log.Logger) {
+func CheckAndInstallPackage(command string, pkgName string, custorm_install, post_install CustormInstallFunc, logger *log.Logger) {
 	err := CheckCommandExists(command, logger)
 	if err != nil {
 		if len(pkgName) == 0 && custorm_install == nil {
@@ -111,9 +111,16 @@ func CheckAndInstallPackage(command string, pkgName string, custorm_install Cust
 			if err := custorm_install(); err != nil {
 				logger.Fatalf("failed to execute install pkg %s via custom script: %s", command, err)
 			}
-			if err := CheckCommandExists(command, logger); err != nil {
-				logger.Fatalf("failed to install pkg %s via custom script: %s", command, err)
+			if post_install != nil {
+				if err := custorm_install(); err != nil {
+					logger.Fatalf("failed to execute post-install for pkg %s via custom script: %s", command, err)
+				}
 			}
+			// NOTE:	we won't check here, we assume the successful execution of customized command represent
+			// 			a success installation
+			// if err := CheckCommandExists(command, logger); err != nil {
+			// 	logger.Fatalf("failed to install pkg %s via custom script: %s", command, err)
+			// }
 		}
 		ClearLastLine()
 		logger.Infof("installed %s", command)
