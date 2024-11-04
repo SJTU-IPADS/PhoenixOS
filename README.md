@@ -46,9 +46,7 @@
 
 ## I. Build and Install *PhOS*
 
-### (A) CUDA Platform ![slack](https://img.shields.io/badge/CUDA-black.svg?logo=nvidia)
-
-#### 💡 Option 1: Build and Install From Source
+### 💡 Option 1: Build and Install From Source
 
 1. **[Clone Repository]**
     First of all, clone this repository **recursively**:
@@ -58,7 +56,7 @@
     ```
 
 2. **[Start Container]**
-    *PhOS* can be built and installed on official CUDA image from nVIDIA.
+    *PhOS* can be built and installed on official vendor image.
 
     > [!NOTE]
     > PhOS require libc6 >= 2.29 for compiling latest CRIU from source.
@@ -146,7 +144,7 @@
 
     If you encounter any build issues, you're able to see building logs under `build_log`. Please open a new issue if things are stuck :-|
 
-#### 💡 Option 2: Install From Pre-built Binaries
+### 💡 Option 2: Install From Pre-built Binaries
 
 1. **[Download Pre-built Package]**
     One can also download pre-built binaries from repo's release page:
@@ -154,11 +152,6 @@
     ```bash
     wget
     ```
-
-
-### (B) Other Platforms ![rocm](https://img.shields.io/badge/ROCm-black.svg?logo=amd) ![rocm](https://img.shields.io/badge/Ascend-black.svg?logo=huawei)
-
-We will release support to other platforms soon :)
 
 
 ## II. Usage

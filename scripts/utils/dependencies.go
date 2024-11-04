@@ -107,12 +107,12 @@ func CheckAndInstallPackage(command string, pkgName string, custorm_install, pos
 				logger.Fatalf("failed to install pkg %s via OS pkg manager: %s", command, err)
 			}
 		} else if custorm_install != nil {
-			logger.Infof("installing %s via custom command...", command)
+			logger.Infof("installing %s via custom script...", command)
 			if err := custorm_install(); err != nil {
 				logger.Fatalf("failed to execute install pkg %s via custom script: %s", command, err)
 			}
 			if post_install != nil {
-				if err := custorm_install(); err != nil {
+				if err := post_install(); err != nil {
 					logger.Fatalf("failed to execute post-install for pkg %s via custom script: %s", command, err)
 				}
 			}
