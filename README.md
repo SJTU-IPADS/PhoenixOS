@@ -99,29 +99,40 @@
 
     *PhOS* provides a convinient build system, which covers compiling, linking and installing all *PhOS* components:
 
-    <ol>
-    <li>
-        <code>phos-autogen</code>: <b>Autogen Engine</b> for generating most of Parser and Worker code for specific hardware platform, based on lightwight notation.
-    </li>
-    <li>
-        <code>phosd</code>: <b>PhOS Daemon</b>, which continuously run at the background, taking over the control of all GPU devices on the node.
-    </li>
-    <li>
-        <code>libphos.so</code>: <b>PhOS Hijacker</b>, which hijacks all GPU API calls on the client-side and forward to PhOS Daemon.
-    </li>
-    <li>
-        <code>libpccl.so</code>: <b>PhOS Checkpoint Communication Library</b> (PCCL), which provide highly-optimized device-to-device state migration. Note that this library is not included in current release.
-    </li>
-    <li>
-        <code>unit-testing</code>: <b>Unit Tests</b> for PhOS, which is based on GoogleTest.
-    </li>
-    <li>
-        <code>phos-cli</code>: <b>Command Line Interface</b> (CLI) for interacting with PhOS.
-    </li>
-    <li>
-        <code>phos-remoting</code>: <b>Remoting Framework</b>, which provide highly-optimized GPU API remoting performance. See more details at <a href="https://github.com/SJTU-IPADS/PhoenixOS-Remoting">SJTU-IPADS/PhoenixOS-Remoting</a>.
-    </li>
-    </ol>
+    <table>
+        <tr>
+            <th width="25%">Component</th>
+            <th width="75%">Description</th>
+        </tr>
+        <tr>
+            <td><code>phos-autogen</code></td>
+            <td><b>Autogen Engine</b> for generating most of Parser and Worker code for specific hardware platform, based on lightwight notation.</td>
+        </tr>
+        <tr>
+            <td><code>phosd</code></td>
+            <td><b>PhOS Daemon</b>, which continuously run at the background, taking over the control of all GPU devices on the node.</td>
+        </tr>
+        <tr>
+            <td><code>libphos.so</code></td>
+            <td><b>PhOS Hijacker</b>, which hijacks all GPU API calls on the client-side and forward to PhOS Daemon.</td>
+        </tr>
+        <tr>
+            <td><code>libpccl.so</code></td>
+            <td><b>PhOS Checkpoint Communication Library</b> (PCCL), which provide highly-optimized device-to-device state migration. Note that this library is not included in current release.</td>
+        </tr>
+        <tr>
+            <td><code>unit-testing</code></td>
+            <td><b>Unit Tests</b> for PhOS, which is based on GoogleTest.</td>
+        </tr>
+        <tr>
+            <td><code>phos-cli</code></td>
+            <td><b>Command Line Interface</b> (CLI) for interacting with PhOS.</td>
+        </tr>
+        <tr>
+            <td><code>phos-remoting</code></td>
+            <td><b>Remoting Framework</b>, which provide highly-optimized GPU API remoting performance. See more details at <a href="https://github.com/SJTU-IPADS/PhoenixOS-Remoting">SJTU-IPADS/PhoenixOS-Remoting</a>.</td>
+        </tr>
+    </table>
 
     To build and install all above components and other dependencies, simply run the build script in the container would works:
 
