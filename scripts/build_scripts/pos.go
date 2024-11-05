@@ -59,7 +59,7 @@ func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	)
 
 	unitOpt := UnitOptions{
-		Name:          "PhOS-CUDA-Remoting",
+		Name:          "PhOS-Remoting",
 		BuildScript:   build_script,
 		RunScript:     "",
 		InstallScript: install_script,

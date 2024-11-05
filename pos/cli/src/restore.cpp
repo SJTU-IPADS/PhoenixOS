@@ -45,9 +45,6 @@ pos_retval_t handle_restore(pos_cli_options_t &clio){
             /* is_required */ true
         }
     });
-    
-
-    
 
     // send restore request to posd
     memcpy(
