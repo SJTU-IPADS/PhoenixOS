@@ -85,7 +85,7 @@ func main() {
 
 	if cmdOpt.DoInstall {
 		// insert environment variable to /etc/profile file
-		ldPreload := "export PHOS=\"LD_PRELOAD=cricket-client.so\"\n"
+		ldPreload := "export phos=\"LD_PRELOAD=cricket-client.so\"\n"
 		exists, err := utils.CheckContentExists("/etc/profile", ldPreload)
 		if err != nil {
 			logger.Fatalf("failed to check file content of /etc/profile")
@@ -110,7 +110,7 @@ func main() {
 			"========================================\n" +
 			"1. Please \"source /etc/profile\" to let PhOS installation take effect\n" + 
 			"2. PhOS daemon (phosd) is not running yet, please start it by \"pos_cli --start daemon\"\n" +
-			"3. To run program with PhOS support, an example looks like \"env $PHOS python3 train.py \"",
+			"3. To run program with PhOS support, an example looks like \"env $phos python3 train.py \"",
 		)
 	}
 }

@@ -46,10 +46,7 @@ namespace cli_ckpt_predump {
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
         cmd->ckpt_dir = std::string(payload->ckpt_dir) 
-                        + std::string("/")
-                        + std::to_string(payload->pid)
-                        + std::string("-")
-                        + std::to_string(ws->tsc_timer.get_tsc());
+                        + std::string("/phos");
 
         // make sure the directory exist
         if (std::filesystem::exists(cmd->ckpt_dir)) {

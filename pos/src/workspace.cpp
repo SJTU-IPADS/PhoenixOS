@@ -428,7 +428,11 @@ int POSWorkspace::pos_process(
     );
     POS_CHECK_POINTER(wqe);
 
-    // push to the work queue
+    /*!
+     *  \brief  push to the work queue
+     *  \note   during restore, we resume the gpu first, then cpu, so this push is safe
+     *  \todo   we need to make sure client is already ready if we overlap the restore later
+     */
     client->push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(wqe);
 
     /*!
