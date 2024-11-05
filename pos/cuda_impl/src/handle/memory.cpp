@@ -96,7 +96,18 @@ pos_retval_t POSHandle_CUDA_Memory::tear_down(){
     cuda_dv_retval = cuMemRelease(hdl);
     if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
         POS_WARN_DETAIL(
-            "failed to tear down CUDA memory, failed to call cuMemRelease: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            "failed to tear down CUDA memory, failed to call cuMemRelease x 1: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
+            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+        );
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // release the physical memory
+    cuda_dv_retval = cuMemRelease(hdl);
+    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+        POS_WARN_DETAIL(
+            "failed to tear down CUDA memory, failed to call cuMemRelease x 2: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
             this->id, this->client_addr, this->server_addr, cuda_dv_retval
         );
         retval = POS_FAILED;

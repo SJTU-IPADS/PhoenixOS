@@ -1,0 +1,2 @@
+job_name: "llama2-13b-chat-hf"
+daemon_addr: "127.0.0.1"
