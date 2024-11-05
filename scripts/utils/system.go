@@ -41,6 +41,27 @@ func ClearLastLine() {
 	fmt.Print("\033[F\033[K")
 }
 
+func CheckContentExists(filePath, content string) (bool, error) {
+    file, err := os.Open(filePath)
+    if err != nil {
+        return false, err
+    }
+    defer file.Close()
+
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        if strings.TrimSpace(scanner.Text()) == content {
+            return true, nil
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return false, err
+    }
+
+    return false, nil
+}
+
 func CreateDir(dir string, overwrite bool, perm fs.FileMode, logger *log.Logger) error {
 	if _, err := os.Stat(dir); err == nil {
 		// has directory exists

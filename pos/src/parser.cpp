@@ -51,10 +51,12 @@ pos_retval_t POSParser::init(){
 void POSParser::shutdown(){ 
     this->_stop_flag = true;
     if(this->_daemon_thread != nullptr){
-        this->_daemon_thread->join();
+        if(this->_daemon_thread->joinable()){
+            this->_daemon_thread->join();
+        }
         delete this->_daemon_thread;
         this->_daemon_thread = nullptr;
-        POS_LOG_C("Runtime daemon thread shutdown");
+        POS_LOG_C("parser daemon thread shutdown");
     }
 }
 

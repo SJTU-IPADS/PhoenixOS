@@ -11,24 +11,24 @@
 
 <div>
     <p>
-    <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
+    <b>PhoenixOS</b> (PhOS) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, PhOS is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
     <p>
-    Note that <i>PhOS</i> is aimming to be a generic system that towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by different hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
-    <div style="margin:20px 0px;">
-        <b>
-        ⚠️ <i>PhOS</i> is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a> for more upcoming cool features on <i>PhOS</i>.
-        </b>
-    </div>
+    Note that PhOS is aimming to be a generic design that towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by specific hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
+    <table style="margin:20px 0px;">
+        <tr><td><b>
+        PhOS is currently under active development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a> for more upcoming cool features on PhOS.
+        </b></td></tr>
+    </table>
     <div style="padding: 0px 10px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">📑 Latest News</h3>
         <ul>
             <li style="margin:0px; margin-bottom:8px;">
                 <p style="margin:0px; margin-bottom:1px;">
-                    <b>[Nov.4, 2024]</b> <i>PhOS</i> is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
+                    <b>[Nov.4, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
                 </p>
                 <p style="margin:0px; margin-bottom:1px;">
-                    👉 <i>PhOS</i> is currently fully supporting continuous checkpoint and fast restore
+                    👉 PhOS is currently fully supporting continuous checkpoint and fast restore
                 </p>
                 <p style="margin:0px; margin-bottom:1px;">
                     👉 We will soon release codes for live migration and multi-GPU support :)
@@ -36,7 +36,7 @@
             </li>
             <li>
                 <p style="margin:0px; margin-bottom:5px;">
-                    <b>[May 20, 2024]</b> <i>PhOS</i> paper is now released on arXiv [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
+                    <b>[May 20, 2024]</b> PhOS paper is now released on arXiv [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]
                 </p>       
             </li>
         </ul>
@@ -44,7 +44,7 @@
 </div>
 
 
-## I. Build and Install *PhOS*
+## I. Build and Install PhOS
 
 ### 💡 Option 1: Build and Install From Source
 
@@ -56,12 +56,11 @@
     ```
 
 2. **[Start Container]**
-    *PhOS* can be built and installed on official vendor image.
+    PhOS can be built and installed on official vendor image.
 
-    > [!NOTE]
-    > PhOS require libc6 >= 2.29 for compiling latest CRIU from source.
+    > NOTE: PhOS require libc6 >= 2.29 for compiling CRIU from source.
 
-    For example, for running *PhOS* for CUDA 11.3,
+    For example, for running PhOS for CUDA 11.3,
     one can build on official CUDA images
     (e.g., [`nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-459c130c94363099b02706b9b25d9fe5822ea233203ce9fbf8dfd276a55e7e95)):
 
@@ -80,7 +79,7 @@
     Note that it's important to execute docker container with root privilege, as CRIU needs the permission to C/R kernel-space memory pages.
 
 3. **[Downloading Necesssary Assets]**
-    *PhOS* relies on some assets to build and test,
+    PhOS relies on some assets to build and test,
     please download these assets by simply running following commands:
 
     ```bash
@@ -95,9 +94,9 @@
 
 
 4. **[Build]**
-    Building *PhOS* is simple!
+    Building PhOS is simple!
 
-    *PhOS* provides a convinient build system, which covers compiling, linking and installing all *PhOS* components:
+    PhOS provides a convinient build system, which covers compiling, linking and installing all PhOS components:
 
     <table>
         <tr>
@@ -170,7 +169,7 @@
 **TODO**
 
 
-## III. How *PhOS* Works?
+## III. How PhOS Works?
 
 As migration is essentially the combination of checkpoint and restore, we below discuss the workflow in PhOS by demonstrating the migration process.
 
@@ -180,14 +179,14 @@ As migration is essentially the combination of checkpoint and restore, we below 
 
 ### 🌟 Checkpoint
 
-During checkpoint, <i>PhOS</i> leverages CRIU to checkpoint the state on CPU-side
+During checkpoint, PhOS leverages CRIU to checkpoint the state on CPU-side
 
 For more details, please check our [paper](https://arxiv.org/abs/2405.12079).
 
 
 ## IV. Paper
 
-If you use *PhOS* in your research, please cite our paper:
+If you use PhOS in your research, please cite our paper:
 
 ```bibtex
 @article{huang2024parallelgpuos,

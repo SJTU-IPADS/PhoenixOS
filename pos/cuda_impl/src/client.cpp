@@ -146,7 +146,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
         goto exit;
     }
     this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = (POSHandleManager<POSHandle>*)(module_mgr);
-    if(std::filesystem::exists(this->_cxt.kernel_meta_path)){
+    if(std::filesystem::exists(this->_cxt.kernel_meta_path) && !is_restoring){
         POS_DEBUG_C("loading kernel meta from cache %s...", this->_cxt.kernel_meta_path.c_str());
         retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
         if(likely(retval == POS_SUCCESS)){

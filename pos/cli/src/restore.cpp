@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "pos/include/common.h"
+#include "pos/include/utils/command_caller.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/restore.h"
 
@@ -17,8 +18,12 @@
 
 
 pos_retval_t handle_restore(pos_cli_options_t &clio){
-    pos_retval_t retval = POS_SUCCESS;
+    pos_retval_t retval = POS_SUCCESS, criu_retval;
     oob_functions::cli_restore::oob_call_data_t call_data;
+    std::string criu_cmd;
+    std::thread criu_thread;
+    std::promise<pos_retval_t> criu_thread_promise;
+    std::future<pos_retval_t> criu_thread_future = criu_thread_promise.get_future();
 
     validate_and_cast_args(clio, {
         {
@@ -45,9 +50,6 @@ pos_retval_t handle_restore(pos_cli_options_t &clio){
             /* is_required */ true
         }
     });
-    
-
-    
 
     // send restore request to posd
     memcpy(
@@ -56,11 +58,33 @@ pos_retval_t handle_restore(pos_cli_options_t &clio){
         oob_functions::cli_restore::kCkptFilePathMaxLen
     );
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Restore, &call_data);
+
+    // check gpu restore
     if(POS_SUCCESS != call_data.retval){
-        POS_WARN("restore failed, %s", call_data.retmsg);
-    } else {
-        POS_LOG("restore done");
+        POS_WARN("gpu restore failed, %s", call_data.retmsg);
+        goto exit;
     }
 
+    // call criu
+    criu_cmd = std::string("criu restore")
+                +   std::string(" -D ") + std::string(clio.metas.ckpt.ckpt_dir)
+                +   std::string(" -j --display-stats");
+    retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, true, true);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN("failed to execute CRIU");
+        goto exit;
+    }
+
+    // check cpu restore
+    if(criu_thread.joinable()){ criu_thread.join(); }
+    criu_retval = criu_thread_future.get();
+    if(POS_SUCCESS != call_data.retval){
+        POS_WARN("cpu restore failed");
+        goto exit;
+    }
+
+    POS_LOG("restore done");
+
+exit:
     return retval;
 }

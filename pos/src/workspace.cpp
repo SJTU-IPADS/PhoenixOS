@@ -186,28 +186,7 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
     POS_LOG(">>>>>>>>>> PhOS Workspace <<<<<<<<<<\n%s\n", __pos_banner.c_str());
-
-    POS_LOG(
-        "PhoenixOS workspace created, welcome!          \n"
-        "   common configurations:                      \n"
-        "       =>  enable_context_pool(%s)             \n"
-        "   ckpt configirations:                        \n"
-        "       =>  ckpt_opt_level(%d, %s)              \n"
-        "       =>  ckpt_interval(%lu ms)               \n"
-        "       =>  enable_ckpt_increamental(%s)        \n"
-        "       =>  enable_ckpt_pipeline(%s)            \n"
-        "   migration configurations:                   \n"
-        "       =>  migration_opt_level(%d, %s)         \n"
-        ,
-        POS_CONF_EVAL_RstEnableContextPool == 1 ? "true" : "false",
-        POS_CONF_EVAL_CkptOptLevel,
-        POS_CONF_EVAL_CkptOptLevel == 0 ? "no ckpt" : POS_CONF_EVAL_CkptOptLevel == 1 ? "sync ckpt" : "async ckpt",
-        POS_CONF_EVAL_CkptDefaultIntervalMs,
-        POS_CONF_EVAL_CkptOptLevel == 0 ? "N/A" : POS_CONF_EVAL_CkptEnableIncremental == 1 ? "true" : "false",
-        POS_CONF_EVAL_CkptOptLevel <= 1 ? "N/A" : POS_CONF_EVAL_CkptEnablePipeline == 1 ? "true" : "false",
-        POS_CONF_EVAL_MigrOptLevel,
-        POS_CONF_EVAL_MigrOptLevel == 0 ? "no migration" : POS_CONF_EVAL_MigrOptLevel == 1 ? "naive" : "pre-copy"
-    );
+    POS_LOG("PhoenixOS workspace created, welcome!");
 }
 
 
@@ -449,7 +428,11 @@ int POSWorkspace::pos_process(
     );
     POS_CHECK_POINTER(wqe);
 
-    // push to the work queue
+    /*!
+     *  \brief  push to the work queue
+     *  \note   during restore, we resume the gpu first, then cpu, so this push is safe
+     *  \todo   we need to make sure client is already ready if we overlap the restore later
+     */
     client->push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(wqe);
 
     /*!
