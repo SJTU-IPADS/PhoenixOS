@@ -14,11 +14,11 @@
     <b>PhoenixOS</b> (<i>PhOS</i>) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, <i>PhOS</i> is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
     <p>
     Note that <i>PhOS</i> is aimming to be a generic design that towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by specific hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
-    <div style="margin:20px 0px;">
-        <b>
+    <table style="margin:20px 0px;">
+        <tr><td><b>
         <i>PhOS</i> is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a> for more upcoming cool features on <i>PhOS</i>.
-        </b>
-    </div>
+        </b></td></tr>
+    </table>
     <div style="padding: 0px 10px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">📑 Latest News</h3>
@@ -58,8 +58,7 @@
 2. **[Start Container]**
     *PhOS* can be built and installed on official vendor image.
 
-> [!NOTE]
-> PhOS require libc6 >= 2.29 for compiling latest CRIU from source.
+    > NOTE: *PhOS* require libc6 >= 2.29 for compiling CRIU from source.
 
     For example, for running *PhOS* for CUDA 11.3,
     one can build on official CUDA images
