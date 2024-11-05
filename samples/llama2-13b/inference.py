@@ -1,51 +1,43 @@
-model_id = 'meta-llama/Llama-2-13b-chat-hf'
-
-import time
+import os
 import transformers
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from huggingface_hub import login
-login(token = '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')
+import time
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
-# model = AutoModelForCausalLM.from_pretrained(model_id, device_map='auto', use_auth_token=True)
-# model.save_pretrained('./model')
+model = AutoModelForCausalLM.from_pretrained('./model_7b').to('cuda:0')
+tokenizer = AutoTokenizer.from_pretrained('./tokenizer_7b')
 
-# tokenizer = AutoTokenizer.from_pretrained(model_id, use_auth_token=True)
-# tokenizer.save_pretrained('./tokenizer')
+print(f"process id: {os.getpid()}")
 
-# exit(0)
-
-model = AutoModelForCausalLM.from_pretrained('./model').to('cuda:0')
-tokenizer = AutoTokenizer.from_pretrained('./tokenizer')
-
-# pip install accelerate
-# pip install -i https://pypi.org/simple/ bitsandbytes
-
-#Llama 2 Inference
-def stream(user_prompt, batch_size=1):
-    system_prompt = 'You are a helpful assistant that provides accurate and concise responses'
+def infer(user_prompt, batch_size=1):
+    system_prompt = "Act as an expert in writing captivating stories. Your task is to create detailed and engaging characters for a story based on the following abstract. Each character should have a distinct personality, background, motivations, and development arc that aligns with the story's themes and direction. Consider how these characters interact with each other and how their individual journeys contribute to the overall narrative. Make sure to include both protagonists and antagonists, giving each a unique voice and perspective. Your characters should be relatable and compelling to the readers, driving the story forward and enhancing its emotional impact.\n"
 
     B_INST, E_INST = "[INST]", "[/INST]"
     B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
 
     prompt = f"{B_INST} {B_SYS}{system_prompt.strip()}{E_SYS}{user_prompt.strip()} {E_INST}\n\n"
-
     inputs = tokenizer([prompt for _ in range(0, batch_size)], return_tensors="pt").to("cuda:0")
 
-    # streamer = TextStreamer(tokenizer)
+    streamer = TextStreamer(tokenizer)
 
-    s_time = time.time()
-    # Despite returning the usual output, the streamer will also print the generated text to stdout.
-    reply = model.generate(**inputs, max_new_tokens=20)
-    e_time = time.time()
+    # streaming
+    start_time = time.time()
+    generated_texts = model.generate(**inputs, streamer=streamer)
+    end_time = time.time()
 
-    num_tokens = 0
-    for response in reply:
-        num_tokens += list(response.size())[0]
+    # calculate throughput
+    text_length = 0
+    for text in generated_texts:
+        text_length += list(text.size())[0]
+    elapsed_time = end_time - start_time
+    throughput = text_length / elapsed_time
+    print(f'Throughput: {throughput:.2f} characters per second')
 
-    thpr = num_tokens/((e_time-s_time)/60)
-    # print(f"throughput: {thpr} tokens / min")
-    # return thpr
+    return
 
-    return e_time-s_time, thpr, num_tokens
 
-stream('Count to ten')
+if __name__ == '__main__':
+    user_prompt = "In a quiet village nestled between two mountains, a young girl named Lila discovers an ancient, shimmering stone that grants her the ability to communicate with the stars. As she learns their secrets, she finds herself drawn into a cosmic conflict between light and darkness. With the fate of her village hanging in the balance, Lila must unite her community and harness the power of the stars to restore harmony before the shadows consume everything she loves."
+
+    for i in range(0, 20):
+        infer(user_prompt=user_prompt, batch_size=1)
+        print("\n\n\n")

@@ -1,0 +1,3 @@
+job_name: "llama2-13b"
+daemon_addr: "127.0.0.1"
+# daemon_addr: "172.17.0.2"
