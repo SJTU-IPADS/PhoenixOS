@@ -63,7 +63,7 @@ POSCheckpointBag::POSCheckpointBag(
 
     // preserve device-side checkpoint slot for device state
     if(dev_allocator != nullptr && dev_deallocator != nullptr){
-    #define __DEV_CKPT_PREFILL_SIZE 1
+    #define __DEV_CKPT_PREFILL_SIZE 0
         for(i=0; i<__DEV_CKPT_PREFILL_SIZE; i++){
             tmp_retval = apply_checkpoint_slot<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
                 i, &tmp_ptr, 0, /* force_overwrite */ false
