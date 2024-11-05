@@ -172,7 +172,10 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             return err
         }
 		post_install_cargo := func() error {
-			logger.Infof("Please \"source ~/.bashrc\", and then execute \"%s\" again :)", utils.GetThisCommand())
+			logger.Infof(
+				"Please \"source ~/.bashrc\" to load environment variables for cargo, and then execute \"%s\" to continue [NOT FINISHED YET!]",
+				utils.GetThisCommand(),
+			)
 			os.Exit(0)
 			return nil
 		}
@@ -187,7 +190,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 		CRIB_LibProtobuf(cmdOpt, buildConf, logger)
 		CRIB_LibYamlCpp(cmdOpt, buildConf, logger)
 		CRIB_LibClang(cmdOpt, buildConf, logger)
-		
+
 		// TODO: just for fast compilation of PhOS, remove later
 		CRIB_PhOS_CUDA_KernelPatcher(cmdOpt, buildConf, logger)
 	}

@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <array>
 #include <string>
+#include <thread>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
@@ -26,20 +27,27 @@
 class POSUtil_Command_Caller {
  public:
     /*!
-     *  \brief  execute a specified command and obtain its result
+     *  \brief  execute a specified command and obtain its result (synchronously)
      *  \param  cmd             the command to execute
      *  \param  result          the result of the executed command
-     *  \param  do_rt_output    whether to do real-time output, default to be false
+     *  \param  print_stdout    dynamically printing stdout
+     *  \param  print_stderr    dynamically printing stderr
      *  \todo   this function should support timeout option
      *  \return POS_SUCCESS once the command is successfully executed
      *          POS_FAILED if failed
      */
-    static inline pos_retval_t exec(std::string& cmd, std::string& result, bool do_rt_output = false){
+    static inline pos_retval_t exec_sync(std::string& cmd, std::string& result, bool print_stdout = false, bool print_stderr = false){
         pos_retval_t retval = POS_SUCCESS;
         std::array<char, 8192> buffer;
         int exit_code = -1;
+        FILE *pipe;
 
-        FILE *pipe = popen(cmd.c_str(), "r");
+        if(print_stderr){
+            print_stdout = true;
+            cmd = cmd + std::string(" 2>&1");
+        }
+
+        pipe = popen(cmd.c_str(), "r");
         if (unlikely(pipe == nullptr)) {
             POS_WARN("failed to open pipe for executing command %s", cmd.c_str());
             retval = POS_FAILED;
@@ -49,7 +57,7 @@ class POSUtil_Command_Caller {
         result.clear();
         while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
             result += buffer.data();
-            if(do_rt_output){ fprintf(stdout, buffer.data()); }
+            if(print_stdout){ std::cout << buffer.data(); }
         }
 
         // remove \n and \r
@@ -63,6 +71,59 @@ class POSUtil_Command_Caller {
             retval = POS_FAILED;
             goto exit;
         }
+
+    exit:
+        return retval;
+    }
+
+
+    /*!
+     *  \brief  execute a specified command and obtain its result (asynchronously)
+     *  \param  cmd             the command to execute
+     *  \param  async_thread    thread handle of the async command execution
+     *  \param  print_stdout    dynamically printing stdout
+     *  \param  print_stderr    dynamically printing stderr
+     *  \todo   this function should support timeout option
+     *  \return POS_SUCCESS once the command is successfully executed
+     *          POS_FAILED if failed
+     */
+    static inline pos_retval_t exec_async(std::string& cmd, std::thread& async_thread, bool print_stdout = false, bool print_stderr = false){
+        pos_retval_t retval = POS_SUCCESS;
+
+        if(print_stderr){
+            print_stdout = true;
+            cmd = cmd + std::string(" 2>&1");
+        }
+
+        auto __exec_async = [&](){
+            std::array<char, 8192> buffer;
+            int exit_code = -1;
+            FILE *pipe;
+
+            pipe = popen(cmd.c_str(), "r");
+            if (unlikely(pipe == nullptr)) {
+                POS_WARN("failed to open pipe for executing command %s", cmd.c_str());
+                retval = POS_FAILED;
+                goto async_exit;
+            }
+
+            while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+                if(print_stdout){ std::cout << buffer.data(); }
+            }
+
+            exit_code = WEXITSTATUS(pclose(pipe));
+            if(unlikely(exit_code != 0)){
+                POS_WARN("failed execution of command %s: exit_code(%d)", cmd.c_str(), exit_code);
+                retval = POS_FAILED;
+                goto async_exit;
+            }
+
+        async_exit:
+            ;
+        };
+
+        async_thread = std::thread(__exec_async);
+        async_thread.detach();  
 
     exit:
         return retval;

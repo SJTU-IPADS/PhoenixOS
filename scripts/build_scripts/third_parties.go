@@ -78,7 +78,7 @@ func CRIB_Criu(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 		utils.CheckAndInstallPackageViaOsPkgManager(
 			"libprotobuf-dev libprotobuf-c-dev protobuf-c-compiler " +
 			"protobuf-compiler python3-protobuf libnet1-dev libcap-dev " +
-			"libnl-3-dev libnl-genl-3-dev ",
+			"libnl-3-dev libnl-genl-3-dev asciidoctor",
 		logger)
 	}
 
@@ -98,7 +98,8 @@ func CRIB_Criu(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		make install								>>{{.LOG_PATH__}} 2>&1
+		git config --global --add safe.directory /root/third_party/criu	>>{{.LOG_PATH__}} 2>&1
+		make install													>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KCriuPath,
 	)
@@ -181,6 +182,18 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		cmdOpt.RootDir, kProtobufPath,
 	)
 
+	install_script := fmt.Sprintf(`
+		#!/bin/bash
+		set -e
+
+		cd %s/%s
+		cp -r ./libproto*.so* {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc {{.SYSTEM_BIN_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp -r ./protoc-3.21.12.0 {{.SYSTEM_BIN_PATH__}}	>>{{.LOG_PATH__}} 2>&1
+		`,
+		cmdOpt.RootDir, kProtobufPath,
+	)
+
 	clean_script := fmt.Sprintf(`
 		#!/bin/bash
 		cd %s/%s
@@ -189,6 +202,9 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		rm -rf {{.LOCAL_LIB_PATH__}}/libproto*.so*		>>{{.LOG_PATH__}} 2>&1
 		rm -rf {{.LOCAL_BIN_PATH__}}/protoc 			>>{{.LOG_PATH__}} 2>&1
 		rm -rf {{.LOCAL_BIN_PATH__}}/protoc-3.21.12.0 	>>{{.LOG_PATH__}} 2>&1
+
+		# we don't clean system installation, as it might corrupted CRIU's
+		# environment, so the clean is not comprehensive here :(
 		`,
 		cmdOpt.RootDir, kProtobufPath,
 	)
@@ -197,7 +213,7 @@ func CRIB_LibProtobuf(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Log
 		Name:          "Protobuf",
 		BuildScript:   build_script,
 		RunScript:     "",
-		InstallScript: "", // don't install it, it would conflict with CRIU build
+		InstallScript: install_script,
 		CleanScript:   clean_script,
 		DoBuild:       cmdOpt.DoBuild,
 		DoRun:         false,
@@ -230,9 +246,9 @@ func CRIB_LibYamlCpp(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logg
 		#!/bin/bash
 		set -e
 		cd %s/%s
-		cp ./libyaml-cpp.so {{.SYSTEM_LIB_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8 {{.SYSTEM_LIB_PATH__}} 		>>{{.LOG_PATH__}} 2>&1
-		cp ./libyaml-cpp.so.0.8.0 {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
+		cp ./build/libyaml-cpp.so {{.SYSTEM_LIB_PATH__}} 			>>{{.LOG_PATH__}} 2>&1
+		cp ./build/libyaml-cpp.so.0.8 {{.SYSTEM_LIB_PATH__}} 		>>{{.LOG_PATH__}} 2>&1
+		cp ./build/libyaml-cpp.so.0.8.0 {{.SYSTEM_LIB_PATH__}} 	>>{{.LOG_PATH__}} 2>&1
 		cp -r ./include {{.SYSTEM_INC_PATH__}} 				>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KLibYamlCppPath,
