@@ -99,6 +99,7 @@ void POSClient::deinit(){
     // stop parser and worker to poll
     this->status = kPOS_ClientStatus_Hang;
 
+    // destory queue group
     this->__destory_qgroup();
 
 exit:
@@ -834,6 +835,7 @@ pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file){
     }
 
     // push this wqe to worker
+    POS_LOG("push_q")
     this->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt);
 
 exit:

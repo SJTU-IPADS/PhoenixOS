@@ -35,7 +35,7 @@ namespace cli_restore {
         POS_CHECK_POINTER(payload = (oob_payload_t*)msg->payload);
 
         // make sure the directory exist
-        ckpt_dir = std::string(payload->ckpt_dir);
+        ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
         if (!std::filesystem::exists(ckpt_dir)) {
             payload->retval = POS_FAILED_NOT_EXIST;
             retmsg = std::string("no ckpt dir exist: ") + ckpt_dir.c_str();
@@ -43,6 +43,7 @@ namespace cli_restore {
         }
 
         // restore client in the workspace
+        POS_LOG("try restore client");
         client_ckpt_path = ckpt_dir + std::string("/c.bin");
         if (!std::filesystem::exists(client_ckpt_path)) {
             payload->retval = POS_FAILED_NOT_EXIST;
@@ -54,6 +55,8 @@ namespace cli_restore {
             goto response;
         }
         POS_CHECK_POINTER(client);
+        POS_ASSERT(client->status != kPOS_ClientStatus_Active);
+        POS_LOG("restore client");
 
         // restore handle in the client handle manager
         if(unlikely(POS_SUCCESS != (
@@ -62,6 +65,7 @@ namespace cli_restore {
             retmsg = std::string("see posd log for more details");
             goto response;
         }
+        POS_LOG("restore handle");
 
         // reload unexecuted APIs in the client queue (async thread)
         if(unlikely(POS_SUCCESS != (
@@ -70,6 +74,7 @@ namespace cli_restore {
             retmsg = std::string("see posd log for more details");
             goto response;
         }
+        POS_LOG("restore apicxts");
 
         // now it's time to let client start to work
         client->status = kPOS_ClientStatus_Active;
