@@ -20,6 +20,7 @@
 #include <array>
 #include <string>
 #include <thread>
+#include <future>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
@@ -81,13 +82,17 @@ class POSUtil_Command_Caller {
      *  \brief  execute a specified command and obtain its result (asynchronously)
      *  \param  cmd             the command to execute
      *  \param  async_thread    thread handle of the async command execution
+     *  \param  thread_promise  return value of the async thread
      *  \param  print_stdout    dynamically printing stdout
      *  \param  print_stderr    dynamically printing stderr
      *  \todo   this function should support timeout option
      *  \return POS_SUCCESS once the command is successfully executed
      *          POS_FAILED if failed
      */
-    static inline pos_retval_t exec_async(std::string& cmd, std::thread& async_thread, bool print_stdout = false, bool print_stderr = false){
+    static inline pos_retval_t exec_async(
+        std::string& cmd, std::thread& async_thread, std::promise<pos_retval_t>& thread_promise,
+        bool print_stdout = false, bool print_stderr = false
+    ){
         pos_retval_t retval = POS_SUCCESS;
 
         if(print_stderr){
@@ -114,8 +119,9 @@ class POSUtil_Command_Caller {
             exit_code = WEXITSTATUS(pclose(pipe));
             if(unlikely(exit_code != 0)){
                 POS_WARN("failed execution of command %s: exit_code(%d)", cmd.c_str(), exit_code);
-                retval = POS_FAILED;
-                goto async_exit;
+                thread_promise.set_value(POS_FAILED);
+            } else {
+                thread_promise.set_value(POS_SUCCESS);
             }
 
         async_exit:
