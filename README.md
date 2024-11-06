@@ -30,7 +30,7 @@
         <ul>
             <li style="margin:0px; margin-bottom:8px;">
                 <p style="margin:0px; margin-bottom:1px;">
-                    <b>[Nov.4, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
+                    <b>[Nov.6, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
                 </p>
                 <p style="margin:0px; margin-bottom:1px;">
                     👉 PhOS is currently fully supporting single-GPU checkpoint and restore
