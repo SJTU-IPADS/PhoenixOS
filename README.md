@@ -1,9 +1,9 @@
 # PhoenixOS
-[![cuda](https://img.shields.io/badge/CUDA-supported-brightgreen.svg?logo=nvidia)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/cuda_gsg/index.html)
-[![rocm](https://img.shields.io/badge/ROCm-Developing-lightgrey.svg?logo=amd)]()
+[![cuda](https://img.shields.io/badge/CUDA-supported-brightgreen.svg?logo=nvidia)](https://phoenixos.readthedocs.io/en/latest/cuda_gsg/index.html#)
+[![rocm](https://img.shields.io/badge/ROCm-Developing-lightgrey.svg?logo=amd)](https://phoenixos.readthedocs.io/en/latest/rocm_gsg/index.html)
 [![ascend](https://img.shields.io/badge/Ascend-Developing-lightgrey.svg?logo=huawei)]()
 [![slack](https://img.shields.io/badge/slack-PhoenixOS-brightgreen.svg?logo=slack)](https://phoenixoshq.slack.com/archives/C07V2QWVB8Q)
-[![docs](https://img.shields.io/badge/Docs-passed-brightgreen.svg?logo=readthedocs)](https://phoenixos-docs.readthedocs-hosted.com/en/latest/index.html)
+[![docs](https://img.shields.io/badge/Docs-passed-brightgreen.svg?logo=readthedocs)](https://phoenixos.readthedocs.io/en/latest/)
 
 <div align="center">
     <img src="./docs/docs/source/_static/images/home/logo.jpg" height="200px" />
@@ -30,7 +30,7 @@
         <ul>
             <li style="margin:0px; margin-bottom:8px;">
                 <p style="margin:0px; margin-bottom:1px;">
-                    <b>[Nov.6, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="http://phoenixos-docs.readthedocs-hosted.com/">Documentations</a>]
+                    <b>[Nov.6, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="https://phoenixos.readthedocs.io/en/latest/index.html">Documentations</a>]
                 </p>
                 <p style="margin:0px; margin-bottom:1px;">
                     👉 PhOS is currently fully supporting single-GPU checkpoint and restore
