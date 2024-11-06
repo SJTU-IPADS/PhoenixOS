@@ -179,7 +179,7 @@ Once successfully installed PhOS, you can now try run your program with PhOS sup
 
 <table style="margin:20px 0px;">
     <tr><td><b>
-    For more details, you can refer to examples under `examples` for step-by-step tutorials to run PhOS.
+    For more details, you can refer to <a href="https://github.com/SJTU-IPADS/PhoenixOS/tree/zhuobin/fix_cli/examples"><code>examples</code></a> for step-by-step tutorials to run PhOS.
     </b></td></tr>
 </table>
 
