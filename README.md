@@ -175,7 +175,9 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
 
 ## III. Usage
 
-Once successfully installed PhOS:
+Once successfully installed PhOS, you can now try run your program with PhOS support!
+
+### (1) Start `posd` and your program
 
 1. Start the PhOS daemon (`phosd`), which takes over all GPU reousces on the node:
 
@@ -183,8 +185,8 @@ Once successfully installed PhOS:
     pos_cli --start daemon --detach
     ```
 
-2. To run with PhOS support, one need to put a `yaml` configure file under the directory which you would run your program.
-This file contains all necessary informations for PhOS to hijack the runned program. An example file looks like:
+2. To run your program with PhOS support, one need to put a `yaml` configure file under the directory which your program would regard as `$PWD`.
+This file contains all necessary informations for PhOS to hijack your program. An example file looks like:
 
     ```yaml
     # [Field]   name of the job
@@ -195,13 +197,47 @@ This file contains all necessary informations for PhOS to hijack the runned prog
     daemon_addr: "127.0.0.1"
     ```
 
-3. You are go for launch now! Try run your program with `env $phos` prefix, for example:
+3. You are going for launch now! Try run your program with `env $phos` prefix, for example:
 
     ```bash
     env $phos python3 train.py
     ```
 
-For more details, you can check examples under `examples` for an end-to-end tutorials to run PhOS.
+### (2) Pre-dump your program
+
+To pre-dump your program, which save the CPU & GPU state without stopping your execution, simple run:
+
+    ```bash
+    # create directory to store checkpoing files
+    mkdir /root/ckpt
+
+    # pre-dump command
+    pos_cli --pre-dump --dir /root/ckpt --pid [your program's pid]
+    ```
+
+### (3) Dump your program
+
+To dump your program, which save the CPU & GPU state and stop your execution, simple run:
+
+    ```bash
+    # create directory to store checkpoing files
+    mkdir /root/ckpt
+
+    # pre-dump command
+    pos_cli --dump --dir /root/ckpt --pid [your program's pid]
+    ```
+
+
+### (4) Restore your program
+
+To restore your program, simply run:
+
+    ```bash
+    # restore command
+    pos_cli --restore --dir /root/ckpt
+    ```
+
+For more details, you can refer to examples under `examples` for step-by-step tutorials to run PhOS.
 
 
 ## IV. How PhOS Works?
