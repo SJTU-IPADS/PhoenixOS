@@ -219,35 +219,35 @@ This file contains all necessary informations for PhOS to hijack your program. A
 
 To pre-dump your program, which save the CPU & GPU state without stopping your execution, simple run:
 
-    ```bash
-    # create directory to store checkpoing files
-    mkdir /root/ckpt
+```bash
+# create directory to store checkpoing files
+mkdir /root/ckpt
 
-    # pre-dump command
-    pos_cli --pre-dump --dir /root/ckpt --pid [your program's pid]
-    ```
+# pre-dump command
+pos_cli --pre-dump --dir /root/ckpt --pid [your program's pid]
+```
 
 ### (3) Dump your program
 
 To dump your program, which save the CPU & GPU state and stop your execution, simple run:
 
-    ```bash
-    # create directory to store checkpoing files
-    mkdir /root/ckpt
+```bash
+# create directory to store checkpoing files
+mkdir /root/ckpt
 
-    # pre-dump command
-    pos_cli --dump --dir /root/ckpt --pid [your program's pid]
-    ```
+# pre-dump command
+pos_cli --dump --dir /root/ckpt --pid [your program's pid]
+```
 
 
 ### (4) Restore your program
 
 To restore your program, simply run:
 
-    ```bash
-    # restore command
-    pos_cli --restore --dir /root/ckpt
-    ```
+```bash
+# restore command
+pos_cli --restore --dir /root/ckpt
+```
 
 
 <br />
