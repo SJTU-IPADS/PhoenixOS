@@ -170,30 +170,45 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
 
 ### 💡 Option 2: Install From Pre-built Binaries
 
-1. **[Download Pre-built Package]**
-    One can also download pre-built binaries from repo's release page:
-
-    ```bash
-    wget
-    ```
+    Will soon be updated :)
 
 
 ## III. Usage
 
-**TODO**
+Once successfully installed PhOS:
+
+1. Start the PhOS daemon (`phosd`), which takes over all GPU reousces on the node:
+
+    ```bash
+    pos_cli --start daemon --detach
+    ```
+
+2. To run with PhOS support, one need to put a `yaml` configure file under the directory which you would run your program.
+This file contains all necessary informations for PhOS to hijack the runned program. An example file looks like:
+
+    ```yaml
+    # [Field]   name of the job
+    # [Note]    job with same name would share some resources in posd, e.g., CUModule, etc.
+    job_name: "llama2-13b-chat-hf"
+
+    # [Field]   remote address of posd, default is local
+    daemon_addr: "127.0.0.1"
+    ```
+
+3. You are go for launch now! Try run your program with `env $phos` prefix, for example:
+
+    ```bash
+    env $phos python3 train.py
+    ```
+
+For more details, you can check examples under `examples` for an end-to-end tutorials to run PhOS.
 
 
 ## IV. How PhOS Works?
 
-As migration is essentially the combination of checkpoint and restore, we below discuss the workflow in PhOS by demonstrating the migration process.
-
 <div align="center">
     <img src="./docs/docs/source/_static/images/pos_mechanism.jpg" width="80%" />
 </div>
-
-### 🌟 Checkpoint
-
-During checkpoint, PhOS leverages CRIU to checkpoint the state on CPU-side
 
 For more details, please check our [paper](https://arxiv.org/abs/2405.12079).
 
