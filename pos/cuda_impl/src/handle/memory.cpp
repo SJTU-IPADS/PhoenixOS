@@ -103,7 +103,7 @@ pos_retval_t POSHandle_CUDA_Memory::tear_down(){
         goto exit;
     }
 
-    // release the physical memory
+    // as we call cuMemRetainAllocationHandle above, we need to release again
     cuda_dv_retval = cuMemRelease(hdl);
     if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
         POS_WARN_DETAIL(

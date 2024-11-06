@@ -175,7 +175,7 @@ namespace cuda_free {
             goto exit;
         }
 
-        // release the physical memory
+        // as we call cuMemRetainAllocationHandle above, we need to release again
         wqe->api_cxt->return_code = cuMemRelease(hdl);
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
             POS_WARN_DETAIL(

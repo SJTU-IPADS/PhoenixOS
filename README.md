@@ -44,6 +44,26 @@
 </div>
 
 
+## Showcase
+
+Under CUDA platform, we compared the performace of PhOS with [nvidia/cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint):
+
+<table>
+    <tr>
+        <th align="center">Checkpointing Llama2-13b-chat</th>
+    <tr>
+    <tr>
+        <td align="center"><img src="./docs/docs/source/_static/images/home/llama2_ckpt.gif" width="80%" /></td>
+    <tr>
+    <tr>
+        <th align="center">Restoring Llama2-13b-chat</th>
+    <tr>
+    <tr>
+        <td align="center"><img src="./docs/docs/source/_static/images/home/llama2_restore.gif"  width="80%" /></td>
+    <tr>
+</table>
+
+
 ## I. Build and Install PhOS
 
 ### 💡 Option 1: Build and Install From Source
