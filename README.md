@@ -44,6 +44,8 @@
 </div>
 
 
+<br />
+
 ## I. Showcase
 
 Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint):
@@ -58,6 +60,7 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
 </table>
 
 
+<br />
 ## II. Build and Install PhOS
 
 ### 💡 Option 1: Build and Install From Source
@@ -173,6 +176,8 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
     Will soon be updated :)
 
 
+<br />
+
 ## III. Usage
 
 Once successfully installed PhOS, you can now try run your program with PhOS support!
@@ -244,6 +249,8 @@ To restore your program, simply run:
     ```
 
 
+<br />
+
 ## IV. How PhOS Works?
 
 <div align="center">
@@ -252,6 +259,8 @@ To restore your program, simply run:
 
 For more details, please check our [paper](https://arxiv.org/abs/2405.12079).
 
+
+<br />
 
 ## V. Paper
 
@@ -265,6 +274,9 @@ If you use PhOS in your research, please cite our paper:
   year={2024}
 }
 ```
+
+
+<br />
 
 ## V. Contributors
 
