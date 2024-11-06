@@ -88,7 +88,10 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
     cd PhoenixOS
 
     # start container
-    sudo docker run -dit --gpus all -v.:/root --name phos nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
+    sudo docker run -dit --gpus all                                         \
+                -v.:/root                                                   \
+                --privileged --network=host --ipc=host                      \
+                --name phos nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
 
     # enter container
     sudo docker exec -it phos /bin/bash
@@ -102,12 +105,14 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
 
     ```bash
     # inside container
-    cd /root/scripts/build_scripts
-    bash download_assets.sh
 
     # install basic dependencies from OS pkg manager
     sudo apt-get update
     sudo apt-get install git wget
+    
+    # download assets
+    cd /root/scripts/build_scripts
+    bash download_assets.sh
     ```
 
 
