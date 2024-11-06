@@ -13,7 +13,7 @@
     <p>
     <b>PhoenixOS</b> (PhOS) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, PhOS is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
     <p>
-    Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint):
+    Under CUDA platform, we compared the C/R performace of PhOS with <a href="https://github.com/NVIDIA/cuda-checkpoint">nvidia/cuda-checkpoint</a>:
     <table>
         <tr><th align="center">Checkpointing Llama2-13b-chat</th></tr>
         <tr><td align="center"><img src="./docs/docs/source/_static/images/home/llama2_ckpt.gif" /></td></tr>
