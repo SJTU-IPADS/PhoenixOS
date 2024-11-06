@@ -177,6 +177,12 @@ Under CUDA platform, we compared the C/R performace of PhOS with [nvidia/cuda-ch
 
 Once successfully installed PhOS, you can now try run your program with PhOS support!
 
+<table style="margin:20px 0px;">
+    <tr><td><b>
+    For more details, you can refer to examples under `examples` for step-by-step tutorials to run PhOS.
+    </b></td></tr>
+</table>
+
 ### (1) Start `posd` and your program
 
 1. Start the PhOS daemon (`phosd`), which takes over all GPU reousces on the node:
@@ -236,8 +242,6 @@ To restore your program, simply run:
     # restore command
     pos_cli --restore --dir /root/ckpt
     ```
-
-For more details, you can refer to examples under `examples` for step-by-step tutorials to run PhOS.
 
 
 ## IV. How PhOS Works?
