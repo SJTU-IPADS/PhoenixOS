@@ -2,7 +2,7 @@
 [![cuda](https://img.shields.io/badge/CUDA-supported-brightgreen.svg?logo=nvidia)](https://phoenixos.readthedocs.io/en/latest/cuda_gsg/index.html#)
 [![rocm](https://img.shields.io/badge/ROCm-Developing-lightgrey.svg?logo=amd)](https://phoenixos.readthedocs.io/en/latest/rocm_gsg/index.html)
 [![ascend](https://img.shields.io/badge/Ascend-Developing-lightgrey.svg?logo=huawei)]()
-[![slack](https://img.shields.io/badge/slack-PhoenixOS-brightgreen.svg?logo=slack)](https://phoenixoshq.slack.com/archives/C07V2QWVB8Q)
+[![slack](https://img.shields.io/badge/slack-PhoenixOS-brightgreen.svg?logo=slack)](https://join.slack.com/t/phoenixoshq/shared_invite/zt-2tkievevq-xaQ3sctxs7bLnTaYeMyBBg)
 [![docs](https://img.shields.io/badge/Docs-passed-brightgreen.svg?logo=readthedocs)](https://phoenixos.readthedocs.io/en/latest/)
 
 <div align="center">
@@ -48,7 +48,7 @@
     </div>
     <table style="margin:20px 0px;">
         <tr><td><b>
-        PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://phoenixoshq.slack.com/archives/C07V2QWVB8Q">slack workspace</a> for more upcoming cool features on PhOS.
+        PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://join.slack.com/t/phoenixoshq/shared_invite/zt-2tkievevq-xaQ3sctxs7bLnTaYeMyBBg">slack workspace</a> for more upcoming cool features on PhOS.
         </b></td></tr>
     </table>
 </div>
