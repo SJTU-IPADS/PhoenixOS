@@ -29,11 +29,6 @@
 #define CLIENT_IP "0.0.0.0"
 
 
-typedef struct migration_cli_meta {
-    uint64_t client_uuid;
-} migration_cli_meta_t;
-
-
 inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
     int opt_val;
     int option_index = 0;
@@ -63,19 +58,21 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
 
     sprintf(
         short_opt,
-        /* action */    "%d%d%d%d%d%d%d%d"
-        /* meta */      "%d:%d:%d:%d:%d:%d:",
+        /* action */    "%d%d%d%d%d%d%d%d%d"
+        /* meta */      "%d:%d:%d:%d:%d:%d:%d:",
         kPOS_CliAction_Help,
+        kPOS_CliAction_Start,
         kPOS_CliAction_PreDump,
         kPOS_CliAction_Dump,
         kPOS_CliAction_Restore,
+        kPOS_CliAction_PreRestore,
+        kPOS_CliAction_Clean,
         kPOS_CliAction_Migrate,
-        kPOS_CliAction_Start,
         kPOS_CliAction_TraceResource,
-        kPOS_CliAction_Preserve,
+        kPOS_CliMeta_Target,
+        kPOS_CliMeta_SkipTarget,
         kPOS_CliMeta_SubAction,
         kPOS_CliMeta_Pid,
-        kPOS_CliMeta_Target,
         kPOS_CliMeta_Dir,
         kPOS_CliMeta_Dip,
         kPOS_CliMeta_Dport
@@ -84,22 +81,24 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
     struct option long_opt[] = {
         // action types
         {"help",            no_argument,        NULL,   kPOS_CliAction_Help},
+        {"start",           no_argument,        NULL,   kPOS_CliAction_Start},
         {"pre-dump",        no_argument,        NULL,   kPOS_CliAction_PreDump},
         {"dump",            no_argument,        NULL,   kPOS_CliAction_Dump},
         {"restore",         no_argument,        NULL,   kPOS_CliAction_Restore},
+        {"pre-restore",     no_argument,        NULL,   kPOS_CliAction_PreRestore},
+        {"clean",           no_argument,        NULL,   kPOS_CliAction_Clean},
         {"migrate",         no_argument,        NULL,   kPOS_CliAction_Migrate},
-        {"preserve",        no_argument,        NULL,   kPOS_CliAction_Preserve},
-        {"start",           no_argument,        NULL,   kPOS_CliAction_Start},
         {"trace-resource",  no_argument,        NULL,   kPOS_CliAction_TraceResource},
 
         // metadatas
         {"target",      required_argument,  NULL,   kPOS_CliMeta_Target},
+        {"skip-target", required_argument,  NULL,   kPOS_CliMeta_SkipTarget},
         {"subaction",   required_argument,  NULL,   kPOS_CliMeta_SubAction},
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
         {"dir",         required_argument,  NULL,   kPOS_CliMeta_Dir},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},
         {"dport",       required_argument,  NULL,   kPOS_CliMeta_Dport},
-    
+
         {NULL,          0,                  NULL,   0}
     };
 
@@ -121,6 +120,9 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
 inline pos_retval_t __dispatch(pos_cli_options_t &clio){
     switch (clio.action_type)
     {
+    case kPOS_CliAction_Help:
+        return handle_help(clio);
+
     case kPOS_CliAction_PreDump:
         return handle_predump(clio);
 

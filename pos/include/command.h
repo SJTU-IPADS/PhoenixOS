@@ -78,9 +78,8 @@ typedef struct POSCommand_QE {
     inline void record_dump_handles(POSHandle *handle){
         dump_handles.insert(handle);
     }
-
-
     // ============================== payloads ==============================
+
 
     POSCommand_QE()
         :   type(kPOS_Command_Nothing),

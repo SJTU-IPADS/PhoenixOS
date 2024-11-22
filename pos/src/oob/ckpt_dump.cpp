@@ -61,22 +61,15 @@ namespace cli_ckpt_dump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_Dump;
-        cmd->ckpt_dir = std::string(payload->ckpt_dir) 
-                        + std::string("/phos");
+        cmd->ckpt_dir = std::string(payload->ckpt_dir);
 
-        // make sure the directory exist
-        if (std::filesystem::exists(cmd->ckpt_dir)) {
-            std::filesystem::remove_all(cmd->ckpt_dir);
-        }
-        try {
-            std::filesystem::create_directories(cmd->ckpt_dir);
-        } catch (const std::filesystem::filesystem_error& e) {
-            retmsg = std::string("failed to create dir: ") + e.what();
-            payload->retval = POS_FAILED;
+        // make sure the directory exists
+        if(unlikely(!std::filesystem::exists(cmd->ckpt_dir))){
+            retmsg = "no ckpt dir created, this is a bug inside CLI";
+            payload->retval = POS_FAILED_NOT_EXIST;
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
             goto response;
         }
-        POS_LOG("create ckpt dir: %s", cmd->ckpt_dir.c_str());
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);

@@ -1,4 +1,4 @@
-# PhoenixOS Sample: llama2-13b-chat Inference
+# PhoenixOS Sample: llama2-13b-chat Pre-training & Inference
 
 ## Environment
 
@@ -6,6 +6,9 @@ This example is fully tested under:
 
 * `pytorch=1.13.0a0+git2263262`
 * `transformers==4.30.0`
+* `accelerate==0.20.1`
+* `sentencepiece==0.2.0`
+* `pandas==2.0.3`
 * CUDA 11.3
 
 We have already built a docker image for running this example (`phoenixos/pytorch:11.3-ubuntu20.04`), you can pull and run the container by:
@@ -18,14 +21,14 @@ docker run -dit --gpu all --privileged  --ipc=host --network=host \
 docker exec -it phos_example /bin/bash
 ```
 
-## Run
+## To Run
 
 After succesfully installed PhOS inside the container (See [Build and Install PhOS](https://github.com/SJTU-IPADS/PhoenixOS/tree/zhuobin/fix_cli?tab=readme-ov-file#i-build-and-install-phos)), you can run this example by:
 
-1. Install the `transformers` python package
+1. Install the necessary python package
 
     ```bash
-    pip3 install transformers==4.30.0
+    pip3 install transformers==4.30.0 accelerate==0.20.1 sentencepiece==0.2.0 pandas==2.0.3
     ```
 
 2. You need to download model parameter and tokenizer, simply run the following script:
@@ -41,6 +44,8 @@ After succesfully installed PhOS inside the container (See [Build and Install Ph
     ```bash
     # inside container
     pos_cli --start --target daemon
+
+    # if you want to control number of CUDA devices, you can add the CUDA_VISIBLE_DEVICES environment variable
     # CUDA_VISIBLE_DEVICES=0 pos_cli --start --target daemon
     ```
 
@@ -48,9 +53,12 @@ After succesfully installed PhOS inside the container (See [Build and Install Ph
 
     ```bash
     # inside container
-    cd /root/example/resnet
+    cd /root/example/llama2-13b-chat-hf
 
     # train
+    env $phos python3 ./train.py
+
+    # inference
     env $phos python3 ./inference.py
     ```
 
@@ -70,6 +78,9 @@ After succesfully installed PhOS inside the container (See [Build and Install Ph
 6. To C/R using [nvidia/cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint) for comparison
 
     ```bash
+    # clear old checkpoints, and mount tmpfs for storing in-memory ckpts
+    bash run_nvcr_ckpt.sh -c
+
     # checkpoint
     bash run_nvcr_ckpt.sh -s true -g
 

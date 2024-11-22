@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -21,6 +22,7 @@ from utils.readData import read_dataset
 from utils.ResNet import ResNet50, ResNet101, ResNet152
 import time
 
+print(f"process id: {os.getpid()}")
 
 # configurations
 torch.backends.cudnn.enabled = False

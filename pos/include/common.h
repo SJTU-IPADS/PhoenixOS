@@ -108,3 +108,13 @@ enum pos_edge_direction_t : uint8_t {
     kPOS_Edge_Direction_Create,
     kPOS_Edge_Direction_Delete
 };
+
+
+// generated in https://patorjk.com/software/taag/#p=display&f=Big&t=PhoenixOS
+const std::string pos_banner =
+    std::string(" _____  _                      _       ____   _____\n") +
+    std::string("|  __ \\| |                    (_)     / __ \\ / ____|\n") +
+    std::string("| |__) | |__   ___   ___ _ __  ___  _| |  | | (___\n") +
+    std::string("|  ___/| '_ \\ / _ \\ / _ \\ '_ \\| \\ \\/ / |  | |\\___ \\\n") +
+    std::string("| |    | | | | (_) |  __/ | | | |>  <| |__| |____) |\n") +
+    std::string("|_|    |_| |_|\\___/ \\___|_| |_|_/_/\\_\\\\____/|_____/");

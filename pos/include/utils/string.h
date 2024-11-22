@@ -17,7 +17,9 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
@@ -98,4 +100,23 @@ class POSUtil_String {
     exit:
         return retval;
     }
+
+    /*!
+     *  \brief  splict a string based on given delimiter
+     *  \param  str         given string to be splited
+     *  \param  delimiter   the delimiter
+     *  \return sub strings
+     */
+    static std::vector<std::string> split_string(const std::string& str, char delimiter) {
+        std::vector<std::string> tokens;
+        std::stringstream ss(str);
+        std::string token;
+
+        while (std::getline(ss, token, delimiter)) {
+            tokens.push_back(token);
+        }
+
+        return tokens;
+    }
+
 };

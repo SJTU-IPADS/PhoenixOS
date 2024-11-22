@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 #include <unistd.h>
 
 #include "pos/include/common.h"
@@ -27,14 +28,20 @@ namespace oob_functions {
 
 
 namespace cli_ckpt_predump {
-    static constexpr uint32_t kCkptFilePathMaxLen = 128;
+    static constexpr uint32_t kCkptFilePathMaxLen = 256;
     static constexpr uint32_t kServerRetMsgMaxLen = 128;
+    static constexpr uint32_t kTargetMaxNum = 16;
+    static constexpr uint32_t kSkipTargetMaxNum = 16;
 
     // payload format
     typedef struct oob_payload {
         /* client */
         __pid_t pid;
         char ckpt_dir[kCkptFilePathMaxLen];
+        uint32_t nb_targets;
+        uint32_t nb_skip_targets;
+        pos_resource_typeid_t targets[kTargetMaxNum];
+        pos_resource_typeid_t skip_targets[kSkipTargetMaxNum];
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];

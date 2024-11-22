@@ -17,20 +17,12 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include "pos/include/common.h"
 #include "pos/include/workspace.h"
 #include "pos/include/proto/handle.pb.h"
 #include "pos/include/proto/client.pb.h"
 
 #include "uuid.h"
-
-// generated in https://patorjk.com/software/taag/#p=display&f=Big&t=PhoenixOS
-const std::string __pos_banner =
-    std::string(" _____  _                      _       ____   _____\n") +
-    std::string("|  __ \\| |                    (_)     / __ \\ / ____|\n") +
-    std::string("| |__) | |__   ___   ___ _ __  ___  _| |  | | (___\n") +
-    std::string("|  ___/| '_ \\ / _ \\ / _ \\ '_ \\| \\ \\/ / |  | |\\___ \\\n") +
-    std::string("| |    | | | | (_) |  __/ | | | |>  <| |__| |____) |\n") +
-    std::string("|_|    |_| |_|\\___/ \\___|_| |_|_/_/\\_\\\\____/|_____/");
 
 
 POSWorkspaceConf::POSWorkspaceConf(POSWorkspace *root_ws){
@@ -186,7 +178,7 @@ POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
     // make sure the protobuf is working
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    POS_LOG(">>>>>>>>>> PhOS Workspace <<<<<<<<<<\n%s\n", __pos_banner.c_str());
+    POS_LOG(">>>>>>>>>> PhOS Workspace <<<<<<<<<<\n%s\n", pos_banner.c_str());
     POS_LOG("PhoenixOS workspace created, welcome!");
 }
 

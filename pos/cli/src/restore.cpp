@@ -41,31 +41,38 @@ pos_retval_t handle_restore(pos_cli_options_t &clio){
     std::promise<pos_retval_t> criu_thread_promise;
     std::future<pos_retval_t> criu_thread_future = criu_thread_promise.get_future();
 
-    validate_and_cast_args(clio, {
-        {
-            /* meta_type */ kPOS_CliMeta_Dir,
-            /* meta_name */ "dir",
-            /* meta_desp */ "directory that stores the checkpoint files",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                // TODO: should we cast the file path to absolute path?
-                if(meta_val.size() >= oob_functions::cli_restore::kCkptFilePathMaxLen){
-                    POS_WARN(
-                        "ckpt file path too long: given(%lu), expected_max(%lu)",
-                        meta_val.size(),
-                        oob_functions::cli_restore::kCkptFilePathMaxLen
-                    );
-                    retval = POS_FAILED_INVALID_INPUT;
-                    goto exit;
-                }
-                memset(clio.metas.ckpt.ckpt_dir, 0, oob_functions::cli_restore::kCkptFilePathMaxLen);
-                memcpy(clio.metas.ckpt.ckpt_dir, meta_val.c_str(), meta_val.size());
-            exit:
-                return retval;
-            },
-            /* is_required */ true
+    validate_and_cast_args(
+        /* clio */ clio,
+        /* rules */ {
+            {
+                /* meta_type */ kPOS_CliMeta_Dir,
+                /* meta_name */ "dir",
+                /* meta_desp */ "directory that stores the checkpoint files",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    // TODO: should we cast the file path to absolute path?
+                    if(meta_val.size() >= oob_functions::cli_restore::kCkptFilePathMaxLen){
+                        POS_WARN(
+                            "ckpt file path too long: given(%lu), expected_max(%lu)",
+                            meta_val.size(),
+                            oob_functions::cli_restore::kCkptFilePathMaxLen
+                        );
+                        retval = POS_FAILED_INVALID_INPUT;
+                        goto exit;
+                    }
+                    memset(clio.metas.ckpt.ckpt_dir, 0, oob_functions::cli_restore::kCkptFilePathMaxLen);
+                    memcpy(clio.metas.ckpt.ckpt_dir, meta_val.c_str(), meta_val.size());
+                exit:
+                    return retval;
+                },
+                /* is_required */ true
+            }
+        },
+        /* collapse_rule */ [](pos_cli_options_t& clio) -> pos_retval_t {
+            pos_retval_t retval = POS_SUCCESS;
+            return retval;
         }
-    });
+    );
 
     // send restore request to posd
     memcpy(

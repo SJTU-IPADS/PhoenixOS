@@ -40,25 +40,32 @@ pos_retval_t handle_start(pos_cli_options_t &clio){
     std::promise<pos_retval_t> phosd_thread_promise;
     std::future<pos_retval_t> phosd_thread_future = phosd_thread_promise.get_future();
 
-    validate_and_cast_args(clio, {
-        {
-            /* meta_type */ kPOS_CliMeta_Target,
-            /* meta_name */ "target",
-            /* meta_desp */ "target to start",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                if(meta_val != std::string("daemon")){
-                    POS_WARN("unknown target %s", meta_val.c_str());
-                    retval = POS_FAILED_INVALID_INPUT;
-                    goto exit;
-                }
-                memcpy(clio.metas.start.target_name, meta_val.c_str(), meta_val.size() + 1);
-            exit:
-                return retval;
-            },
-            /* is_required */ true
+    validate_and_cast_args(
+        /* clio */ clio,
+        /* rules */ {
+            {
+                /* meta_type */ kPOS_CliMeta_Target,
+                /* meta_name */ "target",
+                /* meta_desp */ "target to start",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    if(meta_val != std::string("daemon")){
+                        POS_WARN("unknown target %s", meta_val.c_str());
+                        retval = POS_FAILED_INVALID_INPUT;
+                        goto exit;
+                    }
+                    memcpy(clio.metas.start.target_name, meta_val.c_str(), meta_val.size() + 1);
+                exit:
+                    return retval;
+                },
+                /* is_required */ true
+            }
+        },
+        /* collapse_rule */ [](pos_cli_options_t& clio) -> pos_retval_t {
+            pos_retval_t retval = POS_SUCCESS;
+            return retval;
         }
-    });
+    );
 
 
     if(!strcmp(clio.metas.start.target_name, "daemon")){

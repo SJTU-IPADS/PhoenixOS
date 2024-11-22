@@ -33,44 +33,51 @@
 pos_retval_t handle_migrate(pos_cli_options_t &clio){
     pos_retval_t retval = POS_SUCCESS;
 
-    validate_and_cast_args(clio, {
-        {
-            /* meta_type */ kPOS_CliMeta_Pid,
-            /* meta_name */ "pid",
-            /* meta_desp */ "pid of the process to be migrated",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.pid = std::stoull(meta_val);
-            exit:
-                return retval;
+    validate_and_cast_args(
+        /* clio */ clio,
+        /* rules */ {
+            {
+                /* meta_type */ kPOS_CliMeta_Pid,
+                /* meta_name */ "pid",
+                /* meta_desp */ "pid of the process to be migrated",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    clio.metas.migrate.pid = std::stoull(meta_val);
+                exit:
+                    return retval;
+                },
+                /* is_required */ true
             },
-            /* is_required */ true
-        },
-        {
-            /* meta_type */ kPOS_CliMeta_Dip,
-            /* meta_name */ "dip",
-            /* meta_desp */ "ip of destination host",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.dip = inet_addr(meta_val.c_str());
-            exit:
-                return retval;
+            {
+                /* meta_type */ kPOS_CliMeta_Dip,
+                /* meta_name */ "dip",
+                /* meta_desp */ "ip of destination host",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    clio.metas.migrate.dip = inet_addr(meta_val.c_str());
+                exit:
+                    return retval;
+                },
+                /* is_required */ true
             },
-            /* is_required */ true
-        },
-        {
-            /* meta_type */ kPOS_CliMeta_Dport,
-            /* meta_name */ "dport",
-            /* meta_desp */ "port of posd on destination host",
-            /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
-                pos_retval_t retval = POS_SUCCESS;
-                clio.metas.migrate.dport = std::stoul(meta_val);
-            exit:
-                return retval;
+            {
+                /* meta_type */ kPOS_CliMeta_Dport,
+                /* meta_name */ "dport",
+                /* meta_desp */ "port of posd on destination host",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    clio.metas.migrate.dport = std::stoul(meta_val);
+                exit:
+                    return retval;
+                },
+                /* is_required */ false
             },
-            /* is_required */ false
         },
-    });
+        /* collapse_rule */ [](pos_cli_options_t& clio) -> pos_retval_t {
+            pos_retval_t retval = POS_SUCCESS;
+            return retval;
+        }
+    );
 
     // step 1: remote prepare
     

@@ -27,8 +27,10 @@ namespace oob_functions {
 
 
 namespace cli_ckpt_dump {
-    static constexpr uint32_t kCkptFilePathMaxLen = 128;
+    static constexpr uint32_t kCkptFilePathMaxLen = 256;
     static constexpr uint32_t kServerRetMsgMaxLen = 128;
+    static constexpr uint32_t kTargetMaxNum = 16;
+    static constexpr uint32_t kSkipTargetMaxNum = 16;
 
     // payload format
     typedef struct oob_payload {

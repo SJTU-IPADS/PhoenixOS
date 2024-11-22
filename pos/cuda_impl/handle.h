@@ -42,8 +42,9 @@ enum : pos_resource_typeid_t {
     kPOS_ResourceTypeId_CUDA_Event,
 
     /*! \note   library handle types, define in pos/cuda_impl/handle/xxx.h */
-    kPOS_ResourceTypeId_cuBLAS_Context,
+    kPOS_ResourceTypeId_cuBLAS_Context
 };
+extern std::map<pos_resource_typeid_t,std::string> pos_resource_map;
 
 
 /*!

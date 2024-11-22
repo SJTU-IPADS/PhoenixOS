@@ -126,7 +126,7 @@ ckpt_with_stop() {
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
-                cuda-checkpoint --toggle --pid $pid
+                /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
             echo $(echo "$end - $start" | bc)
@@ -140,7 +140,7 @@ ckpt_with_stop() {
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
-                cuda-checkpoint --toggle --pid $pid
+                /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
             echo $(echo "$end - $start" | bc)
@@ -165,7 +165,19 @@ mount_mem_ckpt() {
 }
 
 umount_mem_ckpt() {
+    for dir in "$dir_path"/*/; do
+        if [ -d "$dir" ]; then
+            umount "$dir" 2>/dev/null
+            if [ $? -eq 0 ]; then
+                echo "umount: $dir"
+            else
+                echo "failed to umount: $dir"
+            fi
+        fi
+    done
     umount $dir_path
+    rm -rf $dir_path
+    echo "umount and rm: $dir_path"
 }
 
 while getopts ":s:cg" opt; do

@@ -44,7 +44,7 @@ start_container() {
         exit 1
     fi
 
-    container_name=phos_torch_cu113_$container_id
+    container_name=phos_torch_cu118_$container_id
 
     if [ $mount = false ] ; then
         $SUDO docker run --gpus all -dit                    \
@@ -52,10 +52,10 @@ start_container() {
                     -v $PWD/pos:/root/pos                   \
                     -v $PWD/examples:/root/examples         \
                     -v $PWD/utils:/root/utils               \
-                    -v /nvme:/nvme                          \
                     --privileged --ipc=host --network=host  \
+                    --userns host                           \
                     --name $container_name                  \
-                    phoenixos/pytorch:11.3-ubuntu20.04
+                    phoenixos/pytorch:11.8-ubuntu20.04
         cd $script_dir && cd .. && cd ..
         # note: we copy files except the autogen, pos, examples and utils folder, which we mount to the container
         while read line; do $SUDO docker cp $line $container_name:/root; done < <(find . -mindepth 1 -maxdepth 1 | grep -v "examples$" | grep -v  "utils$" | grep -v "pos$" | grep -v "autogen$")
@@ -63,10 +63,10 @@ start_container() {
         cd $script_dir && cd .. && cd ..
         $SUDO docker run --gpus all -dit                    \
                     -v $PWD:/root                           \
-                    -v /nvme:/nvme                          \
                     --privileged --network=host --ipc=host  \
+                    --userns host                           \
                     --name $container_name                  \
-                    phoenixos/pytorch:11.3-ubuntu20.04
+                    phoenixos/pytorch:11.8-ubuntu20.04
     fi
     $SUDO docker exec -it $container_name bash
 }
@@ -77,14 +77,14 @@ close_container() {
         echo "no container id provided"
         exit 1
     fi
-    container_name=phos_torch_cu113_$container_id
+    container_name=phos_torch_cu118_$container_id
     $SUDO docker container stop $container_name
     $SUDO docker container rm $container_name
 }
 
 
 enter_container() {
-    container_name=phos_torch_cu113_$container_id
+    container_name=phos_torch_cu118_$container_id
     $SUDO docker exec -it $container_name /bin/bash
 }
 

@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <map>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,7 @@
 #include "pos/include/log.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_predump.h"
+#include "pos/include/oob/ckpt_dump.h"
 #include "pos/include/oob/trace.h"
 
 
@@ -34,77 +36,25 @@
 enum pos_cli_arg : int {
     kPOS_CliAction_Unknown = 0,
     /* ============ actions ============ */
-    /*!
-     *  \brief  print help message
-     */
     kPOS_CliAction_Help,
-
-    /*!
-     *  \brief  pre-dump state of an XPU process, but don't stop the execution
-     *  \param  pid     [Required] PID of the process to be migrated
-     *  \param  dir     [Required] path to the checkpoint file
-     */
-    kPOS_CliAction_PreDump,
-
-    /*!
-     *  \brief  final dump state of an XPU process, and stop the execution
-     *  \param  pid     [Required] PID of the process to be migrated
-     *  \param  dir     [Required] path to the checkpoint file
-     */
-    kPOS_CliAction_Dump,
-
-    /*!
-     *  \brief  restore the state of an XPU process, and continue the execution
-     *  \param  dir     [Required] path to the checkpoint file
-     */
-    kPOS_CliAction_Restore,
-
-    /*!
-     *  \brief  tracing the resource dependecies during execution
-     *  \param  dir         [Required] path to the trace file
-     *  \param  subaction   [Required] start or stop the trace mode
-     */
-    kPOS_CliAction_TraceResource,
-
-    /*!
-     *  \brief  start certain PhOS components
-     *  \param  target      [Required] target to start (options: daemon)
-     */
     kPOS_CliAction_Start,
-
-    /*!
-     *  \brief  migrate context of a XPU process to a new process
-     *  \param  pid     [Required] PID of the process to be migrated
-     *  \param  oip     [Required] out-of-band control plane IP of the remote host
-     *  \param  oport   [Required] out-of-band control plane UDP port of the remote host
-     *  \param  dip     [Required] dataplane IP of the remote host
-     *  \param  dport   [Required] dataplane port of the remote host
-     */
+    kPOS_CliAction_PreDump,
+    kPOS_CliAction_Dump,
+    kPOS_CliAction_Restore,
+    kPOS_CliAction_PreRestore,
+    kPOS_CliAction_Clean,
+    kPOS_CliAction_TraceResource,
     kPOS_CliAction_Migrate,
-
-    /*!
-     *  \brief  preserve XPU resources for fast restoring
-     *  \param  rid                 [Required]  type id of the resource to be preserved
-     *  \param  path_kernel_meta    [Optional]  path to the file that contains kernel parsing metadata, required when
-     *                                          preserving XPU modules
-     */
-    kPOS_CliAction_Preserve,
     kPOS_CliAction_PLACEHOLDER,
-    
+
     /* ============ metadatas ============ */
-    // subaction of the action
     kPOS_CliMeta_SubAction,
-    // generic operation target
     kPOS_CliMeta_Target,
-    // target process id
+    kPOS_CliMeta_SkipTarget,
     kPOS_CliMeta_Pid,
-    // file path for checkpoint / trace, etc.
     kPOS_CliMeta_Dir,
-    // oob ip
     kPOS_CliMeta_Dip,
-    // oob port
     kPOS_CliMeta_Dport,
-    // file path to the kernel metadata
     kPOS_CliMeta_KernelMeta,
     kPOS_CliMeta_PLACEHOLDER
 };
@@ -124,7 +74,7 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
     case kPOS_CliAction_Migrate:
         return "migrate";
 
-    case kPOS_CliAction_Preserve:
+    case kPOS_CliAction_PreRestore:
         return "preserve";
     
     default:
@@ -135,6 +85,12 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
 typedef struct pos_cli_ckpt_metas {
     uint64_t pid;
     char ckpt_dir[oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen];
+    uint32_t nb_targets;
+    pos_resource_typeid_t targets[oob_functions::cli_ckpt_predump::kTargetMaxNum];
+    uint32_t nb_skip_targets;
+    pos_resource_typeid_t skip_targets[oob_functions::cli_ckpt_predump::kSkipTargetMaxNum];
+    POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kTargetMaxNum == oob_functions::cli_ckpt_dump::kTargetMaxNum);
+    POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kSkipTargetMaxNum == oob_functions::cli_ckpt_dump::kSkipTargetMaxNum);
 } pos_cli_ckpt_metas_t;
 
 typedef struct pos_cli_start_metas {
@@ -178,7 +134,9 @@ typedef struct pos_cli_options {
         pos_cli_start_metas_t start;
     } metas;
 
-    pos_cli_options() : local_oob_client(nullptr), remote_oob_client(nullptr), action_type(kPOS_CliAction_Unknown) {}
+    pos_cli_options() : local_oob_client(nullptr), remote_oob_client(nullptr), action_type(kPOS_CliAction_Unknown) {
+        std::memset(&this->metas, 0, sizeof(this->metas));
+    }
 } pos_cli_options_t;
 
 
@@ -196,11 +154,17 @@ typedef struct pos_cli_meta_check_rule {
 
 
 /*!
+ *  \brief  check rule for verifying across different CLI arguments
+ */
+using pos_args_collapse_rule = pos_retval_t(*)(pos_cli_options_t&);
+
+
+/*!
  *  \brief  validate correctness of arguments
  *  \param  clio    all cli infomations
  *  \param  rules   checking rules
  */
-static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_check_rule_t> &&rules){
+static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_check_rule_t>&& rules, pos_args_collapse_rule&& collapse_rule){
     for(auto& rule : rules){
         if(clio._raw_metas.count(rule.meta_type) == 0){
             if(rule.is_required){
@@ -219,8 +183,14 @@ static void validate_and_cast_args(pos_cli_options_t &clio, std::vector<pos_arg_
             POS_ERROR("invalid format for '%s' option", rule.meta_name.c_str());
         }
     }
+
+    if(unlikely(POS_SUCCESS != collapse_rule(clio))){
+        POS_ERROR("failed to execute command, invalid argument provided!");
+    }
 }
 
+
+pos_retval_t handle_help(pos_cli_options_t &clio);
 pos_retval_t handle_predump(pos_cli_options_t &clio);
 pos_retval_t handle_dump(pos_cli_options_t &clio);
 pos_retval_t handle_migrate(pos_cli_options_t &clio);

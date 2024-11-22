@@ -45,13 +45,21 @@ function restore(){
     prev_ckpt_version=$?
     prev_ckpt_dir="$dir_path/$prev_ckpt_version"
     if [ $do_nvcr = true ]; then
+        start=$(date +%s.%3N)
         criu restore -D $prev_ckpt_dir -j --display-stats --restore-detached
+        end=$(date +%s.%3N)
+        echo "restore cpu duration: $(echo "$end - $start" | bc)"
+
         pid=$(ps -ef | grep python3 | grep -v grep | awk '{print $2}')
         if [ -z "$pid" ]; then
             echo "No python3 process restored."
             exit 1
         fi
-        cuda-checkpoint --toggle --pid $pid
+
+        start=$(date +%s.%3N)
+        /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
+        end=$(date +%s.%3N)
+        echo "restore gpu duration: $(echo "$end - $start" | bc)"
     else
         criu restore -D $prev_ckpt_dir -j --display-stats
     fi

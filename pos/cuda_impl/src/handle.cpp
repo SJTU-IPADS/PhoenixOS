@@ -21,6 +21,17 @@
 #include "pos/cuda_impl/handle.h"
 
 
+std::map<pos_resource_typeid_t, std::string> pos_resource_map = {
+    {   kPOS_ResourceTypeId_CUDA_Context,   "cuda_context",     },
+    {   kPOS_ResourceTypeId_CUDA_Function,  "cuda_function",    },
+    {   kPOS_ResourceTypeId_CUDA_Var,       "cuda_var",         },
+    {   kPOS_ResourceTypeId_CUDA_Device,    "cuda_device",      },
+    {   kPOS_ResourceTypeId_CUDA_Memory,    "cuda_memory",      },
+    {   kPOS_ResourceTypeId_CUDA_Stream,    "cuda_stream",      },
+    {   kPOS_ResourceTypeId_CUDA_Event,     "cuda_event",       }
+};
+
+
 pos_retval_t POSHandle_CUDA::__sync_stream(uint64_t stream_id){
     pos_retval_t retval = POS_SUCCESS;
     cudaError_t cuda_rt_retval;

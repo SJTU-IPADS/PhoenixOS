@@ -64,13 +64,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump gpu duration: $(echo "$end - $start" | bc)"
 
-            # criu dump
+            # criu pre-dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "pre-dump cpu duration: $(echo "$end - $start" | bc)"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -78,7 +78,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "restore gpu duration: $(echo "$end - $start" | bc)"
         else
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -86,13 +86,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump gpu duration: $(echo "$end - $start" | bc)"
 
-            # criu dump
+            # criu pre-dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "pre-dump cpu duration: $(echo "$end - $start" | bc)"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -100,7 +100,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "restore gpu duration: $(echo "$end - $start" | bc)"
         fi
         echo "ckpt to: $next_ckpt_dir"
     fi
@@ -126,30 +126,30 @@ ckpt_with_stop() {
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
-                cuda-checkpoint --toggle --pid $pid
+                /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump gpu duration: $(echo "$end - $start" | bc)"
 
             # stop cpu
             start=$(date +%s.%3N)
             criu dump --tree $pid --images-dir $next_ckpt_dir --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump cpu duration: $(echo "$end - $start" | bc)"
         else
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
                 # stop gpu
-                cuda-checkpoint --toggle --pid $pid
+                /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump gpu duration: $(echo "$end - $start" | bc)"
 
             # stop cpu
             start=$(date +%s.%3N)
             criu dump --tree $pid --prev-images-dir $prev_ckpt_dir --images-dir $next_ckpt_dir --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "dump cpu duration: $(echo "$end - $start" | bc)"
         fi
         echo "ckpt version: $next_ckpt_dir"
         # if [ "$?" = "0" ] ; then
@@ -165,7 +165,19 @@ mount_mem_ckpt() {
 }
 
 umount_mem_ckpt() {
+    for dir in "$dir_path"/*/; do
+        if [ -d "$dir" ]; then
+            umount "$dir" 2>/dev/null
+            if [ $? -eq 0 ]; then
+                echo "umount: $dir"
+            else
+                echo "failed to umount: $dir"
+            fi
+        fi
+    done
     umount $dir_path
+    rm -rf $dir_path
+    echo "umount and rm: $dir_path"
 }
 
 while getopts ":s:cg" opt; do
