@@ -236,38 +236,44 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
             handle_list.push_back(handle);
         }
     }
-    
-    // restore handle and its state
-    // TODO: this part can be async and on-demand
-    for(i=0; i<handle_list.size(); i++){
-        POS_CHECK_POINTER(handle = handle_list[i]);
 
-        // restore handle
-        retval = handle->restore();
-        if(unlikely(retval != POS_SUCCESS)){
-            dirty_retval = retval;
-            POS_WARN_C(
-                "failed to restore resource on device: client_addr(%p), rid(%u)",
-                handle->client_addr,
-                handle->resource_type_id
-            );
-            goto exit;
-        }
+    /*!
+     *  \note   [1] under baseline C/R, we directly resume both the resource and state here
+     *          [2] under PhOS C/R, we will on-demand resume resource and its state
+     */
+    #if POS_CONF_EVAL_CkptOptLevel == 1
+        for(i=0; i<handle_list.size(); i++){
+            POS_CHECK_POINTER(handle = handle_list[i]);
 
-        // restore state
-        if(handle->state_size > 0){
-            retval = handle->reload_state( /* stream_id */ 0);
+            // restore handle
+            retval = handle->restore();
             if(unlikely(retval != POS_SUCCESS)){
                 dirty_retval = retval;
                 POS_WARN_C(
-                    "failed to restore resource state on device: client_addr(%p), rid(%u)",
+                    "failed to restore resource on device: client_addr(%p), rid(%u)",
                     handle->client_addr,
                     handle->resource_type_id
                 );
                 goto exit;
             }
+
+            // restore state
+            if(handle->state_size > 0){
+                retval = handle->reload_state( /* stream_id */ 0);
+                if(unlikely(retval != POS_SUCCESS)){
+                    dirty_retval = retval;
+                    POS_WARN_C(
+                        "failed to restore resource state on device: client_addr(%p), rid(%u)",
+                        handle->client_addr,
+                        handle->resource_type_id
+                    );
+                    goto exit;
+                }
+            }
         }
-    }
+    #elif POS_CONF_EVAL_CkptOptLevel == 2
+        
+    #endif
 
 exit:
     return dirty_retval;

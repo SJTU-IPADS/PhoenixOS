@@ -20,6 +20,7 @@
 #include <thread>
 #include <vector>
 #include <map>
+#include <set>
 #include <sched.h>
 #include <pthread.h>
 
@@ -61,13 +62,17 @@ namespace wk_functions {
  */
 typedef struct checkpoint_async_cxt {
     // flag: checkpoint thread to notify the worker thread that the previous checkpoint has done
-    bool is_active;
+    bool TH_actve;
+    bool BH_active;
 
     // checkpoint cmd
     POSCommand_QE_t *cmd;
 
     // (latest) version of each handle to be checkpointed
     std::map<POSHandle*, pos_u64id_t> checkpoint_version_map;
+
+    // all dirty handles since start of concurrent checkpoint
+    std::set<POSHandle*> dirty_handles;
 
     //  this flag should be raise by memcpy API worker function, to avoid slow down by
     //  overlapped checkpoint process
@@ -76,7 +81,7 @@ typedef struct checkpoint_async_cxt {
     // thread handle
     std::thread *thread;
 
-    checkpoint_async_cxt() : is_active(false) {}
+    checkpoint_async_cxt() : TH_actve(false), BH_active(false) {}
 } checkpoint_async_cxt_t;
 
 #endif // POS_CONF_EVAL_CkptOptLevel == 2
@@ -252,12 +257,18 @@ class POSWorker {
         void __daemon_ckpt_async();
 
         /*!
-         *  \brief  overlapped checkpoint procedure, should be implemented by each platform
+         *  \brief  [Top-half] overlapped checkpoint procedure, should be implemented by each platform
          *  \note   this thread will be raised by level-2 ckpt
          *  \note   aware of the macro POS_CONF_EVAL_CkptEnablePipeline
          *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
          */
-        void __checkpoint_async_thread();
+        void __checkpoint_TH_async_thread();
+
+        /*!
+         *  \brief  [Bottom-Half] 
+         *  \return ?
+         */
+        pos_retval_t __checkpoint_BH_sync();
     #endif
 
     #if POS_CONF_EVAL_MigrOptLevel > 0

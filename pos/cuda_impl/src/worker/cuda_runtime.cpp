@@ -306,7 +306,7 @@ namespace cuda_memcpy_h2d {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -362,7 +362,7 @@ namespace cuda_memcpy_d2h {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -379,7 +379,7 @@ namespace cuda_memcpy_d2h {
         );
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
         }
     #endif
@@ -424,7 +424,7 @@ namespace cuda_memcpy_d2d {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize(0);
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -441,7 +441,7 @@ namespace cuda_memcpy_d2d {
         );
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.membus_lock = false;
         }
     #endif
@@ -486,7 +486,7 @@ namespace cuda_memcpy_h2d_async {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -504,7 +504,7 @@ namespace cuda_memcpy_h2d_async {
         );
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -553,7 +553,7 @@ namespace cuda_memcpy_d2h_async {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -622,7 +622,7 @@ namespace cuda_memcpy_d2d_async {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -640,7 +640,7 @@ namespace cuda_memcpy_d2d_async {
         );
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -687,7 +687,7 @@ namespace cuda_memset_async {
          *          provisionally stop
          */
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")
@@ -704,7 +704,7 @@ namespace cuda_memset_async {
         );
 
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){
+        if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){
             wqe->api_cxt->return_code = cudaStreamSynchronize((cudaStream_t)(stream_handle->server_addr));
             if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){ 
                 POS_WARN_DETAIL("failed to sync default stream to avoid ckpt conflict")

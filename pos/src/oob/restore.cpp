@@ -81,7 +81,7 @@ namespace cli_restore {
             retmsg = std::string("see posd log for more details");
             goto response;
         }
-        POS_LOG("restore handle");
+        POS_LOG("restored handle");
 
         // reload unexecuted APIs in the client queue (async thread)
         if(unlikely(POS_SUCCESS != (
@@ -90,7 +90,7 @@ namespace cli_restore {
             retmsg = std::string("see posd log for more details");
             goto response;
         }
-        POS_LOG("restore apicxts");
+        POS_LOG("restored apicxts");
 
         // now it's time to let client start to work
         client->status = kPOS_ClientStatus_Active;

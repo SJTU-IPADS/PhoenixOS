@@ -228,7 +228,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
     if(support_api_meta->involve_membus == true){
         worker_function->append_content(std::format(
             "#if POS_CONF_EVAL_CkptOptLevel == 2\n"
-            "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
+            "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){{\n"
             "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
             "           (cudaStream_t)({})\n"
             "       );\n"
@@ -279,7 +279,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         } else {
             worker_function->append_content(std::format(
                 "#if POS_CONF_EVAL_CkptOptLevel == 2\n"
-                "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.is_active == true ){{\n"
+                "   if( ((POSClient*)(wqe->client))->worker->async_ckpt_cxt.TH_actve == true ){{\n"
                 "       wqe->api_cxt->return_code = cudaStreamSynchronize(\n"
                 "           (cudaStream_t)({})\n"
                 "       );\n"

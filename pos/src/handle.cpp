@@ -86,8 +86,8 @@ pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) 
     uint8_t old_counter;
 
     /*!
-        *  \brief  [case]  the adding has been finished, nothing need to do
-        */
+     *  \brief  [case]  the adding has been finished, nothing need to do
+     */
     if(this->_state_preserve_counter >= 2){
         retval = POS_FAILED_ALREADY_EXIST;
         goto exit;
@@ -96,15 +96,15 @@ pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) 
     old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
     if (old_counter == 0) {
         /*!
-            *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
-            *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
-            */
+         *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
+         *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
+         */
         retval = this->__add(version_id, stream_id);
         this->_state_preserve_counter.store(3, std::memory_order_relaxed);
     } else if (old_counter == 1) {
         /*!
-            *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
-            */
+         *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
+         */
         retval = POS_WARN_ABANDONED;
         while(this->_state_preserve_counter < 3){}
     }
@@ -437,7 +437,7 @@ void POSHandle::collect_broken_handles(pos_broken_handle_list_t *broken_handle_l
     if(unlikely(status != kPOS_HandleStatus_Active && status != kPOS_HandleStatus_Delete_Pending)){
         broken_handle_list->add_handle(layer_id, this);
     }
-    
+
     // iterate over its parent
     for(i=0; i<parent_handles.size(); i++){
         parent_handles[i]->collect_broken_handles(broken_handle_list, layer_id+1);

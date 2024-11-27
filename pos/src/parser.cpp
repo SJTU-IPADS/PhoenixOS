@@ -187,7 +187,6 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     {
     /* ========== Ckpt WQ Command from OOB thread ========== */
     case kPOS_Command_Oob2Parser_Dump:
-    case kPOS_Command_Oob2Parser_PreDump:
         #if POS_CONF_EVAL_CkptOptLevel > 0
             // collect all stateful handles at this timespot to be dumped
             for(auto &handle_id : this->_ws->stateless_resource_type_idx){
@@ -200,7 +199,7 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
                 }
             }
         #endif // POS_CONF_EVAL_CkptOptLevel
-
+    case kPOS_Command_Oob2Parser_PreDump: // TODO: fix this logic
         #if POS_CONF_EVAL_CkptOptLevel > 0
             // collect all stateless handles at this timespot to be predumped
             for(auto &handle_id : this->_ws->stateful_resource_type_idx){
