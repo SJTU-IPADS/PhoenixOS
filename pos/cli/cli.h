@@ -89,6 +89,7 @@ typedef struct pos_cli_ckpt_metas {
     pos_resource_typeid_t targets[oob_functions::cli_ckpt_predump::kTargetMaxNum];
     uint32_t nb_skip_targets;
     pos_resource_typeid_t skip_targets[oob_functions::cli_ckpt_predump::kSkipTargetMaxNum];
+    uint64_t tmpfs_size;
     POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kTargetMaxNum == oob_functions::cli_ckpt_dump::kTargetMaxNum);
     POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kSkipTargetMaxNum == oob_functions::cli_ckpt_dump::kSkipTargetMaxNum);
 } pos_cli_ckpt_metas_t;

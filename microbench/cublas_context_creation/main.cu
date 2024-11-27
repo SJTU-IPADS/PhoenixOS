@@ -199,7 +199,7 @@ int main(){
     POSUtilTscTimer tsc_timer;
 
     s_tick = POSUtilTscTimer::get_tsc();
-    // cublas_result = cublasCreate_v2(&handle);
+    cublas_result = cublasCreate_v2(&handle);
     e_tick = POSUtilTscTimer::get_tsc();
     if(cublas_result != CUBLAS_STATUS_SUCCESS){
         printf("failed to create cublas context");
@@ -209,7 +209,7 @@ int main(){
 
 
     s_tick = POSUtilTscTimer::get_tsc();
-    cublas_result = cublasLtCreate(&lighthandle);
+    // cublas_result = cublasLtCreate(&lighthandle);
     e_tick = POSUtilTscTimer::get_tsc();
     if(cublas_result != CUBLAS_STATUS_SUCCESS){
         printf("failed to create cublasLt context");
@@ -217,5 +217,7 @@ int main(){
     }
     printf("create cublasLt context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
     
+    while(1){};
+
     return 0;
 }

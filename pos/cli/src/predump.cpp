@@ -65,7 +65,6 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
                 /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
                     pos_retval_t retval = POS_SUCCESS;
                     std::filesystem::path absolute_path;
-                    std::string predump_dir;
 
                     absolute_path = std::filesystem::absolute(meta_val);
 
@@ -79,30 +78,8 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
                         goto exit;
                     }
 
-                    predump_dir = absolute_path.string() + std::string("/phos");
-                    POS_ASSERT(predump_dir.size() < oob_functions::cli_ckpt_dump::kCkptFilePathMaxLen);
-
                     memset(clio.metas.ckpt.ckpt_dir, 0, oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen);
                     memcpy(clio.metas.ckpt.ckpt_dir, absolute_path.string().c_str(), absolute_path.string().size());
-
-                    // make sure the directory exist and fresh
-                    if (std::filesystem::exists(predump_dir)) {
-                        std::filesystem::remove_all(predump_dir);
-                    }
-                    try {
-                        std::filesystem::create_directories(predump_dir);
-                    } catch (const std::filesystem::filesystem_error& e) {
-                        POS_WARN(
-                            "failed to create pre-dump directory: error(%s), dir(%s)",
-                            e.what(), predump_dir.c_str()
-                        );
-                        retval = POS_FAILED;
-                        goto exit;
-                    }
-                    POS_LOG("create pre-dump dir: %s",  predump_dir.c_str());
-
-                    // TODO: mount the memory to tmpfs
-                    
 
                 exit:
                     return retval;

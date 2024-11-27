@@ -46,6 +46,11 @@ namespace cli_ckpt_predump {
         POSCommand_QE_t* cmd;
         std::vector<POSCommand_QE_t*> cmds;
 
+        std::string predump_dir, mount_filepath;
+        std::string mount_cmd;
+        std::uintmax_t nb_removed_files;
+        bool has_mount_before = false;
+
         payload = (oob_payload_t*)msg->payload;
         
         // obtain client with specified pid
@@ -61,14 +66,50 @@ namespace cli_ckpt_predump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
-        cmd->ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
+        cmd->ckpt_dir = std::string(payload->ckpt_dir);
 
-        // make sure the directory exists
-        if(unlikely(!std::filesystem::exists(cmd->ckpt_dir))){
-            retmsg = "no ckpt dir created, this is a bug inside CLI";
-            payload->retval = POS_FAILED_NOT_EXIST;
-            memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
-            goto response;
+        // make sure the directory exist and fresh
+        if (std::filesystem::exists(cmd->ckpt_dir)) {
+            try {
+                if(std::filesystem::exists(cmd->ckpt_dir + std::string("/tmpfs_mount.lock"))){
+                    has_mount_before = true;
+                }
+                nb_removed_files = 0;
+                for(auto& de : std::filesystem::directory_iterator(cmd->ckpt_dir)) {
+                    // returns the number of deleted entities since c++17:
+                    nb_removed_files += std::filesystem::remove_all(de.path());
+                }
+                POS_LOG(
+                    "clean old assets under specified pre-dump dir: dir(%s), nb_removed_files(%lu)",
+                    cmd->ckpt_dir.c_str(), nb_removed_files
+                );
+                POS_LOG("reuse pre-dump dir: %s",  cmd->ckpt_dir.c_str());
+            } catch (const std::exception& e) {
+                POS_WARN(
+                    "failed to remove old assets under specified pre-dump dir: dir(%s), error(%s)",
+                    cmd->ckpt_dir.c_str(), e.what()
+                );
+                retval = POS_FAILED;
+                goto exit;
+            }
+        } else {
+            try {
+                std::filesystem::create_directories(cmd->ckpt_dir);
+            } catch (const std::filesystem::filesystem_error& e) {
+                POS_WARN(
+                    "failed to create pre-dump directory: dir(%s), error(%s)",
+                    cmd->ckpt_dir.c_str(), e.what()
+                );
+                retval = POS_FAILED;
+                goto exit;
+            }
+            POS_LOG("create pre-dump dir: %s",  cmd->ckpt_dir.c_str());
+        }
+
+        // mount the memory to tmpfs
+        if(has_mount_before == false){
+            mount_cmd = std::string("mount -t tmpfs -o size=80g tmpfs ") + predump_dir;
+            POS_LOG("mount pre-dump dir to tmpfs: size(%lu), dir(%s)",  cmd->ckpt_dir.c_str());
         }
 
         // send to parser
