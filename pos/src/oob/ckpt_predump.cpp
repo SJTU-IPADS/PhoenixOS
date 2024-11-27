@@ -30,6 +30,7 @@
 #include "pos/cuda_impl/client.h"
 
 
+
 namespace oob_functions {
 
 /*!
@@ -45,12 +46,6 @@ namespace cli_ckpt_predump {
         std::string retmsg;
         POSCommand_QE_t* cmd;
         std::vector<POSCommand_QE_t*> cmds;
-
-        std::string predump_dir, mount_filepath;
-        std::string mount_cmd;
-        std::uintmax_t nb_removed_files;
-        bool has_mount_before = false;
-
         payload = (oob_payload_t*)msg->payload;
         
         // obtain client with specified pid
@@ -66,51 +61,26 @@ namespace cli_ckpt_predump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
-        cmd->ckpt_dir = std::string(payload->ckpt_dir);
-
-        // make sure the directory exist and fresh
-        if (std::filesystem::exists(cmd->ckpt_dir)) {
-            try {
-                if(std::filesystem::exists(cmd->ckpt_dir + std::string("/tmpfs_mount.lock"))){
-                    has_mount_before = true;
-                }
-                nb_removed_files = 0;
-                for(auto& de : std::filesystem::directory_iterator(cmd->ckpt_dir)) {
-                    // returns the number of deleted entities since c++17:
-                    nb_removed_files += std::filesystem::remove_all(de.path());
-                }
-                POS_LOG(
-                    "clean old assets under specified pre-dump dir: dir(%s), nb_removed_files(%lu)",
-                    cmd->ckpt_dir.c_str(), nb_removed_files
-                );
-                POS_LOG("reuse pre-dump dir: %s",  cmd->ckpt_dir.c_str());
-            } catch (const std::exception& e) {
-                POS_WARN(
-                    "failed to remove old assets under specified pre-dump dir: dir(%s), error(%s)",
-                    cmd->ckpt_dir.c_str(), e.what()
-                );
-                retval = POS_FAILED;
-                goto exit;
-            }
-        } else {
-            try {
-                std::filesystem::create_directories(cmd->ckpt_dir);
-            } catch (const std::filesystem::filesystem_error& e) {
-                POS_WARN(
-                    "failed to create pre-dump directory: dir(%s), error(%s)",
-                    cmd->ckpt_dir.c_str(), e.what()
-                );
-                retval = POS_FAILED;
-                goto exit;
-            }
-            POS_LOG("create pre-dump dir: %s",  cmd->ckpt_dir.c_str());
+        cmd->ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
+        
+        // create ckpt directory for GPU-side
+        POS_ASSERT(std::filesystem::exists(payload->ckpt_dir));
+        if (unlikely(std::filesystem::exists(cmd->ckpt_dir))) {
+            
         }
-
-        // mount the memory to tmpfs
-        if(has_mount_before == false){
-            mount_cmd = std::string("mount -t tmpfs -o size=80g tmpfs ") + predump_dir;
-            POS_LOG("mount pre-dump dir to tmpfs: size(%lu), dir(%s)",  cmd->ckpt_dir.c_str());
+        try {
+            std::filesystem::create_directories(cmd->ckpt_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            POS_WARN(
+                "failed predump, failed to create directory for GPU-side: dir(%s), error(%s)",
+                cmd->ckpt_dir.c_str(), e.what()
+            );
+            retmsg = "no client with specified pid was found";
+            payload->retval = POS_FAILED;
+            memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
+            goto response;
         }
+        POS_LOG("create pre-dump dir for GPU-side: %s", cmd->ckpt_dir.c_str());
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);

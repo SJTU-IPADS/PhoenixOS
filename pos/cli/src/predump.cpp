@@ -29,9 +29,10 @@
 #include "pos/include/common.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_predump.h"
+#include "pos/include/utils/string.h"
+#include "pos/include/utils/system.h"
 #include "pos/include/utils/command_caller.h"
 #include "pos/cli/cli.h"
-#include "pos/include/utils/string.h"
 
 
 #if defined(POS_CLI_RUNTIME_TARGET_CUDA)
@@ -42,6 +43,17 @@
 pos_retval_t handle_predump(pos_cli_options_t &clio){
     pos_retval_t retval = POS_SUCCESS;
     oob_functions::cli_ckpt_predump::oob_call_data_t call_data;
+    std::string mount_cmd, mount_result;
+    std::uintmax_t nb_removed_files;
+    bool has_mount_before = false;
+    uint64_t total_mem_bytes, avail_mem_bytes;
+    std::string mount_existance_file;
+    std::ofstream mount_existance_file_stream;
+
+    std::string criu_cmd, criu_result;
+    std::thread criu_thread;
+    std::promise<pos_retval_t> criu_thread_promise;
+    std::future<pos_retval_t> criu_thread_future = criu_thread_promise.get_future();
 
     validate_and_cast_args(
         /* clio */ clio, 
@@ -185,22 +197,123 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
         }
     );
 
-    // TODO: call criu pre-dump
+    mount_existance_file = std::string(clio.metas.ckpt.ckpt_dir) + std::string("/tmpfs_mount.lock");
 
-    // send predump request
+    // step 1: make sure the directory exist and fresh
+    if (std::filesystem::exists(clio.metas.ckpt.ckpt_dir)) {
+        try {
+            if(std::filesystem::exists(mount_existance_file)){
+                has_mount_before = true;
+            }
+            nb_removed_files = 0;
+            for(auto& de : std::filesystem::directory_iterator(clio.metas.ckpt.ckpt_dir)) {
+                if (de.path().filename() == std::string("/tmpfs_mount.lock")) { continue; }
+
+                // returns the number of deleted entities since c++17:
+                nb_removed_files += std::filesystem::remove_all(de.path());
+            }
+            POS_LOG(
+                "clean old assets under specified pre-dump dir: dir(%s), nb_removed_files(%lu)",
+                clio.metas.ckpt.ckpt_dir, nb_removed_files
+            );
+            POS_LOG("reuse pre-dump dir: %s",  clio.metas.ckpt.ckpt_dir);
+        } catch (const std::exception& e) {
+            POS_WARN(
+                "failed to remove old assets under specified pre-dump dir: dir(%s), error(%s)",
+                clio.metas.ckpt.ckpt_dir, e.what()
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+    } else {
+        try {
+            std::filesystem::create_directories(clio.metas.ckpt.ckpt_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            POS_WARN(
+                "failed to create pre-dump directory: dir(%s), error(%s)",
+                clio.metas.ckpt.ckpt_dir, e.what()
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+        POS_LOG("create pre-dump dir: %s", clio.metas.ckpt.ckpt_dir);
+    }
+
+    // step 2: mount the memory to tmpfs
+    if(has_mount_before == false){
+        // obtain available memory on the system
+        retval = POSUtilSystem::get_memory_info(total_mem_bytes, avail_mem_bytes);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed predump, failed to obtain memory information of the ststem");
+            retval = POS_FAILED;
+            goto exit;
+        }
+        if(unlikely(avail_mem_bytes <= MB(128))){
+            POS_WARN(
+                "failed predump, not enough memory on the system: total(%lu bytes), avail(%lu bytes)",
+                total_mem_bytes, avail_mem_bytes
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // execute mount cmd
+        mount_cmd   = std::string("mount -t tmpfs -o size=")
+                    + POSUtilSystem::format_byte_number(avail_mem_bytes * 0.8)
+                    + std::string(" tmpfs ") + std::string(clio.metas.ckpt.ckpt_dir);
+        POS_LOG("%s", mount_cmd.c_str());
+        
+        retval = POSUtil_Command_Caller::exec_sync(mount_cmd, mount_result, true, true);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed to mount predump directory to tmpfs, the predump might be slowed down due to storage IO");
+        } else {
+            POS_DEBUG("mount pre-dump dir to tmpfs: size(%lu), dir(%s)",  avail_mem_bytes * 0.8, cmd->ckpt_dir.c_str());
+            mount_existance_file_stream.open(mount_existance_file);
+            if(unlikely(!mount_existance_file_stream.is_open())){
+                POS_WARN(
+                    "failed to create mount existance file, yet still successfully mount to tmpfs: path(%s)",
+                    mount_existance_file.c_str()
+                );
+            }
+            mount_existance_file_stream << std::to_string(static_cast<int>(avail_mem_bytes * 0.8));
+            mount_existance_file_stream.close();
+        }
+    }
+
+    // step 3: CPU-side predump (async)
+    criu_cmd    = std::string("criu pre-dump ")
+                + std::string("--tree ") + std::to_string(clio.metas.ckpt.pid) + std::string (" ")
+                + std::string("--images-dir ") + std::string(clio.metas.ckpt.ckpt_dir) + std::string (" ")
+                + std::string("--leave-running --shell-job --display-stats");
+    retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, criu_result, false, false);
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN("predump failed, failed to start cpu-side predump thread: retval(%u)", retval);
+        goto exit;
+    }
+
+    // step 4: GPU-side predump (sync)
     call_data.pid = clio.metas.ckpt.pid;
     memcpy(
         call_data.ckpt_dir,
         clio.metas.ckpt.ckpt_dir,
         oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen
     );
-
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_PreDump, &call_data);
     if(POS_SUCCESS != call_data.retval){
-        POS_WARN("predump failed, %s", call_data.retmsg);
-    } else {
-        POS_LOG("predump done");
+        POS_WARN("predump failed, gpu-side predump failed: %s", call_data.retmsg);
+        goto exit;
     }
 
+    // step 5: check CPU-side predump result
+    if(criu_thread.joinable()){ criu_thread.join(); }
+    retval = criu_thread_future.get();
+    if(POS_SUCCESS != retval){
+        POS_WARN("predump failed, cpu-side predump failed: %s", criu_result.c_str());
+        goto exit;
+    }
+
+    POS_LOG("predump done");
+
+ exit:
     return retval;
 }

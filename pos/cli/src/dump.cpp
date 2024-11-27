@@ -218,7 +218,7 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
                 +   std::string(" --shell-job --display-stats")
                 +   std::string(" --tree ") + std::to_string(clio.metas.ckpt.pid);
     retval = POSUtil_Command_Caller::exec_sync(criu_cmd, criu_result, true, true);
-    // retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, true, true);
+    // retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, criu_result, true, true);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN("cpu dump failed");
         // POS_WARN("failed to execute CRIU");

@@ -5,24 +5,46 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <cmath>
+#include <filesystem>
 
 
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 
 
-class POSUtil_System {
+class POSUtilSystem {
  public:
-    POSUtil_Math(){}
-    ~POSUtil_Math(){}
+    POSUtilSystem(){}
+    ~POSUtilSystem(){}
 
-    /* =================== Memory =================== */
-    static pos_retval_t get_available_memory(uint64_t bytes){
+    /* ======================== Memory ======================== */
+ public:
+    static pos_retval_t get_memory_info(uint64_t& total_bytes, uint64_t& avail_bytes){
+        pos_retval_t retval = POS_SUCCESS;
         std::ifstream memInfo("/proc/meminfo");
         std::string line;
-        std::string line;
-        long long total_memory = 0;
-        long long free_memory = 0;
+
+        if (!std::filesystem::exists("/proc/meminfo")) {
+            POS_WARN("failed to get memory info, /proc/meminfo not exists");
+            retval = POS_FAILED_NOT_EXIST;
+            goto exit;
+        }
+
+        while (std::getline(memInfo, line)) {
+            if (line.find("MemTotal:") == 0) {
+                total_bytes = std::stoll(line.substr(line.find_first_of("0123456789")));
+            } else if (line.find("MemAvailable:") == 0) {
+                avail_bytes = std::stoll(line.substr(line.find_first_of("0123456789")));
+                break; // No need to read more lines
+            }
+        }
+
+        total_bytes *= 1024;
+        avail_bytes *= 1024;
+
+    exit:
+        return retval;
     }
 
     /*!
@@ -30,17 +52,18 @@ class POSUtil_System {
      *  \param  bytes   byte number
      *  \return string with unit
      */
-    static std::string format_byte_number(uint64 bytes){
+    static std::string format_byte_number(uint64_t bytes){
         const std::string suffixes[] = {"B", "K", "M", "G"};
         int index = 0;
-        double bytes = static_cast<double>(bytes);
+        double bytes_d = static_cast<double>(bytes);
 
-        while (bytes >= 1024 && index < 3) {
-            size /= 1024;
+        while (bytes_d >= 1024 && index < 3) {
+            bytes_d /= 1024;
             index++;
         }
 
-        bytes = std::ceil(bytes);
-        return std::to_string(static_cast<int>(bytes)) + suffixes[index];
-    }
+        bytes_d = std::ceil(bytes_d);
+        return std::to_string(static_cast<int>(bytes_d)) + suffixes[index];
+    }    
+    /* ======================== Memory ======================== */
 };

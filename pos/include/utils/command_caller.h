@@ -84,6 +84,7 @@ class POSUtil_Command_Caller {
      *  \param  cmd             the command to execute
      *  \param  async_thread    thread handle of the async command execution
      *  \param  thread_promise  return value of the async thread
+     *  \param  result          the result of the executed command
      *  \param  print_stdout    dynamically printing stdout
      *  \param  print_stderr    dynamically printing stderr
      *  \todo   this function should support timeout option
@@ -92,7 +93,7 @@ class POSUtil_Command_Caller {
      */
     static inline pos_retval_t exec_async(
         std::string& cmd, std::thread& async_thread, std::promise<pos_retval_t>& thread_promise,
-        bool print_stdout = false, bool print_stderr = false
+        std::string& result, bool print_stdout = false, bool print_stderr = false
     ){
         pos_retval_t retval = POS_SUCCESS;
 
@@ -113,8 +114,15 @@ class POSUtil_Command_Caller {
                 goto async_exit;
             }
 
+            result.clear();
             while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+                result += buffer.data();
                 if(print_stdout){ std::cout << buffer.data(); }
+            }
+
+            // remove \n and \r
+            while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+                result.pop_back();
             }
 
             exit_code = WEXITSTATUS(pclose(pipe));
