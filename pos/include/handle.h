@@ -490,10 +490,11 @@ class POSHandle {
      *  \brief  commit the device-side state of the resource behind this handle
      *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
+     *  \param  ckpt_dir    directory to store checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully commited
      */
-    pos_retval_t checkpoint_commit_async(uint64_t version_id, uint64_t stream_id=0);
+    pos_retval_t checkpoint_commit_async(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0);
 
 
     /*!

@@ -224,7 +224,7 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
     POS_CHECK_POINTER(cmd);
 
     // for both pre-dump and dump, we need to save pre-dump handles
-    for(set_iter=cmd->predump_handles.begin(); set_iter!=cmd->predump_handles.end(); set_iter++){
+    for(set_iter=cmd->stateful_handles.begin(); set_iter!=cmd->stateful_handles.end(); set_iter++){
         POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
 
@@ -252,7 +252,7 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
 
     // for dump, we also need to save dump handles
     if(cmd->type == kPOS_Command_Parser2Worker_Dump){
-        for(set_iter=cmd->dump_handles.begin(); set_iter!=cmd->dump_handles.end(); set_iter++){
+        for(set_iter=cmd->stateless_handles.begin(); set_iter!=cmd->stateless_handles.end(); set_iter++){
             POSHandle *handle = *set_iter;
             POS_CHECK_POINTER(handle);
 
@@ -389,7 +389,7 @@ void POSWorker::__daemon_ckpt_async(){
 
         // step 1: digest cmd from parser work queue
         cmd_wqes.clear();
-        this->_client->poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
+        this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_WQ>(&cmd_wqes);
         for(i=0; i<cmd_wqes.size(); i++){
             POS_CHECK_POINTER(cmd_wqe = cmd_wqes[i]);
             this->__process_cmd(cmd_wqe);
@@ -403,7 +403,7 @@ void POSWorker::__daemon_ckpt_async(){
             POS_CHECK_POINTER(wqe = wqes[i]);
 
             wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
-            
+
             /*!
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
              */
@@ -431,12 +431,12 @@ void POSWorker::__daemon_ckpt_async(){
 
             if(unlikely(this->async_ckpt_cxt.is_active == true)){
                 /*!
-                *  \brief  before launching the API, we need to preserve the state of all stateful resources for checkpointing
-                *  \note   there're serval cases handle in checkpoint_add:
-                *          [1] the state hasn't been checkpoint yet, then it conducts CoW on the state
-                *          [2] the state is under checkpointing, then it blocks until the checkpoint finished
-                *          [3] the state is already checkpointed, then it directly returns
-                */
+                 *  \brief  before launching the API, we need to preserve the state of all stateful resources for checkpointing
+                 *  \note   there're serval cases handle in checkpoint_add:
+                 *          [1] the state hasn't been checkpoint yet, then it conducts CoW on the state
+                 *          [2] the state is under checkpointing, then it blocks until the checkpoint finished
+                 *          [3] the state is already checkpointed, then it directly returns
+                 */
                 for(auto &inout_handle_view : wqe->inout_handle_views){
                     POS_CHECK_POINTER(handle = inout_handle_view.handle);
                     if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
@@ -488,8 +488,7 @@ void POSWorker::__daemon_ckpt_async(){
                     }
                 }
             } // this->async_ckpt_cxt.is_active == true
-            
-        
+
             launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
             wqe->worker_e_tick = POSUtilTscTimer::get_tsc();
 
@@ -524,25 +523,20 @@ void POSWorker::__checkpoint_async_thread() {
     POSHandle *handle;
     uint64_t s_tick = 0, e_tick = 0;
 
-#if POS_CONF_EVAL_CkptEnablePipeline == 1
-    std::vector<std::shared_future<pos_retval_t>> _commit_threads;
-    std::shared_future<pos_retval_t> _new_commit_thread;
-#endif
-
     typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
     typename std::set<POSHandle*>::iterator set_iter;
 
     POS_CHECK_POINTER(cmd = this->async_ckpt_cxt.cmd);
     POS_ASSERT(this->_ckpt_stream_id != 0);
 
-#if POS_CONF_EVAL_CkptEnablePipeline == 1
-    POS_ASSERT(this->_ckpt_commit_stream_id != 0);
-#endif
+    #if POS_CONF_EVAL_CkptEnablePipeline == 1
+        POS_ASSERT(this->_ckpt_commit_stream_id != 0);
+    #endif
 
-    for(set_iter=cmd->checkpoint_handles.begin(); set_iter!=cmd->checkpoint_handles.end(); set_iter++){
+    for(set_iter=cmd->stateful_handles.begin(); set_iter!=cmd->stateful_handles.end(); set_iter++){
         POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
-        
+
         if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
                     || handle->status == kPOS_HandleStatus_Create_Pending
                     || handle->status == kPOS_HandleStatus_Broken
@@ -585,6 +579,7 @@ void POSWorker::__checkpoint_async_thread() {
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
+            /* ckpt_dir */      cmd->ckpt_dir,
             /* stream_id */     this->_ckpt_commit_stream_id
         );
         if(unlikely(retval != POS_SUCCESS)){
@@ -609,6 +604,7 @@ void POSWorker::__checkpoint_async_thread() {
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
+            /* ckpt_dir */      cmd->ckpt_dir,
             /* stream_id */     this->_ckpt_stream_id
         );
         if(unlikely(retval != POS_SUCCESS && retval != POS_WARN_ABANDONED)){
@@ -616,7 +612,7 @@ void POSWorker::__checkpoint_async_thread() {
             dirty_retval = retval;
             continue;
         }
-        
+
         retval = this->sync(this->_ckpt_stream_id);
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
@@ -719,16 +715,6 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     /* ========== Ckpt WQ Command from parser thread ========== */
     case kPOS_Command_Parser2Worker_PreDump:
     case kPOS_Command_Parser2Worker_Dump:
-        // if nothing to be checkpointed, we just omit
-        if(unlikely(cmd->checkpoint_handles.size() == 0)){
-            cmd->retval = POS_SUCCESS;
-            retval = this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_Cmd_CQ>(cmd);
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_C("failed to reply ckpt cmd cq to parser: retval(%u)", retval);
-            }
-            goto exit;
-        }
-
         /*!
          *  \note   if previous checkpoint thread hasn't finished yet, we abandon this checkpoint
          *          to avoid waiting overhead here
@@ -745,9 +731,7 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
 
         // drain the device
         POS_TRACE_TICK_START(ckpt, ckpt_drain);
-        if(unlikely(
-            POS_SUCCESS != (retval = this->sync())
-        )){
+        if(unlikely(POS_SUCCESS != (retval = this->sync()))){
             POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
             POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
             goto exit;
@@ -758,7 +742,8 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
 
         // deallocate the thread handle of previous checkpoint
         if(likely(this->async_ckpt_cxt.thread != nullptr)){
-            this->async_ckpt_cxt.thread->join();
+            if(this->async_ckpt_cxt.thread->joinable())
+                this->async_ckpt_cxt.thread->join();
             delete this->async_ckpt_cxt.thread;
         }
 
@@ -767,8 +752,8 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
 
         // reset checkpoint version map
         this->async_ckpt_cxt.checkpoint_version_map.clear();
-        for(handle_set_iter = cmd->checkpoint_handles.begin(); 
-            handle_set_iter != cmd->checkpoint_handles.end(); 
+        for(handle_set_iter = cmd->stateful_handles.begin(); 
+            handle_set_iter != cmd->stateful_handles.end(); 
             handle_set_iter++)
         {
             POS_CHECK_POINTER(handle = *handle_set_iter);

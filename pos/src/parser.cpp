@@ -187,6 +187,7 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     {
     /* ========== Ckpt WQ Command from OOB thread ========== */
     case kPOS_Command_Oob2Parser_Dump:
+    case kPOS_Command_Oob2Parser_PreDump:
         #if POS_CONF_EVAL_CkptOptLevel > 0
             // collect all stateful handles at this timespot to be dumped
             for(auto &handle_id : this->_ws->stateless_resource_type_idx){
@@ -195,11 +196,11 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
                 );
                 for(i=0; i<hm->get_nb_handles(); i++){
                     POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-                    cmd->record_dump_handles(handle);
+                    cmd->record_stateless_handles(handle);
                 }
             }
         #endif // POS_CONF_EVAL_CkptOptLevel
-    case kPOS_Command_Oob2Parser_PreDump:
+
         #if POS_CONF_EVAL_CkptOptLevel > 0
             // collect all stateless handles at this timespot to be predumped
             for(auto &handle_id : this->_ws->stateful_resource_type_idx){
@@ -208,7 +209,7 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
                 );
                 for(i=0; i<hm->get_nb_handles(); i++){
                     POS_CHECK_POINTER(handle = hm->get_handle_by_id(i));
-                    cmd->record_predump_handles(handle);
+                    cmd->record_stateful_handles(handle);
                 }
             }
             cmd->type = cmd->type == kPOS_Command_Oob2Parser_PreDump 

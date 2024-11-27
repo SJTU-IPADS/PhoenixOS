@@ -67,7 +67,11 @@ After succesfully installed PhOS inside the container (See [Build and Install Ph
 5. To C/R using PhOS
 
     ```bash
-    # checkpoint
+    # pre-dump
+    mkdir /root/ckpt
+    pos_cli --pre-dump --dir /root/ckpt --pid [your program pid]
+
+    # dump
     mkdir /root/ckpt
     pos_cli --dump --dir /root/ckpt --pid [your program pid]
 
@@ -81,7 +85,10 @@ After succesfully installed PhOS inside the container (See [Build and Install Ph
     # clear old checkpoints, and mount tmpfs for storing in-memory ckpts
     bash run_nvcr_ckpt.sh -c
 
-    # checkpoint
+    # pre-dump
+    bash run_nvcr_ckpt.sh -s false -g
+
+    # dump
     bash run_nvcr_ckpt.sh -s true -g
 
     # restore

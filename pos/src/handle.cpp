@@ -114,13 +114,13 @@ exit:
 }
 
 
-pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t stream_id){ 
+pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id){ 
     pos_retval_t retval = POS_SUCCESS;
     
     #if POS_CONF_EVAL_CkptEnablePipeline == 1
         //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
         //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
-        retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+        retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
     #else
         uint8_t old_counter;
         old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
@@ -130,7 +130,7 @@ pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t st
                 *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
                 *          commit must be sync, as there could have CoW waiting on this commit to be finished
                 */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
             this->_state_preserve_counter.store(3, std::memory_order_relaxed);
         } else if (old_counter == 1) {
             /*!
@@ -140,13 +140,13 @@ pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t st
                 *          on this handle anymore
                 */
             while(this->_state_preserve_counter < 3){}
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
         } else {
             /*!
                 *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
                 *  \note   same as the last case
                 */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
         }
     #endif  // POS_CONF_EVAL_CkptEnablePipeline        
     

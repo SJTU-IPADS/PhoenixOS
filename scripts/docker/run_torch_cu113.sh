@@ -52,7 +52,7 @@ start_container() {
                     -v $PWD/pos:/root/pos                   \
                     -v $PWD/examples:/root/examples         \
                     -v $PWD/utils:/root/utils               \
-                    -v /nvme:/nvme                          \
+                    -v /data:/data                          \
                     --privileged --ipc=host --network=host  \
                     --name $container_name                  \
                     phoenixos/pytorch:11.3-ubuntu20.04
@@ -63,7 +63,7 @@ start_container() {
         cd $script_dir && cd .. && cd ..
         $SUDO docker run --gpus all -dit                    \
                     -v $PWD:/root                           \
-                    -v /nvme:/nvme                          \
+                    -v /data:/data                          \
                     --privileged --network=host --ipc=host  \
                     --name $container_name                  \
                     phoenixos/pytorch:11.3-ubuntu20.04

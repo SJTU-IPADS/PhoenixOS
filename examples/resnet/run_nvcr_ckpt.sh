@@ -64,13 +64,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "gpu stop: " $(echo "$end - $start" | bc) " s"
 
             # criu dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "pre-dump: " $(echo "$end - $start" | bc) " s"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -78,7 +78,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "gpu resume: " $(echo "$end - $start" | bc) " s"
         else
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -86,13 +86,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "gpu stop: " $(echo "$end - $start" | bc) " s"
 
             # criu dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "pre-dump: " $(echo "$end - $start" | bc) " s"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -100,7 +100,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            echo $(echo "$end - $start" | bc)
+            echo "gpu resume: " $(echo "$end - $start" | bc) " s"
         fi
         echo "ckpt to: $next_ckpt_dir"
     fi

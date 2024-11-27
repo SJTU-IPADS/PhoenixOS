@@ -58,25 +58,25 @@ typedef struct POSCommand_QE {
     std::string ckpt_dir;
 
     // for kPOS_Command_xxx_PreDump and kPOS_Command_xxx_Dump
-    std::set<POSHandle*> predump_handles;
-    std::set<POSHandle*> dump_handles;
+    std::set<POSHandle*> stateful_handles;
+    std::set<POSHandle*> stateless_handles;
 
     /*!
      *  \brief  record all handles that need to be checkpointed within this checkpoint op
      *  \param  handle_set  sets of handles to be added
      *  \param  handle      handle to be added
      */
-    inline void record_predump_handles(std::set<POSHandle*>& handle_set){
-        predump_handles.insert(handle_set.begin(), handle_set.end());
+    inline void record_stateful_handles(std::set<POSHandle*>& handle_set){
+        stateful_handles.insert(handle_set.begin(), handle_set.end());
     }
-    inline void record_predump_handles(POSHandle *handle){
-        predump_handles.insert(handle);
+    inline void record_stateful_handles(POSHandle *handle){
+        stateful_handles.insert(handle);
     }
-    inline void record_dump_handles(std::set<POSHandle*>& handle_set){
-        dump_handles.insert(handle_set.begin(), handle_set.end());
+    inline void record_stateless_handles(std::set<POSHandle*>& handle_set){
+        stateless_handles.insert(handle_set.begin(), handle_set.end());
     }
-    inline void record_dump_handles(POSHandle *handle){
-        dump_handles.insert(handle);
+    inline void record_stateless_handles(POSHandle *handle){
+        stateless_handles.insert(handle);
     }
     // ============================== payloads ==============================
 
