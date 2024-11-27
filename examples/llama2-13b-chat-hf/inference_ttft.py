@@ -32,6 +32,8 @@ torch.backends.cudnn.enabled = False
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 def infer(user_prompt, batch_size=1):
+    ttft_start_time = time.time()
+
     system_prompt = "Act as an expert in writing captivating stories. Your task is to create detailed and engaging characters for a story based on the following abstract. Each character should have a distinct personality, background, motivations, and development arc that aligns with the story's themes and direction. Consider how these characters interact with each other and how their individual journeys contribute to the overall narrative. Make sure to include both protagonists and antagonists, giving each a unique voice and perspective. Your characters should be relatable and compelling to the readers, driving the story forward and enhancing its emotional impact.\n"
 
     B_INST, E_INST = "[INST]", "[/INST]"
@@ -40,15 +42,19 @@ def infer(user_prompt, batch_size=1):
     prompt = f"{B_INST} {B_SYS}{system_prompt.strip()}{E_SYS}{user_prompt.strip()} {E_INST}\n\n"
     inputs = tokenizer([prompt for _ in range(0, batch_size)], return_tensors="pt", return_token_type_ids=False).to(device)
 
-    streamer = TextStreamer(tokenizer)
     coldstart_end_time = time.time()
     print(f'[STATISTICS] coldstart duration: {coldstart_end_time-coldstart_start_time:.2f} s')
 
+    lengths = inputs['input_ids'].shape[1]
+    max_sequence_length = max(inputs['input_ids'].shape[0], lengths)
+
     # streaming
     start_time = time.time()
-    generated_texts = model.generate(**inputs, streamer=streamer)
+    generated_texts = model.generate(**inputs, max_length=max_sequence_length+1)
     # generated_texts = model.generate(**inputs, max_length=512)
     end_time = time.time()
+
+    ttft_time = end_time - ttft_start_time
 
     # calculate throughput
     text_length = 0
@@ -58,6 +64,7 @@ def infer(user_prompt, batch_size=1):
     throughput = text_length / elapsed_time
     print(f'[STATISTICS] Duration: {elapsed_time:.2f} s')
     print(f'[STATISTICS] #Tokens: {text_length}')
+    print(f'[STATISTICS] TTFT: {ttft_time:.2f} s')
     print(f'[STATISTICS] LatencyPerToken: {elapsed_time/text_length*1000:.2f} ms')
     print(f'[STATISTICS] Throughput: {throughput:.2f} characters per second')
 
@@ -69,6 +76,5 @@ def infer(user_prompt, batch_size=1):
 if __name__ == '__main__':
     user_prompt = "In a quiet village nestled between two mountains, a young girl named Lila discovers an ancient, shimmering stone that grants her the ability to communicate with the stars. As she learns their secrets, she finds herself drawn into a cosmic conflict between light and darkness. With the fate of her village hanging in the balance, Lila must unite her community and harness the power of the stars to restore harmony before the shadows consume everything she loves."
 
-    for i in range(0, 20):
-        infer(user_prompt=user_prompt, batch_size=1)
-        print("\n\n\n")
+    infer(user_prompt=user_prompt, batch_size=1)
+    print("\n\n\n")

@@ -523,6 +523,8 @@ void POSWorker::__daemon_ckpt_async(){
                 wqe->has_return = true;
             }
 
+            if(unlikely(wqe->id < this->_max_wqe_id))
+                POS_LOG("wqe->id: %lu, this->_max_wqe_id: %lu", wqe->id, this->_max_wqe_id);
             POS_ASSERT(wqe->id >= this->_max_wqe_id);
             this->_max_wqe_id = wqe->id;
         }

@@ -441,7 +441,7 @@ pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
     }
 
     // check whether checkpoint exit
-    retval = get_checkpoint_slot<ckpt_slot_pos, ckpt_state_type>(&ckpt_slot, version);
+    retval = this->get_checkpoint_slot<ckpt_slot_pos, ckpt_state_type>(&ckpt_slot, version);
     if(POS_SUCCESS != retval){
         goto exit;
     }
