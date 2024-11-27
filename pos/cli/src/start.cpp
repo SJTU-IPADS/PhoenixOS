@@ -68,7 +68,13 @@ pos_retval_t handle_start(pos_cli_options_t &clio){
     if(!strcmp(clio.metas.start.target_name, "daemon")){
         // start PhOS daemomn
         phosd_cmd = std::string("cricket-rpc-server");
-        retval = POSUtil_Command_Caller::exec_sync(phosd_cmd, phosd_result, true, true);
+        retval = POSUtil_Command_Caller::exec_sync(
+            phosd_cmd,
+            phosd_result,
+            /* ignore_error */ false,
+            /* print_stdout */ true,
+            /* print_stderr */ true
+        );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("phosd start failed");
             goto exit;

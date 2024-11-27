@@ -61,15 +61,24 @@ namespace cli_ckpt_dump {
         POS_CHECK_POINTER(cmd = new POSCommand_QE_t);
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_Dump;
-        cmd->ckpt_dir = std::string(payload->ckpt_dir);
+        cmd->ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
 
-        // make sure the directory exists
-        if(unlikely(!std::filesystem::exists(cmd->ckpt_dir))){
-            retmsg = "no ckpt dir created, this is a bug inside CLI";
-            payload->retval = POS_FAILED_NOT_EXIST;
+        // create ckpt directory for GPU-side
+        POS_ASSERT(std::filesystem::exists(payload->ckpt_dir));
+        POS_ASSERT(!std::filesystem::exists(cmd->ckpt_dir));
+        try {
+            std::filesystem::create_directories(cmd->ckpt_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            POS_WARN(
+                "failed dump, failed to create directory for GPU-side: dir(%s), error(%s)",
+                cmd->ckpt_dir.c_str(), e.what()
+            );
+            retmsg = "see posd log for more details";
+            payload->retval = POS_FAILED;
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
             goto response;
         }
+        POS_LOG("create dump dir for GPU-side: %s", cmd->ckpt_dir.c_str());
 
         // send to parser
         retval = client->template push_q<kPOS_QueueDirection_Oob2Parser, kPOS_QueueType_Cmd_WQ>(cmd);

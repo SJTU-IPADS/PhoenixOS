@@ -331,6 +331,8 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             // we need to make sure we drain all unexecuted APIs
             // POS_LOG("max_wqe_id: %lu, _api_inst_pc-1:%lu", max_wqe_id, this->_client->_api_inst_pc - 1);
             wqes.clear();
+            // TODO: this might be buggy, consider what if there's a sync call, and simontinuously we dump the program,
+            //       then the retval won't never be returned!
             this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
             for(i=0; i<wqes.size(); i++){
                 POS_CHECK_POINTER(wqe = wqes[i]);

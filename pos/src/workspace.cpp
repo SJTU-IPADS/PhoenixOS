@@ -426,6 +426,7 @@ int POSWorkspace::pos_process(
      *  \note   during restore, we resume the gpu first, then cpu, so this push is safe
      *  \todo   we need to make sure client is already ready if we overlap the restore later
      */
+    while(!client->status == kPOS_ClientStatus_Active){} // TODO: not absolutely right here
     client->push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(wqe);
 
     /*!

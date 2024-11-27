@@ -66,13 +66,13 @@ check_and_install_go() {
         cd $DIR_ASSETS
         rm -rf /usr/local/go
         tar -C /usr/local -xzf go1.23.2.linux-amd64.tar.gz
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> $HOME/.bashrc
-        source $HOME/.bashrc
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+        source /etc/profile
         if [[ ! -x "$(command -v go)" ]]; then
             error "failed to install golang runtime"
         fi
         log "go1.23.2 installed"
-        warn "please \"source $HOME/.bashrc\" for loading golang"
+        warn "please \"source /etc/profile\" for loading golang"
     fi
 }
 

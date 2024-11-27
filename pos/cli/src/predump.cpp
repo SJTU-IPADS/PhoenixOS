@@ -43,6 +43,7 @@
 pos_retval_t handle_predump(pos_cli_options_t &clio){
     pos_retval_t retval = POS_SUCCESS;
     oob_functions::cli_ckpt_predump::oob_call_data_t call_data;
+
     std::string mount_cmd, mount_result;
     std::uintmax_t nb_removed_files;
     bool has_mount_before = false;
@@ -207,8 +208,6 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
             }
             nb_removed_files = 0;
             for(auto& de : std::filesystem::directory_iterator(clio.metas.ckpt.ckpt_dir)) {
-                if (de.path().filename() == std::string("/tmpfs_mount.lock")) { continue; }
-
                 // returns the number of deleted entities since c++17:
                 nb_removed_files += std::filesystem::remove_all(de.path());
             }
@@ -261,37 +260,74 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
         mount_cmd   = std::string("mount -t tmpfs -o size=")
                     + POSUtilSystem::format_byte_number(avail_mem_bytes * 0.8)
                     + std::string(" tmpfs ") + std::string(clio.metas.ckpt.ckpt_dir);
-        POS_LOG("%s", mount_cmd.c_str());
         
-        retval = POSUtil_Command_Caller::exec_sync(mount_cmd, mount_result, true, true);
+        retval = POSUtil_Command_Caller::exec_sync(
+            mount_cmd,
+            mount_result,
+            /* ignore_error */ false,
+            /* print_stdout */ true,
+            /* print_stderr */ true
+        );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to mount predump directory to tmpfs, the predump might be slowed down due to storage IO");
         } else {
-            POS_DEBUG("mount pre-dump dir to tmpfs: size(%lu), dir(%s)",  avail_mem_bytes * 0.8, cmd->ckpt_dir.c_str());
-            mount_existance_file_stream.open(mount_existance_file);
-            if(unlikely(!mount_existance_file_stream.is_open())){
-                POS_WARN(
-                    "failed to create mount existance file, yet still successfully mount to tmpfs: path(%s)",
-                    mount_existance_file.c_str()
-                );
-            }
-            mount_existance_file_stream << std::to_string(static_cast<int>(avail_mem_bytes * 0.8));
-            mount_existance_file_stream.close();
+            POS_LOG(
+                "mount pre-dump dir to tmpfs: size(%lu), dir(%s)",
+                avail_mem_bytes * 0.8, clio.metas.ckpt.ckpt_dir
+            );
         }
     }
 
-    // step 3: CPU-side predump (async)
+    // step 3: create mount existance file
+    POS_ASSERT(!std::filesystem::exists(mount_existance_file));
+    mount_existance_file_stream.open(mount_existance_file);
+    if(unlikely(!mount_existance_file_stream.is_open())){
+        POS_WARN(
+            "failed to create mount existance file, yet still successfully mount to tmpfs: path(%s)",
+            mount_existance_file.c_str()
+        );
+    }
+    mount_existance_file_stream << std::to_string(static_cast<int>(avail_mem_bytes * 0.8));
+    mount_existance_file_stream.close();
+
+    // step 4: check whether CPU-side (CRIU) support predump
+    criu_cmd = std::string("criu check --all");
+    criu_result.clear();
+    retval = POSUtil_Command_Caller::exec_sync(
+        criu_cmd,
+        criu_result,
+        /* ignore_error */ true,
+        /* print_stdout */ false,
+        /* print_stderr */ false
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN("predump failed, failed to check criu supports: retval(%s)", criu_result.c_str());
+        goto exit;
+    }
+    if(criu_result.find("Dirty tracking is OFF. Memory snapshot will not work.") != std::string::npos){
+        POS_WARN("CRIU doesn't support pre-dump, please consider recompile your kernel, see https://github.com/checkpoint-restore/criu/issues/545#issuecomment-416024221");
+        retval = POS_FAILED;
+        goto exit;
+    }
+
+    // step 5: CPU-side predump (async)
     criu_cmd    = std::string("criu pre-dump ")
                 + std::string("--tree ") + std::to_string(clio.metas.ckpt.pid) + std::string (" ")
                 + std::string("--images-dir ") + std::string(clio.metas.ckpt.ckpt_dir) + std::string (" ")
-                + std::string("--leave-running --shell-job --display-stats");
-    retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, criu_result, false, false);
+                + std::string("--leave-running --track-mem --shell-job --display-stats");
+    criu_result.clear();
+    retval = POSUtil_Command_Caller::exec_async(
+        criu_cmd, criu_thread, criu_thread_promise, criu_result,
+        /* ignore_error */ false,
+        /* print_stdout */ false,
+        /* print_stderr */ false
+    );
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN("predump failed, failed to start cpu-side predump thread: retval(%u)", retval);
         goto exit;
     }
 
-    // step 4: GPU-side predump (sync)
+    // step 6: GPU-side predump (sync)
     call_data.pid = clio.metas.ckpt.pid;
     memcpy(
         call_data.ckpt_dir,
@@ -304,7 +340,7 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
         goto exit;
     }
 
-    // step 5: check CPU-side predump result
+    // step 7: check CPU-side predump result
     if(criu_thread.joinable()){ criu_thread.join(); }
     retval = criu_thread_future.get();
     if(POS_SUCCESS != retval){

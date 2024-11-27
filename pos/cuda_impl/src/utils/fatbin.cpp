@@ -77,7 +77,13 @@ pos_retval_t POSUtil_CUDA_Kernel_Parser::__generate_prototype(const std::string&
 
     cmd = std::string("cu++filt ") + kernel_demangles_name;
     kernel_prototype.clear();
-    retval = POSUtil_Command_Caller::exec_sync(cmd, kernel_prototype);
+    retval = POSUtil_Command_Caller::exec_sync(
+        cmd,
+        kernel_prototype,
+        /* ignore_error */ false,
+        /* print_stdout */ false,
+        /* print_stderr */ false
+    );
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN(
             "failed to analyse paramter details of kernel %s due to failed cu++filt execution: cmd(%s)",

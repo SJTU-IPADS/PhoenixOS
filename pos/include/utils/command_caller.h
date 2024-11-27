@@ -32,13 +32,17 @@ class POSUtil_Command_Caller {
      *  \brief  execute a specified command and obtain its result (synchronously)
      *  \param  cmd             the command to execute
      *  \param  result          the result of the executed command
+     *  \param  ignore_error    whether to ignore command execution error (exit_code != 0)
      *  \param  print_stdout    dynamically printing stdout
      *  \param  print_stderr    dynamically printing stderr
      *  \todo   this function should support timeout option
      *  \return POS_SUCCESS once the command is successfully executed
      *          POS_FAILED if failed
      */
-    static inline pos_retval_t exec_sync(std::string& cmd, std::string& result, bool print_stdout = false, bool print_stderr = false){
+    static inline pos_retval_t exec_sync(
+        std::string& cmd, std::string& result, 
+        bool ignore_error = false, bool print_stdout = false, bool print_stderr = false
+    ){
         pos_retval_t retval = POS_SUCCESS;
         std::array<char, 8192> buffer;
         int exit_code = -1;
@@ -68,7 +72,7 @@ class POSUtil_Command_Caller {
         }
 
         exit_code = WEXITSTATUS(pclose(pipe));
-        if(unlikely(exit_code != 0)){
+        if(unlikely(exit_code != 0) && ignore_error == false){
             POS_WARN("failed execution of command %s: exit_code(%d)", cmd.c_str(), exit_code);
             retval = POS_FAILED;
             goto exit;
@@ -85,6 +89,7 @@ class POSUtil_Command_Caller {
      *  \param  async_thread    thread handle of the async command execution
      *  \param  thread_promise  return value of the async thread
      *  \param  result          the result of the executed command
+     *  \param  ignore_error    whether to ignore command execution error (exit_code != 0)
      *  \param  print_stdout    dynamically printing stdout
      *  \param  print_stderr    dynamically printing stderr
      *  \todo   this function should support timeout option
@@ -93,7 +98,7 @@ class POSUtil_Command_Caller {
      */
     static inline pos_retval_t exec_async(
         std::string& cmd, std::thread& async_thread, std::promise<pos_retval_t>& thread_promise,
-        std::string& result, bool print_stdout = false, bool print_stderr = false
+        std::string& result, bool ignore_error = false, bool print_stdout = false, bool print_stderr = false
     ){
         pos_retval_t retval = POS_SUCCESS;
 
@@ -126,7 +131,7 @@ class POSUtil_Command_Caller {
             }
 
             exit_code = WEXITSTATUS(pclose(pipe));
-            if(unlikely(exit_code != 0)){
+            if(unlikely(exit_code != 0) && ignore_error == false){
                 POS_WARN("failed execution of command %s: exit_code(%d)", cmd.c_str(), exit_code);
                 thread_promise.set_value(POS_FAILED);
             } else {

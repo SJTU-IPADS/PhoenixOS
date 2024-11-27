@@ -65,9 +65,7 @@ namespace cli_ckpt_predump {
         
         // create ckpt directory for GPU-side
         POS_ASSERT(std::filesystem::exists(payload->ckpt_dir));
-        if (unlikely(std::filesystem::exists(cmd->ckpt_dir))) {
-            
-        }
+        POS_ASSERT(!std::filesystem::exists(cmd->ckpt_dir));
         try {
             std::filesystem::create_directories(cmd->ckpt_dir);
         } catch (const std::filesystem::filesystem_error& e) {

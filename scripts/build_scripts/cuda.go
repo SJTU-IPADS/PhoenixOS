@@ -181,7 +181,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
                 tmux new -s cargo_installer -d
                 tmux send -t cargo_installer "curl https://sh.rustup.rs -sSf | sh; exit 0" ENTER
                 tmux send-keys -t cargo_installer C-m
-                echo '. "$HOME/.cargo/env"' >> $HOME/.bashrc
+                echo '. "$HOME/.cargo/env"' >> /etc/profile
                 `,
                 false, logger,
             )
@@ -189,7 +189,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
         }
 		post_install_cargo := func() error {
 			logger.Infof(
-				"Please \"source ~/.bashrc\" to load environment variables for cargo, and then execute \"%s\" to continue [NOT FINISHED YET!]",
+				"Please \"source /etc/profile\" to load environment variables for cargo, and then execute \"%s\" to continue [NOT FINISHED YET!]",
 				utils.GetThisCommand(),
 			)
 			os.Exit(0)

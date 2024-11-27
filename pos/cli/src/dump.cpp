@@ -30,10 +30,11 @@
 #include <unistd.h>
 
 #include "pos/include/common.h"
-#include "pos/include/utils/command_caller.h"
-#include "pos/include/utils/string.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_dump.h"
+#include "pos/include/utils/system.h"
+#include "pos/include/utils/command_caller.h"
+#include "pos/include/utils/string.h"
 #include "pos/cli/cli.h"
 
 
@@ -45,6 +46,14 @@
 pos_retval_t handle_dump(pos_cli_options_t &clio){
     pos_retval_t retval = POS_SUCCESS, criu_retval;
     oob_functions::cli_ckpt_dump::oob_call_data_t call_data;
+
+    std::string mount_cmd, mount_result;
+    std::uintmax_t nb_removed_files;
+    bool has_mount_before = false;
+    uint64_t total_mem_bytes, avail_mem_bytes;
+    std::string mount_existance_file;
+    std::ofstream mount_existance_file_stream;
+
     std::string criu_cmd, criu_result;
     std::thread criu_thread;
     std::promise<pos_retval_t> criu_thread_promise;
@@ -86,27 +95,8 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
                         goto exit;
                     }
 
-                    dump_dir = absolute_path.string() + std::string("/phos");
-                    POS_ASSERT(dump_dir.size() < oob_functions::cli_ckpt_dump::kCkptFilePathMaxLen);
-
-                    // make sure the directory exist and fresh
-                    if (std::filesystem::exists(dump_dir)) {
-                        std::filesystem::remove_all(dump_dir);
-                    }
-                    try {
-                        std::filesystem::create_directories(dump_dir);
-                    } catch (const std::filesystem::filesystem_error& e) {
-                        POS_WARN(
-                            "failed to create checkpoint directory: error(%s), dir(%s)",
-                            e.what(), dump_dir.c_str()
-                        );
-                        retval = POS_FAILED;
-                        goto exit;
-                    }
-                    POS_LOG("create ckpt dir: %s",  dump_dir.c_str());
-
                     memset(clio.metas.ckpt.ckpt_dir, 0, oob_functions::cli_ckpt_dump::kCkptFilePathMaxLen);
-                    memcpy(clio.metas.ckpt.ckpt_dir, dump_dir.c_str(), dump_dir.size());
+                    memcpy(clio.metas.ckpt.ckpt_dir, absolute_path.string().c_str(), absolute_path.string().size());
 
                 exit:
                     return retval;
@@ -212,41 +202,142 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
         }
     );
 
-    // call criu
+    mount_existance_file = std::string(clio.metas.ckpt.ckpt_dir) + std::string("/tmpfs_mount.lock");
+
+    // step 1: make sure the directory exist and fresh
+    if (std::filesystem::exists(clio.metas.ckpt.ckpt_dir)) {
+        try {
+            if(std::filesystem::exists(mount_existance_file)){
+                has_mount_before = true;
+            }
+            nb_removed_files = 0;
+            for(auto& de : std::filesystem::directory_iterator(clio.metas.ckpt.ckpt_dir)) {
+                // returns the number of deleted entities since c++17:
+                nb_removed_files += std::filesystem::remove_all(de.path());
+            }
+            POS_LOG(
+                "clean old assets under specified dump dir: dir(%s), nb_removed_files(%lu)",
+                clio.metas.ckpt.ckpt_dir, nb_removed_files
+            );
+            POS_LOG("reuse dump dir: %s",  clio.metas.ckpt.ckpt_dir);
+        } catch (const std::exception& e) {
+            POS_WARN(
+                "failed to remove old assets under specified dump dir: dir(%s), error(%s)",
+                clio.metas.ckpt.ckpt_dir, e.what()
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+    } else {
+        try {
+            std::filesystem::create_directories(clio.metas.ckpt.ckpt_dir);
+        } catch (const std::filesystem::filesystem_error& e) {
+            POS_WARN(
+                "failed to create dump directory: dir(%s), error(%s)",
+                clio.metas.ckpt.ckpt_dir, e.what()
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+        POS_LOG("create dump dir: %s", clio.metas.ckpt.ckpt_dir);
+    }
+
+    // step 2: mount the memory to tmpfs
+    if(has_mount_before == false){
+        // obtain available memory on the system
+        retval = POSUtilSystem::get_memory_info(total_mem_bytes, avail_mem_bytes);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed dump, failed to obtain memory information of the ststem");
+            retval = POS_FAILED;
+            goto exit;
+        }
+        if(unlikely(avail_mem_bytes <= MB(128))){
+            POS_WARN(
+                "failed dump, not enough memory on the system: total(%lu bytes), avail(%lu bytes)",
+                total_mem_bytes, avail_mem_bytes
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // execute mount cmd
+        mount_cmd   = std::string("mount -t tmpfs -o size=")
+                    + POSUtilSystem::format_byte_number(avail_mem_bytes * 0.8)
+                    + std::string(" tmpfs ") + std::string(clio.metas.ckpt.ckpt_dir);
+        
+        retval = POSUtil_Command_Caller::exec_sync(
+            mount_cmd,
+            mount_result,
+            /* ignore_error */ false,
+            /* print_stdout */ true,
+            /* print_stderr */ true
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN("failed to mount dump directory to tmpfs, the dump might be slowed down due to storage IO");
+        } else {
+            POS_LOG(
+                "mount dump dir to tmpfs: size(%s), dir(%s)",
+                POSUtilSystem::format_byte_number(avail_mem_bytes * 0.8).c_str(),
+                clio.metas.ckpt.ckpt_dir
+            );
+        }
+    }
+
+    // step 3: create mount existance file
+    POS_ASSERT(!std::filesystem::exists(mount_existance_file));
+    mount_existance_file_stream.open(mount_existance_file);
+    if(unlikely(!mount_existance_file_stream.is_open())){
+        POS_WARN(
+            "failed to create mount existance file, yet still successfully mount to tmpfs: path(%s)",
+            mount_existance_file.c_str()
+        );
+    }
+    mount_existance_file_stream << std::to_string(static_cast<int>(avail_mem_bytes * 0.8));
+    mount_existance_file_stream.close();
+
+    // step 4: CPU-side dump (async)
     criu_cmd = std::string("criu dump")
                 +   std::string(" --images-dir ") + std::string(clio.metas.ckpt.ckpt_dir)
                 +   std::string(" --shell-job --display-stats")
                 +   std::string(" --tree ") + std::to_string(clio.metas.ckpt.pid);
-    retval = POSUtil_Command_Caller::exec_sync(criu_cmd, criu_result, true, true);
-    // retval = POSUtil_Command_Caller::exec_async(criu_cmd, criu_thread, criu_thread_promise, criu_result, true, true);
+    // retval = POSUtil_Command_Caller::exec_sync(
+    //     criu_cmd, criu_result,
+    //     /* ignore_error */ false,
+    //     /* print_stdout */ true,
+    //     /* print_stderr */ true
+    // );
+    retval = POSUtil_Command_Caller::exec_async(
+        criu_cmd, criu_thread, criu_thread_promise, criu_result,
+        /* ignore_error */ false,
+        /* print_stdout */ true,
+        /* print_stderr */ true
+    );
     if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN("cpu dump failed");
+        POS_WARN("dump failed, failed to start cpu-side dump thread: retval(%u)", retval);
         // POS_WARN("failed to execute CRIU");
         goto exit;
     }
 
-    // send dump request to posd
+    // step 5: GPU-side dump (sync)
     call_data.pid = clio.metas.ckpt.pid;
     memcpy(
         call_data.ckpt_dir,
         clio.metas.ckpt.ckpt_dir,
         oob_functions::cli_ckpt_dump::kCkptFilePathMaxLen
     );
-
-    // check gpu dump
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_Dump, &call_data);
     if(POS_SUCCESS != call_data.retval){
-        POS_WARN("gpu dump failed, %s", call_data.retmsg);
+        POS_WARN("dump failed, gpu-side dump failed, %s", call_data.retmsg);
         goto exit;
     }
 
-    // check cpu dump
-    // if(criu_thread.joinable()){ criu_thread.join(); }
-    // criu_retval = criu_thread_future.get();
-    // if(POS_SUCCESS != call_data.retval){
-    //     POS_WARN("cpu dump failed");
-    //     goto exit;
-    // }
+    // step 6: check CPU-side predump result
+    if(criu_thread.joinable()){ criu_thread.join(); }
+    retval = criu_thread_future.get();
+    if(POS_SUCCESS != retval){
+        POS_WARN("dump failed, cpu-side dump failed: %s", criu_result.c_str());
+        goto exit;
+    }
 
     POS_LOG("dump done");
 
