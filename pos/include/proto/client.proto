@@ -26,4 +26,5 @@ message Bin_POSClient {
     uint64 uuid = 1;
     uint64 pid = 2;
     string job_name = 3;
+    uint64 api_inst_pc = 4;
 }

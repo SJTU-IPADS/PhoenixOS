@@ -266,7 +266,11 @@ class POSClient {
     // worker thread handle
     POSWorker *worker;
 
+    // mark whether this client is under sync call
+    bool is_under_sync_call;
+
  protected:
+    friend class POSWorkspace;
     friend class POSParser;
     friend class POSWorker;
 
@@ -279,7 +283,7 @@ class POSClient {
     // the global workspace
     POSWorkspace *_ws;
     /* ====================== basic ====================== */
-   
+
 
     /* =============== checkpoint / restore ============== */
  public:

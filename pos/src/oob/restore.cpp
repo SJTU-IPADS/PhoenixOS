@@ -93,7 +93,8 @@ namespace cli_restore {
         POS_LOG("restored apicxts");
 
         // now it's time to let client start to work
-        client->status = kPOS_ClientStatus_Active;
+        client->status = kPOS_ClientStatus_Active;  // start polling its internal queue
+        POS_LOG("resumed execution of client");
 
     response:
         POS_ASSERT(retmsg.size() < kServerRetMsgMaxLen);

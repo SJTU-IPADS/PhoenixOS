@@ -396,7 +396,7 @@ void POSWorker::__daemon_ckpt_async(){
         }
 
         // step 2: check whether we need to run the bottom half of concurrent checkpoint
-        if(unlikely(this->async_ckpt_cxt.BH_active == true)){
+        if(unlikely(this->async_ckpt_cxt.BH_active == true) && this->_client->is_under_sync_call == false){
             tmp_retval = this->__checkpoint_BH_sync();
             continue;
         }
@@ -710,14 +710,13 @@ void POSWorker::__checkpoint_TH_async_thread() {
     //                handles and do the dirty-copy
     //                refine this logic later
     this->async_ckpt_cxt.BH_active = true;
-
  exit:
     ;
 }
 
 
 pos_retval_t POSWorker::__checkpoint_BH_sync() {
-    pos_retval_t retval;
+    pos_retval_t retval = POS_SUCCESS;
     POSHandle *handle;
     pos_u64id_t max_wqe_id = 0;
     uint64_t nb_ckpt_handles = 0;
@@ -795,6 +794,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     POS_LOG("#dirty-copy handles(%lu), dirty-copy size(%lu bytes)", nb_ckpt_dirty_handles, dirty_ckpt_size);
 
     // step 4: for dump, we also need to save unexecuted APIs
+    // TODO: no need to worry there would be further wqe coming, as current CLI is design to first C cpu the C gpu
     nb_ckpt_wqes = 0;
     while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
         // we need to make sure we drain all unexecuted APIs

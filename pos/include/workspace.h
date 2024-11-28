@@ -21,6 +21,7 @@
 #include <map>
 #include <string>
 #include <mutex>
+#include <atomic>
 #include <stdint.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -169,12 +170,24 @@ class POSWorkspace {
      */
     pos_retval_t restore_client(std::string& ckpt_file, POSClient** clnt);
 
+
     /*!
      *  \brief  obtain client by given uuid
      *  \param  uuid    uuid of the client
      *  \return pointer to the corresponding POSClient
      */
-    POSClient* get_client_by_uuid(pos_client_uuid_t uuid);
+    inline POSClient* get_client_by_uuid(pos_client_uuid_t uuid){
+        POSClient *retval = nullptr;
+
+        if(uuid >= this->_client_list.size()){
+            goto exit;
+        }
+        retval = this->_client_list[uuid];
+        
+    exit:
+        return retval;
+    }
+
 
     /*!
      *  \brief  obtain client by given pid
@@ -182,14 +195,6 @@ class POSWorkspace {
      *  \return pointer to the corresponding POSClient
      */
     POSClient* get_client_by_pid(__pid_t pid);
-
-    /*!
-     *  \brief  obtain client map
-     *  \return client map
-     */
-    inline std::map<pos_client_uuid_t, POSClient*>& get_client_map(){
-        return this->_client_map;
-    }
 
  protected:
     /*!
@@ -210,6 +215,23 @@ class POSWorkspace {
     virtual pos_retval_t __destory_client(POSClient *client){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
+
+
+    // map of clients
+    std::vector<POSClient*> _client_list;
+    std::map<__pid_t, POSClient*> _pid_client_map;
+
+    // the max uuid that has been recorded
+    pos_client_uuid_t _current_max_uuid;
+
+    // confirms before removing client
+    //  remove source:
+    //      [1] oob unregister client
+    //      [2] oob dump client
+    //  confirm source:
+    //      [1] pos_process_ready
+    std::atomic<bool> _remove_client_acquire;
+
     /* ============ end of client management functions =========== */
 
  public:
@@ -227,6 +249,7 @@ class POSWorkspace {
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t> param_desps,
         void* ret_data=nullptr, uint64_t ret_data_len=0
     );
+
 
     // api manager
     POSApiManager *api_mgnr;
@@ -252,16 +275,6 @@ class POSWorkspace {
      *  \note   use cases: intereact with CLI, and also agent-side
      */
     POSOobServer *_oob_server;
-
-    // map of clients
-    std::map<pos_client_uuid_t, POSClient*> _client_map;
-    std::map<__pid_t, POSClient*> _pid_client_map;
-
-    // the max uuid that has been recorded
-    pos_client_uuid_t _current_max_uuid;
-
-    // context for creating the client
-    pos_client_cxt_t _template_client_cxt;
 
     /*!
      *  \brief  initialize the workspace

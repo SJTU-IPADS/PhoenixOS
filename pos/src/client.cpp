@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <map>
+#include <set>
 #include <algorithm>
 #include <filesystem>
 #include <stdint.h>
@@ -36,6 +37,7 @@ POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, PO
     :   id(id),
         pid(pid),
         status(kPOS_ClientStatus_CreatePending),
+        is_under_sync_call(false),
         _api_inst_pc(0), 
         _cxt(cxt),
         _ws(ws)
@@ -46,6 +48,7 @@ POSClient::POSClient()
     :   id(0),
         pid(0),
         status(kPOS_ClientStatus_CreatePending),
+        is_under_sync_call(false),
         _ws(nullptr)
 {
     POS_ERROR_C("shouldn't call, just for passing compilation");
@@ -81,7 +84,9 @@ exit:
          *          this should be done after all unexecuted API are loaded
          *          again to parser2worker apicxt queues.
          */
-        if(is_restoring == false){
+        if(is_restoring == true){
+            this->status = kPOS_ClientStatus_Hang;
+        } else {
             this->status = kPOS_ClientStatus_Active;
         }
     }
@@ -130,6 +135,7 @@ pos_retval_t POSClient::persist(std::string& ckpt_dir){
     client_binary.set_uuid(this->id);
     client_binary.set_pid(this->pid);
     client_binary.set_job_name(this->_cxt.job_name);
+    client_binary.set_api_inst_pc(this->_api_inst_pc);
 
     // form the path to the checkpoint file of this handle
     ckpt_file_path = ckpt_dir + std::string("/c.bin");
@@ -283,6 +289,8 @@ exit:
 pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     pos_u64id_t apicxt_id;
+    std::set<std::filesystem::path> sorted_by_name;
+    typename std::set<std::filesystem::path>::iterator set_iter;
 
     POS_ASSERT(ckpt_dir.size() > 0);
     if (!std::filesystem::exists(ckpt_dir) || !std::filesystem::is_directory(ckpt_dir)) {
@@ -291,21 +299,29 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
         goto exit;
     }
 
+    // we organize into a set to make sure we insert the wqes in order to the queue
     for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
         if (    entry.is_regular_file() 
             &&  entry.path().extension() == ".bin"
             &&  entry.path().filename().string().rfind("a-", 0) == 0
         ){
-            retval = this->__reload_apicxt(entry.path().string());
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN_C(
-                    "failed to reload api context: ckpt_file(%s)",
-                    entry.path().string().c_str()
-                );
-                goto exit;
-            }
+            sorted_by_name.insert(entry.path());
         }
     }
+
+    for(set_iter = sorted_by_name.begin(); set_iter != sorted_by_name.end(); set_iter++){
+        retval = this->__reload_apicxt((*set_iter).string());
+        POS_LOG("reload %s", (*set_iter).string().c_str());
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C(
+                "failed to reload api context: ckpt_file(%s)",
+                (*set_iter).string().c_str()
+            );
+            goto exit;
+        }
+    }
+            
+            
 
 exit:
     return retval;

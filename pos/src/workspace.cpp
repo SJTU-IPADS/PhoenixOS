@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <string>
+#include <atomic>
 #include <filesystem>
 #include "pos/include/common.h"
 #include "pos/include/workspace.h"
@@ -142,7 +143,11 @@ exit:
 }
 
 
-POSWorkspace::POSWorkspace() : _current_max_uuid(0), ws_conf(this) {
+POSWorkspace::POSWorkspace() :
+    _current_max_uuid(0),
+    _remove_client_acquire(false),
+    ws_conf(this)
+{
     // create out-of-band server
     _oob_server = new POSOobServer(
         /* ws */ this,
@@ -196,7 +201,9 @@ pos_retval_t POSWorkspace::init(){
 
 
 pos_retval_t POSWorkspace::deinit(){
-    typename std::map<pos_client_uuid_t, POSClient*>::iterator clnt_iter;
+    pos_retval_t retval;
+    uint64_t i, nb_clean_client;
+    POSClient *client;
 
     POS_DEBUG_C("deinitializing POS workspace...")
 
@@ -205,16 +212,27 @@ pos_retval_t POSWorkspace::deinit(){
         delete _oob_server;
     }
 
-    POS_DEBUG_C("cleaning all clients...: #clients(%lu)", this->_client_map.size());
-    for(clnt_iter = this->_client_map.begin(); clnt_iter != this->_client_map.end(); clnt_iter++){
-        if(clnt_iter->second != nullptr){
-            clnt_iter->second->deinit();
-            delete clnt_iter->second;
+    POS_DEBUG_C("cleaning all clients...");
+    nb_clean_client = 0;
+    for(i=0; i<this->_client_list.size(); i++){
+        client = this->get_client_by_uuid(i);
+        if(client != nullptr){
+            delete client;
+            this->_client_list[i] = nullptr;
+            nb_clean_client += 1;
         }
     }
+    POS_BACK_LINE;
+    POS_DEBUG_C("cleaned clients: #clients(%lu)", nb_clean_client);
 
     POS_DEBUG_C("deinit platform-specific context...");
-    return this->__deinit();
+    retval = this->__deinit();
+    if(likely(retval == POS_SUCCESS)){
+        POS_BACK_LINE;
+        POS_DEBUG_C("deinited platform-specific context");
+    }
+    
+    return retval;
 }
 
 
@@ -222,21 +240,8 @@ pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSCl
     pos_retval_t retval = POS_SUCCESS;
     uuid_t uuid;
 
-    auto __uuid_to_uint64 = [](const uuid_t uuid) -> uint64_t {
-        static bool is_first = true;
-        uint64_t value = 0;
-
-        // TODO: comment out this once we enable piggyback support of uuid
-        //      in remoting framework
-        if(is_first == true){ is_first = false; return 0; }
-
-        for (int i = 0; i < 8; ++i) { value = (value << 8) | uuid[i]; }
-        return value;
-    };
-
-    // generate uuid for this client
-    uuid_generate_random(uuid);
-    param.id = __uuid_to_uint64(uuid);
+    param.id = this->_current_max_uuid;
+    this->_current_max_uuid += 1;
     param.is_restoring = false;
 
     // create client
@@ -245,7 +250,9 @@ pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSCl
         POS_WARN_C("failed to create platform-specific client");
         goto exit;
     }
-    this->_client_map[(*clnt)->id] = (*clnt);
+
+    this->_client_list.resize(this->_current_max_uuid);
+    this->_client_list[(*clnt)->id] = (*clnt);
     this->_pid_client_map[param.pid] = (*clnt);
     POS_DEBUG_C("create client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, param.pid);
 
@@ -259,12 +266,14 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     POSClient *clnt;
     typename std::map<__pid_t, POSClient*>::iterator pid_client_map_iter;
 
-    if(unlikely(this->_client_map.count(uuid) == 0)){
+    while(this->_remove_client_acquire.exchange(true)){}
+
+    clnt = this->get_client_by_uuid(uuid);
+    if(unlikely(clnt == nullptr)){
         POS_WARN_C("try to remove an non-exist client: uuid(%lu)", uuid);
         retval = POS_FAILED_NOT_EXIST;
         goto exit;
     }
-    POS_CHECK_POINTER(clnt = _client_map[uuid]);
 
     // delete from pid map
     for(pid_client_map_iter = this->_pid_client_map.begin();
@@ -285,11 +294,12 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     }
 
     // erase from global map
-    _client_map.erase(uuid);
+    this->_client_list[uuid] = nullptr;
 
     POS_DEBUG_C("removed client: uuid(%lu)", uuid);
 
 exit:
+    this->_remove_client_acquire.store(false);
     return retval;
 }
 
@@ -302,6 +312,7 @@ pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** cl
     pos_client_uuid_t client_uuid;
     pid_t client_pid;
     std::string client_job_name;
+    POSClient *tmp_client;
 
     POS_CHECK_POINTER(clnt);
     
@@ -322,7 +333,9 @@ pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** cl
     create_param.job_name = client_binary.job_name();
     create_param.is_restoring = true;
 
-    if(unlikely(this->_client_map.count(create_param.id) > 0)){
+    // TODO: fix this logic later, reassign new client id
+    tmp_client = this->get_client_by_uuid(create_param.id);
+    if(unlikely(tmp_client != nullptr)){
         POS_WARN_C("confliction of client uuid, %s", POS_BUG_REPORT);
         retval = POS_FAILED;
         goto exit;
@@ -339,7 +352,13 @@ pos_retval_t POSWorkspace::restore_client(std::string& ckpt_file, POSClient** cl
         POS_WARN_C("failed to create platform-specific client");
         goto exit;
     }
-    this->_client_map[(*clnt)->id] = (*clnt);
+    POS_CHECK_POINTER(clnt);
+    (*clnt)->_api_inst_pc = client_binary.api_inst_pc();
+
+    if(unlikely(this->_client_list.size() < (*clnt)->id))
+        this->_client_list.resize((*clnt)->id);
+    this->_client_list[(*clnt)->id] = (*clnt);
+
     this->_pid_client_map[(*clnt)->pid] = (*clnt);
     POS_DEBUG_C("restore client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, (*clnt)->pid);
 
@@ -360,23 +379,12 @@ POSClient* POSWorkspace::get_client_by_pid(__pid_t pid){
 }
 
 
-POSClient* POSWorkspace::get_client_by_uuid(pos_client_uuid_t uuid){
-    POSClient *retval = nullptr;
-
-    if(unlikely(this->_client_map.count(uuid) > 0)){
-        retval = this->_client_map[uuid];
-    }
-
-    return retval;
-}
-
-
 int POSWorkspace::pos_process(
     uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t> param_desps, void* ret_data, uint64_t ret_data_len
 ){
     uint64_t i;
     int retval, prev_error_code = 0;
-    POSClient *client;
+    POSClient *client = nullptr;
     POSAPIMeta_t api_meta;
     bool has_prev_error = false;
     POSAPIContext_QE* wqe;
@@ -386,26 +394,24 @@ int POSWorkspace::pos_process(
     // TODO: comment out this once we enable piggyback support of uuid
     //      in remoting framework
     uuid = 0;
-
-#if POS_CONF_RUNTIME_EnableDebugCheck
-    // check whether the client exists
-    if(unlikely(this->_client_map.count(uuid) == 0)){
-        POS_WARN_C_DETAIL("no client with uuid(%lu) was recorded", uuid);
-        return POS_FAILED_NOT_EXIST;
-    }
-#endif // POS_CONF_RUNTIME_EnableDebugCheck
-
-    POS_CHECK_POINTER(client = _client_map[uuid]);
     
-    // check whether the metadata of the API was recorded
-#if POS_CONF_RUNTIME_EnableDebugCheck
-    if(unlikely(this->api_mgnr->api_metas.count(api_id) == 0)){
-        POS_WARN_C_DETAIL(
-            "no api metadata was recorded in the api manager: api_id(%lu)", api_id
-        );
-        return POS_FAILED_NOT_EXIST;
+    // wait until client is ready
+    while(client == nullptr){
+        client = this->get_client_by_uuid(uuid);
     }
-#endif // POS_CONF_RUNTIME_EnableDebugCheck
+
+    // wait until client is ready
+    while(client->status != kPOS_ClientStatus_Active){}
+
+    // check whether the metadata of the API was recorded
+    #if POS_CONF_RUNTIME_EnableDebugCheck
+        if(unlikely(this->api_mgnr->api_metas.count(api_id) == 0)){
+            POS_WARN_C_DETAIL(
+                "no api metadata was recorded in the api manager: api_id(%lu)", api_id
+            );
+            return POS_FAILED_NOT_EXIST;
+        }
+    #endif // POS_CONF_RUNTIME_EnableDebugCheck
 
     api_meta = api_mgnr->api_metas[api_id];
 
@@ -423,17 +429,24 @@ int POSWorkspace::pos_process(
 
     /*!
      *  \brief  push to the work queue
-     *  \note   during restore, we resume the gpu first, then cpu, so this push is safe
-     *  \todo   we need to make sure client is already ready if we overlap the restore later
      */
-    while(!client->status == kPOS_ClientStatus_Active){} // TODO: not absolutely right here
     client->push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_WQ>(wqe);
 
     /*!
      *  \note   if this is a sync call, we need to block until cqe is obtained
      */
     if(unlikely(api_meta.is_sync)){
+        // mark the client is under sync call, so that the worker thread will make sure it will return back results
+        // event though it's under dumping
+        client->is_under_sync_call = true;
+
         while(1){
+            #if POS_CONF_RUNTIME_EnableDebugCheck
+                if(unlikely(this->get_client_by_uuid(uuid) == nullptr)){
+                    POS_ERROR_DETAIL("client disappear during waiting of sync call, this is a bug: uuid(%lu)", uuid);
+                }
+            #endif
+
             if(unlikely(
                 POS_SUCCESS != (client->template poll_q<kPOS_QueueDirection_Rpc2Parser,kPOS_QueueType_ApiCxt_CQ>(&cqes))
             )){
@@ -457,11 +470,10 @@ int POSWorkspace::pos_process(
 
                 // found the called sync api
                 if(cqe->id == wqe->id){
-                    // we should NOT do this assumtion here!
-                    // POS_ASSERT(i == cqes.size() - 1);
-
                     // setup return code
                     retval = has_prev_error ? prev_error_code : cqe->api_cxt->return_code;
+
+                    client->is_under_sync_call = false;
 
                     goto exit;
                 }

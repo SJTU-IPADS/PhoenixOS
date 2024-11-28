@@ -260,16 +260,16 @@ namespace cuda_launch_kernel {
         POS_CHECK_POINTER(client);
         
         // check whether given parameter is valid
-    #if POS_CONF_RUNTIME_EnableDebugCheck
-        if(unlikely(wqe->api_cxt->params.size() != 6)){
-            POS_WARN(
-                "parse(cuda_launch_kernel): failed to parse, given %lu params, %lu expected",
-                wqe->api_cxt->params.size(), 6
-            );
-            retval = POS_FAILED_INVALID_INPUT;
-            goto exit;
-        }
-    #endif
+        #if POS_CONF_RUNTIME_EnableDebugCheck
+            if(unlikely(wqe->api_cxt->params.size() != 6)){
+                POS_WARN(
+                    "parse(cuda_launch_kernel): failed to parse, given %lu params, %lu expected",
+                    wqe->api_cxt->params.size(), 6
+                );
+                retval = POS_FAILED_INVALID_INPUT;
+                goto exit;
+            }
+        #endif
 
         // obtain handle managers of function, stream and memory
         hm_function = pos_get_client_typed_hm(
