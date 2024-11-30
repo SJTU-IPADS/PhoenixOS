@@ -47,10 +47,11 @@ enum pos_cli_arg : int {
     kPOS_CliAction_Migrate,
     kPOS_CliAction_PLACEHOLDER,
 
-    /* ============ metadatas ============ */
+    /* ==== metadatas (with params) === */
     kPOS_CliMeta_SubAction,
     kPOS_CliMeta_Target,
     kPOS_CliMeta_SkipTarget,
+    kPOS_CliMeta_Option,
     kPOS_CliMeta_Pid,
     kPOS_CliMeta_Dir,
     kPOS_CliMeta_Dip,
@@ -71,12 +72,30 @@ static std::string pos_cli_action_name(pos_cli_arg action_type){
     case kPOS_CliAction_Help:
         return "help";
 
+    case kPOS_CliAction_Start:
+        return "start";
+
+    case kPOS_CliAction_PreDump:
+        return "pre-dump";
+
+    case kPOS_CliAction_Dump:
+        return "dump";
+
+    case kPOS_CliAction_Restore:
+        return "restore";
+
+    case kPOS_CliAction_PreRestore:
+        return "pre-restore";
+
+    case kPOS_CliAction_Clean:
+        return "clean";
+
+    case kPOS_CliAction_TraceResource:
+        return "trace-resource";
+
     case kPOS_CliAction_Migrate:
         return "migrate";
 
-    case kPOS_CliAction_PreRestore:
-        return "preserve";
-    
     default:
         return "unknown";
     }
@@ -89,7 +108,7 @@ typedef struct pos_cli_ckpt_metas {
     pos_resource_typeid_t targets[oob_functions::cli_ckpt_predump::kTargetMaxNum];
     uint32_t nb_skip_targets;
     pos_resource_typeid_t skip_targets[oob_functions::cli_ckpt_predump::kSkipTargetMaxNum];
-    uint64_t tmpfs_size;
+    bool do_cow;    // this option is only for dump
     POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kTargetMaxNum == oob_functions::cli_ckpt_dump::kTargetMaxNum);
     POS_STATIC_ASSERT(oob_functions::cli_ckpt_predump::kSkipTargetMaxNum == oob_functions::cli_ckpt_dump::kSkipTargetMaxNum);
 } pos_cli_ckpt_metas_t;

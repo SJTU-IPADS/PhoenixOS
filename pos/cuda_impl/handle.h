@@ -28,6 +28,7 @@
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
 
+
 /*!
  *  \brief  idx of CUDA resource types
  */
@@ -44,7 +45,6 @@ enum : pos_resource_typeid_t {
     /*! \note   library handle types, define in pos/cuda_impl/handle/xxx.h */
     kPOS_ResourceTypeId_cuBLAS_Context
 };
-extern std::map<pos_resource_typeid_t,std::string> pos_resource_map;
 
 
 /*!

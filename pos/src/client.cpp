@@ -175,6 +175,13 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
     typename std::map<pos_resource_typeid_t, std::vector<pos_u64id_t>>::iterator map_iter;
     POSHandle *handle;
 
+    #if POS_CONF_EVAL_CkptOptLevel == 1
+        std::map<pos_resource_typeid_t, double> restore_handle_ms;
+        std::map<pos_resource_typeid_t, double> restore_handle_state_ms;
+        typename std::map<pos_resource_typeid_t, double>::iterator timer_map_iter;
+        uint64_t s_tick, e_tick;
+    #endif
+
     auto __deassemble_file_name = [](const std::string& filename) -> std::tuple<pos_resource_typeid_t, pos_u64id_t> {
         std::string baseName = filename.substr(0, filename.find_last_of('.'));
         std::stringstream ss(baseName);
@@ -222,6 +229,15 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
             }
             handle_map[std::get<0>(handle_info)].push_back(std::get<1>(handle_info));
             POS_DEBUG_C("restored handle: rid(%lu), hid(%lu)", std::get<0>(handle_info), std::get<1>(handle_info));
+
+            #if POS_CONF_EVAL_CkptOptLevel == 1
+                if(unlikely(restore_handle_ms.count(std::get<0>(handle_info)) == 0)){
+                    restore_handle_ms[std::get<0>(handle_info)] = 0.0;
+                }
+                if(unlikely(restore_handle_state_ms.count(std::get<0>(handle_info)) == 0)){
+                    restore_handle_state_ms[std::get<0>(handle_info)] = 0.0;
+                }
+            #endif
         }
     }
 
@@ -252,6 +268,7 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
             POS_CHECK_POINTER(handle = handle_list[i]);
 
             // restore handle
+            s_tick = POSUtilTscTimer::get_tsc();
             retval = handle->restore();
             if(unlikely(retval != POS_SUCCESS)){
                 dirty_retval = retval;
@@ -262,8 +279,11 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
                 );
                 goto exit;
             }
+            e_tick = POSUtilTscTimer::get_tsc();
+            restore_handle_ms[handle->resource_type_id] += this->_ws->tsc_timer.tick_to_ms(e_tick-s_tick);
 
             // restore state
+            s_tick = POSUtilTscTimer::get_tsc();
             if(handle->state_size > 0){
                 retval = handle->reload_state( /* stream_id */ 0);
                 if(unlikely(retval != POS_SUCCESS)){
@@ -276,9 +296,19 @@ pos_retval_t POSClient::restore_handles(std::string& ckpt_dir){
                     goto exit;
                 }
             }
+            e_tick = POSUtilTscTimer::get_tsc();
+            restore_handle_state_ms[handle->resource_type_id] += this->_ws->tsc_timer.tick_to_ms(e_tick-s_tick);
+        }
+
+        // print restore duration information
+        for(timer_map_iter = restore_handle_ms.begin(); timer_map_iter != restore_handle_ms.end(); timer_map_iter++){
+            POS_LOG_C("restore handle: rid(%lu), duration(%lf ms)", timer_map_iter->first, timer_map_iter->second);
+        }
+        for(timer_map_iter = restore_handle_state_ms.begin(); timer_map_iter != restore_handle_state_ms.end(); timer_map_iter++){
+            POS_LOG_C("restore handle state: rid(%lu), duration(%lf ms)", timer_map_iter->first, timer_map_iter->second);
         }
     #elif POS_CONF_EVAL_CkptOptLevel == 2
-        
+        /* nothing */
     #endif
 
 exit:

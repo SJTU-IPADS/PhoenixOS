@@ -53,13 +53,16 @@ typedef struct POSCommand_QE {
     // command execution result
     pos_retval_t retval;
 
-    // ============================== payloads ==============================
+
+    // ============================== ckpt payloads ==============================
     // path to store all checkpoints
     std::string ckpt_dir;
-
+    
     // for kPOS_Command_xxx_PreDump and kPOS_Command_xxx_Dump
     std::set<POSHandle*> stateful_handles;
     std::set<POSHandle*> stateless_handles;
+    std::set<pos_resource_typeid_t> target_resource_type_idx;
+    bool do_cow;
 
     /*!
      *  \brief  record all handles that need to be checkpointed within this checkpoint op
@@ -78,10 +81,7 @@ typedef struct POSCommand_QE {
     inline void record_stateless_handles(POSHandle *handle){
         stateless_handles.insert(handle);
     }
-    // ============================== payloads ==============================
+    // ============================== ckpt payloads ==============================
 
-
-    POSCommand_QE()
-        :   type(kPOS_Command_Nothing),
-            retval(POS_SUCCESS) {}
+    POSCommand_QE() : type(kPOS_Command_Nothing), retval(POS_SUCCESS) {}
 } POSCommand_QE_t;

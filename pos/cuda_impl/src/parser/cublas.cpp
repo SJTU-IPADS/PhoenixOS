@@ -351,6 +351,20 @@ namespace cublas_sgemm {
 
         hm_memory->record_modified_handle(memory_handle_C);
 
+        #if POS_CONF_RUNTIME_EnableTrace
+            parser->metric_reducers.reduce(
+                /* index */ POSParser::KERNEL_in_memories,
+                /* value */ 2
+            );
+            parser->metric_reducers.reduce(
+                /* index */ POSParser::KERNEL_out_memories,
+                /* value */ 1
+            );
+            parser->metric_counters.add_counter(
+                /* index */ POSParser::KERNEL_number_of_vendor_kernels
+            );
+        #endif
+
     exit:
         return retval;
     }
@@ -471,6 +485,20 @@ namespace cublas_sgemm_strided_batched {
         });
 
         hm_memory->record_modified_handle(memory_handle_C);
+
+        #if POS_CONF_RUNTIME_EnableTrace
+            parser->metric_reducers.reduce(
+                /* index */ POSParser::KERNEL_in_memories,
+                /* value */ 2
+            );
+            parser->metric_reducers.reduce(
+                /* index */ POSParser::KERNEL_out_memories,
+                /* value */ 1
+            );
+            parser->metric_counters.add_counter(
+                /* index */ POSParser::KERNEL_number_of_vendor_kernels
+            );
+        #endif
 
     exit:
         return retval;

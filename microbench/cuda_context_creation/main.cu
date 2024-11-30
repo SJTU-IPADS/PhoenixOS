@@ -191,33 +191,38 @@ class POSUtilTscTimer {
 
 
 int main(){
-    cublasStatus_t cublas_result = CUBLAS_STATUS_SUCCESS;
-    cublasHandle_t handle = nullptr;
-    cublasLtHandle_t lighthandle;
+    CUcontext cu_context;
+    CUdevice cu_device;
+    CUresult retval;
 
     uint64_t s_tick, e_tick;
     POSUtilTscTimer tsc_timer;
 
-    s_tick = POSUtilTscTimer::get_tsc();
-    cublas_result = cublasCreate_v2(&handle);
-    e_tick = POSUtilTscTimer::get_tsc();
-    if(cublas_result != CUBLAS_STATUS_SUCCESS){
-        printf("failed to create cublas context");
+    cuInit(0);
+
+    retval = cuDeviceGet(&cu_device, 0);
+    if(retval != CUDA_SUCCESS){
+        printf("failed to get cuda device: retval(%d)\n", retval);
         return 1;
     }
-    printf("create cublas context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
 
+    s_tick = POSUtilTscTimer::get_tsc();
+    retval = cuCtxCreate(&cu_context, CU_CTX_SCHED_AUTO, cu_device);
+    if(retval != CUDA_SUCCESS){
+        printf("failed to create cuda context: retval(%d)\n", retval);
+        return 1;
+    }
 
-    // s_tick = POSUtilTscTimer::get_tsc();
-    // cublas_result = cublasLtCreate(&lighthandle);
-    // e_tick = POSUtilTscTimer::get_tsc();
-    // if(cublas_result != CUBLAS_STATUS_SUCCESS){
-    //     printf("failed to create cublasLt context");
-    //     return 1;
-    // }
-    // printf("create cublasLt context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
+    retval = cuCtxPushCurrent(cu_context);
+    if(retval != CUDA_SUCCESS){
+        printf("failed to push cuda context: retval(%d)\n", retval);
+        return 1;
+    }
+    e_tick = POSUtilTscTimer::get_tsc();
     
-    while(1){};
+    printf("create cuda context: %lf ms\n", tsc_timer.tick_range_to_ms(e_tick, s_tick));
+
+    while(1){}
 
     return 0;
 }

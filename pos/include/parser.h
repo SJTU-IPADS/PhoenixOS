@@ -27,7 +27,7 @@
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/api_context.h"
 #include "pos/include/command.h"
-
+#include "pos/include/metrics.h"
 
 // forward declaration
 class POSClient;
@@ -80,6 +80,25 @@ class POSParser {
      *  \brief  raise the shutdown signal to stop the daemon
      */
     void shutdown();
+
+
+    /* ==================== POSParser Metrics ==================== */
+ public:
+    #if POS_CONF_RUNTIME_EnableTrace
+        enum metrics_reducer_type_t : uint8_t {
+            KERNEL_in_memories = 0,
+            KERNEL_out_memories
+        };
+        POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> metric_reducers;
+
+        enum metrics_counter_type_t : uint8_t {
+            KERNEL_number_of_user_kernels = 0,
+            KERNEL_number_of_vendor_kernels
+        };
+        POSMetrics_CounterList<metrics_counter_type_t> metric_counters;
+    #endif
+    /* ==================== POSParser Metrics ==================== */
+
 
  protected:
     // stop flag to indicate the daemon thread to stop

@@ -22,7 +22,9 @@
 
 
 std::map<pos_resource_typeid_t, std::string> pos_resource_map = {
+    {   kPOS_ResourceTypeId_Unknown,        "unknown"           },
     {   kPOS_ResourceTypeId_CUDA_Context,   "cuda_context",     },
+    {   kPOS_ResourceTypeId_CUDA_Module,    "cuda_module",      },
     {   kPOS_ResourceTypeId_CUDA_Function,  "cuda_function",    },
     {   kPOS_ResourceTypeId_CUDA_Var,       "cuda_var",         },
     {   kPOS_ResourceTypeId_CUDA_Device,    "cuda_device",      },

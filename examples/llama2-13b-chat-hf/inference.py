@@ -20,8 +20,14 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 coldstart_start_time = time.time()
 
-model = AutoModelForCausalLM.from_pretrained('/data/huggingface/hub/Llama-2-13b-chat-hf/').to('cuda:0')
+model = AutoModelForCausalLM.from_pretrained('/data/huggingface/hub/Llama-2-13b-chat-hf/')
 tokenizer = AutoTokenizer.from_pretrained('/data/huggingface/hub/Llama-2-13b-chat-hf/')
+
+# fp16
+# model = model.half()
+
+# copy to device
+model = model.to('cuda:0')
 
 # model = AutoModelForCausalLM.from_pretrained('/nvme/huggingface/hub/models--meta-llama--Meta-Llama-3.1-8B/snapshots/48d6d0fc4e02fb1269b36940650a1b7233035cbb/', ignore_mismatched_sizes=True).to('cuda:0')
 # tokenizer = AutoTokenizer.from_pretrained('/nvme/huggingface/hub/models--meta-llama--Meta-Llama-3.1-8B/snapshots/48d6d0fc4e02fb1269b36940650a1b7233035cbb/')
@@ -46,7 +52,7 @@ def infer(user_prompt, batch_size=1):
 
     # streaming
     start_time = time.time()
-    generated_texts = model.generate(**inputs, streamer=streamer)
+    generated_texts = model.generate(**inputs, streamer=streamer, max_length=2048)
     # generated_texts = model.generate(**inputs, max_length=512)
     end_time = time.time()
 
@@ -69,6 +75,6 @@ def infer(user_prompt, batch_size=1):
 if __name__ == '__main__':
     user_prompt = "In a quiet village nestled between two mountains, a young girl named Lila discovers an ancient, shimmering stone that grants her the ability to communicate with the stars. As she learns their secrets, she finds herself drawn into a cosmic conflict between light and darkness. With the fate of her village hanging in the balance, Lila must unite her community and harness the power of the stars to restore harmony before the shadows consume everything she loves."
 
-    for i in range(0, 20):
+    for i in range(0, 1):
         infer(user_prompt=user_prompt, batch_size=1)
         print("\n\n\n")

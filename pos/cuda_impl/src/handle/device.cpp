@@ -117,6 +117,8 @@ pos_retval_t POSHandleManager_CUDA_Device::init(std::map<uint64_t, std::vector<P
 
     POS_ASSERT(related_handles.size() == 0);
 
+    this->_rid = kPOS_ResourceTypeId_CUDA_Device;
+
     // get number of physical devices on the machine
     if(unlikely(cudaSuccess != (
         cuda_rt_retval = cudaGetDeviceCount(&num_device)

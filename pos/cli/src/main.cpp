@@ -90,10 +90,11 @@ inline void __readin_raw_cli(int argc, char *argv[], pos_cli_options_t &clio){
         {"migrate",         no_argument,        NULL,   kPOS_CliAction_Migrate},
         {"trace-resource",  no_argument,        NULL,   kPOS_CliAction_TraceResource},
 
-        // metadatas
+        // metadatas (with param)
         {"target",      required_argument,  NULL,   kPOS_CliMeta_Target},
         {"skip-target", required_argument,  NULL,   kPOS_CliMeta_SkipTarget},
         {"subaction",   required_argument,  NULL,   kPOS_CliMeta_SubAction},
+        {"option",      required_argument,  NULL,   kPOS_CliMeta_Option},
         {"pid",         required_argument,  NULL,   kPOS_CliMeta_Pid},
         {"dir",         required_argument,  NULL,   kPOS_CliMeta_Dir},
         {"dip",         required_argument,  NULL,   kPOS_CliMeta_Dip},

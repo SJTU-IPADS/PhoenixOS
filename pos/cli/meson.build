@@ -260,10 +260,6 @@ ld_args += [ '-lclang', '-lyaml-cpp', '-lpos' ]
 ld_args += ['-lprotobuf', '-lprotobuf-lite', '-lprotoc']    
 
 
-# >>>>>>>>>>>>>> setup macro >>>>>>>>>>>>>>
-add_project_arguments('-DPOS_CLI_RUNTIME_TARGET_CUDA=1', language : 'cpp')
-
-
 # >>>>>>>>>>>>>> setup build options >>>>>>>>>>>>>>
 c_args += ['--std=c++20']
 

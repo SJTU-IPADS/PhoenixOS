@@ -15,5 +15,6 @@
  */
 
 #pragma once
-#include "pos/include/trace/tick.h"
-#include "pos/include/trace/counter.h"
+#include "pos/include/metrics/counter.h"
+#include "pos/include/metrics/reducer.h"
+#include "pos/include/metrics/ticker.h"

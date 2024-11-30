@@ -549,6 +549,22 @@ namespace cuda_launch_kernel {
             }
         }
 
+    #if POS_CONF_RUNTIME_EnableTrace
+        parser->metric_reducers.reduce(
+            /* index */ POSParser::KERNEL_in_memories,
+            /* value */ function_handle->input_pointer_params.size()
+                        + function_handle->inout_pointer_params.size()
+        );
+        parser->metric_reducers.reduce(
+            /* index */ POSParser::KERNEL_out_memories,
+            /* value */ function_handle->output_pointer_params.size()
+                        + function_handle->inout_pointer_params.size()
+        );
+        parser->metric_counters.add_counter(
+            /* index */ POSParser::KERNEL_number_of_user_kernels
+        );
+    #endif
+
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(

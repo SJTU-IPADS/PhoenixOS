@@ -30,17 +30,13 @@
 #include <unistd.h>
 
 #include "pos/include/common.h"
+#include "pos/include/handle.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_dump.h"
 #include "pos/include/utils/system.h"
 #include "pos/include/utils/command_caller.h"
 #include "pos/include/utils/string.h"
 #include "pos/cli/cli.h"
-
-
-#if defined(POS_CLI_RUNTIME_TARGET_CUDA)
-    #include "pos/cuda_impl/handle.h"
-#endif
 
 
 pos_retval_t handle_dump(pos_cli_options_t &clio){
@@ -181,6 +177,33 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
                 },
                 /* is_required */ false
             },
+            {
+                /* meta_type */ kPOS_CliMeta_Option,
+                /* meta_name */ "option",
+                /* meta_desp */ "dump option",
+                /* cast_func */ [](pos_cli_options_t &clio, std::string& meta_val) -> pos_retval_t {
+                    pos_retval_t retval = POS_SUCCESS;
+                    uint64_t i;
+                    std::vector<std::string> substrings;
+                    std::string substring;
+
+                    substrings = POSUtil_String::split_string(meta_val, ',');
+
+                    clio.metas.ckpt.nb_targets = 0;
+                    for(i=0; i<substrings.size(); i++){
+                        substring = substrings[i];
+                        if(substring == std::string("cow")){
+                            clio.metas.ckpt.do_cow = true;
+                        } else {
+                            POS_WARN("unknown option \"%s\", omit", substring.c_str());
+                        }
+                    }
+
+                exit:
+                    return retval;
+                },
+                /* is_required */ false
+            }
         },
         /* collapse_rule */ [](pos_cli_options_t& clio) -> pos_retval_t {
             pos_retval_t retval = POS_SUCCESS;
@@ -333,6 +356,19 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
         clio.metas.ckpt.ckpt_dir,
         oob_functions::cli_ckpt_dump::kCkptFilePathMaxLen
     );
+    memcpy(
+        call_data.targets,
+        clio.metas.ckpt.targets,
+        sizeof(call_data.targets)
+    );
+    memcpy(
+        call_data.skip_targets,
+        clio.metas.ckpt.skip_targets,
+        sizeof(call_data.skip_targets)
+    );
+    call_data.nb_targets = clio.metas.ckpt.nb_targets;
+    call_data.nb_skip_targets = clio.metas.ckpt.nb_skip_targets;
+    call_data.do_cow = clio.metas.ckpt.do_cow;
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_Dump, &call_data);
     if(POS_SUCCESS != call_data.retval){
         POS_WARN("dump failed, gpu-side dump failed, %s", call_data.retmsg);

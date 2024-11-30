@@ -22,7 +22,9 @@
 #include "pos/include/workspace.h"
 #include "pos/include/client.h"
 #include "pos/include/transport.h"
+#include "pos/include/handle.h"
 #include "pos/cuda_impl/client.h"
+#include "pos/cuda_impl/handle.h"
 
 
 POSClient_CUDA::POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_CUDA_t cxt, POSWorkspace *ws) 
@@ -231,6 +233,13 @@ exit:
 
 
 void POSClient_CUDA::deinit_handle_managers(){
+    #if POS_CONF_RUNTIME_EnableTrace
+        POSHandleManager<POSHandle> *hm_memory;
+
+        POS_CHECK_POINTER(hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager<POSHandle>));
+        hm_memory->print_metrics();
+    #endif
+
     this->__dump_hm_cuda_functions();
 }
 
@@ -274,7 +283,7 @@ pos_retval_t POSClient_CUDA::persist_handles(bool with_state){
     this->template poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(&wqes);
     for(i=0; i<wqes.size(); i++){
         POS_CHECK_POINTER(wqe = wqes[i]);
-        wqe->persist</* with_params */ false>(apicxt_dir);
+        wqe->persist</* with_params */ false, /* type */ 1>(apicxt_dir);
     }
 
     // dumping resources

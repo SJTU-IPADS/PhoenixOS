@@ -57,9 +57,6 @@ ckpt_without_stop() {
         next_ckpt_dir="$dir_path/$next_ckpt_version"
         mkdir $next_ckpt_dir
         mount -t tmpfs -o size=80g tmpfs $next_ckpt_dir
-        gpu_ckpt_time=0
-        cpu_ckpt_time=0
-        gpu_restore_time=0
         if [ $prev_ckpt_version = 0 ]; then
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -67,15 +64,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            gpu_ckpt_time=$(echo "$end - $start" | bc)
-            echo "gpu stop: $gpu_ckpt_time s"
+            echo "gpu stop: " $(echo "$end - $start" | bc) " s"
 
             # criu dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            cpu_ckpt_time=$(echo "$end - $start" | bc)
-            echo "pre-dump: $cpu_ckpt_time s"
+            echo "pre-dump: " $(echo "$end - $start" | bc) " s"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -83,8 +78,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            gpu_restore_time=$(echo "$end - $start" | bc)
-            echo "gpu resume: $gpu_restore_time s"
+            echo "gpu resume: " $(echo "$end - $start" | bc) " s"
         else
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -92,15 +86,13 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            gpu_ckpt_time=$(echo "$end - $start" | bc)
-            echo "gpu stop: $gpu_ckpt_time s"
+            echo "gpu stop: " $(echo "$end - $start" | bc) " s"
 
             # criu dump
             start=$(date +%s.%3N)
             criu pre-dump --tree $pid --images-dir $next_ckpt_dir --prev-images-dir $prev_ckpt_dir --leave-running --track-mem --shell-job --display-stats
             end=$(date +%s.%3N)
-            cpu_ckpt_time=$(echo "$end - $start" | bc)
-            echo "pre-dump: $cpu_ckpt_time s"
+            echo "pre-dump: " $(echo "$end - $start" | bc) " s"
 
             start=$(date +%s.%3N)
             if [ $do_nvcr = true ]; then
@@ -108,8 +100,7 @@ ckpt_without_stop() {
                 /root/third_party/cuda-checkpoint/bin/x86_64_Linux/cuda-checkpoint --toggle --pid $pid
             fi
             end=$(date +%s.%3N)
-            gpu_restore_time=$(echo "$end - $start" | bc)
-            echo "gpu resume: $gpu_restore_time s"
+            echo "gpu resume: " $(echo "$end - $start" | bc) " s"
         fi
         echo "ckpt to: $next_ckpt_dir"
     fi

@@ -189,7 +189,7 @@ exit:
 pos_retval_t POSHandleManager_CUDA_Module::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
 
-    /* nothing */
+    this->_rid = kPOS_ResourceTypeId_CUDA_Module;
 
 exit:
     return retval;

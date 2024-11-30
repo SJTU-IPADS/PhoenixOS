@@ -415,10 +415,13 @@ typedef struct POSAPIContext_QE {
      *  \tparam with_params whether to persist with parameter information,
      *          if this persist is for tracing, then false; otherwise for
      *          checkpointing, then true   
+     *  \tparam type        type of the persist wqe:
+     *                      1: unexecuted APIs
+     *                      2: recomputation APIs
      *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointing
      */
-    template<bool with_params>
+    template<bool with_params, int type>
     pos_retval_t persist(std::string ckpt_dir);
 
 

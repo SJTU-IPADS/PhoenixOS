@@ -73,6 +73,7 @@ typedef struct checkpoint_async_cxt {
 
     // all dirty handles since start of concurrent checkpoint
     std::set<POSHandle*> dirty_handles;
+    uint64_t dirty_handle_state_size;
 
     //  this flag should be raise by memcpy API worker function, to avoid slow down by
     //  overlapped checkpoint process
@@ -81,7 +82,7 @@ typedef struct checkpoint_async_cxt {
     // thread handle
     std::thread *thread;
 
-    checkpoint_async_cxt() : TH_actve(false), BH_active(false) {}
+    checkpoint_async_cxt() : TH_actve(false), BH_active(false), dirty_handle_state_size(0) {}
 } checkpoint_async_cxt_t;
 
 #endif // POS_CONF_EVAL_CkptOptLevel == 2
@@ -198,7 +199,7 @@ class POSWorker {
     }
 
     /*!
-     *  \brief  profiling metrics for worker
+     *  \brief  profiling metrics for worker (TODO: delete these useless metric counters)
      */
     #if POS_CONF_RUNTIME_EnableTrace
         /* ========== tick traces ========== */

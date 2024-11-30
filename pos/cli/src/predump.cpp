@@ -27,17 +27,13 @@
 #include <unistd.h>
 
 #include "pos/include/common.h"
+#include "pos/include/handle.h"
 #include "pos/include/oob.h"
 #include "pos/include/oob/ckpt_predump.h"
 #include "pos/include/utils/string.h"
 #include "pos/include/utils/system.h"
 #include "pos/include/utils/command_caller.h"
 #include "pos/cli/cli.h"
-
-
-#if defined(POS_CLI_RUNTIME_TARGET_CUDA)
-    #include "pos/cuda_impl/handle.h"
-#endif
 
 
 pos_retval_t handle_predump(pos_cli_options_t &clio){
@@ -235,7 +231,6 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
             retval = POS_FAILED;
             goto exit;
         }
-        POS_LOG("create pre-dump dir: %s", clio.metas.ckpt.ckpt_dir);
     }
 
     // step 2: mount the memory to tmpfs
@@ -334,6 +329,18 @@ pos_retval_t handle_predump(pos_cli_options_t &clio){
         clio.metas.ckpt.ckpt_dir,
         oob_functions::cli_ckpt_predump::kCkptFilePathMaxLen
     );
+    memcpy(
+        call_data.targets,
+        clio.metas.ckpt.targets,
+        sizeof(call_data.targets)
+    );
+    memcpy(
+        call_data.skip_targets,
+        clio.metas.ckpt.skip_targets,
+        sizeof(call_data.skip_targets)
+    );
+    call_data.nb_targets = clio.metas.ckpt.nb_targets;
+    call_data.nb_skip_targets = clio.metas.ckpt.nb_skip_targets;
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_PreDump, &call_data);
     if(POS_SUCCESS != call_data.retval){
         POS_WARN("predump failed, gpu-side predump failed: %s", call_data.retmsg);

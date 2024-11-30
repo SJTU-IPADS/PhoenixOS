@@ -46,6 +46,9 @@ namespace cli_ckpt_predump {
         std::string retmsg;
         POSCommand_QE_t* cmd;
         std::vector<POSCommand_QE_t*> cmds;
+        uint32_t i;
+        typename std::map<pos_resource_typeid_t,std::string>::iterator map_iter;
+
         payload = (oob_payload_t*)msg->payload;
         
         // obtain client with specified pid
@@ -62,7 +65,23 @@ namespace cli_ckpt_predump {
         cmd->client_id = client->id;
         cmd->type = kPOS_Command_Oob2Parser_PreDump;
         cmd->ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
-        
+
+        POS_ASSERT(!(payload->nb_targets > 0 && payload->nb_skip_targets > 0));
+        if(payload->nb_targets > 0){
+            for(i=0; i<payload->nb_targets; i++)
+                cmd->target_resource_type_idx.insert(payload->targets[i]);
+        } else if(payload->nb_skip_targets > 0){ 
+            for(map_iter = pos_resource_map.begin(); map_iter != pos_resource_map.end(); map_iter++){
+                cmd->target_resource_type_idx.insert(map_iter->first);
+            }
+            for(i=0; i<payload->nb_skip_targets; i++)
+                cmd->target_resource_type_idx.erase(payload->skip_targets[i]);
+        } else { // payload->nb_targets == 0 && payload->nb_skip_targets == 0
+            for(map_iter = pos_resource_map.begin(); map_iter != pos_resource_map.end(); map_iter++){
+                cmd->target_resource_type_idx.insert(map_iter->first);
+            }
+        }
+
         // create ckpt directory for GPU-side
         POS_ASSERT(std::filesystem::exists(payload->ckpt_dir));
         POS_ASSERT(!std::filesystem::exists(cmd->ckpt_dir));
@@ -135,6 +154,10 @@ namespace cli_ckpt_predump {
         payload = (oob_payload_t*)msg->payload;
         payload->pid = cm->pid;
         memcpy(payload->ckpt_dir, cm->ckpt_dir, kCkptFilePathMaxLen);
+        memcpy(payload->targets, cm->targets, sizeof(payload->targets));
+        memcpy(payload->skip_targets, cm->skip_targets, sizeof(payload->skip_targets));
+        payload->nb_targets = cm->nb_targets;
+        payload->nb_skip_targets = cm->nb_skip_targets;
 
         __POS_OOB_SEND();
 

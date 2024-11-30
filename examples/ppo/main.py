@@ -44,6 +44,8 @@ print(opt)
 
 
 def main():
+    print(f"process id: {os.getpid()}")
+
     EnvName = ['Pendulum-v1','LunarLanderContinuous-v2','Humanoid-v4','HalfCheetah-v4','BipedalWalker-v3','BipedalWalkerHardcore-v3']
     BrifEnvName = ['PV1', 'LLdV2', 'Humanv4', 'HCv4','BWv3', 'BWHv3']
 

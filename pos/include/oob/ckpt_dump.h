@@ -37,6 +37,11 @@ namespace cli_ckpt_dump {
         /* client */
         __pid_t pid;
         char ckpt_dir[kCkptFilePathMaxLen];
+        uint32_t nb_targets;
+        uint32_t nb_skip_targets;
+        pos_resource_typeid_t targets[kTargetMaxNum];
+        pos_resource_typeid_t skip_targets[kSkipTargetMaxNum];
+        bool do_cow;
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];
@@ -48,6 +53,11 @@ namespace cli_ckpt_dump {
         /* client */
         __pid_t pid;
         char ckpt_dir[kCkptFilePathMaxLen];
+        uint32_t nb_targets;
+        uint32_t nb_skip_targets;
+        pos_resource_typeid_t targets[kTargetMaxNum];
+        pos_resource_typeid_t skip_targets[kSkipTargetMaxNum];
+        bool do_cow;
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];

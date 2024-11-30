@@ -59,6 +59,23 @@ void POSParser::shutdown(){
         this->_daemon_thread = nullptr;
         POS_LOG_C("parser daemon thread shutdown");
     }
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        static std::map<metrics_reducer_type_t, std::string> reducer_names = {
+            { KERNEL_in_memories, "KERNEL_in_memories" },
+            { KERNEL_out_memories, "KERNEL_out_memories" }
+        };
+        static std::map<metrics_counter_type_t, std::string> counter_names = {
+            { KERNEL_number_of_user_kernels, "KERNEL_number_of_user_kernels" },
+            { KERNEL_number_of_vendor_kernels, "KERNEL_number_of_vendor_kernels" }
+        };
+
+        POS_LOG(
+            "[Parser Metrics]:\n%s\n%s",
+            this->metric_reducers.str(reducer_names).c_str(),
+            this->metric_counters.str(counter_names).c_str()
+        );
+    #endif
 }
 
 
@@ -187,9 +204,11 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
     {
     /* ========== Ckpt WQ Command from OOB thread ========== */
     case kPOS_Command_Oob2Parser_Dump:
+    case kPOS_Command_Oob2Parser_PreDump:
         #if POS_CONF_EVAL_CkptOptLevel > 0
-            // collect all stateful handles at this timespot to be dumped
+            // collect all stateful handles at this timespot to be (pre)dumped
             for(auto &handle_id : this->_ws->stateless_resource_type_idx){
+                if(cmd->target_resource_type_idx.count(handle_id) == 0){ continue; }
                 POS_CHECK_POINTER(
                     hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
                 );
@@ -198,11 +217,10 @@ pos_retval_t POSParser::__process_cmd(POSCommand_QE_t *cmd){
                     cmd->record_stateless_handles(handle);
                 }
             }
-        #endif // POS_CONF_EVAL_CkptOptLevel
-    case kPOS_Command_Oob2Parser_PreDump: // TODO: fix this logic
-        #if POS_CONF_EVAL_CkptOptLevel > 0
-            // collect all stateless handles at this timespot to be predumped
+
+            // collect all stateless handles at this timespot to be (pre)dumped
             for(auto &handle_id : this->_ws->stateful_resource_type_idx){
+                if(cmd->target_resource_type_idx.count(handle_id) == 0){ continue; }
                 POS_CHECK_POINTER(
                     hm = pos_get_client_typed_hm(this->_client, handle_id, POSHandleManager<POSHandle>)
                 );

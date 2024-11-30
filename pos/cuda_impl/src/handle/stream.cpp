@@ -152,6 +152,8 @@ pos_retval_t POSHandleManager_CUDA_Stream::init(std::map<uint64_t, std::vector<P
 
     POS_ASSERT(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 1);
 
+    this->_rid = kPOS_ResourceTypeId_CUDA_Stream;
+
     /*!
      *  \note   we won't use the default stream, and we will create a new non-default stream
      *          within the worker thread, so that we can achieve overlap checkpointing

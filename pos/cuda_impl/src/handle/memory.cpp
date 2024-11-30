@@ -190,6 +190,13 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
     cudaError_t cuda_rt_retval;
     POSCheckpointSlot *ckpt_slot, *cow_ckpt_slot;
     
+    #if POS_CONF_RUNTIME_EnableTrace
+        ((POSHandleManager_CUDA_Memory*)(this->_hm))->metric_tickers.start(
+            POSHandleManager_CUDA_Memory::CKPT_commit
+        );
+    #endif
+
+    // TODO: [zhuobin] why we have this call??
     cudaSetDevice(0);
 
     // apply new host-side checkpoint slot for device-side state
@@ -266,6 +273,12 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
             goto exit;
         }
     }
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        ((POSHandleManager_CUDA_Memory*)(this->_hm))->metric_tickers.end(
+            POSHandleManager_CUDA_Memory::CKPT_commit
+        );
+    #endif
 
     // persist the state after commit
     retval = this->__persist(ckpt_slot, ckpt_dir, stream_id);
@@ -445,6 +458,8 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
     pos_retval_t retval = POS_SUCCESS;
     uint64_t nb_context, i, j;
     POSHandle *context_handle;
+    
+    this->_rid = kPOS_ResourceTypeId_CUDA_Memory;
 
     /*!
      *  \brief  reserve a large portion of virtual memory space on a specified device

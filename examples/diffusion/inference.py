@@ -1,16 +1,21 @@
+import os
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
+
 import torch
 from diffusers import StableDiffusionPipeline, StableDiffusionOnnxPipeline
 import time
 import sys
 import ctypes
-import os
+
 
 torch.backends.cudnn.enabled = False
 
 if(len(sys.argv) < 3):
     print('Usage: python3 inference.py num_iter batch_size [model_path]')
     sys.exit()
-    
+
+print(f"process id: {os.getpid()}")
+
 num_iter = int(sys.argv[1])
 batch_size = int(sys.argv[2])
 

@@ -148,6 +148,8 @@ pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<
     POSHandle *device_handle;
     POSHandle_CUDA_Context *ctx_handle;
     
+    this->_rid = kPOS_ResourceTypeId_CUDA_Context;
+
     if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Device) == 0)){
         retval = POS_FAILED_INVALID_INPUT;
         POS_WARN_C("failed to init handle manager for CUDA context, no device provided");

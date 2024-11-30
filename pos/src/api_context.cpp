@@ -139,7 +139,7 @@ exit:
 }
 
 
-template<bool with_params>
+template<bool with_params, int type>
 pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     std::string ckpt_file_path;
@@ -215,10 +215,17 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     }
 
     // form the path to the checkpoint file of this handle
-    ckpt_file_path = ckpt_dir 
+    if constexpr (type == 1){                   // unexecuted APIs
+        ckpt_file_path = ckpt_dir 
                     + std::string("/a-")
                     + std::to_string(this->id) 
                     + std::string(".bin");
+    } else {                                    // recomputation APIs
+        ckpt_file_path = ckpt_dir 
+                    + std::string("/r-")
+                    + std::to_string(this->id) 
+                    + std::string(".bin");
+    }
 
     // write to file
     ckpt_file_stream.open(ckpt_file_path, std::ios::binary | std::ios::out);
@@ -243,5 +250,7 @@ exit:
     if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
     return retval;
 }
-template pos_retval_t POSAPIContext_QE::persist<true>(std::string ckpt_dir);
-template pos_retval_t POSAPIContext_QE::persist<false>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<true, 1>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<false, 1>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<true, 2>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<false, 2>(std::string ckpt_dir);
