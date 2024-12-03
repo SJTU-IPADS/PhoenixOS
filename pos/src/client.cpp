@@ -38,6 +38,7 @@ POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, PO
         pid(pid),
         status(kPOS_ClientStatus_CreatePending),
         is_under_sync_call(false),
+        offline_counter(0),
         _api_inst_pc(0), 
         _cxt(cxt),
         _ws(ws)
@@ -49,6 +50,7 @@ POSClient::POSClient()
         pid(0),
         status(kPOS_ClientStatus_CreatePending),
         is_under_sync_call(false),
+        offline_counter(0),
         _ws(nullptr)
 {
     POS_ERROR_C("shouldn't call, just for passing compilation");

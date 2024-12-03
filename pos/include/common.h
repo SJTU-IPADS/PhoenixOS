@@ -31,7 +31,31 @@
 #endif
 #define _unused(x) ((void)(x))  // make production build happy
 
-enum pos_retval : uint8_t {
+/*!
+ *  \brief  type for return value
+ */
+using pos_retval_t = uint8_t;
+
+// static constexpr pos_retval_t POS_SUCCESS = 0;
+// static constexpr pos_retval_t POS_WARN_DUPLICATED = 1;
+// static constexpr pos_retval_t POS_WARN_NOT_READY = 2;
+// static constexpr pos_retval_t POS_WARN_ABANDONED = 3;
+// static constexpr pos_retval_t POS_WARN_BLOCKED = 4;
+// static constexpr pos_retval_t POS_FAILED = 5;
+// static constexpr pos_retval_t POS_FAILED_NOT_EXIST = 6;
+// static constexpr pos_retval_t POS_FAILED_ALREADY_EXIST = 7;
+// static constexpr pos_retval_t POS_FAILED_INVALID_INPUT = 8;
+// static constexpr pos_retval_t POS_FAILED_DRAIN = 9;
+// static constexpr pos_retval_t POS_FAILED_NOT_READY = 10;
+// static constexpr pos_retval_t POS_FAILED_TIMEOUT = 11;
+// static constexpr pos_retval_t POS_FAILED_NOT_IMPLEMENTED = 12;
+// static constexpr pos_retval_t POS_FAILED_NOT_ENABLED = 13;
+// static constexpr pos_retval_t POS_FAILED_INCORRECT_OUTPUT = 14;
+// static constexpr pos_retval_t POS_FAILED_NETWORK = 15;
+// static constexpr pos_retval_t POS_FAILED_DRIVER = 16;
+// static constexpr pos_retval_t POS_FAILED_OOM = 17;
+
+enum pos_retval : pos_retval_t {
     POS_SUCCESS = 0,
     POS_WARN_DUPLICATED,
     POS_WARN_NOT_READY,
@@ -72,11 +96,6 @@ enum pos_retval : uint8_t {
 #define KB(x)   ((size_t) (x) << 10)
 #define MB(x)   ((size_t) (x) << 20)
 #define GB(x)   ((size_t) (x) << 30)
-
-/*!
- *  \brief  type for return value
- */
-using pos_retval_t = uint8_t;
 
 /*!
  *  \brief  type for resource typeid

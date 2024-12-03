@@ -6,7 +6,7 @@ project('PhoenixOS', ['CPP'],
 project_name = 'phoenix_os'
 project_name_abbreviation = 'pos'
 
-add_project_arguments('-O0',  language : 'cpp')
+add_project_arguments('-O3',  language : 'cpp')
 
 # >>>>>>>>>>>>>> build prepare >>>>>>>>>>>>>>
 # get environment variables of the build process

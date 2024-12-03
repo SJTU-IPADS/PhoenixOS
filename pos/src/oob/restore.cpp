@@ -72,7 +72,7 @@ namespace cli_restore {
         }
         POS_CHECK_POINTER(client);
         POS_ASSERT(client->status != kPOS_ClientStatus_Active);
-        POS_LOG("restore client");
+        POS_LOG("restored client");
 
         // restore handle in the client handle manager
         if(unlikely(POS_SUCCESS != (

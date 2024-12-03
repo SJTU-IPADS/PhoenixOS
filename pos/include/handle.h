@@ -985,6 +985,7 @@ class POSHandleManager {
     /* ===================== handle status management ======================== */
  public:
     inline pos_retval_t mark_handle_status(T_POSHandle *handle, pos_handle_status_t status){
+        pos_retval_t retval = POS_SUCCESS;
         typename std::map<uint64_t, T_POSHandle*>::iterator handle_map_iter;
         
         POS_CHECK_POINTER(handle);
@@ -1057,6 +1058,8 @@ class POSHandleManager {
         default:
             POS_ERROR_C_DETAIL("unknown status %u", status);
         }
+
+        return retval;
     }
     /* ===================== handle status management ======================== */
 

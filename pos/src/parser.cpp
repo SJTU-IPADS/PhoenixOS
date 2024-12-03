@@ -30,8 +30,8 @@ POSParser::POSParser(POSWorkspace* ws, POSClient* client)
     POS_CHECK_POINTER(client);
 
     // start daemon thread
-    _daemon_thread = new std::thread(&POSParser::__daemon, this);
-    POS_CHECK_POINTER(_daemon_thread);
+    this->_daemon_thread = new std::thread(&POSParser::__daemon, this);
+    POS_CHECK_POINTER(this->_daemon_thread);
 
     POS_LOG_C("parser started");
 };
@@ -43,9 +43,11 @@ POSParser::~POSParser(){
 
 
 pos_retval_t POSParser::init(){
-    if(unlikely(POS_SUCCESS != this->init_ps_functions())){
-        POS_ERROR_C_DETAIL("failed to insert functions");
+    pos_retval_t retval;
+    if(unlikely(POS_SUCCESS != (retval = this->init_ps_functions()))){
+        POS_ERROR_C_DETAIL("failed to insert functions: retval(%u)", retval);
     }
+    return retval;
 }
 
 
@@ -91,10 +93,10 @@ void POSParser::__daemon(){
 
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
-        return;
+        goto exit;
     }
 
-    while(!_stop_flag){
+    while(!this->_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
@@ -189,6 +191,9 @@ void POSParser::__daemon(){
             this->_client->template push_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(apicxt_wqe);
         }
     }
+
+exit:
+    return;
 }
 
 

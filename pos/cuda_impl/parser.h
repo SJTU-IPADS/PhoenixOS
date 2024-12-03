@@ -85,7 +85,7 @@ class POSParser_CUDA : public POSParser {
     POSParser_CUDA(POSWorkspace* ws, POSClient* client) : POSParser(ws, client){}
     ~POSParser_CUDA() = default;
     
- private:
+ protected:
     /*!
      *  \brief      initialization of the runtime daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread

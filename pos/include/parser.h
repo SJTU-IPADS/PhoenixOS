@@ -102,7 +102,7 @@ class POSParser {
 
  protected:
     // stop flag to indicate the daemon thread to stop
-    bool _stop_flag;
+    volatile bool _stop_flag;
 
     // the daemon thread of the runtime
     std::thread *_daemon_thread;

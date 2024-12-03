@@ -145,7 +145,6 @@ exit:
 
 POSWorkspace::POSWorkspace() :
     _current_max_uuid(0),
-    _remove_client_acquire(false),
     ws_conf(this)
 {
     // create out-of-band server
@@ -266,8 +265,6 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     POSClient *clnt;
     typename std::map<__pid_t, POSClient*>::iterator pid_client_map_iter;
 
-    while(this->_remove_client_acquire.exchange(true)){}
-
     clnt = this->get_client_by_uuid(uuid);
     if(unlikely(clnt == nullptr)){
         POS_WARN_C("try to remove an non-exist client: uuid(%lu)", uuid);
@@ -299,7 +296,6 @@ pos_retval_t POSWorkspace::remove_client(pos_client_uuid_t uuid){
     POS_DEBUG_C("removed client: uuid(%lu)", uuid);
 
 exit:
-    this->_remove_client_acquire.store(false);
     return retval;
 }
 

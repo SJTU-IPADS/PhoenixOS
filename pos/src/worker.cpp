@@ -70,9 +70,13 @@ POSWorker::~POSWorker(){
 
 
 pos_retval_t POSWorker::init(){
-    if(unlikely(POS_SUCCESS != this->init_wk_functions())){
-        POS_ERROR_C_DETAIL("failed to insert functions");
+    pos_retval_t retval;
+    if(unlikely(POS_SUCCESS != (
+        retval = this->init_wk_functions()
+    ))){
+        POS_ERROR_C_DETAIL("failed to insert functions: retval(%u)", retval);
     }
+    return retval;
 }
 
 
@@ -121,7 +125,7 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
 void POSWorker::__daemon(){
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
-        return;
+        goto exit;
     }
 
     #if POS_CONF_EVAL_MigrOptLevel == 0
@@ -134,6 +138,9 @@ void POSWorker::__daemon(){
     #else
         this->__daemon_migration_opt();
     #endif
+
+exit:
+    return;
 }
 
 
@@ -149,7 +156,7 @@ void POSWorker::__daemon_ckpt_sync(){
     POSCommand_QE_t *cmd_wqe;
     std::vector<POSCommand_QE_t*> cmd_wqes;
 
-    while(!_stop_flag){
+    while(!this->_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 
@@ -388,7 +395,7 @@ void POSWorker::__daemon_ckpt_async(){
     std::vector<POSCommand_QE_t*> cmd_wqes;
     POSHandle *handle;
 
-    while(!_stop_flag){
+    while(!this->_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
         if(this->_client->status != kPOS_ClientStatus_Active){ continue; }
 

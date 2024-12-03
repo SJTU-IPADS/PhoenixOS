@@ -162,7 +162,7 @@ pos_retval_t POSWorkspace_CUDA::__create_client(pos_create_client_param_t& param
     std::string runtime_daemon_log_path;
     std::string conf;
 
-    POS_CHECK_POINTER(*client);
+    POS_CHECK_POINTER(client);
 
     client_cxt.cxt_base.job_name = param.job_name;
     client_cxt.cxt_base.pid = param.pid;

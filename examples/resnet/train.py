@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+print(f"process id: {os.getpid()}")
+
 import torch
 import numpy as np
 from tqdm import tqdm

@@ -224,14 +224,6 @@ class POSWorkspace {
     // the max uuid that has been recorded
     pos_client_uuid_t _current_max_uuid;
 
-    // confirms before removing client
-    //  remove source:
-    //      [1] oob unregister client
-    //      [2] oob dump client
-    //  confirm source:
-    //      [1] pos_process_ready
-    std::atomic<bool> _remove_client_acquire;
-
     /* ============ end of client management functions =========== */
 
  public:
@@ -250,6 +242,38 @@ class POSWorkspace {
         void* ret_data=nullptr, uint64_t ret_data_len=0
     );
 
+    /*!
+     *  \brief  try obtain the aliveness of the client, if it isn't ready, the remoting framework should stop receiving request
+     *  \param  uuid    uuid of the client
+     *  \return 0 for client not ready
+     *          1 for client ready
+     */    
+    inline int try_lock_client(pos_client_uuid_t uuid){
+        int retval = 1;
+        POSClient *client;
+
+        if(unlikely(this->_client_list.size() <= uuid)){
+            POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
+            retval = 0; goto exit;
+        }
+
+        client = this->_client_list[uuid];
+        if(unlikely(client == nullptr)){
+            POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
+            retval = 0; goto exit;
+        }
+
+        if(unlikely(client->offline_counter > 0)){
+            // confirm to the pos worker thread
+            if(client->offline_counter == 1){
+                POS_DEBUG_C("confirm client offline: uuid(%lu)", uuid);
+                client->offline_counter += 1;
+            }
+        }
+
+    exit:
+        return retval;
+    }
 
     // api manager
     POSApiManager *api_mgnr;

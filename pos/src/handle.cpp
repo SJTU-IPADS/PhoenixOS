@@ -51,10 +51,13 @@ exit:
 
 
 void POSHandle::mark_status(pos_handle_status_t status){
-    using handle_type = typename std::decay<decltype(*this)>::type;
-    POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
-    POS_CHECK_POINTER(hm_cast);
-    hm_cast->mark_handle_status(this, status);
+    // using handle_type = typename std::decay<decltype(*this)>::type;
+    // POSHandleManager<handle_type> *hm_cast = (POSHandleManager<handle_type>*)this->_hm;
+    // POS_CHECK_POINTER(hm_cast);
+
+    POSHandleManager<POSHandle>* hm = (POSHandleManager<POSHandle>*)this->_hm;
+    POS_CHECK_POINTER(hm);
+    hm->mark_handle_status(this, status);
 }
 
 

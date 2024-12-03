@@ -120,7 +120,8 @@ typedef struct pos_create_client_param {
 enum pos_client_status_t : uint8_t {
     kPOS_ClientStatus_CreatePending = 0,
     kPOS_ClientStatus_Active,
-    kPOS_ClientStatus_Hang
+    kPOS_ClientStatus_Hang,
+    kPOS_ClientStatus_RemotingStop
 };
 
 
@@ -268,6 +269,9 @@ class POSClient {
 
     // mark whether this client is under sync call
     bool is_under_sync_call;
+
+    // counter for mark whether a client is offline
+    uint8_t offline_counter;
 
  protected:
     friend class POSWorkspace;
