@@ -302,7 +302,7 @@ func ExecuteCRIB(cmdOpt CmdOptions, buildConf BuildConfigs, unitOpt UnitOptions,
 
 		if unitOpt.DoRun && len(unitOpt.RunScript) > 0 {
 			logger.Infof("running %s...", unitOpt.Name)
-			duration := doPartial(unitOpt.CleanScript, fmt.Sprintf("run_%s.log", unitOpt.Name))
+			duration := doPartial(unitOpt.RunScript, fmt.Sprintf("run_%s.log", unitOpt.Name))
 			utils.ClearLastLine()
 			logger.Infof("ran %s: %.2fs", unitOpt.Name, duration)
 		}

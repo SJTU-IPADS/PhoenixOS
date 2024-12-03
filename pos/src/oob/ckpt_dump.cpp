@@ -131,7 +131,7 @@ namespace cli_ckpt_dump {
             memcpy(payload->retmsg, retmsg.c_str(), retmsg.size());
             goto response;
         }
-        
+
         // before remove client, we persist the state of the client
         if(unlikely(POS_SUCCESS != (payload->retval = client->persist(cmd->ckpt_dir)))){
             POS_WARN("failed to persist the state of client");
