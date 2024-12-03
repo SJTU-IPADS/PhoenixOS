@@ -49,11 +49,7 @@ POSClient_CUDA::POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_C
 POSClient_CUDA::POSClient_CUDA(){}
 
 
-POSClient_CUDA::~POSClient_CUDA(){
-    // shutdown parser and worker
-    if(this->parser != nullptr){ delete this->parser; }
-    if(this->worker != nullptr){ delete this->worker; }
-}
+POSClient_CUDA::~POSClient_CUDA(){}
 
 
 pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
@@ -283,7 +279,7 @@ pos_retval_t POSClient_CUDA::persist_handles(bool with_state){
     this->template poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(&wqes);
     for(i=0; i<wqes.size(); i++){
         POS_CHECK_POINTER(wqe = wqes[i]);
-        wqe->persist</* with_params */ false, /* type */ 1>(apicxt_dir);
+        wqe->persist</* with_params */ false, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(apicxt_dir);
     }
 
     // dumping resources
@@ -570,6 +566,7 @@ void POSClient_CUDA::__dump_hm_cuda_functions() {
         output_file << dump_function_metas(function_handle) << std::endl;
     }
 
+    output_file.flush();
     output_file.close();
     POS_LOG("finish dump kernel metadata to %s", this->_cxt.kernel_meta_path.c_str());
 

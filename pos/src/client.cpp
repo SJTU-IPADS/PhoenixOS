@@ -96,8 +96,10 @@ exit:
 
 
 void POSClient::deinit(){
+    // deinit handle manager of the client
     this->deinit_handle_managers();
 
+    // if client is under trace mode, we dump all its handles
     if(this->_cxt.trace_resource){
         if(unlikely(POS_SUCCESS != this->persist_handles(/* with_state */false))){
             POS_WARN_C("failed to persist handle for tracing");
@@ -109,6 +111,10 @@ void POSClient::deinit(){
 
     // destory queue group
     this->__destory_qgroup();
+
+    // shutdown parser and worker
+    if(this->parser != nullptr){ delete this->parser; }
+    if(this->worker != nullptr){ delete this->worker; }
 
 exit:
     ;
@@ -321,7 +327,8 @@ exit:
 pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     pos_u64id_t apicxt_id;
-    std::set<std::filesystem::path> sorted_by_name;
+    std::set<std::filesystem::path> sorted_unexecuted_apicxts;
+    std::set<std::filesystem::path> sorted_recomputation_apicxts;
     typename std::set<std::filesystem::path>::iterator set_iter;
 
     POS_ASSERT(ckpt_dir.size() > 0);
@@ -331,29 +338,47 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
         goto exit;
     }
 
-    // we organize into a set to make sure we insert the wqes in order to the queue
+    // enqueue recomputation apis
     for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
         if (    entry.is_regular_file() 
             &&  entry.path().extension() == ".bin"
-            &&  entry.path().filename().string().rfind("a-", 0) == 0
+            &&  entry.path().filename().string().rfind("ra-", 0) == 0
         ){
-            sorted_by_name.insert(entry.path());
+            sorted_recomputation_apicxts.insert(entry.path());
         }
     }
-
-    for(set_iter = sorted_by_name.begin(); set_iter != sorted_by_name.end(); set_iter++){
+    for(set_iter = sorted_recomputation_apicxts.begin(); set_iter != sorted_recomputation_apicxts.end(); set_iter++){
         retval = this->__reload_apicxt((*set_iter).string());
         POS_LOG("reload %s", (*set_iter).string().c_str());
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C(
-                "failed to reload api context: ckpt_file(%s)",
+                "failed to reload recomputation api context: ckpt_file(%s)",
                 (*set_iter).string().c_str()
             );
             goto exit;
         }
     }
-            
-            
+
+    // enqueue unexecuted apis
+    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+        if (    entry.is_regular_file() 
+            &&  entry.path().extension() == ".bin"
+            &&  entry.path().filename().string().rfind("ua-", 0) == 0
+        ){
+            sorted_unexecuted_apicxts.insert(entry.path());
+        }
+    }
+    for(set_iter = sorted_unexecuted_apicxts.begin(); set_iter != sorted_unexecuted_apicxts.end(); set_iter++){
+        retval = this->__reload_apicxt((*set_iter).string());
+        POS_LOG("reload %s", (*set_iter).string().c_str());
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C(
+                "failed to reload unexecuted api context: ckpt_file(%s)",
+                (*set_iter).string().c_str()
+            );
+            goto exit;
+        }
+    }
 
 exit:
     return retval;

@@ -214,10 +214,8 @@ pos_retval_t POSWorkspace::deinit(){
     POS_DEBUG_C("cleaning all clients...");
     nb_clean_client = 0;
     for(i=0; i<this->_client_list.size(); i++){
-        client = this->get_client_by_uuid(i);
-        if(client != nullptr){
-            delete client;
-            this->_client_list[i] = nullptr;
+        if(this->_client_list[i] != nullptr){
+            this->remove_client(i);
             nb_clean_client += 1;
         }
     }

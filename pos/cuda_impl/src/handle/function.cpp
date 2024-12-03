@@ -165,8 +165,9 @@ pos_retval_t POSHandleManager_CUDA_Function::allocate_mocked_resource(
     module_handle = related_handles[kPOS_ResourceTypeId_CUDA_Module][0];
     POS_CHECK_POINTER(module_handle);
 
-    // when allocate CUDA function, we would use expected client-side address
-    POS_ASSERT(use_expected_addr == true);
+    // old: when allocate CUDA function, we would use expected client-side address
+    // new: not true, consider cuModuleGetFunction
+    // POS_ASSERT(use_expected_addr == true);
 
     retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, state_size);
     if(unlikely(retval != POS_SUCCESS)){

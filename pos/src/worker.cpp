@@ -356,7 +356,9 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             for(i=0; i<wqes.size(); i++){
                 POS_CHECK_POINTER(wqe = wqes[i]);
                 POS_CHECK_POINTER(wqe->api_cxt);
-                if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true, /* type */ 1>(cmd->ckpt_dir)))){
+                if(unlikely(POS_SUCCESS != (
+                    retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(cmd->ckpt_dir))
+                )){
                     POS_WARN_C("failed to do checkpointing of unexecuted APIs");
                     goto reply_parser;
                 }
@@ -488,8 +490,9 @@ void POSWorker::__daemon_ckpt_async(){
                     }
 
                     // note: we also include those stateless handles here
+                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0)
+                        this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                     this->async_ckpt_cxt.dirty_handles.insert(handle);
-                    this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                 }
                 for(auto &out_handle_view : wqe->output_handle_views){
                     POS_CHECK_POINTER(handle = out_handle_view.handle);
@@ -517,8 +520,9 @@ void POSWorker::__daemon_ckpt_async(){
                     }
 
                     // note: we also include those stateless handles here
+                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0)
+                        this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                     this->async_ckpt_cxt.dirty_handles.insert(handle);
-                    this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                 }
             } // this->async_ckpt_cxt.TH_actve == true
 
@@ -833,7 +837,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     } else {
         do_dirty_copy = true;
         POS_LOG(
-            "[Dirty Behaviour] no Cow enabled, do dirty copy: dirty-copies(%s)",
+            "[Dirty Behaviour] no CoW enabled, do dirty copy: dirty-copies(%s)",
             POSUtilSystem::format_byte_number(this->async_ckpt_cxt.dirty_handle_state_size).c_str()
         );
     }
@@ -877,7 +881,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
             POS_CHECK_POINTER(wqe->api_cxt);
-            if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true, /* type */ 2>(cmd->ckpt_dir)))){
+            if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Recomputation>(cmd->ckpt_dir)))){
                 POS_WARN_C("failed to do checkpointing of recomputation APIs");
                 goto reply_parser;
             }
@@ -895,7 +899,9 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
             POS_CHECK_POINTER(wqe->api_cxt);
-            if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true, /* type */ 1>(cmd->ckpt_dir)))){
+            if(unlikely(POS_SUCCESS != (
+                retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(cmd->ckpt_dir))
+            )){
                 POS_WARN_C("failed to do checkpointing of unexecuted APIs");
                 goto reply_parser;
             }

@@ -410,6 +410,12 @@ typedef struct POSAPIContext_QE {
     }
 
 
+    enum pos_apicxt_persist_typeid_t : uint8_t {
+        ApiCxt_PersistType_Unexecuted = 0,
+        ApiCxt_PersistType_Recomputation
+    };
+
+
     /*!
      *  \brief  persist the state of this APIcontext to specified directory
      *  \tparam with_params whether to persist with parameter information,
@@ -421,7 +427,7 @@ typedef struct POSAPIContext_QE {
      *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointing
      */
-    template<bool with_params, int type>
+    template<bool with_params, pos_apicxt_persist_typeid_t type>
     pos_retval_t persist(std::string ckpt_dir);
 
 
