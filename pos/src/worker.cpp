@@ -337,6 +337,13 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             goto reply_parser; 
         }
 
+        // for dump, we need to force client to stop accepting remoting request
+        POS_ASSERT(this->_client->offline_counter == 0);
+        this->_client->offline_counter = 1;
+        while(this->_client->offline_counter != 2 && this->_client->is_under_sync_call == false){ 
+            /* wait remoting framework to confirm */ 
+        }
+
         // for dump, we also need to save unexecuted APIs
         nb_ckpt_wqes = 0;
         while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
@@ -854,8 +861,14 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
         POS_LOG_C("finished dumping recomputation APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
     }
 
-    // step 4: for dump, we also need to save unexecuted APIs
-    // TODO: no need to worry there would be further wqe coming, as current CLI is design to first C cpu the C gpu
+    // step 4: for dump, we need to force client to stop accepting remoting request
+    POS_ASSERT(this->_client->offline_counter == 0);
+    this->_client->offline_counter = 1;
+    while(this->_client->offline_counter != 2 && this->_client->is_under_sync_call == false){ 
+        /* wait remoting framework to confirm */ 
+    }
+
+    // step 5: for dump, we also need to save unexecuted APIs
     nb_ckpt_wqes = 0;
     while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
         // we need to make sure we drain all unexecuted APIs
@@ -874,7 +887,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     }
     POS_LOG_C("finished dumping unexecuted APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
 
-    // step 5: tear down all handles inside the client
+    // step 6: tear down all handles inside the client
     if(unlikely(POS_SUCCESS != (retval = this->_client->tear_down_all_handles()))){
         POS_WARN_C("failed to tear down handles while dumping");
     }

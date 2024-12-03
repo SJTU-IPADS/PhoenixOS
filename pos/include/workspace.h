@@ -253,13 +253,13 @@ class POSWorkspace {
         POSClient *client;
 
         if(unlikely(this->_client_list.size() <= uuid)){
-            POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
+            // POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
             retval = 0; goto exit;
         }
 
         client = this->_client_list[uuid];
         if(unlikely(client == nullptr)){
-            POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
+            // POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
             retval = 0; goto exit;
         }
 
@@ -269,6 +269,7 @@ class POSWorkspace {
                 POS_DEBUG_C("confirm client offline: uuid(%lu)", uuid);
                 client->offline_counter += 1;
             }
+            retval = 0; goto exit;
         }
 
     exit:

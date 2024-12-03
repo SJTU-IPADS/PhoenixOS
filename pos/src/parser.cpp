@@ -25,7 +25,7 @@
 
 POSParser::POSParser(POSWorkspace* ws, POSClient* client) 
     : _ws(ws), _client(client), _stop_flag(false)
-{   
+{
     POS_CHECK_POINTER(ws);
     POS_CHECK_POINTER(client);
 

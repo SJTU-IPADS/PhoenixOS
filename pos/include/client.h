@@ -268,10 +268,10 @@ class POSClient {
     POSWorker *worker;
 
     // mark whether this client is under sync call
-    bool is_under_sync_call;
+    volatile bool is_under_sync_call;
 
     // counter for mark whether a client is offline
-    uint8_t offline_counter;
+    volatile uint8_t offline_counter;
 
  protected:
     friend class POSWorkspace;
