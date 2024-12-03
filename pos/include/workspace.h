@@ -196,14 +196,6 @@ class POSWorkspace {
      */
     POSClient* get_client_by_pid(__pid_t pid);
 
-    /*!
-     *  \todo   currently the client is data racing between OOB thread and RPC thread
-     *          so we use these counters to synchronize
-     *          once we have the ability to spawn and recollect RPC thread from OOB callback
-     *          we can remove these counetrs
-     */
-    std::vector<std::shared_ptr<std::mutex>> client_lock;
-
  protected:
     /*!
      *  \brief  create a specific-implemented client
@@ -257,16 +249,13 @@ class POSWorkspace {
      *          1 for client ready
      */    
     inline int try_lock_client(pos_client_uuid_t uuid){
-        POSClient *client;
+        volatile POSClient *client;
         int retval = 1;
 
         if(unlikely(this->_client_list.size() <= uuid)){
             // POS_WARN_C("try to require access to non-exist client: uuid(%lu)", uuid);
             return 0;
         }
-
-        // lock the client
-        this->client_lock[uuid]->lock();
 
         client = this->_client_list[uuid];
         if(unlikely(client == nullptr)){
@@ -284,7 +273,6 @@ class POSWorkspace {
         }
 
     exit:
-        this->client_lock[uuid]->unlock();
         return retval;
     }
 

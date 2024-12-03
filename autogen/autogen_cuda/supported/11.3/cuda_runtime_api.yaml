@@ -307,3 +307,162 @@ apis:
     involve_membus: true
     need_stream_sync: false
     constant_params:
+
+  # ​cudaError_t cudaSetDevice ( int  device )
+  - name: "cudaSetDevice"
+    parent_name: "cudaSetDevice"
+    customize_parser: false
+    customize_worker: false
+    is_sync: false
+    # parser
+    type: "set_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 1
+        handle_type: "cuda_device"
+        handle_source: "from_param"
+        side_effects:
+          - "set_as_last_used"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaGetLastError ( void )
+  - name: "cudaGetLastError"
+    parent_name: "cudaGetLastError"
+    customize_parser: false
+    customize_worker: false
+    is_sync: false
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # const char* cudaGetErrorString ( cudaError_t error )
+  - name: "cudaGetErrorString"
+    parent_name: "cudaGetErrorString"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaPeekAtLastError ( void )
+  - name: "cudaPeekAtLastError"
+    parent_name: "cudaPeekAtLastError"
+    customize_parser: false
+    customize_worker: false
+    is_sync: false
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaGetDeviceCount ( int* count )
+  - name: "cudaGetDeviceCount"
+    parent_name: "cudaGetDeviceCount"
+    customize_parser: true
+    customize_worker: true
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaGetDeviceProperties ( cudaDeviceProp* prop, int  device )
+  - name: "cudaGetDeviceProperties"
+    parent_name: "cudaGetDeviceProperties"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 2
+        handle_type: "cuda_device"
+        handle_source: "from_param"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # ​cudaError_t cudaDeviceGetAttribute ( int* value, cudaDeviceAttr attr, int  device )
+  - name: "cudaDeviceGetAttribute"
+    parent_name: "cudaDeviceGetAttribute"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 3
+        handle_type: "cuda_device"
+        handle_source: "from_param"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
+
+  # cudaError_t cudaGetDevice ( int* device )
+  # TODO: not finish yet
+  - name: "cudaGetDevice"
+    parent_name: "cudaGetDevice"
+    customize_parser: false
+    customize_worker: false
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 3
+        handle_type: "cuda_device"
+        handle_source: "from_param"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:

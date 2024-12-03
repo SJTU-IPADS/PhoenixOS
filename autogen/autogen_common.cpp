@@ -34,6 +34,17 @@ pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source)
 }
 
 
+pos_edge_side_effect_typeid_t get_side_effect_by_name(std::string& side_effect){
+    if(side_effect == std::string("set_as_last_used")){
+        return kPOS_EdgeSideEffect_SetAsLastUsed;
+    } else {
+        POS_ERROR_DETAIL(
+            "invalid side effect detected: given_side_effect(%s)", side_effect.c_str()
+        );
+    }
+}
+
+
 pos_retval_t POSAutogener::collect_pos_support_yamls(){
     pos_retval_t retval = POS_SUCCESS;
     pos_support_header_file_meta_t *header_file_meta;

@@ -65,7 +65,7 @@ std::vector<uint64_t> pos_hijacked_cuda_apis({
     rpc_cuDevicePrimaryCtxGetState,
     rpc_cuCtxGetCurrent,
     rpc_cuLaunchKernel,
-    
+
     /* cuBLAS */
     rpc_cublasCreate,
     rpc_cublasSetStream,

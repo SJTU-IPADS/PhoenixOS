@@ -212,7 +212,15 @@ pos_retval_t POSWorkspace_CUDA::__destory_client(POSClient *client){
 
     POS_CHECK_POINTER(cuda_client = reinterpret_cast<POSClient_CUDA*>(client));
     cuda_client->deinit();
-    delete cuda_client;
+
+    /*!
+     *  \note   we temp comment this out
+     *  \todo   currently the client is data racing between OOB thread and RPC thread
+     *          the RPC would have no idea the cuda_client has been deleted, so we don't delete tmply
+     *          once we have the ability to spawn and recollect RPC thread from OOB callback
+     *          we can resume this delete
+     */
+    // delete cuda_client;
 
 exit:
     return retval;

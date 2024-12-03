@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <vector>
+#include <mutex>
 
 #include "pos/include/common.h"
 #include "pos/include/oob.h"

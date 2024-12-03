@@ -253,10 +253,6 @@ pos_retval_t POSWorkspace::create_client(pos_create_client_param_t& param, POSCl
     this->_client_list.resize(this->_current_max_uuid);
     this->_client_list[(*clnt)->id] = (*clnt);
 
-    this->client_lock.resize(this->_current_max_uuid);
-    this->client_lock[(*clnt)->id] = std::make_shared<std::mutex>();
-    POS_CHECK_POINTER(this->client_lock[(*clnt)->id].get());
-
     this->_pid_client_map[param.pid] = (*clnt);
     POS_DEBUG_C("create client: addr(%p), uuid(%lu), pid(%d)", (*clnt), (*clnt)->id, param.pid);
 

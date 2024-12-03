@@ -48,12 +48,28 @@ enum pos_handle_source_typeid_t : uint8_t {
 };
 
 
+/*
+ *  \brief  type of side effect could cause by an edge
+ */
+enum pos_edge_side_effect_typeid_t : uint8_t {
+    kPOS_EdgeSideEffect_SetAsLastUsed = 0,
+};
+
+
 /*!
  *  \brief  obtain handle source type according to given string from yaml file
  *  \param  handle_source   given string
  *  \return the corresponding handle source type
  */
 pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source);
+
+
+/*!
+ *  \brief  obtain side effect type according to given string from yaml file
+ *  \param  side_effect   given string
+ *  \return the corresponding side effect type
+ */
+pos_edge_side_effect_typeid_t get_side_effect_by_name(std::string& side_effect);
 
 
 /*!
@@ -76,6 +92,9 @@ typedef struct pos_support_edge_meta {
     // index of the parameter that indicate the resource state size behind this handle
     // this field is only used by create edge
     uint16_t state_size_param_index;
+
+    // side effects of this edge
+    std::vector<pos_edge_side_effect_typeid_t> side_effects;
 } pos_support_edge_meta_t;
 
 

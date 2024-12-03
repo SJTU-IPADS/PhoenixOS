@@ -259,7 +259,7 @@ class POSClient {
     __pid_t pid;
 
     // state of this client
-    pos_client_status_t status;
+    volatile pos_client_status_t status;
 
     // parser thread handle
     POSParser *parser;

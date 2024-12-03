@@ -61,6 +61,8 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
     ){
         std::string edge_direction_str, related_handles_str;
         bool is_hm_duplicated, is_handle_duplicated;
+        uint64_t i;
+        pos_edge_side_effect_typeid_t side_effect_id;
         POS_CHECK_POINTER(edge_meta);
 
         edge_direction_str = 
@@ -200,7 +202,6 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 return retstr;
             };
 
-            // TODO: we need to fix this, add use_expected_addr param
             parser_function->append_content(std::format(
                 "// create handle in the hm\n"
                 "retval = {}->allocate_mocked_resource(\n"
@@ -209,6 +210,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 "{}\n"
                 "   }}),\n" 
                 "   /* size */ kPOS_HandleDefaultSize,\n"
+                "   /* use_expected_addr */ {},\n"
                 "   /* expected_addr */ {},\n"
                 "   /* state_size */ {}\n"
                 ");\n"
@@ -223,6 +225,7 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 hm_name,
                 handle_name,
                 __cast_in_edges_to_related_handle_map(),
+                edge_meta->expected_addr_param_index != 0 ? std::string("true") : std::string("false"),
                 edge_meta->expected_addr_param_index != 0
                     ? std::format("pos_api_param_value(wqe, {}, uint64_t)", edge_meta->expected_addr_param_index - 1)
                     : std::string("0"),
@@ -236,8 +239,13 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 handle_name
             ));
         } else if (edge_direction == kPOS_Edge_Direction_Delete){
-            // case: for delete edge, create handle from handle manager
-            // TODO
+            // case: for delete edge, mark handle as delete pending state
+            parser_function->append_content(std::format(
+                "// mark handle as delete pending state, to remove it from handle manager\n"
+                "{}->mark_status(kPOS_HandleStatus_Delete_Pending);"
+                ,
+                handle_name
+            ));
         } else {
             POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
         }
@@ -270,6 +278,32 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
                 edge_meta->index - 1,
                 handle_name
             ));
+        }
+
+        // step 5: record side effect of the edge
+        for(i=0; i<edge_meta->side_effects.size(); i++){
+            side_effect_id = edge_meta->side_effects[i];
+            switch (side_effect_id)
+            {
+            case kPOS_EdgeSideEffect_SetAsLastUsed:
+                if(unlikely(edge_direction == kPOS_Edge_Direction_Create || edge_direction == kPOS_Edge_Direction_Delete)){
+                    POS_WARN(
+                        "%s edge but has SetAsLastUsed side effect, is this normal?: api(%s)",
+                        edge_direction_str.c_str(),
+                        api_snake_name.c_str()
+                    );
+                }
+                parser_function->append_content(std::format(
+                    "// set as last-used handle\n"
+                    "{}->latest_used_handle = {};"
+                    ,
+                    hm_name, handle_name
+                ));
+                break;
+
+            default:
+                POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
+            }
         }
     };
 

@@ -38,7 +38,7 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
         pos_retval_t retval = POS_SUCCESS;
         uint64_t j, k;
         pos_support_edge_meta_t *edge_meta, *related_edge_meta;
-        std::string handle_type, handle_source, related_handle_type, related_handle_source;
+        std::string handle_type, handle_source, side_effect, related_handle_type, related_handle_source;
         std::vector<pos_support_edge_meta_t*>* related_handles;
 
         POS_CHECK_POINTER(api_meta);
@@ -69,8 +69,16 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             handle_source = edge["handle_source"].as<std::string>();
             edge_meta->handle_source = get_handle_source_by_name(handle_source);
 
-            // [4] state_size and expected_addr involved in this edge
-            // this field is only for create edge
+            // [4] side effects of the APIs (optional)
+            if(edge["side_effects"]){
+                for(k=0; k<edge["side_effects"].size(); k++){
+                    side_effect = edge["side_effects"][j].as<std::string>();
+                    edge_meta->side_effects.push_back(get_side_effect_by_name(side_effect));
+                }
+            }
+
+            // [5] state_size and expected_addr involved in this edge (optional)
+            // these fields are only required create edge
             if(std::string(edge_list_name) == std::string("create_edges")){
                 if(edge["state_size_param_index"]){
                     edge_meta->state_size_param_index = edge["state_size_param_index"].as<uint16_t>();
@@ -113,12 +121,12 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             // parent name of the API
             api_meta->parent_name = api["parent_name"].as<std::string>();
 
-            // whether the API is synchronous
-            api_meta->is_sync = api["is_sync"].as<bool>();
-
             // whether to customize the parser and worker logic of API
             api_meta->customize_parser = api["customize_parser"].as<bool>();
             api_meta->customize_worker = api["customize_worker"].as<bool>();
+
+            // whether the API is synchronous
+            api_meta->is_sync = api["is_sync"].as<bool>();
 
             // dependent headers to support hijacking this API
             api_meta->dependent_headers = dependent_headers;
