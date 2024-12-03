@@ -318,38 +318,7 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
     mount_existance_file_stream << std::to_string(static_cast<int>(avail_mem_bytes * 0.8));
     mount_existance_file_stream.close();
 
-    // step 4: CPU-side dump (sync)
-    criu_cmd = std::string("criu dump")
-                +   std::string(" --images-dir ") + std::string(clio.metas.ckpt.ckpt_dir)
-                +   std::string(" --shell-job --display-stats")
-                +   std::string(" --tree ") + std::to_string(clio.metas.ckpt.pid);
-    retval = POSUtil_Command_Caller::exec_sync(
-        criu_cmd, criu_result,
-        /* ignore_error */ false,
-        /* print_stdout */ true,
-        /* print_stderr */ true
-    );
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN("dump failed, failed to dump cpu-side: retval(%u)", retval);
-        // POS_WARN("failed to execute CRIU");
-        goto exit;
-    }
-
-    // step 4: CPU-side dump (async)
-    // TODO: we will change to async call once we deal with the workspace issue :(
-    // retval = POSUtil_Command_Caller::exec_async(
-    //     criu_cmd, criu_thread, criu_thread_promise, criu_result,
-    //     /* ignore_error */ false,
-    //     /* print_stdout */ true,
-    //     /* print_stderr */ true
-    // );
-    // if(unlikely(retval != POS_SUCCESS)){
-    //     POS_WARN("dump failed, failed to start cpu-side dump thread: retval(%u)", retval);
-    //     // POS_WARN("failed to execute CRIU");
-    //     goto exit;
-    // }
-
-    // step 5: GPU-side dump (sync)
+    // step 4: GPU-side dump (sync)
     call_data.pid = clio.metas.ckpt.pid;
     memcpy(
         call_data.ckpt_dir,
@@ -372,6 +341,37 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_Dump, &call_data);
     if(POS_SUCCESS != call_data.retval){
         POS_WARN("dump failed, gpu-side dump failed, %s", call_data.retmsg);
+        goto exit;
+    }
+
+    // step 5: CPU-side dump (async)
+    // TODO: we will change to async call once we deal with the workspace issue :(
+    // retval = POSUtil_Command_Caller::exec_async(
+    //     criu_cmd, criu_thread, criu_thread_promise, criu_result,
+    //     /* ignore_error */ false,
+    //     /* print_stdout */ true,
+    //     /* print_stderr */ true
+    // );
+    // if(unlikely(retval != POS_SUCCESS)){
+    //     POS_WARN("dump failed, failed to start cpu-side dump thread: retval(%u)", retval);
+    //     // POS_WARN("failed to execute CRIU");
+    //     goto exit;
+    // }
+
+    // step 5: CPU-side dump (sync)
+    criu_cmd = std::string("criu dump")
+                +   std::string(" --images-dir ") + std::string(clio.metas.ckpt.ckpt_dir)
+                +   std::string(" --shell-job --display-stats")
+                +   std::string(" --tree ") + std::to_string(clio.metas.ckpt.pid);
+    retval = POSUtil_Command_Caller::exec_sync(
+        criu_cmd, criu_result,
+        /* ignore_error */ false,
+        /* print_stdout */ true,
+        /* print_stderr */ true
+    );
+    if(unlikely(retval != POS_SUCCESS)){
+        POS_WARN("dump failed, failed to dump cpu-side: retval(%u)", retval);
+        // POS_WARN("failed to execute CRIU");
         goto exit;
     }
 

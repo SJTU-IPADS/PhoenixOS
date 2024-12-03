@@ -755,6 +755,31 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     // mark top-half as disabled here to avoid missed dirty handles
     this->async_ckpt_cxt.TH_actve = false;
 
+    // step 0, for dump, we need to force client to stop accepting remoting request
+    POS_ASSERT(this->_client->offline_counter == 0);
+    if(this->_client->offline_counter == 0){
+        // case: first stop attempt
+        this->_client->offline_counter = 1;
+        while(this->_client->offline_counter != 2){ 
+            /* wait remoting framework to confirm */
+            if(this->_client->is_under_sync_call == true){
+                retval = POS_WARN_ABANDONED;
+                goto exit;
+            }
+        }
+    } else if(this->_client->offline_counter == 1){
+        // case: subsequent stop attempt, the remoting framework haven't confirmed yet
+        while(this->_client->offline_counter != 2){
+            /* wait remoting framework to confirm */
+            POS_ASSERT(this->_client->is_under_sync_call == false);
+        }
+    } else if(this->_client->offline_counter == 2){
+        // case: subsequent stop attempt, the remoting frameowork has replied, we're free to go for dump
+    } else {
+        POS_ERROR_C_DETAIL("unexpected value obtained");
+    }
+
+
     // step 1: synchronize the worker thread
     if(unlikely(POS_SUCCESS != (retval = this->sync()))){
         POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
@@ -859,13 +884,6 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
             nb_ckpt_wqes += 1;
         }
         POS_LOG_C("finished dumping recomputation APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
-    }
-
-    // step 4: for dump, we need to force client to stop accepting remoting request
-    POS_ASSERT(this->_client->offline_counter == 0);
-    this->_client->offline_counter = 1;
-    while(this->_client->offline_counter != 2 && this->_client->is_under_sync_call == false){ 
-        /* wait remoting framework to confirm */ 
     }
 
     // step 5: for dump, we also need to save unexecuted APIs

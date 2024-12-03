@@ -146,7 +146,7 @@ class POSWorker {
 
     /*!
      *  \brief  make the specified stream synchronized
-     *  \param  stream_id   index of the stream to be synced, default to be 0
+     *  \param  stream_id   index of the stream to be sync, default to be 0
      */
     virtual pos_retval_t sync(uint64_t stream_id=0){
         return POS_FAILED_NOT_IMPLEMENTED;

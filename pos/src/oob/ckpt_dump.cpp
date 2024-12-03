@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <mutex>
 
 #include "pos/include/common.h"
 #include "pos/include/handle.h"
@@ -140,7 +141,9 @@ namespace cli_ckpt_dump {
 
         // remove client
         if(likely(cmds[0]->retval == POS_SUCCESS)){
+            ws->client_lock[cmd->client_id]->lock();
             ws->remove_client(cmd->client_id);
+            ws->client_lock[cmd->client_id]->unlock();
         }
 
     response:
