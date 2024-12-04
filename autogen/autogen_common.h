@@ -48,12 +48,28 @@ enum pos_handle_source_typeid_t : uint8_t {
 };
 
 
+/*
+ *  \brief  type of side effect could cause by an edge
+ */
+enum pos_edge_side_effect_typeid_t : uint8_t {
+    kPOS_EdgeSideEffect_SetAsLastUsed = 0,
+};
+
+
 /*!
  *  \brief  obtain handle source type according to given string from yaml file
  *  \param  handle_source   given string
  *  \return the corresponding handle source type
  */
 pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source);
+
+
+/*!
+ *  \brief  obtain side effect type according to given string from yaml file
+ *  \param  side_effect   given string
+ *  \return the corresponding side effect type
+ */
+pos_edge_side_effect_typeid_t get_side_effect_by_name(std::string& side_effect);
 
 
 /*!
@@ -76,6 +92,9 @@ typedef struct pos_support_edge_meta {
     // index of the parameter that indicate the resource state size behind this handle
     // this field is only used by create edge
     uint16_t state_size_param_index;
+
+    // side effects of this edge
+    std::vector<pos_edge_side_effect_typeid_t> side_effects;
 } pos_support_edge_meta_t;
 
 
@@ -102,7 +121,7 @@ typedef struct pos_support_api_meta {
     bool is_sync;
 
     // ========== fields for parser ==========
-    bool customize_parser;
+    std::string parser_type;
     std::vector<pos_support_edge_meta_t*> create_edges;
     std::vector<pos_support_edge_meta_t*> delete_edges;
     std::vector<pos_support_edge_meta_t*> in_edges;
@@ -111,7 +130,7 @@ typedef struct pos_support_api_meta {
 
     // ========== fields for worker ==========
     // whether to customize worker function's logic
-    bool customize_worker;
+    std::string worker_type;
 
     // whether the worker function involves operation on memory bus
     bool involve_membus;
@@ -238,16 +257,32 @@ class POSAutogener {
     
 
     /*!
+     *  \brief  try to obtain the header_file_meta by given yaml file,
+     *          as multiple yaml configuration files might share the same header file meta
+     *  \param  file_path           path to the yaml file to be parsed
+     *  \param  header_file_meta    the potential obtained metadata of the parsed yaml file
+     *  \return POS_SUCCESS for successfully obtained 
+     */
+    pos_retval_t __try_get_header_file_meta(
+        const std::string& file_path, pos_support_header_file_meta_t **header_file_meta
+    );
+
+
+    /*!
      *  \brief  collect all APIs from a yaml file that records pos-supported information
      *  \note   this function is implemeneted by each target
-     *  \param  file_path           path to the yaml file to be parsed
-     *  \param  header_file_meta    metadata of the parsed yaml file
+     *  \param  file_path                   path to the yaml file to be parsed
+     *  \param  header_file_meta            metadata of the parsed yaml file
+     *  \param  need_init_header_file_meta  whether one needs to iniatialize header_file_meta
+     *                                      only the first subfile should be true
      *  \return POS_SUCCESS for successfully parsed 
      */
     pos_retval_t __collect_pos_support_yaml(
         const std::string& file_path,
-        pos_support_header_file_meta_t *header_file_meta
+        pos_support_header_file_meta_t *header_file_meta,
+        bool need_init_header_file_meta
     );
+
 
     /*!
      *  \brief  collect all APIs from a single vendor header file
@@ -263,6 +298,7 @@ class POSAutogener {
         pos_support_header_file_meta_t* support_header_file_meta
     );
 
+
     /*!
      *  \brief  generate the parser logic of an API
      *  \param  vendor_api_meta     metadata of the parsed vendor API
@@ -273,6 +309,7 @@ class POSAutogener {
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta
     );
+
 
     /*!
      *  \brief  generate the worker logic of an API
@@ -288,6 +325,7 @@ class POSAutogener {
         pos_vendor_api_meta_t* vendor_api_meta,
         pos_support_api_meta_t* support_api_meta
     );
+
 
     /*!
      *  \brief  insert target-specific parser code of the API
@@ -308,6 +346,7 @@ class POSAutogener {
         POSCodeGen_CppBlock *api_namespace,
         POSCodeGen_CppBlock *parser_function
     );
+
 
     /*!
      *  \brief  insert target-specific worker code of the API

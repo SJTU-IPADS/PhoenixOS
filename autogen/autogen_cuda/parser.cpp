@@ -483,6 +483,12 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
 
     // step 1: declare variables in the parser
     parser_function->declare_var("pos_retval_t retval = POS_SUCCESS;");
+    
+    // for those APIs to be skipped logic, we just return POS_SUCCESS in the parser function
+    if(support_api_meta->parser_type == std::string("skipped")){
+        goto insert_retval_code;
+    }
+
     parser_function->declare_var("POSClient_CUDA *client;");
 
     // step 2: check input pointers for wqe and ws
@@ -544,11 +550,15 @@ pos_retval_t POSAutogener::__insert_code_parser_for_target(
     );
 
     // step 7: exit processing
+ insert_retval_code:
     parser_function->append_content(
         "// parser exit\n"
         "exit:"
     );
-    if(support_api_meta->api_type == kPOS_API_Type_Create_Resource){
+    if(
+        support_api_meta->api_type == kPOS_API_Type_Create_Resource
+        || support_api_meta->worker_type == std::string("skipped")
+    ){
         parser_function->append_content("wqe->status = kPOS_API_Execute_Status_Return_After_Parse;");
     }
     parser_function->append_content("return retval;");

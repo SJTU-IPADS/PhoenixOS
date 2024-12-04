@@ -67,10 +67,21 @@ pos_retval_t POSAutogener::collect_pos_support_yamls(){
         if(entry.is_regular_file() &&  entry.path().extension() == ".yaml"){
             POS_LOG_C("parsing support file %s...", entry.path().c_str())
 
-            POS_CHECK_POINTER(header_file_meta = new pos_support_header_file_meta_t);
+            retval = this->__try_get_header_file_meta(entry.path(), &header_file_meta);
+            if(retval == POS_SUCCESS){
+                POS_CHECK_POINTER(header_file_meta);
+            } else if(retval == POS_FAILED_NOT_EXIST) {
+                POS_CHECK_POINTER(header_file_meta = new pos_support_header_file_meta_t);
+            } else {
+                POS_ERROR_C("failed to parse file %s", entry.path().c_str())
+            }
 
             if(unlikely(POS_SUCCESS != (
-                retval = this->__collect_pos_support_yaml(entry.path(), header_file_meta)
+                retval = this->__collect_pos_support_yaml(
+                    entry.path(),
+                    header_file_meta,
+                    retval == POS_FAILED_NOT_EXIST ? true : false
+                )
             ))){
                 POS_ERROR_C("failed to parse file %s", entry.path().c_str())
             }
@@ -295,7 +306,7 @@ pos_retval_t POSAutogener::__generate_api_parser(
     POS_CHECK_POINTER(support_api_meta);
 
     // for those APIs to be customized logic, we just omit
-    if(support_api_meta->customize_parser == true){
+    if(support_api_meta->parser_type == std::string("customized")){
         goto exit;
     }
 
@@ -397,7 +408,7 @@ pos_retval_t POSAutogener::__generate_api_worker(
     POS_CHECK_POINTER(support_api_meta);
 
     // for those APIs to be customized logic, we just omit
-    if(support_api_meta->customize_worker == true){
+    if(support_api_meta->worker_type == std::string("customized")){
         goto exit;
     }
 

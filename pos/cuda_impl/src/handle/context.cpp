@@ -168,7 +168,10 @@ pos_retval_t POSHandleManager_CUDA_Context::init(std::map<uint64_t, std::vector<
                 /* related_handle */ std::map<uint64_t, std::vector<POSHandle*>>({
                     { kPOS_ResourceTypeId_CUDA_Device, { device_handle } }
                 }),
-                /* size */ sizeof(CUcontext)
+                /* size */ 1,
+                /* use_expected_addr */ true,
+                /* expected_addr */ static_cast<uint64_t>(i),   // device id == context id
+                /* state_size */ 0
             )
         ))){
             POS_WARN_C_DETAIL(

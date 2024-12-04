@@ -1,0 +1,44 @@
+# Copyright 2024 The PhoenixOS Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# CUDA: 11.3
+# Type: Occupancy
+# Docs: https://docs.nvidia.com/cuda/archive/11.3.0/cuda-runtime-api/group__CUDART__OCCUPANCY.html
+
+header_file_name: "cuda_runtime_api.h"
+dependent_headers:
+  - "cuda_runtime_api.h"
+  - "cuda.h"
+successful_retval: "cudaSuccess"
+apis:
+  # cudaError_t cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags ( int* numBlocks, const void* func, int  blockSize, size_t dynamicSMemSize, unsigned int  flags )
+  - name: "cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags"
+    parent_name: "cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags"
+    parser_type: "default"
+    worker_type: "default"
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 2
+        handle_type: "cuda_function"
+        handle_source: "from_param"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:

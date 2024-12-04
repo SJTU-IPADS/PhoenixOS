@@ -17,9 +17,41 @@
 #include "autogen_cuda.h"
 
 
+pos_retval_t POSAutogener::__try_get_header_file_meta(
+    const std::string& file_path,
+    pos_support_header_file_meta_t **header_file_meta
+){
+    pos_retval_t retval = POS_SUCCESS;
+    std::string header_file_name;
+    YAML::Node config;
+
+    POS_CHECK_POINTER(header_file_meta);
+
+    try {
+        config = YAML::LoadFile(file_path);
+        header_file_name = config["header_file_name"].as<std::string>();
+        if(this->_supported_header_file_meta_map.count(header_file_name) > 0){
+            POS_CHECK_POINTER(*header_file_meta = this->_supported_header_file_meta_map[header_file_name]);
+        } else {
+            *header_file_meta = nullptr;
+            retval = POS_FAILED_NOT_EXIST;
+        }
+    } catch (const YAML::Exception& e) {
+        POS_WARN_C("failed to parse yaml file: path(%s), error(%s)", file_path.c_str(), e.what());
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
+
+exit:
+    return retval;
+}
+
+
+
 pos_retval_t POSAutogener::__collect_pos_support_yaml(
     const std::string& file_path,
-    pos_support_header_file_meta_t *header_file_meta
+    pos_support_header_file_meta_t *header_file_meta,
+    bool need_init_header_file_meta
 ){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, k;
@@ -93,9 +125,12 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
 
     try {
         config = YAML::LoadFile(file_path);
-        header_file_meta->file_name = config["header_file_name"].as<std::string>();
-        header_file_meta->successful_retval = config["successful_retval"].as<std::string>();
 
+        if(need_init_header_file_meta){
+            header_file_meta->file_name = config["header_file_name"].as<std::string>();
+            header_file_meta->successful_retval = config["successful_retval"].as<std::string>();
+        }
+        
         if(config["dependent_headers"]){
             for(i=0; i<config["dependent_headers"].size(); i++){
                 dependent_headers.push_back(config["dependent_headers"][i].as<std::string>());
@@ -117,8 +152,18 @@ pos_retval_t POSAutogener::__collect_pos_support_yaml(
             api_meta->is_sync = api["is_sync"].as<bool>();
 
             // whether to customize the parser and worker logic of API
-            api_meta->customize_parser = api["customize_parser"].as<bool>();
-            api_meta->customize_worker = api["customize_worker"].as<bool>();
+            api_meta->parser_type = api["parser_type"].as<std::string>();
+            api_meta->worker_type = api["worker_type"].as<std::string>();
+            POS_ASSERT(
+                api_meta->parser_type == std::string("default")
+                || api_meta->parser_type == std::string("skipped")
+                || api_meta->parser_type == std::string("customized")
+            );
+            POS_ASSERT(
+                api_meta->worker_type == std::string("default")
+                || api_meta->worker_type == std::string("skipped")
+                || api_meta->worker_type == std::string("customized")
+            );
 
             // dependent headers to support hijacking this API
             api_meta->dependent_headers = dependent_headers;

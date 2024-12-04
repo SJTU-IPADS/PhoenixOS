@@ -186,6 +186,11 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
     // step 1: declare variables in the worker
     worker_function->declare_var("pos_retval_t retval = POS_SUCCESS;");
+    
+    // for those APIs to be skipped logic, we just return POS_SUCCESS in the worker function
+    if(support_api_meta->worker_type == std::string("skipped")){
+        goto insert_retval_code;
+    }
 
     // step 2: check input pointers for wqe and ws
     worker_function->append_content(
@@ -333,12 +338,13 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         support_header_file_meta->successful_retval
     ));
 
+ insert_retval_code:
     // step 10: exit pointer
     worker_function->append_content(
         "exit:\n"
         "return retval;"
     );
 
-exit:
+ exit:
     return retval;
 }
