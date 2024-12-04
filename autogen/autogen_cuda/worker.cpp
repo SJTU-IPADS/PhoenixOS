@@ -56,7 +56,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
             is_var_duplicated = worker_function->declare_var(std::format(
                 "{} __create_handle__ = NULL;",
-                clang_getCString(clang_getTypeSpelling(api_param->type))
+                api_param->type
             ));
             POS_ASSERT(is_var_duplicated == false);
         }
@@ -86,6 +86,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                     if(other_edge->index - 1 == i){
                         param_str = std::format("pos_api_input_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
+                        break;
                     }
                 }
                 for(j=0; j<support_api_meta->out_edges.size() && !is_param_formed; j++){
@@ -93,6 +94,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                     if(other_edge->index - 1 == i){
                         param_str = std::format("pos_api_output_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
+                        break;
                     }
                 }
                 for(j=0; j<support_api_meta->inout_edges.size() && !is_param_formed; j++){
@@ -100,6 +102,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                     if(other_edge->index - 1 == i){
                         param_str = std::format("pos_api_inout_handle_offset_server_addr(wqe, {})", j);
                         is_param_formed = true;
+                        break;
                     }
                 }
                 if (support_api_meta->api_type == kPOS_API_Type_Delete_Resource && !is_param_formed) {
@@ -108,6 +111,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                     if(other_edge->index - 1 == i){
                         param_str = std::format("pos_api_delete_handle(wqe, 0)->server_addr");
                         is_param_formed = true;
+                        break;
                     }
                 }
 
@@ -115,7 +119,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                 if (!is_param_formed){
                     param_str = std::format(
                         "pos_api_param_value(wqe, {}, {})",
-                        i, clang_getCString(clang_getTypeSpelling(api_param->type))
+                        i, api_param->type
                     );
                     is_param_formed = true;
                 }
@@ -127,7 +131,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
                 // if (!api_param->is_pointer && !is_param_formed){
                 //     param_str = std::format(
                 //         "pos_api_param_value(wqe, {}, {})",
-                //         i, clang_getCString(clang_getTypeSpelling(api_param->type))
+                //         i, api_param->type
                 //     );
                 //     is_param_formed = true;
                 // }
@@ -136,8 +140,8 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
 
             param_list_str += std::format(
                 "    /* {} */ ({})({})",
-                clang_getCString(api_param->name),
-                clang_getCString(clang_getTypeSpelling(api_param->type)),
+                api_param->name,
+                api_param->type,
                 param_str
             );
             if(i != vendor_api_meta->params.size()-1){
@@ -251,7 +255,7 @@ pos_retval_t POSAutogener::__insert_code_worker_for_target(
         "{}"
         ");"
         ,
-        clang_getCString(vendor_api_meta->name),
+        vendor_api_meta->name,
         __form_parameter_list()
     ));
 

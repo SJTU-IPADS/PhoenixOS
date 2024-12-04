@@ -48,28 +48,12 @@ enum pos_handle_source_typeid_t : uint8_t {
 };
 
 
-/*
- *  \brief  type of side effect could cause by an edge
- */
-enum pos_edge_side_effect_typeid_t : uint8_t {
-    kPOS_EdgeSideEffect_SetAsLastUsed = 0,
-};
-
-
 /*!
  *  \brief  obtain handle source type according to given string from yaml file
  *  \param  handle_source   given string
  *  \return the corresponding handle source type
  */
 pos_handle_source_typeid_t get_handle_source_by_name(std::string& handle_source);
-
-
-/*!
- *  \brief  obtain side effect type according to given string from yaml file
- *  \param  side_effect   given string
- *  \return the corresponding side effect type
- */
-pos_edge_side_effect_typeid_t get_side_effect_by_name(std::string& side_effect);
 
 
 /*!
@@ -92,9 +76,6 @@ typedef struct pos_support_edge_meta {
     // index of the parameter that indicate the resource state size behind this handle
     // this field is only used by create edge
     uint16_t state_size_param_index;
-
-    // side effects of this edge
-    std::vector<pos_edge_side_effect_typeid_t> side_effects;
 } pos_support_edge_meta_t;
 
 
@@ -175,13 +156,9 @@ typedef struct pos_support_header_file_meta {
  *  \brief  metadata of a parameter of an vendor API
  */
 typedef struct pos_vendor_param_meta {
-    CXString name;
-    CXType type;
+    std::string name;
+    std::string type;
     bool is_pointer;
-
-    ~pos_vendor_param_meta(){
-        clang_disposeString(name);
-    }
 } pos_vendor_param_meta_t;
 
 
@@ -189,11 +166,10 @@ typedef struct pos_vendor_param_meta {
  *  \brief  metadata of an vendor API
  */
 typedef struct pos_vendor_api_meta {
-    CXString name;
-    CXType return_type;
+    std::string name;
+    std::string return_type;
     std::vector<pos_vendor_param_meta_t*> params;
     ~pos_vendor_api_meta(){
-        clang_disposeString(name);
         for(auto& param : params){ if(!param){ delete param; }}
     }
 } pos_vendor_api_meta_t;
