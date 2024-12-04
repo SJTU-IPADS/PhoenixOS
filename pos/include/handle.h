@@ -535,10 +535,9 @@ class POSHandle {
      *  \param  ckpt_dir            directory to store checkpoint files
      *  \param  with_state          whether to persist with state
      *  \param  version_id          version of checkpoint to be persisted, if with_state is true
-     *  \param  commit_stream_id    index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persisting  
      */
-    pos_retval_t checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id=0);
+    pos_retval_t checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id);
 
 
     /*!
@@ -547,10 +546,9 @@ class POSHandle {
      *  \param  ckpt_dir            directory to store checkpoint files
      *  \param  with_state          whether to persist with state
      *  \param  version_id          version of checkpoint to be persisted, if with_state is true
-     *  \param  commit_stream_id    index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persisting  
      */
-    pos_retval_t checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id=0);
+    pos_retval_t checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id);
 
 
     /*!
@@ -623,10 +621,9 @@ class POSHandle {
      *  \brief  async thread to persist the checkpoint to file system
      *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
      *  \param  ckpt_dir    directory to store the checkpoint
-     *  \param  stream_id   index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persist
      */
-    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0);
+    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir);
     /* ==================== checkpoint add/commit/persist ==================== */
 
 

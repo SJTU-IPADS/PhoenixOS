@@ -216,7 +216,7 @@ exit:
 }
 
 
-pos_retval_t POSHandle::checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id){
+pos_retval_t POSHandle::checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id){
     pos_retval_t retval = POS_SUCCESS, prev_retval;
     std::future<pos_retval_t> persist_future;
     POSCheckpointSlot *ckpt_slot = nullptr;
@@ -259,11 +259,11 @@ pos_retval_t POSHandle::checkpoint_persist_async(std::string ckpt_dir, bool with
 
     // persist asynchronously
     this->_persist_thread = new std::thread(
-        [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t commit_stream_id){
-            pos_retval_t retval = handle->__persist_async_thread(ckpt_slot, ckpt_dir, commit_stream_id);
+        [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir){
+            pos_retval_t retval = handle->__persist_async_thread(ckpt_slot, ckpt_dir);
             handle->_persist_promise->set_value(retval);
         },
-        this, ckpt_slot, ckpt_dir, commit_stream_id
+        this, ckpt_slot, ckpt_dir
     );
     POS_CHECK_POINTER(this->_persist_thread);
 
@@ -279,11 +279,11 @@ exit:
 }
 
 
-pos_retval_t POSHandle::checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id){
+pos_retval_t POSHandle::checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id){
     pos_retval_t retval = POS_SUCCESS;
 
     // raise persist thread
-    retval = this->checkpoint_persist_async(ckpt_dir, with_state, version_id, commit_stream_id);
+    retval = this->checkpoint_persist_async(ckpt_dir, with_state, version_id);
     if(unlikely(retval != POS_SUCCESS)){
         goto exit;
     }
@@ -299,7 +299,7 @@ exit:
 }
 
 
-pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t commit_stream_id){
+pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, actual_state_size;
     std::string ckpt_file_path;
@@ -308,16 +308,6 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     pos_protobuf::Bin_POSHandle *base_binary = nullptr;
 
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
-
-    if(unlikely(POS_SUCCESS != (
-        retval = this->__sync_stream(commit_stream_id)
-    ))){
-        POS_WARN_C(
-            "failed to sync checkpoint commit stream before persisting: server_addr(%p), retval(%u)",
-            this->server_addr, retval
-        );
-        goto exit;
-    }
 
     if(unlikely(POS_SUCCESS != (
         retval = this->__generate_protobuf_binary(&handle_binary, &_base_binary)

@@ -86,6 +86,89 @@ typedef struct checkpoint_async_cxt {
     // thread handle
     std::thread *thread;
 
+    // metrics
+    #if POS_CONF_RUNTIME_EnableTrace
+        enum metrics_reducer_type_t : uint8_t {
+            CKPT_cow_bytes_by_ckpt_thread = 0,
+            CKPT_cow_bytes_by_worker_thread,
+            CKPT_commit_bytes_by_ckpt_thread,
+            CKPT_dirty_commit_bytes
+        };
+        POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> metric_reducers;
+    
+        enum metrics_counter_type_t : uint8_t {
+            CKPT_cow_done_times_by_ckpt_thread = 0,
+            CKPT_cow_block_times_by_ckpt_thread,
+            CKPT_cow_done_times_by_worker_thread,
+            CKPT_cow_block_times_by_worker_thread,
+            CKPT_commit_times_by_ckpt_thread,
+            CKPT_dirty_commit_times,
+            CKPT_nb_recomputation_apis,
+            CKPT_nb_unexecuted_apis,
+            PERSIST_handle_times,
+            PERSIST_wqe_times
+        };
+        POSMetrics_CounterList<metrics_counter_type_t> metric_counters;
+
+        enum metrics_ticker_type_t : uint8_t {
+            COMMON_sync = 0,
+            CKPT_cow_done_ticks_by_ckpt_thread,
+            CKPT_cow_block_ticks_by_ckpt_thread,
+            CKPT_cow_done_ticks_by_worker_thread,
+            CKPT_cow_block_ticks_by_worker_thread,
+            CKPT_commit_ticks_by_ckpt_thread,
+            CKPT_dirty_commit_ticks,
+            PERSIST_handle_ticks,
+            PERSIST_wqe_ticks
+        };
+        POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
+
+        
+        /*!
+         *  \brief  print the metrics of the async checkpoint context
+         */
+        inline void print_metrics(){
+            static std::map<metrics_reducer_type_t, std::string> reducer_names = {
+                { CKPT_cow_bytes_by_ckpt_thread, "CoW Bytes (by Ckpt Thread)" },
+                { CKPT_cow_bytes_by_worker_thread, "CoW Bytes (by Worker Thread)" },
+                { CKPT_commit_bytes_by_ckpt_thread, "Commit Bytes Bytes (by Ckpt Thread)" },
+                { CKPT_dirty_commit_bytes, "Dirty Copy Bytes (by Worker Thread)" },
+            };
+
+            static std::map<metrics_counter_type_t, std::string> counter_names = {
+                { CKPT_cow_done_times_by_ckpt_thread, "# Handles (Cow Done by Ckpt Thread)" },
+                { CKPT_cow_block_times_by_ckpt_thread, "# Handles (Cow Block by Ckpt Thread)" },
+                { CKPT_cow_done_times_by_worker_thread, "# Handles (Cow Done by Worker Thread)" },
+                { CKPT_cow_block_times_by_worker_thread, "# Handles (Cow Block by Worker Thread)" },
+                { CKPT_commit_times_by_ckpt_thread, "# Handles (Commit by Ckpt Thread)" },
+                { CKPT_dirty_commit_times, "# Dirty-copied Handles (Commit by Worker Thread)" },
+                { CKPT_nb_recomputation_apis, "# Recomputation APIs" },
+                { CKPT_nb_unexecuted_apis, "# Unexecuted APIs" },
+                { PERSIST_handle_times, "# Persisted Handles" },
+                { PERSIST_wqe_times, "# Persisted WQEs" },
+            };
+        
+            static std::map<metrics_ticker_type_t, std::string> ticker_names = {
+                { COMMON_sync, "Device Synchronize" },
+                { CKPT_cow_done_ticks_by_ckpt_thread, "CoW Done (by Ckpt Thread)" },
+                { CKPT_cow_block_ticks_by_ckpt_thread, "CoW Block (by Ckpt Thread)" },
+                { CKPT_cow_done_ticks_by_worker_thread, "CoW Done (by Worker Thread)" },
+                { CKPT_cow_block_ticks_by_worker_thread, "CoW Done (by Worker Thread)" },
+                { CKPT_commit_ticks_by_ckpt_thread, "Commit (by Ckpt Thread)" },
+                { CKPT_dirty_commit_ticks, "Dirty Copy Commit (by Worker Thread)" },
+                { PERSIST_handle_ticks, "Persist Handles" },
+                { PERSIST_wqe_ticks, "Persist WQEs" },
+            };
+
+            POS_LOG(
+                "[AsyncCkpt Metrics]:\n%s\n%s\n%s",
+                this->metric_tickers.str(ticker_names).c_str(),
+                this->metric_counters.str(counter_names).c_str(),
+                this->metric_reducers.str(reducer_names).c_str()
+            );
+        }
+    #endif
+
     checkpoint_async_cxt() : TH_actve(false), BH_active(false), dirty_handle_state_size(0) {}
 } checkpoint_async_cxt_t;
 
@@ -206,30 +289,6 @@ class POSWorker {
      *  \brief  profiling metrics for worker (TODO: delete these useless metric counters)
      */
     #if POS_CONF_RUNTIME_EnableTrace
-        enum metrics_reducer_type_t : uint8_t {
-            CKPT_cow_bytes_by_ckpt_thread = 0,
-            CKPT_cow_bytes_by_worker_thread,
-            CKPT_commit_bytes_by_ckpt_thread,
-            CKPT_commit_bytes_by_worker_thread
-        };
-        POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> metric_reducers;
-    
-        enum metrics_counter_type_t : uint8_t {
-            CKPT_cow_times_by_ckpt_thread = 0,
-            CKPT_cow_times_by_worker_thread,
-            CKPT_commit_times_by_ckpt_thread,
-            CKPT_commit_times_by_worker_thread
-        };
-        POSMetrics_CounterList<metrics_counter_type_t> metric_counters;
-
-        enum metrics_ticker_type_t : uint8_t {
-            CKPT_cow_ticks_by_ckpt_thread = 0,
-            CKPT_cow_ticks_by_worker_thread,
-            CKPT_commit_ticks_by_ckpt_thread,
-            CKPT_commit_ticks_by_worker_thread
-        };
-        POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
-
         /* ========== tick traces ========== */
         // tick metrics for checkpoint process
         POS_TRACE_TICK_LIST_DEF(

@@ -73,8 +73,15 @@ class POSMetrics_TickerList {
     }
 
 
-    inline std::string str(std::map<K,std::string>& ticker_names){
+    inline void reset_tickers(){
+        this->_s_tick_map.clear();
+        this->_duration_tick_map.clear();
+    }
+
+
+    inline std::string str(std::map<K,std::string> ticker_names){
         std::string print_string("");
+        typename std::map<K, std::string>::iterator name_map_iter;
         typename std::unordered_map<K, std::vector<uint64_t>>::iterator map_iter;
         uint64_t min_tick = 0, max_tick = 0, overall_tick = 0;
         uint64_t p10_tick = 0, p50_tick = 0, p99_tick = 0;
@@ -109,9 +116,19 @@ class POSMetrics_TickerList {
             print_string += std::string("  p99: ") 
                             + std::to_string(this->tsc_timer.tick_to_ms(p99_tick))
                             + std::string(" ms\n");
+            ticker_names.erase(map_iter->first);
         }
 
-        if(print_string.size() == 0){ print_string = std::string("Empty"); }
+        for(name_map_iter=ticker_names.begin(); name_map_iter!=ticker_names.end(); name_map_iter++){
+            print_string += std::string("[Ticker Metric Report] ") + name_map_iter->second + std::string(":\n");
+            print_string += std::string("  max: N/A ms");
+            print_string += std::string("  min: N/A ms");
+            print_string += std::string("  avg: N/A ms");
+            print_string += std::string("  sum: N/A ms");
+            print_string += std::string("  p10: N/A ms");
+            print_string += std::string("  p50: N/A ms");
+            print_string += std::string("  p99: N/A ms");
+        }
 
         return print_string;
     }

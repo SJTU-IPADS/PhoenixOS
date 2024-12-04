@@ -45,8 +45,9 @@ class POSMetrics_CounterList {
     inline void reset_counters(){ this->_map.clear(); }
 
 
-    inline std::string str(std::map<K,std::string>& counter_names){
+    inline std::string str(std::map<K,std::string> counter_names){
         std::string print_string("");
+        typename std::map<K, std::string>::iterator name_map_iter;
         typename std::unordered_map<K, uint64_t>::iterator map_iter;
 
         for(map_iter = this->_map.begin(); map_iter != this->_map.end(); map_iter++){
@@ -55,9 +56,12 @@ class POSMetrics_CounterList {
                             + counter_names[map_iter->first] + std::string(": ");
             print_string += std::to_string(map_iter->second);
             print_string += std::string("\n");
+            counter_names.erase(map_iter->first);
         }
 
-        if(print_string.size() == 0){ print_string = std::string("Empty"); }
+        for(name_map_iter=counter_names.begin(); name_map_iter!=counter_names.end(); name_map_iter++){
+            print_string += std::string("[Reducer Metric Report] ") + counter_names[name_map_iter->first] + std::string(": N/A\n");
+        }
 
         return print_string;
     }
