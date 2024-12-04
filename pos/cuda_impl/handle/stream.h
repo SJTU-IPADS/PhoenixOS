@@ -89,21 +89,6 @@ class POSHandle_CUDA_Stream final : public POSHandle_CUDA {
 
 
     /*!
-     *  \brief  commit the state of the resource behind this handle
-     *  \param  version_id  version of this checkpoint
-     *  \param  stream_id   index of the stream to do this checkpoint
-     *  \param  from_cow    whether to dump from on-device cow buffer
-     *  \param  is_sync    whether the commit process should be sync
-     *  \param  ckpt_dir    directory to store the checkpoint
-     *  \return POS_SUCCESS for successfully checkpointed
-     */
-    pos_retval_t __commit(
-        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
-        bool is_sync=false, std::string ckpt_dir=""
-    ) override;
-
-
-    /*!
      *  \brief  generate protobuf message for this handle
      *  \param  binary      pointer to the generated binary
      *  \param  base_binary pointer to the base field inside the binary

@@ -481,6 +481,7 @@ class POSHandle {
 
     /*!
      *  \brief  add the state of the resource behind this handle to another on-device resource syncly
+     *  \note   only handle of stateful resource should implement this method
      *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
@@ -491,13 +492,13 @@ class POSHandle {
 
     /*!
      *  \brief  commit the device-side state of the resource behind this handle
+     *  \note   only handle of stateful resource should implement this method
      *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
-     *  \param  ckpt_dir    directory to store checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully commited
      */
-    pos_retval_t checkpoint_commit_async(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0);
+    pos_retval_t checkpoint_commit_async(uint64_t version_id, uint64_t stream_id=0);
 
 
     /*!
@@ -505,11 +506,10 @@ class POSHandle {
      *  \note   only handle of stateful resource should implement this method
      *  \note   this function should be called at the worker thread
      *  \param  version_id  version of this checkpoint
-     *  \param  ckpt_dir    directory to store checkpoint
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    pos_retval_t checkpoint_commit_sync(uint64_t version_id, std::string ckpt_dir="", uint64_t stream_id=0);
+    pos_retval_t checkpoint_commit_sync(uint64_t version_id, uint64_t stream_id=0);
 
 
     /*!
@@ -531,20 +531,33 @@ class POSHandle {
 
 
     /*!
-     *  \brief  synchronize the persisting process
-     *  \return POS_SUCCESS for successfully persist
+     *  \brief  asynchronously persist this handle
+     *  \param  ckpt_dir            directory to store checkpoint files
+     *  \param  with_state          whether to persist with state
+     *  \param  version_id          version of checkpoint to be persisted, if with_state is true
+     *  \param  commit_stream_id    index of the stream on which checkpoint is commited
+     *  \return POS_SUCCESS for successfully persisting  
      */
-    pos_retval_t sync_persist();
+    pos_retval_t checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id=0);
 
 
     /*!
      *  \brief  synchronously persist this handle
      *  \note   this function is for tracing system which need checkpoint without state
-     *  \param  ckpt_dir    directory to store checkpoint files
-     *  \param  with_state  whether to persist with state
+     *  \param  ckpt_dir            directory to store checkpoint files
+     *  \param  with_state          whether to persist with state
+     *  \param  version_id          version of checkpoint to be persisted, if with_state is true
+     *  \param  commit_stream_id    index of the stream on which checkpoint is commited
      *  \return POS_SUCCESS for successfully persisting  
      */
-    pos_retval_t persist_sync(std::string ckpt_dir, bool with_state);
+    pos_retval_t checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id=0);
+
+
+    /*!
+     *  \brief  synchronize the persisting process
+     *  \return POS_SUCCESS for successfully persist
+     */
+    pos_retval_t sync_persist();
 
 
  protected:
@@ -574,34 +587,24 @@ class POSHandle {
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
      *  \param  is_sync     whether the commit process should be sync
-     *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
-    virtual pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false, bool is_sync=false, std::string ckpt_dir=""){ 
+    virtual pos_retval_t __commit(uint64_t version_id, uint64_t stream_id=0, bool from_cow=false, bool is_sync=false){
+        // only stateful handle should rewrite this function
+        POS_ERROR_C_DETAIL("%s shouldn't called __commit function", this->get_resource_name().c_str()); 
         return POS_FAILED_NOT_IMPLEMENTED;
     }
 
 
     /*!
-     *  \brief  persist the checkpoint to file system
-     *  \note   this function would be called inside __commit
-     *          i.e., persist after succesfully committing
-     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
-     *  \param  ckpt_dir    directory to store the checkpoint
-     *  \param  stream_id   index of the stream on which checkpoint is commited
-     *  \return POS_SUCCESS for successfully persist
+     *  \brief  obtain the checkpoint slot with corresponding version index for persist
+     *  \param  ckpt_slot   obtained checkpoint slot
+     *  \param  version_id  given version index
+     *  \return POS_SUCCESS for successful get
      */
-    pos_retval_t __persist(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0);
-
-
-    /*!
-     *  \brief  async thread to persist the checkpoint to file system
-     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
-     *  \param  ckpt_dir    directory to store the checkpoint
-     *  \param  stream_id   index of the stream on which checkpoint is commited
-     *  \return POS_SUCCESS for successfully persist
-     */
-    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0);
+    virtual pos_retval_t __get_checkpoint_slot_for_persist(POSCheckpointSlot** ckpt_slot, uint64_t version_id){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
 
 
     /*!
@@ -613,6 +616,17 @@ class POSHandle {
     virtual pos_retval_t __generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary){
         return POS_FAILED_NOT_IMPLEMENTED;
     }
+
+
+ private:
+    /*!
+     *  \brief  async thread to persist the checkpoint to file system
+     *  \param  ckpt_slot   the checkopoint slot which stores the host-side checkpoint
+     *  \param  ckpt_dir    directory to store the checkpoint
+     *  \param  stream_id   index of the stream on which checkpoint is commited
+     *  \return POS_SUCCESS for successfully persist
+     */
+    pos_retval_t __persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id=0);
     /* ==================== checkpoint add/commit/persist ==================== */
 
 

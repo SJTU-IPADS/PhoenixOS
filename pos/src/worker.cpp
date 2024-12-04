@@ -231,7 +231,7 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
 
     POS_CHECK_POINTER(cmd);
 
-    auto __commit_and_persist_handles = [&](std::set<POSHandle*>& handle_set) -> pos_retval_t {
+    auto __commit_and_persist_handles = [&](std::set<POSHandle*>& handle_set, bool with_state) -> pos_retval_t {
         pos_retval_t retval = POS_SUCCESS;
         typename std::set<POSHandle*>::iterator set_iter;
         
@@ -246,14 +246,26 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
                 continue;
             }
             
-            // this call will commit then persist
+            // commit the handle first
             retval = handle->checkpoint_commit_sync(
                 /* version_id */ handle->latest_version,
-                /* ckpt_dir */ cmd->ckpt_dir,
                 /* stream_id */ 0
             );
             if(unlikely(POS_SUCCESS != retval)){
-                POS_WARN_C("failed to checkpoint handle");
+                POS_WARN_C("failed to commit handle: hid(%lu), retval(%d)", handle->id, retval);
+                retval = POS_FAILED;
+                goto exit;
+            }
+
+            // persist the handle
+            retval = handle->checkpoint_persist_sync(
+                /* ckpt_dir */ cmd->ckpt_dir,
+                /* with_state */ with_state,
+                /* version_id */ handle->latest_version,
+                /* commit_stream_id */ 0
+            );
+            if(unlikely(POS_SUCCESS != retval)){
+                POS_WARN_C("failed to persist handle: hid(%lu), retval(%d)", handle->id, retval);
                 retval = POS_FAILED;
                 goto exit;
             }
@@ -268,13 +280,13 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
 
     s_tick = POSUtilTscTimer::get_tsc();
     // save statelful handles
-    retval = __commit_and_persist_handles(cmd->stateful_handles);
+    retval = __commit_and_persist_handles(cmd->stateful_handles, /* with_state */ true);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to commit and persist stateful handles");
         goto exit;
     }
     // save stateless handles
-    retval = __commit_and_persist_handles(cmd->stateless_handles);
+    retval = __commit_and_persist_handles(cmd->stateless_handles, /* with_state */ false);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to commit and persist stateful handles");
         goto exit;
@@ -564,8 +576,8 @@ void POSWorker::__checkpoint_TH_async_thread() {
     POSCommand_QE_t *cmd;
     POSHandle *handle;
     uint64_t s_tick = 0, e_tick = 0;
+    uint64_t commit_stream_id;
 
-    typename std::map<pos_resource_typeid_t, std::set<POSHandle*>>::iterator map_iter;
     typename std::set<POSHandle*>::iterator set_iter;
 
     POS_CHECK_POINTER(cmd = this->async_ckpt_cxt.cmd);
@@ -583,16 +595,17 @@ void POSWorker::__checkpoint_TH_async_thread() {
                     || handle->status == kPOS_HandleStatus_Create_Pending
                     || handle->status == kPOS_HandleStatus_Broken
         )){
-            continue;
+            goto membus_lock_check;
         }
 
         if(unlikely(this->async_ckpt_cxt.checkpoint_version_map.count(handle) == 0)){
             POS_WARN_C("failed to checkpoint handle, no checkpoint version provided: client_addr(%p)", handle->client_addr);
-            continue;
+            goto membus_lock_check;
         }
 
         checkpoint_version = this->async_ckpt_cxt.checkpoint_version_map[handle];
 
+        // step 1: add & commit of all stateful handles
     #if POS_CONF_EVAL_CkptEnablePipeline == 1
         /*!
          *  \brief  [phrase 1]  add the state of this handle from its origin buffer
@@ -615,26 +628,29 @@ void POSWorker::__checkpoint_TH_async_thread() {
 
         /*!
          *  \brief  [phrase 2]  commit the resource state from cache
-         *  \note   originally the commit process is async as it would never be disturbed by CoW, but we also need to prevent
-         *          ckpt memcpy conflict with normal memcpy, so we sync the execution here to check the memcpy flag
          */
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
-            /* ckpt_dir */      cmd->ckpt_dir,
             /* stream_id */     this->_ckpt_commit_stream_id
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
             dirty_retval = retval;
-            continue;
+            goto membus_lock_check;
         }
 
-        retval = this->sync(this->_ckpt_commit_stream_id);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
-            dirty_retval = retval;
-        }
+        /*!
+         *  \note   originally the commit process is async as it would never be disturbed by CoW, but we also need to prevent
+         *          ckpt memcpy conflict with normal memcpy, so we sync the execution here to check the memcpy flag
+         *  \note   the sync would be done by persist below, we omit here
+         */
+        // retval = this->sync(this->_ckpt_commit_stream_id);
+        // if(unlikely(retval != POS_SUCCESS)){
+        //     POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+        //     dirty_retval = retval;
+        // }
+        commit_stream_id = this->_ckpt_commit_stream_id;
 
         POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
         POS_TRACE_COUNTER_ADD(ckpt, ckpt_commit_size, handle->state_size);
@@ -646,29 +662,49 @@ void POSWorker::__checkpoint_TH_async_thread() {
         POS_TRACE_TICK_START(ckpt, ckpt_commit);
         retval = handle->checkpoint_commit_async(
             /* version_id */    checkpoint_version,
-            /* ckpt_dir */      cmd->ckpt_dir,
             /* stream_id */     this->_ckpt_stream_id
         );
         if(unlikely(retval != POS_SUCCESS && retval != POS_WARN_ABANDONED)){
             POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
             dirty_retval = retval;
-            continue;
+            goto membus_lock_check;
         }
 
-        retval = this->sync(this->_ckpt_stream_id);
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
-            dirty_retval = retval;
-        }
+        // the sync would be done by persist below, we omit here
+        // retval = this->sync(this->_ckpt_stream_id);
+        // if(unlikely(retval != POS_SUCCESS)){
+        //     POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+        //     dirty_retval = retval;
+        // }
+        commit_stream_id = this->_ckpt_stream_id;
 
         POS_TRACE_TICK_APPEND(ckpt, ckpt_commit);
         POS_TRACE_COUNTER_ADD(ckpt, ckpt_commit_size, handle->state_size);
     #endif
+        // step 2: asynchronously persist all stateful handles
+        retval = handle->checkpoint_persist_async(
+            /* ckpt_dir */ cmd->ckpt_dir,
+            /* with_state */ true,
+            /* version_id */ checkpoint_version,
+            /* commit_stream_id */ commit_stream_id
+        );
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)",
+                handle->id,
+                cmd->ckpt_dir,
+                checkpoint_version
+            );
+            dirty_retval = retval;
+            goto membus_lock_check;
+        }
+        this->async_ckpt_cxt.persist_handles.insert(handle);
 
+    membus_lock_check:
         /*!
          *  \note   we need to avoid conflict between ckpt memcpy and normal memcpy, and we will stop once it occurs
          */
-        while(this->async_ckpt_cxt.membus_lock == true){ /* block */ }
+        while(this->async_ckpt_cxt.membus_lock == true && !this->_stop_flag){ /* block */ }
     }
 
     // collect the statistic of of this checkpoint round
@@ -767,6 +803,8 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
         while(this->_client->offline_counter != 2){ 
             /* wait remoting framework to confirm */
             if(this->_client->is_under_sync_call == true){
+                // if the RPC thread is currently encounter a sync call
+                // we should finish it before we doing the dump
                 retval = POS_WARN_ABANDONED;
                 goto exit;
             }
@@ -787,7 +825,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     // step 1: synchronize the worker thread
     if(unlikely(POS_SUCCESS != (retval = this->sync()))){
         POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
-        goto reply_parser;
+        goto sync_persist;
     }
 
     // step 2: dump stateless handles
@@ -802,17 +840,20 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
             continue;
         }
 
-        retval = handle->checkpoint_commit_sync(
-            /* version_id */ handle->latest_version,
+        // asynchronously persist all stateless handles
+        retval = handle->checkpoint_persist_async(
             /* ckpt_dir */ cmd->ckpt_dir,
-            /* stream_id */ 0
+            /* with_state */ false,
+            /* version_id */ 0,
+            /* commit_stream_id */ 0
         );
-        if(unlikely(POS_SUCCESS != retval)){
-            POS_WARN_C("failed to checkpoint handle");
-            retval = POS_FAILED;
-            goto exit;
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN(
+                "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)", handle->id, cmd->ckpt_dir
+            );
+            goto sync_persist;
         }
-
+        this->async_ckpt_cxt.persist_handles.insert(handle);
         nb_ckpt_handles += 1;
     }
     POS_LOG("#stateless handles(%lu)", nb_ckpt_handles);
@@ -855,16 +896,31 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
                 continue;
             }
 
+            // step 1: commit the state
             retval = handle->checkpoint_commit_sync(
                 /* version_id */ handle->latest_version,
-                /* ckpt_dir */ cmd->ckpt_dir,
                 /* stream_id */ 0
             );
             if(unlikely(POS_SUCCESS != retval)){
-                POS_WARN_C("failed to checkpoint handle");
+                POS_WARN_C("failed to commit handle");
                 retval = POS_FAILED;
-                goto exit;
+                goto sync_persist;
             }
+
+            // step 2: asynchronously persist
+            retval = handle->checkpoint_persist_async(
+                /* ckpt_dir */ cmd->ckpt_dir,
+                /* with_state */ true,
+                /* version_id */ handle->latest_version,
+                /* commit_stream_id */ 0
+            );
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN(
+                    "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)", handle->id, cmd->ckpt_dir
+                );
+                goto sync_persist;
+            }
+            this->async_ckpt_cxt.persist_handles.insert(handle); // actually this is redundant
 
             nb_ckpt_dirty_handles += 1;
             dirty_ckpt_size += handle->state_size;
@@ -883,7 +939,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
             POS_CHECK_POINTER(wqe->api_cxt);
             if(unlikely(POS_SUCCESS != (retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Recomputation>(cmd->ckpt_dir)))){
                 POS_WARN_C("failed to do checkpointing of recomputation APIs");
-                goto reply_parser;
+                goto sync_persist;
             }
             nb_ckpt_wqes += 1;
         }
@@ -903,15 +959,26 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
                 retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(cmd->ckpt_dir))
             )){
                 POS_WARN_C("failed to do checkpointing of unexecuted APIs");
-                goto reply_parser;
+                goto sync_persist;
             }
             nb_ckpt_wqes += 1;
             max_wqe_id = (wqe->id > max_wqe_id) ? wqe->id : max_wqe_id;
         }
     }
     POS_LOG_C("finished dumping unexecuted APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
+ 
+ sync_persist:
+    // step 6: make sure all async persist thread are finished
+    for(set_iter=this->async_ckpt_cxt.persist_handles.begin(); set_iter!=this->async_ckpt_cxt.persist_handles.end(); set_iter++){
+        POSHandle *handle = *set_iter;
+        POS_CHECK_POINTER(handle);
+        if(unlikely(POS_SUCCESS != (retval = handle->sync_persist()))){
+            POS_WARN_C("failed to sync async persist thread of handle: hid(%lu)", handle->id);
+            goto reply_parser;
+        }
+    }
 
-    // step 6: tear down all handles inside the client
+    // step 7: tear down all handles inside the client
     if(unlikely(POS_SUCCESS != (retval = this->_client->tear_down_all_handles()))){
         POS_WARN_C("failed to tear down handles while dumping");
     }
@@ -971,6 +1038,7 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
         this->async_ckpt_cxt.cmd = cmd;
         this->async_ckpt_cxt.dirty_handles.clear();
         this->async_ckpt_cxt.dirty_handle_state_size = 0;
+        this->async_ckpt_cxt.persist_handles.clear();
 
         // deallocate the thread handle of previous checkpoint
         if(likely(this->async_ckpt_cxt.thread != nullptr)){

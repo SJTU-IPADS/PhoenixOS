@@ -27,6 +27,7 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/trace.h"
+#include "pos/include/metrics.h"
 
 
 // forward declaration
@@ -62,8 +63,8 @@ namespace wk_functions {
  */
 typedef struct checkpoint_async_cxt {
     // flag: checkpoint thread to notify the worker thread that the previous checkpoint has done
-    bool TH_actve;
-    bool BH_active;
+    volatile bool TH_actve;
+    volatile bool BH_active;
 
     // checkpoint cmd
     POSCommand_QE_t *cmd;
@@ -71,13 +72,16 @@ typedef struct checkpoint_async_cxt {
     // (latest) version of each handle to be checkpointed
     std::map<POSHandle*, pos_u64id_t> checkpoint_version_map;
 
+    // all handles persisted in async checkpoint thread
+    std::set<POSHandle*> persist_handles;
+
     // all dirty handles since start of concurrent checkpoint
     std::set<POSHandle*> dirty_handles;
     uint64_t dirty_handle_state_size;
 
     //  this flag should be raise by memcpy API worker function, to avoid slow down by
     //  overlapped checkpoint process
-    bool membus_lock;
+    volatile bool membus_lock;
 
     // thread handle
     std::thread *thread;
@@ -202,6 +206,30 @@ class POSWorker {
      *  \brief  profiling metrics for worker (TODO: delete these useless metric counters)
      */
     #if POS_CONF_RUNTIME_EnableTrace
+        enum metrics_reducer_type_t : uint8_t {
+            CKPT_cow_bytes_by_ckpt_thread = 0,
+            CKPT_cow_bytes_by_worker_thread,
+            CKPT_commit_bytes_by_ckpt_thread,
+            CKPT_commit_bytes_by_worker_thread
+        };
+        POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> metric_reducers;
+    
+        enum metrics_counter_type_t : uint8_t {
+            CKPT_cow_times_by_ckpt_thread = 0,
+            CKPT_cow_times_by_worker_thread,
+            CKPT_commit_times_by_ckpt_thread,
+            CKPT_commit_times_by_worker_thread
+        };
+        POSMetrics_CounterList<metrics_counter_type_t> metric_counters;
+
+        enum metrics_ticker_type_t : uint8_t {
+            CKPT_cow_ticks_by_ckpt_thread = 0,
+            CKPT_cow_ticks_by_worker_thread,
+            CKPT_commit_ticks_by_ckpt_thread,
+            CKPT_commit_ticks_by_worker_thread
+        };
+        POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
+
         /* ========== tick traces ========== */
         // tick metrics for checkpoint process
         POS_TRACE_TICK_LIST_DEF(

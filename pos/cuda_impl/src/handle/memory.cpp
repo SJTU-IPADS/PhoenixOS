@@ -183,9 +183,7 @@ exit:
 }
 
 
-pos_retval_t POSHandle_CUDA_Memory::__commit(
-    uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir
-){ 
+pos_retval_t POSHandle_CUDA_Memory::__commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync){ 
     pos_retval_t retval = POS_SUCCESS;
     cudaError_t cuda_rt_retval;
     POSCheckpointSlot *ckpt_slot, *cow_ckpt_slot;
@@ -280,12 +278,30 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(
         );
     #endif
 
-    // persist the state after commit
-    retval = this->__persist(ckpt_slot, ckpt_dir, stream_id);
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle_CUDA_Memory::__get_checkpoint_slot_for_persist(POSCheckpointSlot** ckpt_slot, uint64_t version_id){
+    pos_retval_t retval = POS_SUCCESS;
+
+    POS_CHECK_POINTER(ckpt_slot);
+
+    if(unlikely(POS_SUCCESS != (
+        retval = this->ckpt_bag->template get_checkpoint_slot<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(
+            /* ckpt_slot */ ckpt_slot,
+            /* version */ version_id
+        )
+    ))){
+        POS_WARN_C("failed to obtain checkpoint slot for persist: version_id(%lu), retval(%d)", version_id, retval);
+        goto exit;
+    }
 
 exit:
     return retval;
 }
+
 
 
 pos_retval_t POSHandle_CUDA_Memory::__generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary){

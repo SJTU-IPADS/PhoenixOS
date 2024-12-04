@@ -79,11 +79,6 @@ bool POSHandle::is_client_addr_in_range(void *addr, uint64_t *offset){
 }
 
 
-pos_retval_t POSHandle::checkpoint_commit_sync(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id) {
-    return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
-}
-
-
 pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) { 
     pos_retval_t retval = POS_SUCCESS;
     uint8_t old_counter;
@@ -117,13 +112,13 @@ exit:
 }
 
 
-pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, std::string ckpt_dir, uint64_t stream_id){ 
+pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t stream_id){ 
     pos_retval_t retval = POS_SUCCESS;
     
     #if POS_CONF_EVAL_CkptEnablePipeline == 1
         //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
         //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
-        retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
+        retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
     #else
         uint8_t old_counter;
         old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
@@ -133,7 +128,7 @@ pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, std::string
                 *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
                 *          commit must be sync, as there could have CoW waiting on this commit to be finished
                 */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
             this->_state_preserve_counter.store(3, std::memory_order_relaxed);
         } else if (old_counter == 1) {
             /*!
@@ -143,17 +138,22 @@ pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, std::string
                 *          on this handle anymore
                 */
             while(this->_state_preserve_counter < 3){}
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
         } else {
             /*!
                 *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
                 *  \note   same as the last case
                 */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false, ckpt_dir);
+            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
         }
     #endif  // POS_CONF_EVAL_CkptEnablePipeline        
     
     return retval;
+}
+
+
+pos_retval_t POSHandle::checkpoint_commit_sync(uint64_t version_id, uint64_t stream_id) {
+    return this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
 }
 
 
@@ -186,48 +186,6 @@ exit:
 }
 
 
-pos_retval_t POSHandle::__persist(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
-    pos_retval_t retval = POS_SUCCESS, prev_retval;
-    std::future<pos_retval_t> persist_future;
-
-    // no directory specified, skip persisting
-    if(ckpt_dir.size() == 0){ goto exit; }
-
-    // verify the path exists
-    if(unlikely(!std::filesystem::exists(ckpt_dir))){
-        POS_WARN_C(
-            "failed to persist checkpoint, no ckpt directory exists, this is a bug: ckpt_dir(%s)",
-            ckpt_dir.c_str()
-        );
-        retval = POS_FAILED_NOT_EXIST;
-        goto exit;
-    }
-
-    // collect previous persisting thread if any
-    if(this->_persist_thread != nullptr){
-        if(unlikely(POS_SUCCESS != (prev_retval = this->sync_persist()))){
-            POS_WARN_C("pervious persisting is failed: retval(%u)", prev_retval);
-        }
-    }
-
-    this->_persist_promise = new std::promise<pos_retval_t>;
-    POS_CHECK_POINTER(this->_persist_promise);
-
-    // persist asynchronously
-    this->_persist_thread = new std::thread(
-        [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
-            pos_retval_t retval = handle->__persist_async_thread(ckpt_slot, ckpt_dir, stream_id);
-            handle->_persist_promise->set_value(retval);
-        },
-        this, ckpt_slot, ckpt_dir, stream_id
-    );
-    POS_CHECK_POINTER(this->_persist_thread);
-
-exit:
-    return retval;
-}
-
-
 pos_retval_t POSHandle::sync_persist(){
     pos_retval_t retval = POS_SUCCESS;
     std::future<pos_retval_t> persist_future;
@@ -247,44 +205,101 @@ pos_retval_t POSHandle::sync_persist(){
         this->_persist_thread = nullptr;
         delete this->_persist_promise;
         this->_persist_promise = nullptr;
+
+        POS_DEBUG("persist thread finished: hid(%lu), retval(%d)", this->id, retval);
     } else {
         retval = POS_FAILED_NOT_EXIST;
     }
-
+    
 exit:
     return retval;
 }
 
 
-pos_retval_t POSHandle::persist_sync(std::string ckpt_dir, bool with_state){
-    pos_retval_t retval = POS_SUCCESS;
+pos_retval_t POSHandle::checkpoint_persist_async(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id){
+    pos_retval_t retval = POS_SUCCESS, prev_retval;
+    std::future<pos_retval_t> persist_future;
+    POSCheckpointSlot *ckpt_slot = nullptr;
 
     POS_ASSERT(ckpt_dir.size() > 0);
 
-    if(with_state == true){
-        // try persist with state
-        if(this->status == kPOS_HandleStatus_Active){
-            retval = this->__commit(this->latest_version, /* stream_id */ 0, /* from_cache */ false, /* is_sync */ true, ckpt_dir);
+    // verify the path exists
+    if(unlikely(!std::filesystem::exists(ckpt_dir))){
+        POS_WARN_C(
+            "failed to persist checkpoint, no ckpt directory exists, this is a bug: ckpt_dir(%s)",
+            ckpt_dir.c_str()
+        );
+        retval = POS_FAILED_NOT_EXIST;
+        goto exit;
+    }
+
+    // try obtain checkpoint slot if needed
+    // if the handle isn't active, we will persist without state
+    if(with_state == true && this->status == kPOS_HandleStatus_Active){
+        retval = this->__get_checkpoint_slot_for_persist(&ckpt_slot, version_id);
+        if(unlikely(retval != POS_SUCCESS)){
+            POS_WARN_C(
+                "failed persist, failed to get checkpoint slot with specified version: hid(%id), ckpt_version(%lu)",
+                this->id, version_id
+            );
             goto exit;
-        } else {
-            POS_WARN_C("failed to persist with state, hanlde isn't active, omit state");
+        }
+        POS_CHECK_POINTER(ckpt_slot);
+    }
+
+    // collect previous persisting thread if any
+    if(this->_persist_thread != nullptr){
+        if(unlikely(POS_SUCCESS != (prev_retval = this->sync_persist()))){
+            POS_WARN_C("pervious handle persisting is failed: hid(%lu), retval(%u)", this->id, prev_retval);
         }
     }
 
-    // persist without state
-    retval = this->__persist(nullptr, ckpt_dir, 0);
-    if(unlikely(retval != POS_SUCCESS)){
-        POS_WARN_C("failed to run persist thread");
-        goto exit;
-    }
-    retval = this->sync_persist();
+    this->_persist_promise = new std::promise<pos_retval_t>;
+    POS_CHECK_POINTER(this->_persist_promise);
+
+    // persist asynchronously
+    this->_persist_thread = new std::thread(
+        [](POSHandle* handle, POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t commit_stream_id){
+            pos_retval_t retval = handle->__persist_async_thread(ckpt_slot, ckpt_dir, commit_stream_id);
+            handle->_persist_promise->set_value(retval);
+        },
+        this, ckpt_slot, ckpt_dir, commit_stream_id
+    );
+    POS_CHECK_POINTER(this->_persist_thread);
+
+    POS_DEBUG(
+        "persist thread started: hid(%lu), with_state(%s), ckpt_dir(%s)",
+        this->id,
+        ckpt_slot != nullptr ? "true" : "false",
+        ckpt_dir.c_str()
+    );
 
 exit:
     return retval;
 }
 
 
-pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t stream_id){
+pos_retval_t POSHandle::checkpoint_persist_sync(std::string ckpt_dir, bool with_state, uint64_t version_id, uint64_t commit_stream_id){
+    pos_retval_t retval = POS_SUCCESS;
+
+    // raise persist thread
+    retval = this->checkpoint_persist_async(ckpt_dir, with_state, version_id, commit_stream_id);
+    if(unlikely(retval != POS_SUCCESS)){
+        goto exit;
+    }
+
+    // sync the persist thread
+    retval = this->sync_persist();
+    if(unlikely(retval != POS_SUCCESS)){
+        goto exit;
+    }
+
+exit:
+    return retval;
+}
+
+
+pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std::string ckpt_dir, uint64_t commit_stream_id){
     pos_retval_t retval = POS_SUCCESS;
     uint64_t i, actual_state_size;
     std::string ckpt_file_path;
@@ -295,7 +310,7 @@ pos_retval_t POSHandle::__persist_async_thread(POSCheckpointSlot* ckpt_slot, std
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
     if(unlikely(POS_SUCCESS != (
-        retval = this->__sync_stream(stream_id)
+        retval = this->__sync_stream(commit_stream_id)
     ))){
         POS_WARN_C(
             "failed to sync checkpoint commit stream before persisting: server_addr(%p), retval(%u)",

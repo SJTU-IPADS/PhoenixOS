@@ -48,13 +48,13 @@ pos_retval_t POSWorkspace_CUDA::__init(){
     );
     this->stateful_resource_type_idx.insert(
         this->stateful_resource_type_idx.end(), {
-            kPOS_ResourceTypeId_CUDA_Memory
+            kPOS_ResourceTypeId_CUDA_Memory,
+            kPOS_ResourceTypeId_CUDA_Module
         }
     );
     this->stateless_resource_type_idx.insert(
         this->stateless_resource_type_idx.end(), {
             kPOS_ResourceTypeId_CUDA_Context,
-            kPOS_ResourceTypeId_CUDA_Module,
             kPOS_ResourceTypeId_CUDA_Function,
             kPOS_ResourceTypeId_CUDA_Var,
             kPOS_ResourceTypeId_CUDA_Device,

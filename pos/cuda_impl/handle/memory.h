@@ -185,13 +185,20 @@ class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
      *  \param  stream_id   index of the stream to do this checkpoint
      *  \param  from_cow    whether to dump from on-device cow buffer
      *  \param  is_sync    whether the commit process should be sync
-     *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointed
      */
     pos_retval_t __commit(
-        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false,
-        bool is_sync=false, std::string ckpt_dir=""
+        uint64_t version_id, uint64_t stream_id=0, bool from_cache=false, bool is_sync=false
     ) override;
+
+
+    /*!
+     *  \brief  obtain the checkpoint slot with corresponding version index for persist
+     *  \param  ckpt_slot   obtained checkpoint slot
+     *  \param  version_id  given version index
+     *  \return POS_SUCCESS for successful get
+     */
+    pos_retval_t __get_checkpoint_slot_for_persist(POSCheckpointSlot** ckpt_slot, uint64_t version_id) override;
 
 
     /*!

@@ -75,11 +75,6 @@ pos_retval_t POSHandle_CUDA_Event::__add(uint64_t version_id, uint64_t stream_id
 }
 
 
-pos_retval_t POSHandle_CUDA_Event::__commit(uint64_t version_id, uint64_t stream_id, bool from_cache, bool is_sync, std::string ckpt_dir){
-    return this->__persist(nullptr, ckpt_dir, stream_id);
-}
-
-
 pos_retval_t POSHandle_CUDA_Event::__generate_protobuf_binary(google::protobuf::Message** binary, google::protobuf::Message** base_binary){
     pos_retval_t retval = POS_SUCCESS;
     pos_protobuf::Bin_POSHandle_CUDA_Event *cuda_event_binary;
