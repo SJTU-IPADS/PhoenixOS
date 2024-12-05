@@ -279,7 +279,7 @@ pos_retval_t POSClient_CUDA::persist_handles(bool with_state){
     this->template poll_q<kPOS_QueueDirection_ParserLocal, kPOS_QueueType_ApiCxt_Trace_WQ>(&wqes);
     for(i=0; i<wqes.size(); i++){
         POS_CHECK_POINTER(wqe = wqes[i]);
-        wqe->persist</* with_params */ false, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(apicxt_dir);
+        wqe->persist</* with_params */ false, /* type */ ApiCxt_TypeId_Unexecuted>(apicxt_dir);
     }
 
     // dumping resources

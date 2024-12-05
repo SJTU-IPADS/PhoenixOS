@@ -27,12 +27,36 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
+#include "pos/include/client.h"
 #include "pos/include/api_context.h"
 #include "pos/include/utils/timer.h"
 #include "pos/include/proto/apicxt.pb.h"
 
 
-POSAPIContext_QE::POSAPIContext_QE(POSClient* client, const std::string& ckpt_file){
+POSAPIContext_QE::POSAPIContext_QE(
+    uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
+    uint64_t inst_id, void* retval_data, uint64_t retval_size, POSClient* pos_client
+) : client_id(uuid), client(pos_client), id(inst_id), has_return(false),
+    status(kPOS_API_Execute_Status_Init), type(ApiCxt_TypeId_Normal)
+{
+    POS_CHECK_POINTER(pos_client);
+    this->api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
+    POS_CHECK_POINTER(this->api_cxt);
+    create_tick = POSUtilTimestamp::get_tsc();
+    parser_s_tick = parser_e_tick = worker_s_tick = worker_e_tick = 0;
+
+    // reserve space
+    input_handle_views.reserve(5);
+    output_handle_views.reserve(5);
+    inout_handle_views.reserve(5);
+    create_handle_views.reserve(1);
+    delete_handle_views.reserve(1);
+}
+
+
+POSAPIContext_QE::POSAPIContext_QE(
+    POSClient* client, const std::string& ckpt_file, pos_apicxt_typeid_t type
+){
     pos_retval_t retval = POS_SUCCESS;
     pos_protobuf::Bin_POSAPIContext apicxt_binary;
     POSHandleView_t hv;
@@ -42,6 +66,7 @@ POSAPIContext_QE::POSAPIContext_QE(POSClient* client, const std::string& ckpt_fi
     POSAPIParam_t *api_param;
 
     POS_CHECK_POINTER(client);
+    POS_ASSERT(type == ApiCxt_TypeId_Unexecuted || type == ApiCxt_TypeId_Recomputation);
 
     input.open(ckpt_file, std::ios::in | std::ios::binary);
     if(!input){
@@ -60,6 +85,7 @@ POSAPIContext_QE::POSAPIContext_QE(POSClient* client, const std::string& ckpt_fi
     this->client_id = client->id;
     this->id = apicxt_binary.id();
     this->has_return = apicxt_binary.has_return();
+    this->type = type;
 
     this->api_cxt = new POSAPIContext_t(apicxt_binary.api_id());
     POS_CHECK_POINTER(this->api_cxt);
@@ -139,7 +165,12 @@ exit:
 }
 
 
-template<bool with_params, POSAPIContext_QE::pos_apicxt_persist_typeid_t type>
+POSAPIContext_QE::~POSAPIContext_QE(){
+    // TODO: release handle views
+}
+
+
+template<bool with_params, pos_apicxt_typeid_t type>
 pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     std::string ckpt_file_path;
@@ -148,7 +179,7 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     pos_protobuf::Bin_POSAPIParam *param_binary;
     std::ofstream ckpt_file_stream;
 
-    POS_STATIC_ASSERT(type == ApiCxt_PersistType_Unexecuted || type == ApiCxt_PersistType_Recomputation);
+    POS_STATIC_ASSERT(type == ApiCxt_TypeId_Unexecuted || type == ApiCxt_TypeId_Recomputation);
     POS_ASSERT(std::filesystem::exists(ckpt_dir));
 
     apicxt_binary.set_id(this->id);
@@ -216,12 +247,12 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     }
 
     // form the path to the checkpoint file of this handle
-    if constexpr (type == ApiCxt_PersistType_Unexecuted){
+    if constexpr (type == ApiCxt_TypeId_Unexecuted){
         ckpt_file_path = ckpt_dir 
                     + std::string("/ua-")
                     + std::to_string(this->id) 
                     + std::string(".bin");
-    } else { // ApiCxt_PersistType_Recomputation
+    } else { // ApiCxt_TypeId_Recomputation
         ckpt_file_path = ckpt_dir 
                     + std::string("/ra-")
                     + std::to_string(this->id) 
@@ -251,7 +282,7 @@ exit:
     if(ckpt_file_stream.is_open()){ ckpt_file_stream.close(); }
     return retval;
 }
-template pos_retval_t POSAPIContext_QE::persist<true, POSAPIContext_QE::ApiCxt_PersistType_Unexecuted>(std::string ckpt_dir);
-template pos_retval_t POSAPIContext_QE::persist<false, POSAPIContext_QE::ApiCxt_PersistType_Unexecuted>(std::string ckpt_dir);
-template pos_retval_t POSAPIContext_QE::persist<true, POSAPIContext_QE::ApiCxt_PersistType_Recomputation>(std::string ckpt_dir);
-template pos_retval_t POSAPIContext_QE::persist<false, POSAPIContext_QE::ApiCxt_PersistType_Recomputation>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<true, ApiCxt_TypeId_Unexecuted>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<false, ApiCxt_TypeId_Unexecuted>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<true, ApiCxt_TypeId_Recomputation>(std::string ckpt_dir);
+template pos_retval_t POSAPIContext_QE::persist<false, ApiCxt_TypeId_Recomputation>(std::string ckpt_dir);

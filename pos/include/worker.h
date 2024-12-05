@@ -128,14 +128,14 @@ typedef struct checkpoint_async_cxt {
          *  \brief  print the metrics of the async checkpoint context
          */
         inline void print_metrics(){
-            static std::map<metrics_reducer_type_t, std::string> reducer_names = {
+            static std::unordered_map<metrics_reducer_type_t, std::string> reducer_names = {
                 { CKPT_cow_bytes_by_ckpt_thread, "CoW Bytes (by Ckpt Thread)" },
                 { CKPT_cow_bytes_by_worker_thread, "CoW Bytes (by Worker Thread)" },
                 { CKPT_commit_bytes_by_ckpt_thread, "Commit Bytes Bytes (by Ckpt Thread)" },
                 { CKPT_dirty_commit_bytes, "Dirty Copy Bytes (by Worker Thread)" },
             };
 
-            static std::map<metrics_counter_type_t, std::string> counter_names = {
+            static std::unordered_map<metrics_counter_type_t, std::string> counter_names = {
                 { CKPT_cow_done_times_by_ckpt_thread, "# Handles (Cow Done by Ckpt Thread)" },
                 { CKPT_cow_block_times_by_ckpt_thread, "# Handles (Cow Block by Ckpt Thread)" },
                 { CKPT_cow_done_times_by_worker_thread, "# Handles (Cow Done by Worker Thread)" },
@@ -147,8 +147,8 @@ typedef struct checkpoint_async_cxt {
                 { PERSIST_handle_times, "# Persisted Handles" },
                 { PERSIST_wqe_times, "# Persisted WQEs" },
             };
-        
-            static std::map<metrics_ticker_type_t, std::string> ticker_names = {
+
+            static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
                 { COMMON_sync, "Device Synchronize" },
                 { CKPT_cow_done_ticks_by_ckpt_thread, "CoW Done (by Ckpt Thread)" },
                 { CKPT_cow_block_ticks_by_ckpt_thread, "CoW Block (by Ckpt Thread)" },
@@ -268,7 +268,7 @@ class POSWorker {
         uint64_t _ckpt_commit_stream_id;
     #endif
 
-    
+
     /*!
      *  \brief  insertion of worker functions
      *  \return POS_SUCCESS for succefully insertion
@@ -285,44 +285,37 @@ class POSWorker {
         return POS_SUCCESS; 
     }
 
+ protected:
     /*!
-     *  \brief  profiling metrics for worker (TODO: delete these useless metric counters)
+     *  \brief      start an ticker on GPU
+     *  \example    on CUDA platform, this API is implemented using ÇUDA event
+     *  \param      stream_id   index of the gpu stream to be measured
+     *  \return     POS_SUCCESS for successfully started
      */
-    #if POS_CONF_RUNTIME_EnableTrace
-        /* ========== tick traces ========== */
-        // tick metrics for checkpoint process
-        POS_TRACE_TICK_LIST_DEF(
-            /* list_name */ ckpt,
-            /* tick_list */
-                ckpt_drain,
-                ckpt_cow_done,       
-                ckpt_cow_wait,
-                ckpt_add_done,
-                ckpt_add_wait,
-                ckpt_commit
-        );
-        POS_TRACE_TICK_LIST_DECLARE(ckpt);
+    virtual pos_retval_t start_gpu_ticker(uint64_t stream_id=0){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    };
 
-        /* ========== counter traces ========== */
-        // counter metrics for checkpoint process
-        POS_TRACE_COUNTER_LIST_DEF(
-            /* list_name */ ckpt,
-            /* counters */
-                ckpt_drain,
-                ckpt_cow_done_size,       
-                ckpt_cow_wait_size,
-                ckpt_add_done_size,
-                ckpt_add_wait_size,
-                ckpt_commit_size
-        );
-        POS_TRACE_COUNTER_LIST_DECLARE(ckpt);
-    #endif
+
+    /*!
+     *  \brief      stop an ticker on GPU
+     *  \example    on CUDA platform, this API is implemented using ÇUDA event
+     *  \note       this API should cause device synchronization
+     *  \param      stream_id   index of the gpu stream to be measured
+     *  \param      ticker      value of the ticker
+     *  \return     POS_SUCCESS for successfully started
+     */
+    virtual pos_retval_t stop_gpu_ticker(uint64_t& ticker, uint64_t stream_id=0){
+        return POS_FAILED_NOT_IMPLEMENTED;
+    }
+
 
  private:
     /*!
      *  \brief  processing daemon of the worker
      */
     void __daemon();
+
 
     #if POS_CONF_EVAL_CkptOptLevel == 0 || POS_CONF_EVAL_CkptOptLevel == 1
         /*!
@@ -383,4 +376,40 @@ class POSWorker {
 
     // maximum index of processed wqe index
     uint64_t _max_wqe_id;
+
+    // mark restoring phrase
+    enum pos_worker_restore_phraseid_t : uint8_t {
+        kPOS_WorkRestorePhrase_Recomputation_Init = 0,
+        kPOS_WorkRestorePhrase_Recomputation,
+        kPOS_WorkRestorePhrase_Unexecution,
+        kPOS_WorkRestorePhrase_Normal
+    };
+    pos_worker_restore_phraseid_t _restoring_phrase;
+
+    // metrics
+    #if POS_CONF_RUNTIME_EnableTrace
+        enum metrics_reducer_type_t : uint8_t {
+            RESTORE_ondemand_reload_bytes = 0,
+        };
+        POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> _metric_reducers;
+
+        enum metrics_counter_type_t : uint8_t {
+            RESTORE_nb_ondemand_reload_handles = 0,
+            RESTORE_nb_ondemand_reload_state_handles,
+        };
+        POSMetrics_CounterList<metrics_counter_type_t> _metric_counter;
+
+        enum metrics_ticker_type_t : uint8_t {
+            RESTORE_recomputation_ticks = 0,    // gpu ticker
+            RESTORE_unexecution_ticks,          // gpu ticker
+            RESTORE_ondemand_reload_ticks,
+            RESTORE_ondemand_reload_state_ticks
+        };
+        POSMetrics_TickerList<metrics_ticker_type_t> _metric_ticker;
+
+        /*!
+         *  \brief  print the metrics of the worker
+         */
+        void __print_metrics();
+    #endif
 };

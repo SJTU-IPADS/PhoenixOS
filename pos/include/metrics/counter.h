@@ -45,9 +45,9 @@ class POSMetrics_CounterList {
     inline void reset_counters(){ this->_map.clear(); }
 
 
-    inline std::string str(std::map<K,std::string> counter_names){
+    inline std::string str(std::unordered_map<K,std::string> counter_names){
         std::string print_string("");
-        typename std::map<K, std::string>::iterator name_map_iter;
+        typename std::unordered_map<K, std::string>::iterator name_map_iter;
         typename std::unordered_map<K, uint64_t>::iterator map_iter;
 
         for(map_iter = this->_map.begin(); map_iter != this->_map.end(); map_iter++){

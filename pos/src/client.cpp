@@ -328,7 +328,9 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
     pos_retval_t retval = POS_SUCCESS;
     pos_u64id_t apicxt_id;
     std::set<std::filesystem::path> sorted_unexecuted_apicxts;
-    std::set<std::filesystem::path> sorted_recomputation_apicxts;
+    # if POS_CONF_EVAL_CkptOptLevel == 2
+        std::set<std::filesystem::path> sorted_recomputation_apicxts;
+    #endif
     typename std::set<std::filesystem::path>::iterator set_iter;
 
     POS_ASSERT(ckpt_dir.size() > 0);
@@ -338,26 +340,28 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
         goto exit;
     }
 
-    // enqueue recomputation apis
-    for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
-        if (    entry.is_regular_file() 
-            &&  entry.path().extension() == ".bin"
-            &&  entry.path().filename().string().rfind("ra-", 0) == 0
-        ){
-            sorted_recomputation_apicxts.insert(entry.path());
+    # if POS_CONF_EVAL_CkptOptLevel == 2
+        // enqueue recomputation apis
+        for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
+            if (    entry.is_regular_file() 
+                &&  entry.path().extension() == ".bin"
+                &&  entry.path().filename().string().rfind("ra-", 0) == 0
+            ){
+                sorted_recomputation_apicxts.insert(entry.path());
+            }
         }
-    }
-    for(set_iter = sorted_recomputation_apicxts.begin(); set_iter != sorted_recomputation_apicxts.end(); set_iter++){
-        retval = this->__reload_apicxt((*set_iter).string());
-        POS_LOG("reload %s", (*set_iter).string().c_str());
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN_C(
-                "failed to reload recomputation api context: ckpt_file(%s)",
-                (*set_iter).string().c_str()
-            );
-            goto exit;
+        for(set_iter = sorted_recomputation_apicxts.begin(); set_iter != sorted_recomputation_apicxts.end(); set_iter++){
+            retval = this->__reload_apicxt((*set_iter).string(), ApiCxt_TypeId_Recomputation);
+            POS_LOG("reload %s", (*set_iter).string().c_str());
+            if(unlikely(retval != POS_SUCCESS)){
+                POS_WARN_C(
+                    "failed to reload recomputation api context: ckpt_file(%s)",
+                    (*set_iter).string().c_str()
+                );
+                goto exit;
+            }
         }
-    }
+    #endif
 
     // enqueue unexecuted apis
     for (const auto& entry : std::filesystem::directory_iterator(ckpt_dir)) {
@@ -369,7 +373,7 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
         }
     }
     for(set_iter = sorted_unexecuted_apicxts.begin(); set_iter != sorted_unexecuted_apicxts.end(); set_iter++){
-        retval = this->__reload_apicxt((*set_iter).string());
+        retval = this->__reload_apicxt((*set_iter).string(), ApiCxt_TypeId_Unexecuted);
         POS_LOG("reload %s", (*set_iter).string().c_str());
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C(
@@ -857,7 +861,7 @@ exit:
 }
 
 
-pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file){
+pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file, pos_apicxt_typeid_t type){
     pos_retval_t retval = POS_SUCCESS;
     POSAPIContext_QE_t *apicxt;
     uint64_t i;
@@ -867,7 +871,7 @@ pos_retval_t POSClient::__reload_apicxt(const std::string& ckpt_file){
 
     POS_ASSERT(ckpt_file.size() > 0);
     
-    POS_CHECK_POINTER(apicxt = new POSAPIContext_QE_t(this, ckpt_file));
+    POS_CHECK_POINTER(apicxt = new POSAPIContext_QE_t(this, ckpt_file, type));
     if(unlikely(apicxt->client == nullptr)){
         POS_WARN_C(
             "failed to restore apicxt from binary checkpoint file: ckpt_file(%s)",

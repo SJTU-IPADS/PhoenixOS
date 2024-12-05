@@ -29,6 +29,7 @@
 #include "pos/include/handle.h"
 #include "pos/include/command.h"
 #include "pos/include/transport.h"
+#include "pos/include/api_context.h"
 #include "pos/include/utils/lockfree_queue.h"
 #include "pos/include/utils/timer.h"
 
@@ -354,9 +355,10 @@ class POSClient {
      *  \brief  reload unexecuted API context from checkpoint file
      *  \note   this function is called by POSClient::restore_apicxts
      *  \param  ckpt_file   path to the checkpoint file of the handle
-     *  
+     *  \param  type        type of the apicxt to be restored
+     *  \return POS_SUCCESS for successfully restore from checkpoint file
      */
-    pos_retval_t __reload_apicxt(const std::string& ckpt_file);
+    pos_retval_t __reload_apicxt(const std::string& ckpt_file, pos_apicxt_typeid_t type);
 
 
  private: 

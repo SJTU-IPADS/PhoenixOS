@@ -27,6 +27,10 @@ class POSMetrics_TickerList {
         this->_duration_tick_map[index].push_back(e_tick - s_tick_it->second);
     }
 
+    inline void add(K index, uint64_t& value){
+        this->_duration_tick_map[index].push_back(value);
+    }
+
     inline void get_tick(
         K index, double& avg, uint64_t& min, uint64_t& max, uint64_t& overall,
         uint64_t& p10, uint64_t& p50, uint64_t& p99
@@ -79,9 +83,9 @@ class POSMetrics_TickerList {
     }
 
 
-    inline std::string str(std::map<K,std::string> ticker_names){
+    inline std::string str(std::unordered_map<K,std::string> ticker_names){
         std::string print_string("");
-        typename std::map<K, std::string>::iterator name_map_iter;
+        typename std::unordered_map<K, std::string>::iterator name_map_iter;
         typename std::unordered_map<K, std::vector<uint64_t>>::iterator map_iter;
         uint64_t min_tick = 0, max_tick = 0, overall_tick = 0;
         uint64_t p10_tick = 0, p50_tick = 0, p99_tick = 0;
@@ -121,13 +125,13 @@ class POSMetrics_TickerList {
 
         for(name_map_iter=ticker_names.begin(); name_map_iter!=ticker_names.end(); name_map_iter++){
             print_string += std::string("[Ticker Metric Report] ") + name_map_iter->second + std::string(":\n");
-            print_string += std::string("  max: N/A ms");
-            print_string += std::string("  min: N/A ms");
-            print_string += std::string("  avg: N/A ms");
-            print_string += std::string("  sum: N/A ms");
-            print_string += std::string("  p10: N/A ms");
-            print_string += std::string("  p50: N/A ms");
-            print_string += std::string("  p99: N/A ms");
+            print_string += std::string("  max: N/A ms\n");
+            print_string += std::string("  min: N/A ms\n");
+            print_string += std::string("  avg: N/A ms\n");
+            print_string += std::string("  sum: N/A ms\n");
+            print_string += std::string("  p10: N/A ms\n");
+            print_string += std::string("  p50: N/A ms\n");
+            print_string += std::string("  p99: N/A ms\n");
         }
 
         return print_string;

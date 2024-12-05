@@ -128,8 +128,3 @@ template pos_retval_t POSCheckpointBag::invalidate_all_version<kPOS_CkptSlotPosi
 pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
     return POS_FAILED_NOT_IMPLEMENTED;
 }
-
-
-std::vector<pos_host_ckpt_t> POSCheckpointBag::get_host_checkpoint_records(){
-    return std::vector<pos_host_ckpt_t>();
-}

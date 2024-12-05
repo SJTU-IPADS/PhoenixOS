@@ -87,125 +87,52 @@ namespace wk_functions {
  */
 class POSWorker_CUDA : public POSWorker {
  public:
-    POSWorker_CUDA(POSWorkspace* ws, POSClient* client) : POSWorker(ws, client) {}
-    ~POSWorker_CUDA(){};
+    POSWorker_CUDA(POSWorkspace* ws, POSClient* client);
+    ~POSWorker_CUDA();
+
 
     /*!
      *  \brief  make the worker thread synchronized
      *  \param  stream_id   index of the stream to be synced, default to be 0
      */
-    pos_retval_t sync(uint64_t stream_id=0) override {
-        pos_retval_t retval = POS_SUCCESS;
-        cudaError_t cuda_rt_retval;
+    pos_retval_t sync(uint64_t stream_id=0) override;
 
-        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_C_DETAIL(
-                "failed to synchronize worker, is this a bug?: stream_id(%p), cuda_rt_retval(%d)",
-                stream_id, cuda_rt_retval
-            );
-            retval = POS_FAILED;
-        }
-
-        return retval;
-    }
 
  protected:    
     /*!
      *  \brief      initialization of the worker daemon thread
      *  \example    for CUDA, one need to call API e.g. cudaSetDevice first to setup the context for a thread
      */
-    pos_retval_t daemon_init() override {
-        /*!
-         *  \note   make sure the worker thread is bound to a CUDA context
-         *          if we don't do this and use the driver API, it might be unintialized
-         */
-        if(cudaSetDevice(0) != cudaSuccess){
-            POS_WARN_C_DETAIL("worker thread failed to invoke cudaSetDevice");
-            return POS_FAILED; 
-        }
-        cudaDeviceSynchronize();
-        
-    #if POS_CONF_EVAL_CkptOptLevel == 2
-        POS_ASSERT(
-            cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_stream_id))
-        );
-
-        POS_ASSERT(
-            cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_cow_stream_id))
-        );
-    #endif
-
-    #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
-        POS_ASSERT(
-            cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_commit_stream_id))
-        );
-    #endif
-
-    #if POS_CONF_EVAL_MigrOptLevel == 2
-        POS_ASSERT(
-            cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_migration_precopy_stream_id))
-        );
-    #endif
-
-        return POS_SUCCESS; 
-    }
+    pos_retval_t daemon_init() override;
 
     
     /*!
      *  \brief  insertion of worker functions
      *  \return POS_SUCCESS for succefully insertion
      */
-    pos_retval_t init_wk_functions() override {
-        this->_launch_functions.insert({
-            /* CUDA runtime functions */
-            {   CUDA_MALLOC,                    wk_functions::cuda_malloc::launch                       },
-            {   CUDA_FREE,                      wk_functions::cuda_free::launch                         },
-            {   CUDA_LAUNCH_KERNEL,             wk_functions::cuda_launch_kernel::launch                },
-            {   CUDA_MEMCPY_HTOD,               wk_functions::cuda_memcpy_h2d::launch                   },
-            {   CUDA_MEMCPY_DTOH,               wk_functions::cuda_memcpy_d2h::launch                   },
-            {   CUDA_MEMCPY_DTOD,               wk_functions::cuda_memcpy_d2d::launch                   },
-            {   CUDA_MEMCPY_HTOD_ASYNC,         wk_functions::cuda_memcpy_h2d_async::launch             },
-            {   CUDA_MEMCPY_DTOH_ASYNC,         wk_functions::cuda_memcpy_d2h_async::launch             },
-            {   CUDA_MEMCPY_DTOD_ASYNC,         wk_functions::cuda_memcpy_d2d_async::launch             },
-            {   CUDA_MEMSET_ASYNC,              wk_functions::cuda_memset_async::launch                 },
-            {   CUDA_SET_DEVICE,                wk_functions::cuda_set_device::launch                   },
-            {   CUDA_GET_LAST_ERROR,            wk_functions::cuda_get_last_error::launch               },
-            {   CUDA_GET_ERROR_STRING,          wk_functions::cuda_get_error_string::launch             },
-            {   CUDA_PEEK_AT_LAST_ERROR,        wk_functions::cuda_peek_at_last_error::launch           },
-            {   CUDA_GET_DEVICE_COUNT,          wk_functions::cuda_get_device_count::launch             },
-            {   CUDA_GET_DEVICE_PROPERTIES,     wk_functions::cuda_get_device_properties::launch        },
-            {   CUDA_DEVICE_GET_ATTRIBUTE,      wk_functions::cuda_device_get_attribute::launch         },
-            {   CUDA_GET_DEVICE,                wk_functions::cuda_get_device::launch                   },
-            {   CUDA_FUNC_GET_ATTRIBUTES,       wk_functions::cuda_func_get_attributes::launch          },
-            {   CUDA_OCCUPANCY_MAX_ACTIVE_BPM_WITH_FLAGS,   
-                                        wk_functions::cuda_occupancy_max_active_bpm_with_flags::launch  },
-            {   CUDA_STREAM_SYNCHRONIZE,        wk_functions::cuda_stream_synchronize::launch           },
-            {   CUDA_STREAM_IS_CAPTURING,       wk_functions::cuda_stream_is_capturing::launch          },
-            {   CUDA_EVENT_CREATE_WITH_FLAGS,   wk_functions::cuda_event_create_with_flags::launch      },
-            {   CUDA_EVENT_DESTROY,             wk_functions::cuda_event_destory::launch                },
-            {   CUDA_EVENT_RECORD,              wk_functions::cuda_event_record::launch                 },
-            {   CUDA_EVENT_QUERY,               wk_functions::cuda_event_query::launch                  },
-            
-            /* CUDA driver functions */
-            {   rpc_cuModuleLoad,               wk_functions::cu_module_load::launch                    },
-            {   rpc_cuModuleLoadData,           wk_functions::cu_module_load_data::launch               },
-            {   rpc_register_function,          wk_functions::__register_function::launch               },
-            {   rpc_cuModuleGetFunction,        wk_functions::cu_module_get_function::launch            },
-            {   rpc_register_var,               wk_functions::cu_module_get_global::launch              },
-            {   rpc_cuDevicePrimaryCtxGetState, wk_functions::cu_device_primary_ctx_get_state::launch   },
-            {   rpc_cuLaunchKernel,             wk_functions::cuda_launch_kernel::launch                },
-            {   rpc_cuGetErrorString,           wk_functions::cu_get_error_string::launch               },
-            
-            /* cuBLAS functions */
-            {   rpc_cublasCreate,               wk_functions::cublas_create::launch                     },
-            {   rpc_cublasSetStream,            wk_functions::cublas_set_stream::launch                 },
-            {   rpc_cublasSetMathMode,          wk_functions::cublas_set_math_mode::launch              },
-            {   rpc_cublasSgemm,                wk_functions::cublas_sgemm::launch                      },
-            {   rpc_cublasSgemmStridedBatched,  wk_functions::cublas_sgemm_strided_batched::launch      },
-        });
-        POS_DEBUG_C("insert %lu worker launch functions", this->_launch_functions.size());
+    pos_retval_t init_wk_functions() override;
 
-        return POS_SUCCESS;
-    }
+
+    /*!
+     *  \brief      start an ticker on GPU
+     *  \example    on CUDA platform, this API is implemented using ÇUDA event
+     *  \param      stream_id   index of the gpu stream to be measured
+     *  \return     POS_SUCCESS for successfully started
+     */
+    pos_retval_t start_gpu_ticker(uint64_t stream_id=0) override;
+
+
+    /*!
+     *  \brief      stop an ticker on GPU
+     *  \example    on CUDA platform, this API is implemented using ÇUDA event
+     *  \note       this API should cause device synchronization
+     *  \param      stream_id   index of the gpu stream to be measured
+     *  \param      ticker      value of the ticker
+     *  \return     POS_SUCCESS for successfully started
+     */
+    pos_retval_t stop_gpu_ticker(uint64_t& ticker, uint64_t stream_id=0) override;
+
+ private:
+    // ticker events on each CUDA stream
+    std::map<cudaStream_t, cudaEvent_t> _cuda_ticker_events;
 };

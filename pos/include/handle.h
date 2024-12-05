@@ -824,7 +824,7 @@ class POSHandleManager {
         POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
 
         inline void print_metrics(){
-            std::map<metrics_ticker_type_t, std::string> ticker_names = {
+            std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
                 { CKPT_commit, "CKPT_commit (GPU Memory -> CPU Memory)" }
             };
             POS_ASSERT(pos_resource_map.count(this->_rid) > 0);

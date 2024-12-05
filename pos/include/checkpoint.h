@@ -288,20 +288,6 @@ class POSCheckpointBag {
     pos_retval_t load(uint64_t version, void* ckpt_data);
 
 
-    /*!
-     *  \brief  obtain all host-side checkpoint records
-     *  \note   this function only return those api context that hasn't been pruned by checkpoint system
-     *  \return all host-side checkpoint records
-     */
-    std::vector<pos_host_ckpt_t> get_host_checkpoint_records();
-
-
-    // waitlist of the host-side checkpoint record, populated during restore phrase
-    std::vector<std::tuple<
-        /* wqe_id */ pos_u64id_t, /* param_id */ uint32_t, /* offset */ uint64_t, /* size */ uint64_t>
-    > host_ckpt_waitlist;
-
-
     // indicate whether the checkpoint has been finished in the latest checkpoint round
     bool is_latest_ckpt_finished;
 

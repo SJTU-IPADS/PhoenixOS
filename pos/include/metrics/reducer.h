@@ -112,9 +112,9 @@ class POSMetrics_ReducerList {
     }
 
 
-    inline std::string str(std::map<K,std::string> reducer_names){
+    inline std::string str(std::unordered_map<K,std::string> reducer_names){
         std::string print_string("");
-        typename std::map<K, std::string>::iterator name_map_iter;
+        typename std::unordered_map<K, std::string>::iterator name_map_iter;
         typename std::unordered_map<K, uint64_t>::iterator max_map_iter, min_map_iter, sum_map_iter;
         typename std::unordered_map<K, V>::iterator avg_counter_map_iter;
 

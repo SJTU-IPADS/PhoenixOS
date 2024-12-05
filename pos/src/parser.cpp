@@ -63,11 +63,11 @@ void POSParser::shutdown(){
     }
 
     #if POS_CONF_RUNTIME_EnableTrace
-        static std::map<metrics_reducer_type_t, std::string> reducer_names = {
+        static std::unordered_map<metrics_reducer_type_t, std::string> reducer_names = {
             { KERNEL_in_memories, "KERNEL_in_memories" },
             { KERNEL_out_memories, "KERNEL_out_memories" }
         };
-        static std::map<metrics_counter_type_t, std::string> counter_names = {
+        static std::unordered_map<metrics_counter_type_t, std::string> counter_names = {
             { KERNEL_number_of_user_kernels, "KERNEL_number_of_user_kernels" },
             { KERNEL_number_of_vendor_kernels, "KERNEL_number_of_vendor_kernels" }
         };

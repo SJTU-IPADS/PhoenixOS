@@ -29,8 +29,11 @@
 #include "pos/include/common.h"
 #include "pos/include/log.h"
 #include "pos/include/handle.h"
-#include "pos/include/client.h"
 #include "pos/include/utils/timer.h"
+
+
+// forward declaration
+class POSClient;
 
 
 /*!
@@ -83,6 +86,16 @@ typedef struct POSAPIMeta {
     // name of the api
     std::string api_name;
 } POSAPIMeta_t;
+
+
+/*!
+ *  \brief  execution type of POSAPIContext_QE
+ */
+enum pos_apicxt_typeid_t : uint8_t {
+    ApiCxt_TypeId_Normal = 0,
+    ApiCxt_TypeId_Unexecuted,
+    ApiCxt_TypeId_Recomputation
+};
 
 
 /*!
@@ -313,8 +326,8 @@ typedef struct POSAPIContext_QE {
     // execution status of the API call
     pos_api_execute_status_t status;
 
-    // mark whether this api context has been pruned in the checkpoint system
-    bool is_ckpt_pruned;
+    // ApiCxt Type
+    pos_apicxt_typeid_t type;
 
     // all involved handle during the processing of this API instance
     std::vector<POSHandleView_t> input_handle_views;
@@ -328,23 +341,6 @@ typedef struct POSAPIContext_QE {
     uint64_t parser_s_tick, parser_e_tick, worker_s_tick, worker_e_tick;
     /* ======= end of profiling fields ======== */
 
-    /* =========== checkpoint op specific fields =========== */
-    // number of handles this checkpoint op checkpointed
-    uint64_t nb_ckpt_handles;
-    uint64_t nb_abandon_handles;
-
-    // size of state this checkpoint op checkpointed
-    uint64_t ckpt_size;
-    uint64_t abandon_ckpt_size;
-
-    // checkpoint memory consumption after this checkpoint op
-    uint64_t ckpt_memory_consumption;
-
-    // handles that will be checkpointed by this checkpoint op
-    // std::map<pos_resource_typeid_t, std::set<POSHandle*>> checkpoint_handles;
-    std::set<POSHandle*> checkpoint_handles;
-
-    /* ======= end of checkpoint op specific fields ======== */
 
     /*!
      *  \brief  constructor
@@ -359,38 +355,7 @@ typedef struct POSAPIContext_QE {
     POSAPIContext_QE(
         uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
         uint64_t inst_id, void* retval_data, uint64_t retval_size, POSClient* pos_client
-    ) : client_id(uuid), client(pos_client), has_return(false),
-        status(kPOS_API_Execute_Status_Init), id(inst_id), is_ckpt_pruned(false)
-    {
-        POS_CHECK_POINTER(pos_client);
-        this->api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
-        POS_CHECK_POINTER(this->api_cxt);
-        create_tick = POSUtilTimestamp::get_tsc();
-        parser_s_tick = parser_e_tick = worker_s_tick = worker_e_tick = 0;
-
-        // initialization of checkpoint op specific fields
-        nb_ckpt_handles = 0;
-        nb_abandon_handles = 0;
-        ckpt_size = 0;
-        abandon_ckpt_size = 0;
-        ckpt_memory_consumption = 0;
-
-        // reserve space
-        input_handle_views.reserve(5);
-        output_handle_views.reserve(5);
-        inout_handle_views.reserve(5);
-        create_handle_views.reserve(1);
-        delete_handle_views.reserve(1);
-    }
-
-
-    /*!
-     *  \brief  constructor
-     *  \note   this constructor is used only during restore phrase
-     *  \param  pos_client          pointer to the POSClient instance
-     */
-    POSAPIContext_QE(POSClient* pos_client) 
-        : client(pos_client), has_return(false), is_ckpt_pruned(false){}
+    );
 
 
     /*!
@@ -398,22 +363,16 @@ typedef struct POSAPIContext_QE {
      *  \note   this constructor is for restoring from binary checkpoint file
      *  \param  client      pointer to the POSClient instance
      *  \param  ckpt_file   path to the checkpoint file
+     *  \param  type        type of the restored APIContext, either ApiCxt_TypeId_Unexecuted
+     *                      or ApiCxt_TypeId_Recomputation
      */
-    POSAPIContext_QE(POSClient* client, const std::string& ckpt_file);
+    POSAPIContext_QE(POSClient* client, const std::string& ckpt_file, pos_apicxt_typeid_t type);
 
 
     /*!
      *  \brief  deconstructor
      */
-    ~POSAPIContext_QE(){
-        // TODO: release handle views
-    }
-
-
-    enum pos_apicxt_persist_typeid_t : uint8_t {
-        ApiCxt_PersistType_Unexecuted = 0,
-        ApiCxt_PersistType_Recomputation
-    };
+    ~POSAPIContext_QE();
 
 
     /*!
@@ -427,7 +386,7 @@ typedef struct POSAPIContext_QE {
      *  \param  ckpt_dir    directory to store the checkpoint
      *  \return POS_SUCCESS for successfully checkpointing
      */
-    template<bool with_params, pos_apicxt_persist_typeid_t type>
+    template<bool with_params, pos_apicxt_typeid_t type>
     pos_retval_t persist(std::string ckpt_dir);
 
 
@@ -449,33 +408,6 @@ typedef struct POSAPIContext_QE {
             inout_handle_views.emplace_back(handle_view);
         }
     }
-
-    /*!
-     *  \brief  record all handles that need to be checkpointed within this checkpoint op
-     *  \param  id          resource type index
-     *  \param  handle_set  sets of handles
-     */
-    inline void record_checkpoint_handles(std::set<POSHandle*>& handle_set){
-        checkpoint_handles.insert(handle_set.begin(), handle_set.end());
-    }
-
-    /*!
-     *  \brief  record all handles that need to be checkpointed within this checkpoint op
-     *  \param  handle  the handle to be recorded
-     */
-    inline void record_checkpoint_handles(POSHandle *handle){
-        checkpoint_handles.insert(handle);
-    }
-
-    /*!
-     *  \brief  obtain involved handles with specified direction
-     *  \param  dir     expected direction
-     *  \param  handles pointer to a list that stores the results
-     */
-    inline void get_handles_by_dir(pos_edge_direction_t dir, std::vector<POSHandle*> *handles){
-        POS_ERROR_C_DETAIL("not implemented");
-    }
-
 } POSAPIContext_QE_t;
 
 

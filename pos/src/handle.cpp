@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <string>
+#include <fstream>
 #include <map>
 #include <type_traits>
 #include <stdint.h>

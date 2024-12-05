@@ -501,18 +501,3 @@ pos_retval_t POSCheckpointBag::load(uint64_t version, void* ckpt_data){
 exit:
     return retval;
 }
-
-
-std::vector<pos_host_ckpt_t> POSCheckpointBag::get_host_checkpoint_records(){
-    std::vector<pos_host_ckpt_t> ret_list;
-    typename std::unordered_map<uint64_t, pos_host_ckpt_t>::iterator map_iter;
-
-    for(map_iter=this->_host_ckpt_map.begin(); map_iter!=this->_host_ckpt_map.end(); map_iter++){
-        POS_CHECK_POINTER(map_iter->second.wqe)
-        if(likely(map_iter->second.wqe->is_ckpt_pruned == false)){
-            ret_list.push_back(map_iter->second);
-        }
-    }
-
-    return ret_list;
-}

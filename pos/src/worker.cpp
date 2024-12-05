@@ -34,7 +34,9 @@
 #include "pos/include/trace.h"
 
 
-POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) : _max_wqe_id(0) {
+POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) 
+    : _max_wqe_id(0)
+{
     POS_CHECK_POINTER(this->_ws = ws);
     POS_CHECK_POINTER(this->_client = client);
     this->_stop_flag = false;
@@ -56,16 +58,15 @@ POSWorker::POSWorker(POSWorkspace* ws, POSClient* client) : _max_wqe_id(0) {
         this->_migration_precopy_stream_id = 0;
     #endif
 
-    // initialize trace tick list
-    POS_TRACE_TICK_LIST_SET_TSC_TIMER(ckpt, &ws->tsc_timer);
-    POS_TRACE_TICK_LIST_RESET(ckpt);
+    this->_restoring_phrase = kPOS_WorkRestorePhrase_Recomputation_Init;
 
     POS_LOG_C("worker started");
 }
 
 
 POSWorker::~POSWorker(){ 
-    this->shutdown(); 
+    this->shutdown();
+    this->__print_metrics();
 }
 
 
@@ -148,8 +149,8 @@ exit:
 
 
 void POSWorker::__daemon_ckpt_sync(){
-    uint64_t i, api_id;
-    pos_retval_t launch_retval;
+    uint64_t i, api_id, gpu_ticker;
+    pos_retval_t launch_retval, tmp_retval;
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
@@ -176,6 +177,91 @@ void POSWorker::__daemon_ckpt_sync(){
             POS_CHECK_POINTER(wqe = wqes[i]);
             POS_CHECK_POINTER(wqe->api_cxt);
             
+            #if POS_CONF_RUNTIME_EnableTrace
+                if(unlikely(this->_restoring_phrase < kPOS_WorkRestorePhrase_Normal)){
+
+                    if(wqe->type == ApiCxt_TypeId_Recomputation){
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 1: first recomputation API
+                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Recomputation;
+                            }
+                        } else {
+                            // case 2: subsequent recomputation API
+                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation);
+                        }
+
+                    } else if (wqe->type == ApiCxt_TypeId_Unexecuted){
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 3: no recomputation API, first unexecution API
+                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
+                            }
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
+                            // case 4: first unexecution API after recomputation API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
+                                tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                                if(unlikely(tmp_retval != POS_SUCCESS)){
+                                    POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                    this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                                }
+                            }
+                        } else {
+                            // case 5: subsequent unexecution API
+                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution);
+                        }
+
+                    } else {
+                        POS_ASSERT(wqe->type == ApiCxt_TypeId_Normal);
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 6: no recomputation API, no unexecution API
+                            this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
+                            // case: first normal API after recomputation API, no unexecution API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            }
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution){
+                            // case 7: first normal API after unexecution API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_unexecution_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                                this->__print_metrics();
+                            }
+                        } else {
+                            POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
+                        }
+
+                    }
+                }
+            #endif
+
             wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
             
             api_id = wqe->api_cxt->api_id;
@@ -358,17 +444,13 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
         // for dump, we also need to save unexecuted APIs
         nb_ckpt_wqes = 0;
         while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
-            // we need to make sure we drain all unexecuted APIs
-            // POS_LOG("max_wqe_id: %lu, _api_inst_pc-1:%lu", max_wqe_id, this->_client->_api_inst_pc - 1);
             wqes.clear();
-            // TODO: this might be buggy, consider what if there's a sync call, and simontinuously we dump the program,
-            //       then the retval won't never be returned!
             this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
             for(i=0; i<wqes.size(); i++){
                 POS_CHECK_POINTER(wqe = wqes[i]);
                 POS_CHECK_POINTER(wqe->api_cxt);
                 if(unlikely(POS_SUCCESS != (
-                    retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(cmd->ckpt_dir))
+                    retval = wqe->persist</* with_params */ true, /* type */ ApiCxt_TypeId_Unexecuted>(cmd->ckpt_dir))
                 )){
                     POS_WARN_C("failed to do checkpointing of unexecuted APIs");
                     goto reply_parser;
@@ -406,7 +488,7 @@ exit:
 
 
 void POSWorker::__daemon_ckpt_async(){
-    uint64_t i, api_id;
+    uint64_t i, api_id, gpu_ticker;
     pos_retval_t launch_retval, tmp_retval;
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
@@ -439,6 +521,91 @@ void POSWorker::__daemon_ckpt_async(){
 
         for(i=0; i<wqes.size(); i++){
             POS_CHECK_POINTER(wqe = wqes[i]);
+
+            #if POS_CONF_RUNTIME_EnableTrace
+                if(unlikely(this->_restoring_phrase < kPOS_WorkRestorePhrase_Normal)){
+
+                    if(wqe->type == ApiCxt_TypeId_Recomputation){
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 1: first recomputation API
+                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Recomputation;
+                            }
+                        } else {
+                            // case 2: subsequent recomputation API
+                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation);
+                        }
+
+                    } else if (wqe->type == ApiCxt_TypeId_Unexecuted){
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 3: no recomputation API, first unexecution API
+                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
+                            }
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
+                            // case 4: first unexecution API after recomputation API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
+                                tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
+                                if(unlikely(tmp_retval != POS_SUCCESS)){
+                                    POS_WARN("failed to start gpu ticker, restore measurement abandoned");
+                                    this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                                }
+                            }
+                        } else {
+                            // case 5: subsequent unexecution API
+                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution);
+                        }
+
+                    } else {
+                        POS_ASSERT(wqe->type == ApiCxt_TypeId_Normal);
+
+                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
+                            // case 6: no recomputation API, no unexecution API
+                            this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
+                            // case: first normal API after recomputation API, no unexecution API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            }
+                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution){
+                            // case 7: first normal API after unexecution API
+                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
+                            if(unlikely(tmp_retval != POS_SUCCESS)){
+                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                            } else {
+                                this->_metric_ticker.add(RESTORE_unexecution_ticks, gpu_ticker);
+                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
+                                this->__print_metrics();
+                            }
+                        } else {
+                            POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
+                        }
+
+                    }
+                }
+            #endif
 
             wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
 
@@ -936,7 +1103,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
 
     // step 3: decide either dump recomputation APIs (only if CoW is enabled) or do dirty copy
     if(cmd->do_cow == true){
-        if(this->async_ckpt_cxt.dirty_handle_state_size >= GB(4)){
+        if(this->async_ckpt_cxt.dirty_handle_state_size >= GB(2)){
             // case: too many dirty copies, we dump recomputation APIs
             do_dirty_copy = false;
             POS_LOG(
@@ -1027,7 +1194,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
                 this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::PERSIST_wqe_ticks);
             #endif
             if(unlikely(POS_SUCCESS != (
-                retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Recomputation>(cmd->ckpt_dir)
+                retval = wqe->persist</* with_params */ true, /* type */ ApiCxt_TypeId_Recomputation>(cmd->ckpt_dir)
             ))){
                 POS_WARN_C("failed to do checkpointing of recomputation APIs");
                 goto sync_persist;
@@ -1053,7 +1220,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
                 this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::PERSIST_wqe_ticks);
             #endif
             if(unlikely(POS_SUCCESS != (
-                retval = wqe->persist</* with_params */ true, /* type */ POSAPIContext_QE_t::ApiCxt_PersistType_Unexecuted>(cmd->ckpt_dir))
+                retval = wqe->persist</* with_params */ true, /* type */ ApiCxt_TypeId_Unexecuted>(cmd->ckpt_dir))
             )){
                 POS_WARN_C("failed to do checkpointing of unexecuted APIs");
                 goto sync_persist;
@@ -1177,7 +1344,6 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::COMMON_sync);
         #endif
         if(unlikely(POS_SUCCESS != (retval = this->sync()))){
-            POS_TRACE_TICK_APPEND(ckpt, ckpt_drain);
             POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
             goto exit;
         }
@@ -1244,8 +1410,11 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                         continue;
                     }
                 }
-
+                
                 // restore handle
+                #if POS_CONF_RUNTIME_EnableTrace
+                    this->_metric_ticker.start(RESTORE_ondemand_reload_ticks);
+                #endif
                 if(unlikely(POS_SUCCESS != broken_handle->restore())){
                     POS_ERROR_C(
                         "failed to restore broken handle: resource_type(%s), client_addr(%p), server_addr(%p), state(%u)",
@@ -1257,11 +1426,18 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                         "restore broken handle: resource_type_id(%lu)",
                         broken_handle->resource_type_id
                     );
+                    #if POS_CONF_RUNTIME_EnableTrace
+                        this->_metric_ticker.end(RESTORE_ondemand_reload_ticks);
+                        this->_metric_counter.add_counter(RESTORE_nb_ondemand_reload_handles);
+                    #endif
                 }
 
                 // restore handle state (on-demand restore)
                 // TODO: prefetching opt.
                 if(broken_handle->state_size > 0 && broken_handle->state_status == kPOS_HandleStatus_StateMiss){
+                    #if POS_CONF_RUNTIME_EnableTrace
+                        this->_metric_ticker.start(RESTORE_ondemand_reload_state_ticks);
+                    #endif
                     if(unlikely(POS_SUCCESS != broken_handle->reload_state(/* stream_id */ 0))){
                         POS_ERROR_C(
                             "failed to restore state of broken handle: "
@@ -1273,6 +1449,12 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                             broken_handle->status,
                             broken_handle->state_size
                         );
+                    } else {
+                        #if POS_CONF_RUNTIME_EnableTrace
+                            this->_metric_ticker.end(RESTORE_ondemand_reload_state_ticks);
+                            this->_metric_counter.add_counter(RESTORE_nb_ondemand_reload_state_handles);
+                            this->_metric_reducers.reduce(RESTORE_ondemand_reload_bytes, broken_handle->state_size);
+                        #endif
                     }
                 }
 
@@ -1290,3 +1472,30 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
 exit:
     return retval;
 }
+
+
+#if POS_CONF_RUNTIME_EnableTrace
+    void POSWorker::__print_metrics(){
+        static std::unordered_map<metrics_reducer_type_t, std::string> reducer_names = {
+            { RESTORE_ondemand_reload_bytes, "On-demand Reload Bytes (by Worker Thread)" },
+        };
+
+        static std::unordered_map<metrics_counter_type_t, std::string> counter_names = {
+            { RESTORE_nb_ondemand_reload_handles, "# On-demand Reload Handles (by Worker Thread)" },
+        };
+
+        static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
+            { RESTORE_recomputation_ticks, "Recomputation APIs" },
+            { RESTORE_unexecution_ticks, "Unexecuted APIs" },
+            { RESTORE_ondemand_reload_ticks, "On-demand Reload (by Worker Thread)" },
+            { RESTORE_ondemand_reload_state_ticks, "On-demand Reload State (by Worker Thread)" },
+        };
+
+        POS_LOG(
+            "[Worker Metrics]:\n%s\n%s\n%s",
+            this->_metric_ticker.str(ticker_names).c_str(),
+            this->_metric_counter.str(counter_names).c_str(),
+            this->_metric_reducers.str(reducer_names).c_str()
+        );
+    }
+#endif
