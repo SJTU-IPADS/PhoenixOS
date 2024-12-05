@@ -1,0 +1,26 @@
+ckpt pid 570570
+1.773
+Warn  (criu/kerndat.c:1637): CRIU was built without libnftables support
+Warn  (compel/arch/x86/src/lib/infect.c:418): Will restore 570574 with interrupted system call
+Displaying dump stats:
+Freezing time: 6405 us
+Frozen time: 2632196 us
+Memory dump time: 2231281 us
+Memory write time: 1750229 us
+IRMAP resolve time: 0 us
+Memory pages scanned: 4971584 (0x4bdc40)
+Memory pages skipped from parent: 0 (0x0)
+Memory pages written: 1166924 (0x11ce4c)
+Lazy memory pages: 0 (0x0)
+2.662
+ckpt version: ./ckpt/1
+
+Warn  (criu/kerndat.c:1637): CRIU was built without libnftables support
+Displaying restore stats:
+Pages compared: 0 (0x0)
+Pages skipped COW: 0 (0x0)
+Pages restored: 1166924 (0x11ce4c)
+Restore time: 2284895 us
+Forking time: 0 us
+restore cpu duration: 2.353
+restore gpu duration: .833

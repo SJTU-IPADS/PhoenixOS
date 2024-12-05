@@ -67,7 +67,7 @@ POSAPIContext_QE::POSAPIContext_QE(
     POS_CHECK_POINTER(pos_client);
     this->api_cxt = new POSAPIContext_t(api_id, param_desps, retval_data, retval_size);
     POS_CHECK_POINTER(this->api_cxt);
-    create_tick = POSUtilTimestamp::get_tsc();
+    create_tick = POSUtilTscTimer::get_tsc();
     parser_s_tick = parser_e_tick = worker_s_tick = worker_e_tick = 0;
 
     // reserve space

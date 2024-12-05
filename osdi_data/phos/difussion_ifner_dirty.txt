@@ -1,0 +1,304 @@
+ POS Log  create dump dir for GPU-side: /root/examples/./ckpt/phos
+ POS Log  #stateless handles(16589)
+ POS Log  [Dirty Behaviour] no CoW enabled, do dirty copy: dirty-copies(4G)
+ POS Log  [AsyncCkpt Metrics]:
+[Ticker Metric Report] Persist WQEs:
+  max: 0.142479 ms
+  min: 0.142479 ms
+  avg: 0.142479 ms
+  sum: 0.142479 ms
+  p10: 0.142479 ms
+  p50: 0.142479 ms
+  p99: 0.142479 ms
+[Ticker Metric Report] Dirty Copy Commit (by Worker Thread):
+  max: 50.055517 ms
+  min: 0.108190 ms
+  avg: 4.749712 ms
+  sum: 227.986174 ms
+  p10: 0.109492 ms
+  p50: 0.508037 ms
+  p99: 49.866320 ms
+[Ticker Metric Report] Persist Handles:
+  max: 1807.408504 ms
+  min: 0.022099 ms
+  avg: 92.375110 ms
+  sum: 4711.130603 ms
+  p10: 0.022777 ms
+  p50: 0.031310 ms
+  p99: 1731.825496 ms
+[Ticker Metric Report] Commit (by Ckpt Thread):
+  max: 44.989089 ms
+  min: 0.000095 ms
+  avg: 0.829579 ms
+  sum: 376.628824 ms
+  p10: 0.000148 ms
+  p50: 0.096749 ms
+  p99: 5.023006 ms
+[Ticker Metric Report] Device Synchronize:
+  max: 0.022975 ms
+  min: 0.011856 ms
+  avg: 0.017416 ms
+  sum: 0.034831 ms
+  p10: 0.011856 ms
+  p50: 0.011856 ms
+  p99: 0.011856 ms
+[Ticker Metric Report] CoW Done (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] CoW Done (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] CoW Block (by Ckpt Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] CoW Done (by Ckpt Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Counter Metric Report] # Persisted Handles: 17042
+[Counter Metric Report] # Unexecuted APIs: 1
+[Counter Metric Report] # Dirty-copied Handles (Commit by Worker Thread): 48
+[Counter Metric Report] # Handles (Commit by Ckpt Thread): 453
+[Reducer Metric Report] # Persisted WQEs: N/A
+[Reducer Metric Report] # Recomputation APIs: N/A
+[Reducer Metric Report] # Handles (Cow Block by Worker Thread): N/A
+[Reducer Metric Report] # Handles (Cow Done by Worker Thread): N/A
+[Reducer Metric Report] # Handles (Cow Block by Ckpt Thread): N/A
+[Reducer Metric Report] # Handles (Cow Done by Ckpt Thread): N/A
+
+[Reducer Metric Report] Dirty Copy Bytes (by Worker Thread):
+  max: 1073741824
+  min: 2097152
+  sum: 3938451456
+  avg: 82051072.000000
+[Reducer Metric Report] Commit Bytes Bytes (by Ckpt Thread):
+  max: 1073741824
+  min: 2768
+  sum: 9524482768
+  avg: 21025348.273731
+[Reducer Metric Report] CoW Bytes (by Worker Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A
+[Reducer Metric Report] CoW Bytes (by Ckpt Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A
+
+ POS Log  [HandleManager Metrics] cuda_memory:
+[Ticker Metric Report] CKPT_commit (GPU Memory -> CPU Memory):
+  max: 50.054460 ms
+  min: 0.095528 ms
+  avg: 2.015220 ms
+  sum: 560.231073 ms
+  p10: 0.108689 ms
+  p50: 0.883226 ms
+  p99: 44.988012 ms
+
+ POS Log  finish dump kernel metadata to /var/log/phos/daemon/diffusion_kernel_metas.txt
+ POS Log  [POSParser @ 0x7fcb9c001040]  parser daemon thread shutdown
+ POS Log  [Parser Metrics]:
+[Reducer Metric Report] KERNEL_out_memories:
+  max: 3
+  min: 0
+  sum: 42096
+  avg: 0.596996
+[Reducer Metric Report] KERNEL_in_memories:
+  max: 6
+  min: 0
+  sum: 93935
+  avg: 1.332166
+
+[Counter Metric Report] KERNEL_number_of_vendor_kernels: 21859
+[Counter Metric Report] KERNEL_number_of_user_kernels: 48654
+
+ POS Log  [POSWorker @ 0x7fcb9c001df0]  worker daemon thread shutdown
+ POS Log  [Worker Metrics]:
+[Ticker Metric Report] On-demand Reload (by Worker Thread):
+  max: 0.034229 ms
+  min: 0.034229 ms
+  avg: 0.034229 ms
+  sum: 0.034229 ms
+  p10: 0.034229 ms
+  p50: 0.034229 ms
+  p99: 0.034229 ms
+[Ticker Metric Report] On-demand Reload State (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Unexecuted APIs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Recomputation APIs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Counter Metric Report] # On-demand Reload Handles (by Worker Thread): 1
+[Reducer Metric Report] # On-demand Reload Handles with State (by Worker Thread): N/A
+
+[Reducer Metric Report] On-demand Reload Bytes (by Worker Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A
+
+ POS Log  try restore client
+ POS Log  [POSParser @ 0x7fcb9c001040]  parser started
+ POS Log  [POSWorker @ 0x7fcb9c001b70]  worker started
+ POS Warn  [POSTransport_RDMA<false> @ 0x7fcb9c000b60]  failed to ibv_query_port on first port for device mlx5_0
+ POS Log  restored client
+ POS Log  restored handle
+ POS Log  restored apicxts
+ POS Log  resumed execution of client
+ POS Log  [Worker Metrics]:
+[Ticker Metric Report] Unexecuted APIs:
+  max: 44.998872 ms
+  min: 44.998872 ms
+  avg: 44.998872 ms
+  sum: 44.998872 ms
+  p10: 44.998872 ms
+  p50: 44.998872 ms
+  p99: 44.998872 ms
+[Ticker Metric Report] On-demand Reload State (by Worker Thread):
+  max: 21.749260 ms
+  min: 5.302133 ms
+  avg: 11.198024 ms
+  sum: 44.792099 ms
+  p10: 5.302133 ms
+  p50: 7.300641 ms
+  p99: 10.440065 ms
+[Ticker Metric Report] On-demand Reload (by Worker Thread):
+  max: 0.205832 ms
+  min: 0.008397 ms
+  avg: 0.114103 ms
+  sum: 0.684621 ms
+  p10: 0.008397 ms
+  p50: 0.079728 ms
+  p99: 0.187985 ms
+[Ticker Metric Report] Recomputation APIs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Counter Metric Report] # On-demand Reload Handles with State (by Worker Thread): 4
+[Counter Metric Report] # On-demand Reload Handles (by Worker Thread): 6
+
+[Reducer Metric Report] On-demand Reload Bytes (by Worker Thread):
+  max: 48234496
+  min: 3514728
+  sum: 83206504
+  avg: 20801626.000000
+
+----server_vanilla_infos----
+api 2: count 1, server_vanilla_time 30821.000000
++00:01:26.652613 INFO:  RPC deinit requested.
+ POS Log  [HandleManager Metrics] cuda_memory:
+[Ticker Metric Report] CKPT_commit (GPU Memory -> CPU Memory):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+ POS Log  finish dump kernel metadata to /var/log/phos/daemon/diffusion_kernel_metas.txt
+ POS Log  [POSParser @ 0x7fcb9c001040]  parser daemon thread shutdown
+ POS Log  [Parser Metrics]:
+[Reducer Metric Report] KERNEL_out_memories:
+  max: 3
+  min: 0
+  sum: 135848
+  avg: 0.596015
+[Reducer Metric Report] KERNEL_in_memories:
+  max: 6
+  min: 0
+  sum: 303077
+  avg: 1.329711
+
+[Counter Metric Report] KERNEL_number_of_vendor_kernels: 70437
+[Counter Metric Report] KERNEL_number_of_user_kernels: 157490
+
+ POS Log  [POSWorker @ 0x7fcb9c001b70]  worker daemon thread shutdown
+ POS Log  [Worker Metrics]:
+[Ticker Metric Report] Unexecuted APIs:
+  max: 44.998872 ms
+  min: 44.998872 ms
+  avg: 44.998872 ms
+  sum: 44.998872 ms
+  p10: 44.998872 ms
+  p50: 44.998872 ms
+  p99: 44.998872 ms
+[Ticker Metric Report] On-demand Reload State (by Worker Thread):
+  max: 681.014812 ms
+  min: 0.198937 ms
+  avg: 16.484114 ms
+  sum: 4170.480796 ms
+  p10: 1.519478 ms
+  p50: 5.138986 ms
+  p99: 99.723937 ms
+[Ticker Metric Report] On-demand Reload (by Worker Thread):
+  max: 0.976099 ms
+  min: 0.000063 ms
+  avg: 0.135316 ms
+  sum: 41.271579 ms
+  p10: 0.035905 ms
+  p50: 0.137895 ms
+  p99: 0.442288 ms
+[Ticker Metric Report] Recomputation APIs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Counter Metric Report] # On-demand Reload Handles with State (by Worker Thread): 253
+[Counter Metric Report] # On-demand Reload Handles (by Worker Thread): 305
+
+[Reducer Metric Report] On-demand Reload Bytes (by Worker Thread):
+  max: 1073741824
+  min: 164544
+  sum: 9039948208
+  avg: 35731020.584980

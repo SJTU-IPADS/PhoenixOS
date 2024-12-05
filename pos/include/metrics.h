@@ -18,3 +18,4 @@
 #include "pos/include/metrics/counter.h"
 #include "pos/include/metrics/reducer.h"
 #include "pos/include/metrics/ticker.h"
+#include "pos/include/metrics/sequence.h"

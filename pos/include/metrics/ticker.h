@@ -18,13 +18,16 @@ class POSMetrics_TickerList {
         this->_s_tick_map[index] = POSUtilTscTimer::get_tsc();
     }
 
-    inline void end(K index){
-        uint64_t e_tick = POSUtilTscTimer::get_tsc();
+    inline uint64_t end(K index){
+        uint64_t e_tick = POSUtilTscTimer::get_tsc(), diff;
 
         auto s_tick_it = this->_s_tick_map.find(index);
         POS_ASSERT(s_tick_it != this->_s_tick_map.end());
 
-        this->_duration_tick_map[index].push_back(e_tick - s_tick_it->second);
+        diff = e_tick - s_tick_it->second;
+        this->_duration_tick_map[index].push_back(diff);
+
+        return diff;
     }
 
     inline void add(K index, uint64_t& value){

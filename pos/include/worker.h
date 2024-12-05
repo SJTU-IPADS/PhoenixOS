@@ -56,6 +56,21 @@ namespace wk_functions {
 };  // namespace ps_functions
 
 
+#if POS_CONF_EVAL_CkptOptLevel == 1
+
+typedef struct checkpoint_sync_cxt {
+    // whether currently the checkpoint is active
+    volatile bool ckpt_active;
+
+    // checkpoint cmd
+    POSCommand_QE_t *cmd;
+
+    checkpoint_sync_cxt() : ckpt_active(false), cmd(nullptr) {}
+} checkpoint_sync_cxt_t;
+
+#endif
+
+
 #if POS_CONF_EVAL_CkptOptLevel == 2
 
 /*!
@@ -153,7 +168,7 @@ typedef struct checkpoint_async_cxt {
                 { CKPT_cow_done_ticks_by_ckpt_thread, "CoW Done (by Ckpt Thread)" },
                 { CKPT_cow_block_ticks_by_ckpt_thread, "CoW Block (by Ckpt Thread)" },
                 { CKPT_cow_done_ticks_by_worker_thread, "CoW Done (by Worker Thread)" },
-                { CKPT_cow_block_ticks_by_worker_thread, "CoW Done (by Worker Thread)" },
+                { CKPT_cow_block_ticks_by_worker_thread, "CoW Block (by Worker Thread)" },
                 { CKPT_commit_ticks_by_ckpt_thread, "Commit (by Ckpt Thread)" },
                 { CKPT_dirty_commit_ticks, "Dirty Copy Commit (by Worker Thread)" },
                 { PERSIST_handle_ticks, "Persist Handles" },
@@ -221,8 +236,11 @@ class POSWorker {
      */
     static void __done(POSWorkspace* ws, POSAPIContext_QE_t* wqe);
 
+    #if POS_CONF_EVAL_CkptOptLevel == 1
+        checkpoint_sync_cxt_t sync_ckpt_cxt;
+    #endif
+
     #if POS_CONF_EVAL_CkptOptLevel == 2
-        // overlapped checkpoint context
         checkpoint_async_cxt_t async_ckpt_cxt;
     #endif
     
@@ -389,23 +407,58 @@ class POSWorker {
     // metrics
     #if POS_CONF_RUNTIME_EnableTrace
         enum metrics_reducer_type_t : uint8_t {
-            RESTORE_ondemand_reload_bytes = 0,
+            __REDUCER_BASE__= 0,
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                CKPT_commit_bytes,
+            #endif
+            RESTORE_ondemand_reload_bytes,
         };
         POSMetrics_ReducerList<metrics_reducer_type_t, uint64_t> _metric_reducers;
 
         enum metrics_counter_type_t : uint8_t {
-            RESTORE_nb_ondemand_reload_handles = 0,
+            __COUNTER_BASE__= 0,
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                CKPT_commit_times,
+                CKPT_nb_unexecuted_apis,
+                PERSIST_handle_times,
+                PERSIST_wqe_times,
+            #endif
+            RESTORE_nb_ondemand_reload_handles,
             RESTORE_nb_ondemand_reload_state_handles,
         };
-        POSMetrics_CounterList<metrics_counter_type_t> _metric_counter;
+        POSMetrics_CounterList<metrics_counter_type_t> _metric_counters;
 
         enum metrics_ticker_type_t : uint8_t {
-            RESTORE_recomputation_ticks = 0,    // gpu ticker
-            RESTORE_unexecution_ticks,          // gpu ticker
+            __TICKER_BASE__= 0,
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                COMMON_sync,
+                CKPT_commit_ticks,
+                PERSIST_handle_ticks,
+                PERSIST_wqe_ticks,
+            #else // POS_CONF_EVAL_CkptOptLevel == 2
+                RESTORE_recomputation_ticks,    // gpu ticker
+                RESTORE_unexecution_ticks,      // gpu ticker
+            #endif
             RESTORE_ondemand_reload_ticks,
-            RESTORE_ondemand_reload_state_ticks
+            RESTORE_ondemand_reload_state_ticks,
         };
-        POSMetrics_TickerList<metrics_ticker_type_t> _metric_ticker;
+        POSMetrics_TickerList<metrics_ticker_type_t> _metric_tickers;
+        
+        enum metrics_sequence_type_t : uint8_t {
+            __SEQUENCE_BASE__= 0,
+            KERNEL_out_handle_state_size,
+            KERNEL_inout_handle_state_size,
+            CKPT_nb_cow_handles,
+            CKPT_nb_cow_stateful_handles,
+            CKPT_nb_cow_size,
+            // note: here could have a crazy metric to collect each kernel's duration
+            RESTORE_ondemand_restore_handle_nb,
+            RESTORE_ondemand_restore_handle_with_state_nb,
+            RESTORE_ondemand_restore_handle_state_size,
+            RESTORE_ondemand_restore_handle_duration,
+            RESTORE_ondemand_restore_handle_state_duration
+        };
+        POSMetrics_SequenceList<metrics_sequence_type_t, uint64_t> _metric_sequences;
 
         /*!
          *  \brief  print the metrics of the worker

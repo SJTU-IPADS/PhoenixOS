@@ -148,10 +148,10 @@ namespace cuda_free {
             /* handle */ &memory_handle
         );
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN(
-                "parse(cuda_free): no CUDA memory was founded: client_addr(%p)",
-                (void*)pos_api_param_value(wqe, 0, void*)
-            );
+            // POS_WARN(
+            //     "parse(cuda_free): no CUDA memory was founded: client_addr(%p)",
+            //     (void*)pos_api_param_value(wqe, 0, void*)
+            // );
             goto exit;
         }
 

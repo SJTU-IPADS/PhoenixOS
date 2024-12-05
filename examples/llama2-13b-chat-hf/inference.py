@@ -52,7 +52,7 @@ def infer(user_prompt, batch_size=1):
 
     # streaming
     start_time = time.time()
-    generated_texts = model.generate(**inputs, streamer=streamer, max_length=2048)
+    generated_texts = model.generate(**inputs, streamer=streamer, max_length=1024)
     # generated_texts = model.generate(**inputs, max_length=512)
     end_time = time.time()
 

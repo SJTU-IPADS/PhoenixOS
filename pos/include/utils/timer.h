@@ -88,6 +88,7 @@ class POSUtilTscTimer {
  public:
     POSUtilTscTimer(){ 
         this->update_tsc_freq(); 
+        this->_init_tsc = POSUtilTscTimer::get_tsc();
     }
     ~POSUtilTscTimer() = default;
 
@@ -100,6 +101,16 @@ class POSUtilTscTimer {
         __asm__ volatile("rdtsc" : "=a"(a), "=d"(d));
         return (d << 32) | a;
     }
+
+
+    /*!
+     *  \brief  obtain the tsc duration from the beginning of this instance
+     *  \return the tsc duration from the beginning of this instance
+     */
+    inline uint64_t get_relative_tsc(){
+        return POSUtilTscTimer::get_tsc() - this->_init_tsc;
+    }
+
 
     /*!
      *  \brief  update the TSC frequency
@@ -164,45 +175,26 @@ class POSUtilTscTimer {
     /*!
      *  \brief  calculate from tick steps to duration (ms)
      *  \param  tick steps 
-     *  \return duration  duration (ms)
+     *  \return duration (ms)
      */
     inline double tick_to_ms(uint64_t ticks){
-        return (double)(ticks) * (double)1000.0f / (double) this->_tsc_freq;
+        return (double)(ticks) / (double) this->_tsc_freq * (double)1000.0f;
     }
 
     /*!
      *  \brief  calculate from tick steps to duration (us)
      *  \param  tick steps 
-     *  \return duration  duration (us)
+     *  \return duration (us)
      */
     inline double tick_to_us(uint64_t ticks){
-        return (double)(ticks) * (double)1000000.0f / (double) this->_tsc_freq;
+        return (double)(ticks) / (double) this->_tsc_freq * (double)1000000.0f;
     }
 
  private:
     // frequency of TSC register
     double _tsc_freq_g;
     double _tsc_freq;
-};
-
-
-class POSUtilTimestamp {
- public:
-    /*!
-     *  \brief  ontain TSC tick
-     *  \return TSC tick
-     */
-    static inline uint64_t get_tsc(){
-        uint64_t a, d;
-        __asm__ volatile("rdtsc" : "=a"(a), "=d"(d));
-        return (d << 32) | a;
-    }
-
-    /*!
-     *  \brief  delay specified microsecond
-     *  \param  duration_us specified microsecond
-     */
-    static inline void delay_us(uint32_t microseconds){
-        std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
-    }
+    
+    // tsc value when this instance is enabled
+    uint64_t _init_tsc;
 };

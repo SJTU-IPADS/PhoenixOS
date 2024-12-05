@@ -1,0 +1,25 @@
+ckpt pid 571390
+3.914
+Warn  (criu/kerndat.c:1637): CRIU was built without libnftables support
+Displaying dump stats:
+Freezing time: 1051 us
+Frozen time: 4728419 us
+Memory dump time: 4091114 us
+Memory write time: 3322815 us
+IRMAP resolve time: 0 us
+Memory pages scanned: 6846131 (0x6876b3)
+Memory pages skipped from parent: 0 (0x0)
+Memory pages written: 2174711 (0x212ef7)
+Lazy memory pages: 0 (0x0)
+4.756
+ckpt version: ./ckpt/1
+
+Warn  (criu/kerndat.c:1637): CRIU was built without libnftables support
+Displaying restore stats:
+Pages compared: 0 (0x0)
+Pages skipped COW: 0 (0x0)
+Pages restored: 2174711 (0x212ef7)
+Restore time: 3509836 us
+Forking time: 0 us
+restore cpu duration: 3.569
+restore gpu duration: 1.45

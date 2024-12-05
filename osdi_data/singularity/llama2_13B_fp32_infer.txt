@@ -1,0 +1,220 @@
+ POS Log  create dump dir for GPU-side: /root/examples/./ckpt/phos
+ POS Log  [HandleManager Metrics] cuda_memory:
+[Ticker Metric Report] CKPT_commit (GPU Memory -> CPU Memory):
+  max: 27.818374 ms
+  min: 0.116734 ms
+  avg: 6.230922 ms
+  sum: 2442.521699 ms
+  p10: 0.660051 ms
+  p50: 4.766633 ms
+  p99: 16.901070 ms
+
+ POS Log  finish dump kernel metadata to /var/log/phos/daemon/llama2-13b-chat-hf_kernel_metas.txt
+ POS Log  [POSParser @ 0x7feff4001100]  parser daemon thread shutdown
+ POS Log  [Parser Metrics]:
+[Reducer Metric Report] KERNEL_out_memories:
+  max: 5
+  min: 0
+  sum: 80763
+  avg: 0.240211
+[Reducer Metric Report] KERNEL_in_memories:
+  max: 8
+  min: 0
+  sum: 166229
+  avg: 0.494410
+
+[Counter Metric Report] KERNEL_number_of_vendor_kernels: 67962
+[Counter Metric Report] KERNEL_number_of_user_kernels: 268255
+
+ POS Log  [POSWorker @ 0x7feff4001ed0]  worker daemon thread shutdown
+ POS Log  [Worker Metrics]:
+[Ticker Metric Report] Persist Handles:
+  max: 1232.332985 ms
+  min: 0.046622 ms
+  avg: 4.700388 ms
+  sum: 80874.877546 ms
+  p10: 0.093486 ms
+  p50: 0.116724 ms
+  p99: 142.442823 ms
+[Ticker Metric Report] Commit:
+  max: 27.818535 ms
+  min: 0.000057 ms
+  avg: 3.965608 ms
+  sum: 2442.814727 ms
+  p10: 0.000151 ms
+  p50: 0.922094 ms
+  p99: 13.282777 ms
+[Ticker Metric Report] Sync:
+  max: 0.057780 ms
+  min: 0.009282 ms
+  avg: 0.033531 ms
+  sum: 0.067063 ms
+  p10: 0.009282 ms
+  p50: 0.009282 ms
+  p99: 0.009282 ms
+[Ticker Metric Report] On-demand Reload (by Worker Thread):
+  max: 0.095674 ms
+  min: 0.095674 ms
+  avg: 0.095674 ms
+  sum: 0.095674 ms
+  p10: 0.095674 ms
+  p50: 0.095674 ms
+  p99: 0.095674 ms
+[Ticker Metric Report] On-demand Reload State (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Persist WQEs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Counter Metric Report] # Persisted Handles: 17206
+[Counter Metric Report] # Commit Handles: 616
+[Counter Metric Report] # On-demand Reload Handles (by Worker Thread): 1
+[Reducer Metric Report] # On-demand Reload Handles with State (by Worker Thread): N/A
+[Reducer Metric Report] # Persisted WQEs: N/A
+[Reducer Metric Report] # Unexecuted APIs: N/A
+
+[Reducer Metric Report] Commit Bytes (by Worker Thread):
+  max: 656408576
+  min: 2768
+  sum: 54672028616
+  avg: 88753293.207792
+[Reducer Metric Report] On-demand Reload Bytes (by Worker Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A
+
+ POS Log  try restore client
+ POS Log  [POSParser @ 0x7feff4001100]  parser started
+ POS Log  [POSWorker @ 0x7feff4001ed0]  worker started
+ POS Warn  [POSTransport_RDMA<false> @ 0x7fef84525b20]  failed to ibv_query_port on first port for device mlx5_0
+ POS Log  restored client
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(1), duration(0.137345 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(2), duration(0.029600 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(3), duration(474.225967 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(4), duration(0.003829 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(5), duration(0.418399 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(6), duration(99.753801 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(7), duration(0.080949 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle: rid(9), duration(1.045156 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(1), duration(0.000075 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(2), duration(741.133855 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(3), duration(0.626800 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(4), duration(0.000008 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(5), duration(0.000019 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(6), duration(31359.254085 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(7), duration(0.000094 ms)
+ POS Log  [POSClient_CUDA @ 0x7fef841a6810]  restore handle state: rid(9), duration(0.000014 ms)
+ POS Log  restored handle
+ POS Log  restored apicxts
+ POS Log  resumed execution of client
+
+----server_vanilla_infos----
+api 2: count 1, server_vanilla_time 40503.000000
++00:06:37.809315 INFO:  RPC deinit requested.
+ POS Log  [HandleManager Metrics] cuda_memory:
+[Ticker Metric Report] CKPT_commit (GPU Memory -> CPU Memory):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+ POS Log  finish dump kernel metadata to /var/log/phos/daemon/llama2-13b-chat-hf_kernel_metas.txt
+ POS Log  [POSParser @ 0x7feff4001100]  parser daemon thread shutdown
+ POS Log  [Parser Metrics]:
+[Reducer Metric Report] KERNEL_out_memories:
+  max: 5
+  min: 0
+  sum: 237133
+  avg: 0.240210
+[Reducer Metric Report] KERNEL_in_memories:
+  max: 8
+  min: 0
+  sum: 488081
+  avg: 0.494413
+
+[Counter Metric Report] KERNEL_number_of_vendor_kernels: 199539
+[Counter Metric Report] KERNEL_number_of_user_kernels: 787653
+
+ POS Log  [POSWorker @ 0x7feff4001ed0]  worker daemon thread shutdown
+ POS Log  [Worker Metrics]:
+[Ticker Metric Report] On-demand Reload State (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] On-demand Reload (by Worker Thread):
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Persist WQEs:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Persist Handles:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Commit:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+[Ticker Metric Report] Sync:
+  max: N/A ms
+  min: N/A ms
+  avg: N/A ms
+  sum: N/A ms
+  p10: N/A ms
+  p50: N/A ms
+  p99: N/A ms
+
+[Reducer Metric Report] # On-demand Reload Handles with State (by Worker Thread): N/A
+[Reducer Metric Report] # On-demand Reload Handles (by Worker Thread): N/A
+[Reducer Metric Report] # Persisted WQEs: N/A
+[Reducer Metric Report] # Persisted Handles: N/A
+[Reducer Metric Report] # Unexecuted APIs: N/A
+[Reducer Metric Report] # Commit Handles: N/A
+
+[Reducer Metric Report] On-demand Reload Bytes (by Worker Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A
+[Reducer Metric Report] Commit Bytes (by Worker Thread):
+  max: N/A
+  min: N/A
+  sum: N/A
+  avg: N/A

@@ -151,7 +151,7 @@ exit:
 
 
 void POSWorker::__daemon_ckpt_sync(){
-    uint64_t i, api_id, gpu_ticker;
+    uint64_t i, api_id;
     pos_retval_t launch_retval, tmp_retval;
     POSAPIMeta_t api_meta;
     POSAPIContext_QE *wqe;
@@ -171,7 +171,14 @@ void POSWorker::__daemon_ckpt_sync(){
             this->__process_cmd(cmd_wqe);
         }
 
-        // step 2: digest apicxt from parser work queue
+        // step 2: check whether we need to run the bottom half of sync checkpoint
+        if(unlikely(this->sync_ckpt_cxt.ckpt_active == true) && this->_client->is_under_sync_call == false){
+            POS_CHECK_POINTER(this->sync_ckpt_cxt.cmd);
+            this->__process_cmd(this->sync_ckpt_cxt.cmd);
+            continue;
+        }
+
+        // step 3: digest apicxt from parser work queue
         wqes.clear();
         this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
 
@@ -179,91 +186,6 @@ void POSWorker::__daemon_ckpt_sync(){
             POS_CHECK_POINTER(wqe = wqes[i]);
             POS_CHECK_POINTER(wqe->api_cxt);
             
-            #if POS_CONF_RUNTIME_EnableTrace
-                if(unlikely(this->_restoring_phrase < kPOS_WorkRestorePhrase_Normal)){
-
-                    if(wqe->type == ApiCxt_TypeId_Recomputation){
-
-                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
-                            // case 1: first recomputation API
-                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
-                            if(unlikely(tmp_retval != POS_SUCCESS)){
-                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            } else {
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Recomputation;
-                            }
-                        } else {
-                            // case 2: subsequent recomputation API
-                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation);
-                        }
-
-                    } else if (wqe->type == ApiCxt_TypeId_Unexecuted){
-
-                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
-                            // case 3: no recomputation API, first unexecution API
-                            tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
-                            if(unlikely(tmp_retval != POS_SUCCESS)){
-                                POS_WARN("failed to start gpu ticker, restore measurement abandoned");
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            } else {
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
-                            }
-                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
-                            // case 4: first unexecution API after recomputation API
-                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
-                            if(unlikely(tmp_retval != POS_SUCCESS)){
-                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            } else {
-                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
-                                tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
-                                if(unlikely(tmp_retval != POS_SUCCESS)){
-                                    POS_WARN("failed to start gpu ticker, restore measurement abandoned");
-                                    this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                                }
-                            }
-                        } else {
-                            // case 5: subsequent unexecution API
-                            POS_ASSERT(this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution);
-                        }
-
-                    } else {
-                        POS_ASSERT(wqe->type == ApiCxt_TypeId_Normal);
-
-                        if(this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation_Init){
-                            // case 6: no recomputation API, no unexecution API
-                            this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
-                            // case: first normal API after recomputation API, no unexecution API
-                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
-                            if(unlikely(tmp_retval != POS_SUCCESS)){
-                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            } else {
-                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            }
-                        } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution){
-                            // case 7: first normal API after unexecution API
-                            tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
-                            if(unlikely(tmp_retval != POS_SUCCESS)){
-                                POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                            } else {
-                                this->_metric_ticker.add(RESTORE_unexecution_ticks, gpu_ticker);
-                                this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
-                                this->__print_metrics();
-                            }
-                        } else {
-                            POS_ERROR_C_DETAIL("shouldn't be here, this is a bug");
-                        }
-
-                    }
-                }
-            #endif
-
             wqe->worker_s_tick = POSUtilTscTimer::get_tsc();
             
             api_id = wqe->api_cxt->api_id;
@@ -314,8 +236,6 @@ void POSWorker::__daemon_ckpt_sync(){
 
 pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
     pos_retval_t retval = POS_SUCCESS;
-    uint64_t nb_ckpt_handles = 0, ckpt_size = 0;
-    uint64_t s_tick, e_tick;
 
     POS_CHECK_POINTER(cmd);
 
@@ -334,18 +254,34 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
                 continue;
             }
             
-            // commit the handle first
-            retval = handle->checkpoint_commit_sync(
-                /* version_id */ handle->latest_version,
-                /* stream_id */ 0
-            );
-            if(unlikely(POS_SUCCESS != retval)){
-                POS_WARN_C("failed to commit handle: hid(%lu), retval(%d)", handle->id, retval);
-                retval = POS_FAILED;
-                goto exit;
+            if(with_state == true){
+                // commit the handle first
+                #if POS_CONF_RUNTIME_EnableTrace
+                    this->_metric_tickers.start(CKPT_commit_ticks);
+                #endif
+                retval = handle->checkpoint_commit_sync(
+                    /* version_id */ handle->latest_version,
+                    /* stream_id */ 0
+                );
+                if(unlikely(POS_SUCCESS != retval)){
+                    POS_WARN_C("failed to commit handle: hid(%lu), retval(%d)", handle->id, retval);
+                    retval = POS_FAILED;
+                    goto exit;
+                }
+                #if POS_CONF_RUNTIME_EnableTrace
+                    this->_metric_tickers.end(CKPT_commit_ticks);
+                    this->_metric_counters.add_counter(CKPT_commit_times);
+                    this->_metric_reducers.reduce(
+                        /* index */ CKPT_commit_bytes,
+                        /* value */ handle->state_size
+                    );
+                #endif
             }
 
             // persist the handle
+            #if POS_CONF_RUNTIME_EnableTrace
+                this->_metric_tickers.start(PERSIST_handle_ticks);
+            #endif
             retval = handle->checkpoint_persist_sync(
                 /* ckpt_dir */ cmd->ckpt_dir,
                 /* with_state */ with_state,
@@ -356,16 +292,16 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
                 retval = POS_FAILED;
                 goto exit;
             }
-
-            nb_ckpt_handles += 1;
-            ckpt_size += handle->state_size;
+            #if POS_CONF_RUNTIME_EnableTrace
+                this->_metric_tickers.end(PERSIST_handle_ticks);
+                this->_metric_counters.add_counter(PERSIST_handle_times);
+            #endif
         }
 
     exit:
         return retval;
     };
 
-    s_tick = POSUtilTscTimer::get_tsc();
     // save statelful handles
     retval = __commit_and_persist_handles(cmd->stateful_handles, /* with_state */ true);
     if(unlikely(retval != POS_SUCCESS)){
@@ -378,18 +314,18 @@ pos_retval_t POSWorker::__checkpoint_handle_sync(POSCommand_QE_t *cmd){
         POS_WARN_C("failed to commit and persist stateful handles");
         goto exit;
     }
-    e_tick = POSUtilTscTimer::get_tsc();
 
     // make sure the checkpoint is finished
+    #if POS_CONF_RUNTIME_EnableTrace
+        this->_metric_tickers.start(COMMON_sync);
+    #endif
     retval = this->sync();
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("commit and persist unfinished: failed to synchronize");
-    } else {
-        POS_LOG(
-            "commit and persist finished: #finished_handles(%lu), size(%lu Bytes), duration(%lf ms)",
-            nb_ckpt_handles, ckpt_size, this->_ws->tsc_timer.tick_to_ms(e_tick-s_tick)
-        );
     }
+    #if POS_CONF_RUNTIME_EnableTrace
+        this->_metric_tickers.end(COMMON_sync);
+    #endif
 
 exit:
     return retval;
@@ -404,7 +340,6 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     POSAPIContext_QE *wqe;
     std::vector<POSAPIContext_QE*> wqes;
     pos_u64id_t max_wqe_id = 0;
-    uint64_t s_tick, e_tick;
 
     POS_CHECK_POINTER(cmd);
 
@@ -413,14 +348,48 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
     /* ========== Ckpt WQ Command from parser thread ========== */
     case kPOS_Command_Parser2Worker_PreDump:
     case kPOS_Command_Parser2Worker_Dump:
+        if(cmd->type == kPOS_Command_Parser2Worker_Dump){
+            this->sync_ckpt_cxt.ckpt_active = true;
+            this->sync_ckpt_cxt.cmd = cmd;
 
-        s_tick = POSUtilTscTimer::get_tsc();
+            // step 0, for dump, we need to force client to stop accepting remoting request
+            if(this->_client->offline_counter == 0){
+                // case: first stop attempt
+                this->_client->offline_counter = 1;
+                while(this->_client->offline_counter != 2){ 
+                    /* wait remoting framework to confirm */
+                    if(this->_client->is_under_sync_call == true){
+                        // if the RPC thread is currently encounter a sync call
+                        // we should finish it before we doing the dump
+                        retval = POS_WARN_ABANDONED;
+                        goto exit;
+                    }
+                }
+            } else if(this->_client->offline_counter == 1){
+                // case: subsequent stop attempt, the remoting framework haven't confirmed yet
+                while(this->_client->offline_counter != 2){
+                    /* wait remoting framework to confirm */
+                    POS_ASSERT(this->_client->is_under_sync_call == false);
+                }
+            } else if(this->_client->offline_counter == 2){
+                // case: subsequent stop attempt, the remoting frameowork has replied, we're free to go for dump
+            } else {
+                POS_ERROR_C_DETAIL("unexpected value obtained");
+            }
+        }
 
         // for both pre-dump and dump, we need to first checkpoint handles
+        #if POS_CONF_RUNTIME_EnableTrace
+            this->_metric_tickers.start(COMMON_sync);
+        #endif
         if(unlikely(POS_SUCCESS != (retval = this->sync()))){
             POS_WARN_C("failed to synchornize the worker thread before starting checkpoint op");
             goto reply_parser;
         }
+        #if POS_CONF_RUNTIME_EnableTrace
+            this->_metric_tickers.end(COMMON_sync);
+        #endif
+
         if(unlikely(POS_SUCCESS != (retval = this->__checkpoint_handle_sync(cmd)))){
             POS_WARN_C("failed to do checkpointing of handles");
             goto reply_parser;
@@ -428,45 +397,43 @@ pos_retval_t POSWorker::__process_cmd(POSCommand_QE_t *cmd){
 
         // pre-dump is done here
         if(cmd->type == kPOS_Command_Parser2Worker_PreDump){
-            // print downtime
-            e_tick = POSUtilTscTimer::get_tsc();
-            POS_LOG("GPU pre-dump downtime: %lf ms", this->_ws->tsc_timer.tick_to_ms(e_tick-s_tick));
-
             // reply to parser thread
             goto reply_parser; 
         }
 
-        // for dump, we need to force client to stop accepting remoting request
-        POS_ASSERT(this->_client->offline_counter == 0);
-        this->_client->offline_counter = 1;
-        while(this->_client->offline_counter != 2 && this->_client->is_under_sync_call == false){ 
-            /* wait remoting framework to confirm */ 
-        }
-
         // for dump, we also need to save unexecuted APIs
-        nb_ckpt_wqes = 0;
         while(max_wqe_id < this->_client->_api_inst_pc-1 && this->_max_wqe_id < this->_client->_api_inst_pc-1){
             wqes.clear();
             this->_client->template poll_q<kPOS_QueueDirection_Parser2Worker, kPOS_QueueType_ApiCxt_WQ>(&wqes);
             for(i=0; i<wqes.size(); i++){
                 POS_CHECK_POINTER(wqe = wqes[i]);
                 POS_CHECK_POINTER(wqe->api_cxt);
+
+                #if POS_CONF_RUNTIME_EnableTrace
+                    this->_metric_tickers.start(PERSIST_wqe_ticks);
+                #endif
                 if(unlikely(POS_SUCCESS != (
                     retval = wqe->persist</* with_params */ true, /* type */ ApiCxt_TypeId_Unexecuted>(cmd->ckpt_dir))
                 )){
                     POS_WARN_C("failed to do checkpointing of unexecuted APIs");
                     goto reply_parser;
                 }
-                nb_ckpt_wqes += 1;
+                #if POS_CONF_RUNTIME_EnableTrace
+                    this->_metric_tickers.end(PERSIST_wqe_ticks);
+                    this->_metric_counters.add_counter(PERSIST_wqe_times);
+                #endif
+
                 max_wqe_id = (wqe->id > max_wqe_id) ? wqe->id : max_wqe_id;
             }
         }
-        POS_LOG_C("finished dumping unexecuted APIs: nb_ckpt_wqes(%lu)", nb_ckpt_wqes);
 
         // tear down all handles inside the client
         if(unlikely(POS_SUCCESS != (retval = this->_client->tear_down_all_handles()))){
             POS_WARN_C("failed to tear down handles while dumping");
         }
+
+        this->sync_ckpt_cxt.ckpt_active = false;
+        this->sync_ckpt_cxt.cmd = nullptr;
 
     reply_parser:
         // reply to parser
@@ -498,6 +465,10 @@ void POSWorker::__daemon_ckpt_async(){
     POSCommand_QE_t *cmd_wqe;
     std::vector<POSCommand_QE_t*> cmd_wqes;
     POSHandle *handle;
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        uint64_t nb_cow_handle = 0, nb_cow_stateful_handle = 0, nb_cow_size = 0;
+    #endif
 
     while(!this->_stop_flag){
         // if the client isn't ready, the queue might not exist, we can't do any queue operation
@@ -561,7 +532,7 @@ void POSWorker::__daemon_ckpt_async(){
                                 POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                             } else {
-                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_metric_tickers.add(RESTORE_recomputation_ticks, gpu_ticker);
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Unexecution;
                                 tmp_retval = this->start_gpu_ticker(/* stream_id */ 0);
                                 if(unlikely(tmp_retval != POS_SUCCESS)){
@@ -587,7 +558,7 @@ void POSWorker::__daemon_ckpt_async(){
                                 POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                             } else {
-                                this->_metric_ticker.add(RESTORE_recomputation_ticks, gpu_ticker);
+                                this->_metric_tickers.add(RESTORE_recomputation_ticks, gpu_ticker);
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                             }
                         } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution){
@@ -597,7 +568,7 @@ void POSWorker::__daemon_ckpt_async(){
                                 POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                             } else {
-                                this->_metric_ticker.add(RESTORE_unexecution_ticks, gpu_ticker);
+                                this->_metric_tickers.add(RESTORE_unexecution_ticks, gpu_ticker);
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                                 this->__print_metrics();
                             }
@@ -637,6 +608,10 @@ void POSWorker::__daemon_ckpt_async(){
             #endif
 
             if(unlikely(this->async_ckpt_cxt.TH_actve == true)){
+                #if POS_CONF_RUNTIME_EnableTrace
+                    nb_cow_handle = 0; nb_cow_stateful_handle = 0; nb_cow_size = 0;
+                #endif
+
                 /*!
                  *  \brief  before launching the API, we need to preserve the state of all stateful resources for checkpointing
                  *  \note   there're serval cases handle in checkpoint_add:
@@ -673,6 +648,11 @@ void POSWorker::__daemon_ckpt_async(){
                             } else if(tmp_retval == POS_WARN_ABANDONED){
                                 this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
+                            }
+                            nb_cow_handle += 1;
+                            if(handle->state_size > 0){
+                                nb_cow_stateful_handle += 1;
+                                nb_cow_size += handle->state_size;
                             }
                         #endif
                     }
@@ -714,14 +694,28 @@ void POSWorker::__daemon_ckpt_async(){
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
                             }
                         #endif
+                        nb_cow_handle += 1;
+                        if(handle->state_size > 0){
+                            nb_cow_stateful_handle += 1;
+                            nb_cow_size += handle->state_size;
+                        }
                     }
 
-                    // note: we also include those stateless handles here
+                    // note: we might also include those stateless handles here
                     if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0){
                         this->async_ckpt_cxt.dirty_handles.insert(handle);
                         this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                     }
                 }
+
+                #if POS_CONF_RUNTIME_EnableTrace
+                    if(nb_cow_handle > 0)
+                        this->_metric_sequences.add_spot(CKPT_nb_cow_handles, nb_cow_handle);
+                    if(nb_cow_stateful_handle > 0)
+                        this->_metric_sequences.add_spot(CKPT_nb_cow_stateful_handles, nb_cow_stateful_handle);
+                    if(nb_cow_size > 0)
+                        this->_metric_sequences.add_spot(CKPT_nb_cow_size, nb_cow_size);
+                #endif
             } // this->async_ckpt_cxt.TH_actve == true
 
             launch_retval = (*(_launch_functions[api_id]))(_ws, wqe);
@@ -1032,7 +1026,6 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
     this->async_ckpt_cxt.TH_actve = false;
 
     // step 0, for dump, we need to force client to stop accepting remoting request
-    POS_ASSERT(this->_client->offline_counter == 0);
     if(this->_client->offline_counter == 0){
         // case: first stop attempt
         this->_client->offline_counter = 1;
@@ -1385,11 +1378,17 @@ exit:
 
 pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMeta_t* api_meta){
     pos_retval_t retval = POS_SUCCESS;
-    
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        uint64_t restore_ticks = 0, restore_state_ticks = 0;
+        uint64_t nb_restored_handle = 0, nb_restored_handle_with_state = 0, nb_restored_bytes = 0;
+        uint64_t output_handle_state_size = 0, inout_handle_state_size = 0;
+    #endif
+
     POS_CHECK_POINTER(wqe);
     POS_CHECK_POINTER(api_meta);
 
-    auto __restore_broken_hendles_per_direction = [&](std::vector<POSHandleView_t>& handle_view_vec){
+    auto __restore_broken_hendles_per_direction = [&](std::vector<POSHandleView_t>& handle_view_vec, pos_edge_direction_t edge){
         uint64_t i;
         POSHandle::pos_broken_handle_list_t broken_handle_list;
         POSHandle *broken_handle;
@@ -1398,6 +1397,13 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
 
         // step 1: restore resource allocation
         for(i=0; i<handle_view_vec.size(); i++){
+            #if POS_CONF_RUNTIME_EnableTrace
+                if(edge == kPOS_Edge_Direction_Out)
+                    output_handle_state_size += handle_view_vec[i].handle->state_size;
+                else if(edge == kPOS_Edge_Direction_InOut)
+                    inout_handle_state_size += handle_view_vec[i].handle->state_size;
+            #endif
+
             broken_handle_list.reset();
             handle_view_vec[i].handle->collect_broken_handles(&broken_handle_list);
 
@@ -1426,7 +1432,7 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                 
                 // restore handle
                 #if POS_CONF_RUNTIME_EnableTrace
-                    this->_metric_ticker.start(RESTORE_ondemand_reload_ticks);
+                    this->_metric_tickers.start(RESTORE_ondemand_reload_ticks);
                 #endif
                 if(unlikely(POS_SUCCESS != broken_handle->restore())){
                     POS_ERROR_C(
@@ -1435,21 +1441,22 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                         broken_handle->status
                     );
                 } else {
+                    #if POS_CONF_RUNTIME_EnableTrace
+                        restore_ticks += this->_metric_tickers.end(RESTORE_ondemand_reload_ticks);
+                        this->_metric_counters.add_counter(RESTORE_nb_ondemand_reload_handles);
+                    #endif
                     POS_DEBUG_C(
                         "restore broken handle: resource_type_id(%lu)",
                         broken_handle->resource_type_id
                     );
-                    #if POS_CONF_RUNTIME_EnableTrace
-                        this->_metric_ticker.end(RESTORE_ondemand_reload_ticks);
-                        this->_metric_counter.add_counter(RESTORE_nb_ondemand_reload_handles);
-                    #endif
+                    nb_restored_handle += 1;
                 }
 
                 // restore handle state (on-demand restore)
                 // TODO: prefetching opt.
                 if(broken_handle->state_size > 0 && broken_handle->state_status == kPOS_HandleStatus_StateMiss){
                     #if POS_CONF_RUNTIME_EnableTrace
-                        this->_metric_ticker.start(RESTORE_ondemand_reload_state_ticks);
+                        this->_metric_tickers.start(RESTORE_ondemand_reload_state_ticks);
                     #endif
                     if(unlikely(POS_SUCCESS != broken_handle->reload_state(/* stream_id */ 0))){
                         POS_ERROR_C(
@@ -1464,23 +1471,45 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                         );
                     } else {
                         #if POS_CONF_RUNTIME_EnableTrace
-                            this->_metric_ticker.end(RESTORE_ondemand_reload_state_ticks);
-                            this->_metric_counter.add_counter(RESTORE_nb_ondemand_reload_state_handles);
+                            restore_state_ticks += this->_metric_tickers.end(RESTORE_ondemand_reload_state_ticks);
+                            this->_metric_counters.add_counter(RESTORE_nb_ondemand_reload_state_handles);
                             this->_metric_reducers.reduce(RESTORE_ondemand_reload_bytes, broken_handle->state_size);
                         #endif
+                        POS_DEBUG_C(
+                            "restore missing state of broken handle: rid(%lu), hid(%lu), state_size(%lu bytes)",
+                            broken_handle->resource_type_id, broken_handle->id, broken_handle->state_size
+                        );
+                        nb_restored_handle_with_state += 1;
+                        nb_restored_bytes += broken_handle->state_size;
                     }
                 }
 
             } // while (1)
-
         } // foreach handle_view_vec
     };
 
-    __restore_broken_hendles_per_direction(wqe->input_handle_views);
-    __restore_broken_hendles_per_direction(wqe->output_handle_views);
-    __restore_broken_hendles_per_direction(wqe->inout_handle_views);
-    __restore_broken_hendles_per_direction(wqe->create_handle_views);
-    __restore_broken_hendles_per_direction(wqe->delete_handle_views);
+    __restore_broken_hendles_per_direction(wqe->input_handle_views, kPOS_Edge_Direction_In);
+    __restore_broken_hendles_per_direction(wqe->output_handle_views, kPOS_Edge_Direction_Out);
+    __restore_broken_hendles_per_direction(wqe->inout_handle_views, kPOS_Edge_Direction_InOut);
+    __restore_broken_hendles_per_direction(wqe->create_handle_views, kPOS_Edge_Direction_Create);
+    __restore_broken_hendles_per_direction(wqe->delete_handle_views, kPOS_Edge_Direction_Delete);
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        if(unlikely(output_handle_state_size > 0))
+            this->_metric_sequences.add_spot(KERNEL_out_handle_state_size, output_handle_state_size);
+        if(unlikely(inout_handle_state_size > 0))
+            this->_metric_sequences.add_spot(KERNEL_inout_handle_state_size, inout_handle_state_size);
+        if(unlikely(nb_restored_handle > 0))
+            this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_nb, nb_restored_handle);
+        if(unlikely(nb_restored_handle_with_state > 0))
+            this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_with_state_nb, nb_restored_handle_with_state);
+        if(unlikely(nb_restored_bytes > 0))
+            this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_state_size, nb_restored_bytes);
+        if(unlikely(restore_ticks > 0))
+            this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_duration, this->_ws->tsc_timer.tick_to_ms(restore_ticks));
+        if(unlikely(restore_state_ticks > 0))
+            this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_state_duration, this->_ws->tsc_timer.tick_to_ms(restore_state_ticks));
+    #endif
 
 exit:
     return retval;
@@ -1490,26 +1519,57 @@ exit:
 #if POS_CONF_RUNTIME_EnableTrace
     void POSWorker::__print_metrics(){
         static std::unordered_map<metrics_reducer_type_t, std::string> reducer_names = {
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                { CKPT_commit_bytes, "Commit Bytes (by Worker Thread)" },
+            #endif
             { RESTORE_ondemand_reload_bytes, "On-demand Reload Bytes (by Worker Thread)" },
         };
 
         static std::unordered_map<metrics_counter_type_t, std::string> counter_names = {
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                { CKPT_commit_times, "# Commit Handles" },
+                { CKPT_nb_unexecuted_apis, "# Unexecuted APIs" },
+                { PERSIST_handle_times, "# Persisted Handles" },
+                { PERSIST_wqe_times, "# Persisted WQEs" },
+            #endif
             { RESTORE_nb_ondemand_reload_handles, "# On-demand Reload Handles (by Worker Thread)" },
             { RESTORE_nb_ondemand_reload_state_handles, "# On-demand Reload Handles with State (by Worker Thread)" },
         };
 
         static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
-            { RESTORE_recomputation_ticks, "Recomputation APIs" },
-            { RESTORE_unexecution_ticks, "Unexecuted APIs" },
+            #if POS_CONF_EVAL_CkptOptLevel <= 1
+                { COMMON_sync, "Sync" },
+                { CKPT_commit_ticks, "Commit" },
+                { PERSIST_handle_ticks, "Persist Handles" },
+                { PERSIST_wqe_ticks, "Persist WQEs" },
+            #else
+                { RESTORE_recomputation_ticks, "Recomputation APIs" },
+                { RESTORE_unexecution_ticks, "Unexecuted APIs" },
+            #endif
             { RESTORE_ondemand_reload_ticks, "On-demand Reload (by Worker Thread)" },
             { RESTORE_ondemand_reload_state_ticks, "On-demand Reload State (by Worker Thread)" },
         };
 
+        static std::vector<std::pair<metrics_sequence_type_t, std::string>> sequence_name = {
+            { KERNEL_out_handle_state_size, "Output Handle State Size (byte)" },
+            { KERNEL_inout_handle_state_size, "InOut Handle State Size (byte)" },
+            { CKPT_nb_cow_handles, "# CoW Handles" },
+            { CKPT_nb_cow_size, "CoW Handle State Size (byte)" },
+            { RESTORE_ondemand_restore_handle_nb, "# On-demand Restore Handles" },
+            { RESTORE_ondemand_restore_handle_with_state_nb, "# On-demand Restore Handles (with State)" },
+            { RESTORE_ondemand_restore_handle_state_size, "On-demand Restore State Size (byte)" },
+            { RESTORE_ondemand_restore_handle_duration, "On-demand Restore Duration (ms)" },
+            { RESTORE_ondemand_restore_handle_state_duration, "On-demand Restore State Duration (ms)" },
+        };
+
         POS_LOG(
-            "[Worker Metrics]:\n%s\n%s\n%s",
-            this->_metric_ticker.str(ticker_names).c_str(),
-            this->_metric_counter.str(counter_names).c_str(),
-            this->_metric_reducers.str(reducer_names).c_str()
+            "[Worker Metrics]:\n%s\n%s\n%s\n%s",
+            this->_metric_tickers.str(ticker_names).c_str(),
+            this->_metric_counters.str(counter_names).c_str(),
+            this->_metric_reducers.str(reducer_names).c_str(),
+            this->_metric_sequences.str(sequence_name).c_str()
         );
+
+        fflush(stdout);
     }
 #endif

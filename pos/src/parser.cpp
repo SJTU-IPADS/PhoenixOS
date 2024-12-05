@@ -145,10 +145,12 @@ void POSParser::__daemon(){
             );
 
             if(unlikely(POS_SUCCESS != parser_retval)){
-                POS_WARN_C(
-                    "failed to execute parser function: client_id(%lu), api_id(%lu)",
-                    apicxt_wqe->client_id, api_id
-                );
+                // note:    some trash programs (e.g., inside torch) can cause parser failed (on purpose)
+                //          so we ignore parser failed warning
+                // POS_WARN_C(
+                //     "failed to execute parser function: client_id(%lu), api_id(%lu)",
+                //     apicxt_wqe->client_id, api_id
+                // );
                 apicxt_wqe->status = kPOS_API_Execute_Status_Parser_Failed;
                 apicxt_wqe->return_tick = POSUtilTscTimer::get_tsc();
                 this->_client->template push_q<kPOS_QueueDirection_Rpc2Parser, kPOS_QueueType_ApiCxt_CQ>(apicxt_wqe);
