@@ -196,17 +196,14 @@ typedef struct POSAPIContext {
     // parameter list of the called API
     std::vector<POSAPIParam_t*> params;
 
-    // overall size of all parameters
-    uint64_t overall_param_size;
-
     // pointer to the area to store the return result
     void *ret_data;
+    
+    // size of the return value
+    uint64_t retval_size;
 
     // return code of the API
     int return_code;
-
-    uint64_t retval_size;
-
 
     /*!
      *  \brief  constructor
@@ -215,34 +212,19 @@ typedef struct POSAPIContext {
      *  \param  ret_data_       pointer to the memory area that store the returned value
      *  \param  retval_size_    size of the return value
      */
-    POSAPIContext(uint64_t api_id_, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0) 
-        : api_id(api_id_), ret_data(ret_data_), retval_size(retval_size_)
-    {
-        POSAPIParam_t *param;
+    POSAPIContext(
+        uint64_t api_id_, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_=nullptr, uint64_t retval_size_=0
+    );
 
-        overall_param_size = 0;
-        params.reserve(16);
-
-        // insert parameters
-        for(auto& param_desp : param_desps){
-            POS_CHECK_POINTER(param = new POSAPIParam_t(param_desp.value, param_desp.size));
-            params.push_back(param);
-            overall_param_size += param_desp.size;
-        }
-    }
 
     /*!
      *  \brief  constructor
      *  \note   this constructor is for restoring
-     *  \param  api_id_ specialized API index of the checkpointing op
+     *  \param  api_id_     specialized API index of the checkpointing op
+     *  \param  retval_size size of return value
      */
-    POSAPIContext(uint64_t api_id_) : api_id(api_id_), overall_param_size(0) {}
+    POSAPIContext(uint64_t api_id_, uint64_t retval_size);
 
-    /*!
-     *  \brief  constructor
-     *  \note   this constructor is used during restore phrase
-     */
-    POSAPIContext() : api_id(0), overall_param_size(0) {}
 
     ~POSAPIContext(){
         for(auto param : params){ POS_CHECK_POINTER(param); delete param; }

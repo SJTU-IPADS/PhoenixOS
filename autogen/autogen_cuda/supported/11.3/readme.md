@@ -5,3 +5,6 @@ This documentation contains `yaml` files for descriptors of CUDA 11.3 APIs for a
 Refs:
 * [CUDA Toolkit Documentation 11.3](https://docs.nvidia.com/cuda/archive/11.3.0/cuda-runtime-api/index.html)
 * []
+
+TODO:
+* we still need to add return value description to support restore recomputation (allocate potential memory space)

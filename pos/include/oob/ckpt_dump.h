@@ -42,6 +42,7 @@ namespace cli_ckpt_dump {
         pos_resource_typeid_t targets[kTargetMaxNum];
         pos_resource_typeid_t skip_targets[kSkipTargetMaxNum];
         bool do_cow;
+        bool force_recompute;
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];
@@ -58,6 +59,7 @@ namespace cli_ckpt_dump {
         pos_resource_typeid_t targets[kTargetMaxNum];
         pos_resource_typeid_t skip_targets[kSkipTargetMaxNum];
         bool do_cow;
+        bool force_recompute;
         /* server */
         pos_retval_t retval;
         char retmsg[kServerRetMsgMaxLen];

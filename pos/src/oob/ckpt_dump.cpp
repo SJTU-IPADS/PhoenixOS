@@ -67,6 +67,9 @@ namespace cli_ckpt_dump {
         cmd->type = kPOS_Command_Oob2Parser_Dump;
         cmd->ckpt_dir = std::string(payload->ckpt_dir) + std::string("/phos");
         cmd->do_cow = payload->do_cow;
+        cmd->force_recompute = payload->force_recompute;
+        if(cmd->force_recompute == true)
+            POS_ASSERT(cmd->do_cow == true);
 
         POS_ASSERT(!(payload->nb_targets > 0 && payload->nb_skip_targets > 0));
         if(payload->nb_targets > 0){
@@ -174,6 +177,7 @@ namespace cli_ckpt_dump {
         payload->nb_targets = cm->nb_targets;
         payload->nb_skip_targets = cm->nb_skip_targets;
         payload->do_cow = cm->do_cow;
+        payload->force_recompute = cm->force_recompute;
 
         __POS_OOB_SEND();
 

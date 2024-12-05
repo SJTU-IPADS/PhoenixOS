@@ -55,4 +55,5 @@ message Bin_POSAPIContext {
     uint64 worker_s_tick = 13;
     uint64 worker_e_tick = 14;
     repeated Bin_POSAPIParam params = 15;
+    uint64 retval_size = 16;
 }

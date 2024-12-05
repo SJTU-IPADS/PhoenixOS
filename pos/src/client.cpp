@@ -352,7 +352,6 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
         }
         for(set_iter = sorted_recomputation_apicxts.begin(); set_iter != sorted_recomputation_apicxts.end(); set_iter++){
             retval = this->__reload_apicxt((*set_iter).string(), ApiCxt_TypeId_Recomputation);
-            POS_LOG("reload %s", (*set_iter).string().c_str());
             if(unlikely(retval != POS_SUCCESS)){
                 POS_WARN_C(
                     "failed to reload recomputation api context: ckpt_file(%s)",
@@ -374,7 +373,6 @@ pos_retval_t POSClient::restore_apicxts(std::string& ckpt_dir){
     }
     for(set_iter = sorted_unexecuted_apicxts.begin(); set_iter != sorted_unexecuted_apicxts.end(); set_iter++){
         retval = this->__reload_apicxt((*set_iter).string(), ApiCxt_TypeId_Unexecuted);
-        POS_LOG("reload %s", (*set_iter).string().c_str());
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN_C(
                 "failed to reload unexecuted api context: ckpt_file(%s)",

@@ -33,6 +33,31 @@
 #include "pos/include/proto/apicxt.pb.h"
 
 
+POSAPIContext::POSAPIContext(
+    uint64_t api_id_, std::vector<POSAPIParamDesp_t>& param_desps, void* ret_data_, uint64_t retval_size_
+) 
+    : api_id(api_id_), ret_data(ret_data_), retval_size(retval_size_)
+{
+    POSAPIParam_t *param;
+
+    params.reserve(16);
+
+    // insert parameters
+    for(auto& param_desp : param_desps){
+        POS_CHECK_POINTER(param = new POSAPIParam_t(param_desp.value, param_desp.size));
+        params.push_back(param);
+    }
+}
+
+
+POSAPIContext::POSAPIContext(uint64_t api_id_, uint64_t retval_size) 
+    : api_id(api_id_)
+{
+    if(retval_size > 0)
+        POS_CHECK_POINTER(this->ret_data = malloc(retval_size));
+}
+
+
 POSAPIContext_QE::POSAPIContext_QE(
     uint64_t api_id, pos_client_uuid_t uuid, std::vector<POSAPIParamDesp_t>& param_desps,
     uint64_t inst_id, void* retval_data, uint64_t retval_size, POSClient* pos_client
@@ -87,7 +112,7 @@ POSAPIContext_QE::POSAPIContext_QE(
     this->has_return = apicxt_binary.has_return();
     this->type = type;
 
-    this->api_cxt = new POSAPIContext_t(apicxt_binary.api_id());
+    this->api_cxt = new POSAPIContext_t(apicxt_binary.api_id(), apicxt_binary.retval_size());
     POS_CHECK_POINTER(this->api_cxt);
 
     for(i=0; i<apicxt_binary.input_handle_views_size(); i++){
@@ -185,6 +210,7 @@ pos_retval_t POSAPIContext_QE::persist(std::string ckpt_dir){
     apicxt_binary.set_id(this->id);
     apicxt_binary.set_has_return(this->has_return);
     apicxt_binary.set_api_id(this->api_cxt->api_id);
+    apicxt_binary.set_retval_size(this->api_cxt->retval_size);
 
     for(POSHandleView_t &hv : this->input_handle_views){
         POS_CHECK_POINTER(hv_binary = apicxt_binary.add_input_handle_views());

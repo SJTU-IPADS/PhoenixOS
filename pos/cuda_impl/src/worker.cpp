@@ -181,8 +181,14 @@ pos_retval_t POSWorker_CUDA::start_gpu_ticker(uint64_t stream_id){
     this->_cuda_ticker_events[(cudaStream_t)(stream_id)] = start;
 
 exit:
-    if(retval != POS_SUCCESS && start != (cudaEvent_t)(nullptr)){
-        cudaEventDestroy(start);
+    if(retval != POS_SUCCESS){
+        if(start != (cudaEvent_t)(nullptr)){
+            cudaEventDestroy(start);
+        }
+            
+        if(this->_cuda_ticker_events.count((cudaStream_t)(stream_id)) > 0){
+            this->_cuda_ticker_events.erase((cudaStream_t)(stream_id));
+        }
     }
     return retval;
 }
@@ -222,8 +228,7 @@ pos_retval_t POSWorker_CUDA::stop_gpu_ticker(uint64_t& ticker, uint64_t stream_i
     }
 
     cudart_retval = cudaEventElapsedTime(
-        &duration_ms,
-        this->_cuda_ticker_events[(cudaStream_t)(stream_id)], stop
+        &duration_ms, this->_cuda_ticker_events[(cudaStream_t)(stream_id)], stop
     );
     if(unlikely(cudart_retval != CUDA_SUCCESS)){
         POS_WARN_C("failed to elapsed time between CUDA events: stream_id(%lu)", stream_id);
@@ -231,14 +236,20 @@ pos_retval_t POSWorker_CUDA::stop_gpu_ticker(uint64_t& ticker, uint64_t stream_i
         goto exit;
     }
 
+    POS_CHECK_POINTER(this->_ws);
     ticker = (uint64_t)(this->_ws->tsc_timer.ms_to_tick((uint64_t)(duration_ms)));
 
 exit:
     if(this->_cuda_ticker_events.count((cudaStream_t)(stream_id)) > 0){
-        cudaEventDestroy(this->_cuda_ticker_events[(cudaStream_t)(stream_id)]);
+        if(this->_cuda_ticker_events[(cudaStream_t)(stream_id)] != (cudaEvent_t)(nullptr)){
+            cudaEventDestroy(this->_cuda_ticker_events[(cudaStream_t)(stream_id)]);
+        }
+        
         this->_cuda_ticker_events.erase((cudaStream_t)(stream_id));
     }
-    if(stop != (cudaEvent_t)(nullptr))
+    if(stop != (cudaEvent_t)(nullptr)){
         cudaEventDestroy(stop);
+    }
+
     return retval;
 }

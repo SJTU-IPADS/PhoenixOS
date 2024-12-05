@@ -63,6 +63,7 @@ typedef struct POSCommand_QE {
     std::set<POSHandle*> stateless_handles;
     std::set<pos_resource_typeid_t> target_resource_type_idx;
     bool do_cow;
+    bool force_recompute;
 
     /*!
      *  \brief  record all handles that need to be checkpointed within this checkpoint op

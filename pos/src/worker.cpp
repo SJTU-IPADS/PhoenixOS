@@ -66,7 +66,9 @@ POSWorker::POSWorker(POSWorkspace* ws, POSClient* client)
 
 POSWorker::~POSWorker(){ 
     this->shutdown();
-    this->__print_metrics();
+    #if POS_CONF_RUNTIME_EnableTrace
+        this->__print_metrics();
+    #endif
 }
 
 
@@ -579,7 +581,7 @@ void POSWorker::__daemon_ckpt_async(){
                             // case 6: no recomputation API, no unexecution API
                             this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                         } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Recomputation){
-                            // case: first normal API after recomputation API, no unexecution API
+                            // case 7: first normal API after recomputation API, no unexecution API
                             tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
                             if(unlikely(tmp_retval != POS_SUCCESS)){
                                 POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
@@ -589,7 +591,7 @@ void POSWorker::__daemon_ckpt_async(){
                                 this->_restoring_phrase = kPOS_WorkRestorePhrase_Normal;
                             }
                         } else if (this->_restoring_phrase == kPOS_WorkRestorePhrase_Unexecution){
-                            // case 7: first normal API after unexecution API
+                            // case 8: first normal API after unexecution API
                             tmp_retval = this->stop_gpu_ticker(gpu_ticker, /* stream_id */ 0);
                             if(unlikely(tmp_retval != POS_SUCCESS)){
                                 POS_WARN("failed to stop gpu ticker, restore measurement abandoned");
@@ -676,9 +678,10 @@ void POSWorker::__daemon_ckpt_async(){
                     }
 
                     // note: we also include those stateless handles here
-                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0)
+                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0){
+                        this->async_ckpt_cxt.dirty_handles.insert(handle);
                         this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
-                    this->async_ckpt_cxt.dirty_handles.insert(handle);
+                    }
                 }
                 for(auto &out_handle_view : wqe->output_handle_views){
                     POS_CHECK_POINTER(handle = out_handle_view.handle);
@@ -714,9 +717,10 @@ void POSWorker::__daemon_ckpt_async(){
                     }
 
                     // note: we also include those stateless handles here
-                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0)
+                    if(this->async_ckpt_cxt.dirty_handles.count(handle) == 0){
+                        this->async_ckpt_cxt.dirty_handles.insert(handle);
                         this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
-                    this->async_ckpt_cxt.dirty_handles.insert(handle);
+                    }
                 }
             } // this->async_ckpt_cxt.TH_actve == true
 
@@ -1103,20 +1107,29 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
 
     // step 3: decide either dump recomputation APIs (only if CoW is enabled) or do dirty copy
     if(cmd->do_cow == true){
-        if(this->async_ckpt_cxt.dirty_handle_state_size >= GB(2)){
+        if((this->async_ckpt_cxt.dirty_handle_state_size) >= GB(2)){
             // case: too many dirty copies, we dump recomputation APIs
             do_dirty_copy = false;
             POS_LOG(
-                "[Dirty Behaviour] potential dirty copies too large, dumping recomputation APIs: dirty-copies(%s)",
+                "[Dirty Behaviour] potential dirty copies too large, do reompute: dirty-copies(%s)",
                 POSUtilSystem::format_byte_number(this->async_ckpt_cxt.dirty_handle_state_size).c_str()
             );
         } else {
-            // case: not too many dirty copies, conduct dirty copy
-            do_dirty_copy = true;
-            POS_LOG(
-                "[Dirty Behaviour] potential dirty copies is acceptable, do dirty copy: dirty-copies(%s)",
-                POSUtilSystem::format_byte_number(this->async_ckpt_cxt.dirty_handle_state_size).c_str()
-            );
+            if(cmd->force_recompute == true){
+                // case: not too many dirty copies, bot force-recompute is enabled
+                do_dirty_copy = false;
+                POS_LOG(
+                    "[Dirty Behaviour] potential dirty copies is acceptable, but force-recompute is enabled, do reompute: dirty-copies(%s)",
+                    POSUtilSystem::format_byte_number(this->async_ckpt_cxt.dirty_handle_state_size).c_str()
+                );
+            } else {
+                // case: not too many dirty copies, conduct dirty copy
+                do_dirty_copy = true;
+                POS_LOG(
+                    "[Dirty Behaviour] potential dirty copies is acceptable, do dirty copy: dirty-copies(%s)",
+                    POSUtilSystem::format_byte_number(this->async_ckpt_cxt.dirty_handle_state_size).c_str()
+                );
+            }
         }
     } else {
         do_dirty_copy = true;
@@ -1482,6 +1495,7 @@ exit:
 
         static std::unordered_map<metrics_counter_type_t, std::string> counter_names = {
             { RESTORE_nb_ondemand_reload_handles, "# On-demand Reload Handles (by Worker Thread)" },
+            { RESTORE_nb_ondemand_reload_state_handles, "# On-demand Reload Handles with State (by Worker Thread)" },
         };
 
         static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {

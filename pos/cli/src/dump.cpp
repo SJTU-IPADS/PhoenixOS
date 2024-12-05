@@ -194,9 +194,16 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
                         substring = substrings[i];
                         if(substring == std::string("cow")){
                             clio.metas.ckpt.do_cow = true;
+                        } else if(substring == std::string("force_recompute")){
+                            clio.metas.ckpt.force_recompute = true;
                         } else {
                             POS_WARN("unknown option \"%s\", omit", substring.c_str());
                         }
+                    }
+
+                    if(clio.metas.ckpt.force_recompute == true && clio.metas.ckpt.do_cow == false){
+                        clio.metas.ckpt.do_cow = true;
+                        POS_WARN("\"force_recompute\" option enabled without \"cow\" option, appended");
                     }
 
                 exit:
@@ -338,6 +345,7 @@ pos_retval_t handle_dump(pos_cli_options_t &clio){
     call_data.nb_targets = clio.metas.ckpt.nb_targets;
     call_data.nb_skip_targets = clio.metas.ckpt.nb_skip_targets;
     call_data.do_cow = clio.metas.ckpt.do_cow;
+    call_data.force_recompute = clio.metas.ckpt.force_recompute;
     retval = clio.local_oob_client->call(kPOS_OOB_Msg_CLI_Ckpt_Dump, &call_data);
     if(POS_SUCCESS != call_data.retval){
         POS_WARN("dump failed, gpu-side dump failed, %s", call_data.retmsg);
