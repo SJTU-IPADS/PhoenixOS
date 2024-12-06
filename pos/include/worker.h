@@ -397,7 +397,7 @@ class POSWorker {
 
     // mark restoring phrase
     enum pos_worker_restore_phraseid_t : uint8_t {
-        kPOS_WorkRestorePhrase_Recomputation_Init = 0,
+        kPOS_WorkRestorePhrase_Init = 0,
         kPOS_WorkRestorePhrase_Recomputation,
         kPOS_WorkRestorePhrase_Unexecution,
         kPOS_WorkRestorePhrase_Normal
@@ -446,11 +446,10 @@ class POSWorker {
         
         enum metrics_sequence_type_t : uint8_t {
             __SEQUENCE_BASE__= 0,
-            KERNEL_out_handle_state_size,
-            KERNEL_inout_handle_state_size,
-            CKPT_nb_cow_handles,
-            CKPT_nb_cow_stateful_handles,
-            CKPT_nb_cow_size,
+            #if POS_CONF_RUNTIME_EnableMemoryTrace
+                KERNEL_write_state_size,
+                CKPT_cow_size,
+            #endif
             // note: here could have a crazy metric to collect each kernel's duration
             RESTORE_ondemand_restore_handle_nb,
             RESTORE_ondemand_restore_handle_with_state_nb,

@@ -33,3 +33,6 @@
 
 // whether to enable runtime trace of statistics 
 #define POS_CONF_RUNTIME_EnableTrace            @conf_runtime_enable_trace@
+
+// whether to collect runtime memory trace of statistics
+#define POS_CONF_RUNTIME_EnableMemoryTrace      @conf_runtime_enable_memory_trace@

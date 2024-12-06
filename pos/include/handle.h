@@ -818,22 +818,7 @@ class POSHandleManager {
     /* =========================== metric system ============================= */
  public:
     #if POS_CONF_RUNTIME_EnableTrace
-        enum metrics_ticker_type_t : uint8_t {
-            CKPT_commit = 0,
-        };
-        POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
-
-        inline void print_metrics(){
-            std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
-                { CKPT_commit, "CKPT_commit (GPU Memory -> CPU Memory)" }
-            };
-            POS_ASSERT(pos_resource_map.count(this->_rid) > 0);
-            POS_LOG(
-                "[HandleManager Metrics] %s:\n%s",
-                pos_resource_map[this->_rid].c_str(),
-                this->metric_tickers.str(ticker_names).c_str()
-            );
-        }
+        virtual void print_metrics(){}
     #endif
     /* =========================== metric system ============================= */
 

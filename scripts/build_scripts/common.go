@@ -105,6 +105,7 @@ type BuildConfigs struct {
 	RuntimeEnableDebugCheck     uint8  `yaml:"runtime_enable_debug_check"`
 	RuntimeEnableHijackApiCheck uint8  `yaml:"runtime_enable_hijack_api_check"`
 	RuntimeEnableTrace          uint8  `yaml:"runtime_enable_trace"`
+	RuntimeEnableMemoryTrace  	uint8  `yaml:"runtime_enable_memory_trace"`
 	RuntimeDefaultDaemonLogPath string `yaml:"runtime_default_daemon_log_path"`
 	RuntimeDefaultClientLogPath string `yaml:"runtime_default_client_log_path"`
 
@@ -142,6 +143,7 @@ func (buildConf *BuildConfigs) print(logger *log.Logger) {
 			- RuntimeEnableDebugCheck: %v
 			- RuntimeEnableHijackApiCheck: %v
 			- RuntimeEnableTrace: %v
+			- RuntimeEnableMemoryTrace: %v
 			- RuntimeDaemonLogPath: %v
 			- RuntimeClientLogPath: %v
 		> Evaluation Configs:
@@ -163,6 +165,7 @@ func (buildConf *BuildConfigs) print(logger *log.Logger) {
 		buildConf.RuntimeEnableDebugCheck,
 		buildConf.RuntimeEnableHijackApiCheck,
 		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeEnableMemoryTrace,
 		buildConf.RuntimeDefaultDaemonLogPath,
 		buildConf.RuntimeDefaultClientLogPath,
 		buildConf.EvalCkptOptLevel,
@@ -192,6 +195,7 @@ func (buildConf *BuildConfigs) export_string() string {
 		export POS_BUILD_CONF_RuntimeEnableDebugCheck=%v
 		export POS_BUILD_CONF_RuntimeEnableHijackApiCheck=%v
 		export POS_BUILD_CONF_RuntimeEnableTrace=%v
+		export POS_BUILD_CONF_RuntimeEnableMemoryTrace=%v
 		export POS_BUILD_CONF_RuntimeDefaultDaemonLogPath=%v
 		export POS_BUILD_CONF_RuntimeDefaultClientLogPath=%v
 
@@ -215,6 +219,7 @@ func (buildConf *BuildConfigs) export_string() string {
 		buildConf.RuntimeEnableDebugCheck,
 		buildConf.RuntimeEnableHijackApiCheck,
 		buildConf.RuntimeEnableTrace,
+		buildConf.RuntimeEnableMemoryTrace,
 		buildConf.RuntimeDefaultDaemonLogPath,
 		buildConf.RuntimeDefaultClientLogPath,
 

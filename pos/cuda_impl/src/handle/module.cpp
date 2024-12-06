@@ -171,6 +171,10 @@ pos_retval_t POSHandle_CUDA_Module::__reload_state(void* mapped, uint64_t ckpt_f
     }
     POS_CHECK_POINTER(module_binary.mutable_base());
 
+    #if POS_CONF_RUNTIME_EnableTrace
+        ((POSHandleManager_CUDA_Module*)(this->_hm))->metric_tickers.start(POSHandleManager_CUDA_Module::RESTORE_reload_state);
+    #endif
+
     cuda_dv_retval = cuModuleLoadData(
         /* module */ &module,
         /* image */  reinterpret_cast<const void*>(module_binary.mutable_base()->state().c_str())
@@ -180,6 +184,14 @@ pos_retval_t POSHandle_CUDA_Module::__reload_state(void* mapped, uint64_t ckpt_f
         retval = POS_FAILED;
         goto exit;
     }
+
+    #if POS_CONF_RUNTIME_EnableTrace
+        ((POSHandleManager_CUDA_Module*)(this->_hm))->metric_tickers.end(POSHandleManager_CUDA_Module::RESTORE_reload_state);
+        ((POSHandleManager_CUDA_Module*)(this->_hm))->metric_reducers.reduce(
+            POSHandleManager_CUDA_Module::RESTORE_nb_reload_functions,
+            this->function_desps.size()
+        );
+    #endif
 
     this->set_server_addr((void*)module);
     this->mark_status(kPOS_HandleStatus_Active);
@@ -442,4 +454,21 @@ pos_retval_t POSHandleManager_CUDA_Module::__reallocate_single_handle(void* mapp
 
 exit:
     return retval;
+}
+
+
+void POSHandleManager_CUDA_Module::print_metrics() {
+    static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
+        { RESTORE_reload_state, "Restore State" }
+    };
+    static std::unordered_map<metrics_reducer_type_t, std::string> reducer_names = {
+        { RESTORE_nb_reload_functions, "# Restored Functions" }
+    };
+    POS_ASSERT(pos_resource_map.count(this->_rid) > 0);
+    POS_LOG(
+        "[HandleManager Metrics] %s:\n%s\n%s",
+        pos_resource_map[this->_rid].c_str(),
+        this->metric_tickers.str(ticker_names).c_str(),
+        this->metric_reducers.str(reducer_names).c_str()
+    );
 }

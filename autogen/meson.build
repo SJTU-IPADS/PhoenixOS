@@ -147,6 +147,15 @@ if conf_runtime_enable_trace != 0 and conf_runtime_enable_trace != 1
     )
 endif
 
+# whether to trace the memory statistics
+conf_runtime_enable_memory_trace = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeEnableMemoryTrace').stdout().strip().to_int()
+if conf_runtime_enable_memory_trace != 0 and conf_runtime_enable_memory_trace != 1
+    assert(
+        false, 
+        'conf_runtime_enable_memory_trace get invalid value: ' + conf_runtime_enable_memory_trace.to_string()
+    )
+endif
+
 # log path of PhOS daemon
 conf_runtime_default_daemon_log_path = run_command('sh', '-c', 'echo $POS_BUILD_CONF_RuntimeDefaultDaemonLogPath').stdout().strip()
 if conf_runtime_default_daemon_log_path == ''

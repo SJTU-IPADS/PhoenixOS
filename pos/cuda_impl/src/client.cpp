@@ -230,10 +230,14 @@ exit:
 
 void POSClient_CUDA::deinit_handle_managers(){
     #if POS_CONF_RUNTIME_EnableTrace
-        POSHandleManager<POSHandle> *hm_memory;
+        POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandleManager_CUDA_Module *hm_module;
 
-        POS_CHECK_POINTER(hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager<POSHandle>));
+        POS_CHECK_POINTER(hm_memory = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Memory, POSHandleManager_CUDA_Memory));
+        POS_CHECK_POINTER(hm_module = pos_get_client_typed_hm(this, kPOS_ResourceTypeId_CUDA_Module, POSHandleManager_CUDA_Module));
+
         hm_memory->print_metrics();
+        hm_module->print_metrics();
     #endif
 
     this->__dump_hm_cuda_functions();

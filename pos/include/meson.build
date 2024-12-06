@@ -32,6 +32,7 @@ runtime_conf.set('conf_runtime_default_client_log_path', conf_runtime_default_cl
 runtime_conf.set('conf_runtime_enable_debug_check', conf_runtime_enable_debug_check)
 runtime_conf.set('conf_runtime_enable_hijack_api_check', conf_runtime_enable_hijack_api_check)
 runtime_conf.set('conf_runtime_enable_trace', conf_runtime_enable_trace)
+runtime_conf.set('conf_runtime_enable_memory_trace', conf_runtime_enable_memory_trace)
 configure_file(input : 'runtime_configs.h.in', output : 'runtime_configs.h', configuration : runtime_conf)
 
 

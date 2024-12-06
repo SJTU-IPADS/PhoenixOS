@@ -325,6 +325,20 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
     pos_retval_t try_restore_from_pool(POSHandle_CUDA_Memory* handle) override;
 
 
+    /* =========================== metric system ============================= */
+ public:
+    #if POS_CONF_RUNTIME_EnableTrace
+        enum metrics_ticker_type_t : uint8_t {
+            __TICKER_BASE__ = 0,
+            RESTORE_reload_state
+        };
+        POSMetrics_TickerList<metrics_ticker_type_t> metric_tickers;
+
+        void print_metrics() override;
+    #endif
+    /* =========================== metric system ============================= */
+
+
  private:
     /*!
      *  \brief  restore the extra fields of handle with specific type

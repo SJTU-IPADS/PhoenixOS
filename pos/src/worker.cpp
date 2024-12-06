@@ -645,14 +645,10 @@ void POSWorker::__daemon_ckpt_async(){
                                     /* index */ checkpoint_async_cxt_t::CKPT_cow_bytes_by_worker_thread,
                                     /* value */ handle->state_size
                                 );
+                                if(handle->state_size > 0){ nb_cow_size += handle->state_size; }
                             } else if(tmp_retval == POS_WARN_ABANDONED){
                                 this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
-                            }
-                            nb_cow_handle += 1;
-                            if(handle->state_size > 0){
-                                nb_cow_stateful_handle += 1;
-                                nb_cow_size += handle->state_size;
                             }
                         #endif
                     }
@@ -689,16 +685,12 @@ void POSWorker::__daemon_ckpt_async(){
                                     /* index */ checkpoint_async_cxt_t::CKPT_cow_bytes_by_worker_thread,
                                     /* value */ handle->state_size
                                 );
+                                if(handle->state_size > 0){ nb_cow_size += handle->state_size; }
                             } else if(tmp_retval == POS_WARN_ABANDONED){
                                 this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
                             }
                         #endif
-                        nb_cow_handle += 1;
-                        if(handle->state_size > 0){
-                            nb_cow_stateful_handle += 1;
-                            nb_cow_size += handle->state_size;
-                        }
                     }
 
                     // note: we might also include those stateless handles here
@@ -709,12 +701,9 @@ void POSWorker::__daemon_ckpt_async(){
                 }
 
                 #if POS_CONF_RUNTIME_EnableTrace
-                    if(nb_cow_handle > 0)
-                        this->_metric_sequences.add_spot(CKPT_nb_cow_handles, nb_cow_handle);
-                    if(nb_cow_stateful_handle > 0)
-                        this->_metric_sequences.add_spot(CKPT_nb_cow_stateful_handles, nb_cow_stateful_handle);
-                    if(nb_cow_size > 0)
-                        this->_metric_sequences.add_spot(CKPT_nb_cow_size, nb_cow_size);
+                    #if POS_CONF_RUNTIME_EnableMemoryTrace
+                        this->_metric_sequences.add_spot(CKPT_cow_size, nb_cow_size);
+                    #endif
                 #endif
             } // this->async_ckpt_cxt.TH_actve == true
 
@@ -1382,7 +1371,7 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
     #if POS_CONF_RUNTIME_EnableTrace
         uint64_t restore_ticks = 0, restore_state_ticks = 0;
         uint64_t nb_restored_handle = 0, nb_restored_handle_with_state = 0, nb_restored_bytes = 0;
-        uint64_t output_handle_state_size = 0, inout_handle_state_size = 0;
+        uint64_t write_state_size = 0;
     #endif
 
     POS_CHECK_POINTER(wqe);
@@ -1398,10 +1387,12 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
         // step 1: restore resource allocation
         for(i=0; i<handle_view_vec.size(); i++){
             #if POS_CONF_RUNTIME_EnableTrace
-                if(edge == kPOS_Edge_Direction_Out)
-                    output_handle_state_size += handle_view_vec[i].handle->state_size;
-                else if(edge == kPOS_Edge_Direction_InOut)
-                    inout_handle_state_size += handle_view_vec[i].handle->state_size;
+                #if POS_CONF_RUNTIME_EnableMemoryTrace
+                    if(edge == kPOS_Edge_Direction_Out)
+                        write_state_size += handle_view_vec[i].handle->state_size;
+                    else if(edge == kPOS_Edge_Direction_InOut)
+                        write_state_size += handle_view_vec[i].handle->state_size;
+                #endif
             #endif
 
             broken_handle_list.reset();
@@ -1495,10 +1486,10 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
     __restore_broken_hendles_per_direction(wqe->delete_handle_views, kPOS_Edge_Direction_Delete);
 
     #if POS_CONF_RUNTIME_EnableTrace
-        if(unlikely(output_handle_state_size > 0))
-            this->_metric_sequences.add_spot(KERNEL_out_handle_state_size, output_handle_state_size);
-        if(unlikely(inout_handle_state_size > 0))
-            this->_metric_sequences.add_spot(KERNEL_inout_handle_state_size, inout_handle_state_size);
+        #if POS_CONF_RUNTIME_EnableMemoryTrace
+            if(unlikely(write_state_size > 0))
+                this->_metric_sequences.add_spot(KERNEL_write_state_size, write_state_size);
+        #endif
         if(unlikely(nb_restored_handle > 0))
             this->_metric_sequences.add_spot(RESTORE_ondemand_restore_handle_nb, nb_restored_handle);
         if(unlikely(nb_restored_handle_with_state > 0))
@@ -1551,10 +1542,10 @@ exit:
         };
 
         static std::vector<std::pair<metrics_sequence_type_t, std::string>> sequence_name = {
-            { KERNEL_out_handle_state_size, "Output Handle State Size (byte)" },
-            { KERNEL_inout_handle_state_size, "InOut Handle State Size (byte)" },
-            { CKPT_nb_cow_handles, "# CoW Handles" },
-            { CKPT_nb_cow_size, "CoW Handle State Size (byte)" },
+            #if POS_CONF_RUNTIME_EnableMemoryTrace
+                { KERNEL_write_state_size, "Kernel Write Size (byte)" },
+                { CKPT_cow_size, "CoW Size (byte)" },
+            #endif
             { RESTORE_ondemand_restore_handle_nb, "# On-demand Restore Handles" },
             { RESTORE_ondemand_restore_handle_with_state_nb, "# On-demand Restore Handles (with State)" },
             { RESTORE_ondemand_restore_handle_state_size, "On-demand Restore State Size (byte)" },
