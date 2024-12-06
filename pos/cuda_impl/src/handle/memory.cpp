@@ -749,6 +749,8 @@ exit:
 }
 
 
+#if POS_CONF_RUNTIME_EnableTrace
+
 void POSHandleManager_CUDA_Memory::print_metrics() {
     static std::unordered_map<metrics_ticker_type_t, std::string> ticker_names = {
         { RESTORE_reload_state, "Restore State" }
@@ -760,3 +762,5 @@ void POSHandleManager_CUDA_Memory::print_metrics() {
         this->metric_tickers.str(ticker_names).c_str()
     );
 }
+
+#endif

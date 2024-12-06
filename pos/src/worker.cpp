@@ -585,7 +585,7 @@ void POSWorker::__daemon_ckpt_async(){
             /*!
              *  \brief  if the async ckpt thread is active, we cache this wqe for potential recomputation while restoring
              */
-            if(unlikely(this->async_ckpt_cxt.TH_actve == true)){
+            if(unlikely(this->async_ckpt_cxt.TH_actve == true && this->async_ckpt_cxt.cmd->do_cow)){
                 this->_client->template push_q<kPOS_QueueDirection_WorkerLocal, kPOS_QueueType_ApiCxt_CkptDag_WQ>(wqe);
             }
 
@@ -627,7 +627,10 @@ void POSWorker::__daemon_ckpt_async(){
                     )){
                         continue;
                     }
-                    if(this->async_ckpt_cxt.cmd->do_cow && this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0){
+                    if( this->async_ckpt_cxt.cmd->do_cow 
+                        && this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0
+                        && this->async_ckpt_cxt.dirty_handles.count(handle) == 0
+                    ){
                         #if POS_CONF_RUNTIME_EnableTrace
                             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_done_ticks_by_worker_thread);
                             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
@@ -667,7 +670,10 @@ void POSWorker::__daemon_ckpt_async(){
                     )){
                         continue;
                     }
-                    if(this->async_ckpt_cxt.cmd->do_cow && this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0){
+                    if( this->async_ckpt_cxt.cmd->do_cow 
+                        && this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0
+                        && this->async_ckpt_cxt.dirty_handles.count(handle) == 0
+                    ){
                         #if POS_CONF_RUNTIME_EnableTrace
                             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_done_ticks_by_worker_thread);
                             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
@@ -729,8 +735,6 @@ void POSWorker::__daemon_ckpt_async(){
                 wqe->has_return = true;
             }
 
-            if(unlikely(wqe->id < this->_max_wqe_id))
-                POS_LOG("wqe->id: %lu, this->_max_wqe_id: %lu", wqe->id, this->_max_wqe_id);
             POS_ASSERT(wqe->id >= this->_max_wqe_id);
             this->_max_wqe_id = wqe->id;
         }
@@ -1433,6 +1437,7 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                     );
                 } else {
                     #if POS_CONF_RUNTIME_EnableTrace
+                        nb_restored_handle += 1;
                         restore_ticks += this->_metric_tickers.end(RESTORE_ondemand_reload_ticks);
                         this->_metric_counters.add_counter(RESTORE_nb_ondemand_reload_handles);
                     #endif
@@ -1440,7 +1445,6 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                         "restore broken handle: resource_type_id(%lu)",
                         broken_handle->resource_type_id
                     );
-                    nb_restored_handle += 1;
                 }
 
                 // restore handle state (on-demand restore)
@@ -1465,13 +1469,13 @@ pos_retval_t POSWorker::__restore_broken_handles(POSAPIContext_QE* wqe, POSAPIMe
                             restore_state_ticks += this->_metric_tickers.end(RESTORE_ondemand_reload_state_ticks);
                             this->_metric_counters.add_counter(RESTORE_nb_ondemand_reload_state_handles);
                             this->_metric_reducers.reduce(RESTORE_ondemand_reload_bytes, broken_handle->state_size);
+                            nb_restored_handle_with_state += 1;
+                            nb_restored_bytes += broken_handle->state_size;
                         #endif
                         POS_DEBUG_C(
                             "restore missing state of broken handle: rid(%lu), hid(%lu), state_size(%lu bytes)",
                             broken_handle->resource_type_id, broken_handle->id, broken_handle->state_size
                         );
-                        nb_restored_handle_with_state += 1;
-                        nb_restored_bytes += broken_handle->state_size;
                     }
                 }
 

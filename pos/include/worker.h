@@ -397,7 +397,7 @@ class POSWorker {
 
     // mark restoring phrase
     enum pos_worker_restore_phraseid_t : uint8_t {
-        kPOS_WorkRestorePhrase_Init = 0,
+        kPOS_WorkRestorePhrase_Recomputation_Init = 0,
         kPOS_WorkRestorePhrase_Recomputation,
         kPOS_WorkRestorePhrase_Unexecution,
         kPOS_WorkRestorePhrase_Normal
