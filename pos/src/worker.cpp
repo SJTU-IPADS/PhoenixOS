@@ -467,7 +467,7 @@ void POSWorker::__daemon_ckpt_async(){
     POSHandle *handle;
 
     #if POS_CONF_RUNTIME_EnableTrace
-        uint64_t nb_cow_handle = 0, nb_cow_stateful_handle = 0, nb_cow_size = 0;
+        uint64_t nb_cow_handle = 0, nb_cow_stateful_handle = 0, cow_size = 0;
     #endif
 
     while(!this->_stop_flag){
@@ -609,7 +609,7 @@ void POSWorker::__daemon_ckpt_async(){
 
             if(unlikely(this->async_ckpt_cxt.TH_actve == true)){
                 #if POS_CONF_RUNTIME_EnableTrace
-                    nb_cow_handle = 0; nb_cow_stateful_handle = 0; nb_cow_size = 0;
+                    nb_cow_handle = 0; nb_cow_stateful_handle = 0; cow_size = 0;
                 #endif
 
                 /*!
@@ -648,7 +648,7 @@ void POSWorker::__daemon_ckpt_async(){
                                     /* index */ checkpoint_async_cxt_t::CKPT_cow_bytes_by_worker_thread,
                                     /* value */ handle->state_size
                                 );
-                                if(handle->state_size > 0){ nb_cow_size += handle->state_size; }
+                                if(handle->state_size > 0){ cow_size += handle->state_size; }
                             } else if(tmp_retval == POS_WARN_ABANDONED){
                                 this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
@@ -691,7 +691,7 @@ void POSWorker::__daemon_ckpt_async(){
                                     /* index */ checkpoint_async_cxt_t::CKPT_cow_bytes_by_worker_thread,
                                     /* value */ handle->state_size
                                 );
-                                if(handle->state_size > 0){ nb_cow_size += handle->state_size; }
+                                if(handle->state_size > 0){ cow_size += handle->state_size; }
                             } else if(tmp_retval == POS_WARN_ABANDONED){
                                 this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_worker_thread);
                                 this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_worker_thread);
@@ -708,7 +708,8 @@ void POSWorker::__daemon_ckpt_async(){
 
                 #if POS_CONF_RUNTIME_EnableTrace
                     #if POS_CONF_RUNTIME_EnableMemoryTrace
-                        this->_metric_sequences.add_spot(CKPT_cow_size, nb_cow_size);
+                        if(cow_size > 0)
+                            this->_metric_sequences.add_spot(CKPT_cow_size, cow_size);
                     #endif
                 #endif
             } // this->async_ckpt_cxt.TH_actve == true

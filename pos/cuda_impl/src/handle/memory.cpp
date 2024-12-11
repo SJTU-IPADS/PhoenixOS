@@ -652,7 +652,7 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     POS_ASSERT(device_handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
     device_id = static_cast<int>((uint64_t)(device_handle->client_addr));
 
-    POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 1);
+    POS_ASSERT(POSHandleManager_CUDA_Memory::expo.count(device_id) == 1);
     POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 1);
 
     // obtain the desired address based on reserved virtual memory space pointer

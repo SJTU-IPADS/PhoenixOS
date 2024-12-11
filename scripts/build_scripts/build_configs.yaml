@@ -26,7 +26,7 @@ runtime_enable_print_debug: 0
 runtime_enable_print_with_color: 1
 runtime_enable_debug_check: 1
 runtime_enable_hijack_api_check: 0
-runtime_enable_trace: 0
+runtime_enable_trace: 1
 runtime_enable_memory_trace: 0
 runtime_default_daemon_log_path: "/var/log/phos/daemon"
 runtime_default_client_log_path: "/var/log/phos/client"

@@ -35,6 +35,11 @@ pipe = StableDiffusionPipeline.from_pretrained(
     torch_dtype=torch.float32,
 ).to(device)
 
+total_params = sum(p.numel() for p in pipe.unet.parameters()) + \
+               sum(p.numel() for p in pipe.text_encoder.parameters()) + \
+               sum(p.numel() for p in pipe.vae.parameters())
+print(f"Total parameters: {total_params}")
+
 print("end read model")
 
 prompt = "a photo of an astronaut riding a horse on mars"
