@@ -33,13 +33,10 @@ func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 		{{.CMD_EXPRORT_ENV_VAR__}}
 		export POS_ENABLE=true
 		cd %s/%s
-		make libtirpc -j 																	>>{{.LOG_PATH__}} 2>&1
-		cp ./submodules/libtirpc/install/lib/libtirpc.so {{.LOCAL_LIB_PATH__}}/libtirpc.so	>>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		make clean 																			>>{{.LOG_PATH__}} 2>&1
-		LOG=INFO make cricket-rpc-server cricket-client.so -j 								>>{{.LOG_PATH__}} 2>&1
-		cp cricket-rpc-server {{.LOCAL_BIN_PATH__}}/cricket-rpc-server 						>>{{.LOG_PATH__}} 2>&1
-		cp cricket-client.so {{.LOCAL_LIB_PATH__}}/cricket-client.so 						>>{{.LOG_PATH__}} 2>&1
+		LIBPOS_PATH=../lib cargo build --features shm,phos,async_api --release 	>>{{.LOG_PATH__}} 2>&1
+		cd target/release
+		cp server {{.LOCAL_BIN_PATH__}}/xpu-server								>>{{.LOG_PATH__}} 2>&1
+		cp libclient.so {{.LOCAL_LIB_PATH__}}/libxpuclient.so					>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KRemotingPath,
 	)
@@ -47,29 +44,24 @@ func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.L
 	install_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e
-		cd %s/%s
-		cp ./submodules/libtirpc/install/lib/libtirpc.so {{.SYSTEM_LIB_PATH__}}/libtirpc.so >>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		cp cricket-rpc-server {{.SYSTEM_BIN_PATH__}}/cricket-rpc-server >>{{.LOG_PATH__}} 2>&1
-		cp cricket-client.so {{.SYSTEM_LIB_PATH__}}/cricket-client.so >>{{.LOG_PATH__}} 2>&1
+		cd %s/%s/target/release											>>{{.LOG_PATH__}} 2>&1
+		cp server {{.SYSTEM_BIN_PATH__}}/xpu-server						>>{{.LOG_PATH__}} 2>&1
+		cp libclient.so {{.SYSTEM_LIB_PATH__}}/libxpuclient.so			>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KRemotingPath,
 	)
 
 	clean_script := fmt.Sprintf(`
-		# set -e
+		#set -e
 		cd %s/%s
-		make clean 											>>{{.LOG_PATH__}} 2>&1
-		cd cpu
-		make clean	 										>>{{.LOG_PATH__}} 2>&1
+		cargo clean 										>>{{.LOG_PATH__}} 2>&1
 		# clean local installcation
-		rm -rf {{.LOCAL_BIN_PATH__}}/cricket-rpc-server 	>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.LOCAL_LIB_PATH__}}/libtirpc.so 			>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.LOCAL_LIB_PATH__}}/cricket-client.so 		>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_BIN_PATH__}}/xpu-server 			>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.LOCAL_LIB_PATH__}}/libxpuclient.so 		>>{{.LOG_PATH__}} 2>&1
+
 		# clean system installation
-		rm -rf {{.SYSTEM_BIN_PATH__}}/cricket-rpc-server 	>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_LIB_PATH__}}/libtirpc.so			>>{{.LOG_PATH__}} 2>&1
-		rm -rf {{.SYSTEM_LIB_PATH__}}/cricket-client.so 	>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_BIN_PATH__}}/xpu-server 			>>{{.LOG_PATH__}} 2>&1
+		rm -rf {{.SYSTEM_LIB_PATH__}}/libxpuclient.so 		>>{{.LOG_PATH__}} 2>&1
 		`,
 		cmdOpt.RootDir, KRemotingPath,
 	)

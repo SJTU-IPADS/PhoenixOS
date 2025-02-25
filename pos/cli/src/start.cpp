@@ -67,7 +67,7 @@ pos_retval_t handle_start(pos_cli_options_t &clio){
 
     if(!strcmp(clio.metas.start.target_name, "daemon")){
         // start PhOS daemomn
-        phosd_cmd = std::string("cricket-rpc-server");
+        phosd_cmd = std::string("xpu-server");
         retval = POSUtil_Command_Caller::exec_sync(
             phosd_cmd,
             phosd_result,

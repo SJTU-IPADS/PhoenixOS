@@ -277,7 +277,7 @@ sources += [
     'pos/src/oob/mgnt.cpp',
 
     # binding functions for remoting framework
-    # 'pos/src/remoting/agent.cpp',
+    'pos/src/remoting/agent.cpp',
 
     # protobuf generated file
     'pos/include/proto/client.pb.cc',
@@ -324,7 +324,7 @@ if conf_runtime_target == 'cuda'
         'pos/cuda_impl/src/handle/var.cpp',
 
         # binding functions for remoting framework
-        # 'pos/cuda_impl/src/remoting/workspace.cpp',
+        'pos/cuda_impl/src/remoting/workspace.cpp',
 
         # protobuf generated file
         'pos/cuda_impl/proto/context.pb.cc',

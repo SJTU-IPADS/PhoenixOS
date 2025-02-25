@@ -19,5 +19,5 @@
 	url = https://github.com/util-linux/util-linux.git
 [submodule "remoting"]
 	path = remoting
-	url = https://github.com/SJTU-IPADS/PhoenixOS-Remoting.git
-	branch = v0.10-cricket
+	url = git@ipads.se.sjtu.edu.cn:scaleaisys/xpuremoting.git
+	branch = PhOS

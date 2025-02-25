@@ -101,8 +101,8 @@ func main() {
 
 	if cmdOpt.DoInstall {
 		// insert environment variable to /etc/profile file
-		ldPreload := "export phos=\"LD_PRELOAD=cricket-client.so\"\n"
-		exists, err := utils.CheckContentExists("/etc/profile", ldPreload)
+		envVars := "export phos=\"LD_PRELOAD=libxpuclient.so\" RUST_LOG=error\n"
+		exists, err := utils.CheckContentExists("/etc/profile", envVars)
 		if err != nil {
 			logger.Fatalf("failed to check file content of /etc/profile")
 		}
@@ -113,7 +113,7 @@ func main() {
 			}
 			defer file.Close()
 
-			if _, err := file.WriteString(ldPreload); err != nil {
+			if _, err := file.WriteString(envVars); err != nil {
 				logger.Fatal("failed to write /etc/profile: %v", err)
 			}
 		}
