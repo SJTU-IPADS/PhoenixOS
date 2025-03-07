@@ -63,7 +63,7 @@ util_install_common () {
 check_and_install_go() {
     if [[ ! -x "$(command -v go)" ]]; then
         warn "no go installed, installing from assets..."
-        cd $DIR_ASSETS
+        cd $DIR_THIRD_PARTIES
         rm -rf /usr/local/go
         tar -C /usr/local -xzf go1.23.2.linux-amd64.tar.gz
         echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile

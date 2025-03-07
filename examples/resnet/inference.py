@@ -74,7 +74,7 @@ def run_infer():
             if print_statistics_per_iter:
                 print(f"itetration {nb_iteration} duration: {int(round((end_t-start_t) * 1000))} ms")
 
-            if nb_iteration == 64:
+            if nb_iteration == 512:
                 print(f"reach {nb_iteration}, break")
                 break
 

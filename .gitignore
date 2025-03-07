@@ -39,10 +39,7 @@ bin/
 tmp/
 
 # ignore all assets
-assets
-dockerfiles/assets
 third_party/libclang-static-build
-third_party/libclang-static-build.tar.gz
 
 # ignore exps. results
 osdi_data

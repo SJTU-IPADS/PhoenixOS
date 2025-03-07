@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-
+	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
 )
 
@@ -27,6 +27,13 @@ const (
 )
 
 func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
+	if cmdOpt.DoBuild {
+		//utils.CheckAndInstallPackageViaOsPkgManager("libnccl2=2.25.1-1+cuda12.8", logger)
+		utils.CheckAndInstallPackageViaOsPkgManager("libnccl-dev=2.9.9-1+cuda11.3", logger)
+		utils.CheckAndInstallPackageViaOsPkgManager("clang", logger)
+		utils.CheckAndInstallPackageViaOsPkgManager("cmake", logger)
+	}
+
 	build_script := fmt.Sprintf(`
 		#!/bin/bash
 		set -e

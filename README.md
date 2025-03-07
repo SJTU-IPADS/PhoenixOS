@@ -101,7 +101,7 @@
 
     # install basic dependencies from OS pkg manager
     apt-get update
-    apt-get install git wget
+    apt-get install git-lfs
     
     # download assets
     cd /root/scripts/build_scripts

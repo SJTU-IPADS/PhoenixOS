@@ -20,6 +20,8 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # import utilities
 source $script_dir/../common.sh
 
+
+
 # ================== program starts here ==================
 check_and_install_go
 if [ $? -ne 0 ]; then
