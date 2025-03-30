@@ -1,24 +1,28 @@
 [submodule "third_party/cuda-checkpoint"]
 	path = third_party/cuda-checkpoint
-    url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/cuda-checkpoint.git
+	url = https://github.com/NVIDIA/cuda-checkpoint.git
 	branch = main
 [submodule "third_party/googletest"]
 	path = third_party/googletest
-    url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/googletest.git
+	url = https://github.com/google/googletest.git
+	branch = main
 [submodule "third_party/yaml-cpp"]
 	path = third_party/yaml-cpp
-    url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/yaml-cpp.git
+	url = https://github.com/jbeder/yaml-cpp.git
+	branch = master
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
-	url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/protobuf.git
+	url = https://github.com/protocolbuffers/protobuf.git
+	branch = main
 [submodule "third_party/criu"]
 	path = third_party/criu
-	url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/criu.git
+	url = https://github.com/SJTU-IPADS/PhoenixOS-CRIU.git
 	branch = adapt_cuda_checkpoint
 [submodule "third_party/util-linux"]
 	path = third_party/util-linux
-	url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/util-linux.git
+	url = https://github.com/util-linux/util-linux.git
+	branch = master
 [submodule "remoting"]
 	path = remoting
-	url = https://ipads.se.sjtu.edu.cn:1312/scaleaisys/phoenixos-submodules/remoting.git
+	url = https://github.com/SJTU-IPADS/PhoenixOS-Remoting.git
 	branch = main
