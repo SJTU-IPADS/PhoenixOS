@@ -281,11 +281,6 @@ class POSWorker {
         uint64_t _cow_stream_id;
     #endif
 
-    #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
-        // stream for commiting checkpoint from device
-        uint64_t _ckpt_commit_stream_id;
-    #endif
-
 
     /*!
      *  \brief  insertion of worker functions
@@ -358,8 +353,6 @@ class POSWorker {
         /*!
          *  \brief  [Top-half] overlapped checkpoint procedure, should be implemented by each platform
          *  \note   this thread will be raised by level-2 ckpt
-         *  \note   aware of the macro POS_CONF_EVAL_CkptEnablePipeline
-         *  \note   aware of the macro POS_CKPT_ENABLE_ORCHESTRATION
          */
         void __checkpoint_TH_async_thread();
 
@@ -446,10 +439,10 @@ class POSWorker {
         
         enum metrics_sequence_type_t : uint8_t {
             __SEQUENCE_BASE__= 0,
-            #if POS_CONF_RUNTIME_EnableMemoryTrace
-                KERNEL_write_state_size,
-                CKPT_cow_size,
-            #endif
+            KERNEL_write_state_size,
+            CKPT_cow_size,
+            CKPT_cow_duration,
+
             // note: here could have a crazy metric to collect each kernel's duration
             RESTORE_ondemand_restore_handle_nb,
             RESTORE_ondemand_restore_handle_with_state_nb,

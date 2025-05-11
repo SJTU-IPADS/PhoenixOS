@@ -1,9 +1,12 @@
 import time
+import os
 import torch
 from torch.utils.data import DataLoader, Dataset
 from diffusers import StableDiffusionPipeline
 from transformers import CLIPTextModel, CLIPTokenizer
 import numpy as np
+import asyncio
+import threading
 
 image_size = 64
 batch_size = 4
@@ -27,7 +30,7 @@ class RandomDataset(Dataset):
         return torch.tensor(image), caption
 
 
-model_path = "/data/huggingface/hub/stable-diffusion-v1-4/"
+model_path = "/data/huggingface/hub/CompVis/stable-diffusion-v1-4"
 pipeline = StableDiffusionPipeline.from_pretrained(model_path)
 unet = pipeline.unet.to(device)
 vae = pipeline.vae.to(device)
@@ -44,10 +47,56 @@ optimizer = torch.optim.AdamW(unet.parameters(), lr=learning_rate)
 
 start_time = time.perf_counter()
 
+async def run_pos_cli(pid, cmd):
+    env = os.environ.copy()
+    env.pop("LD_PRELOAD", None)
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        print(f"[stdout]\n{stdout.decode()}")
+    else:
+        print(f"[stderr]\n{stderr.decode()}")
+        raise RuntimeError(f"Command failed with return code {process.returncode}")
+
+
+class phos:
+    @staticmethod
+    def predump(pid, mode='cow'):
+        async def run_and_log():
+            try:
+                if mode == 'cow':
+                    await run_pos_cli(pid, cmd=f"pos_cli --pre-dump --dir ./ckpt --option cow --pid {pid}")
+                elif mode == 'sow':
+                    await run_pos_cli(pid, cmd=f"pos_cli --pre-dump --dir ./ckpt --pid {pid}")
+                elif mode == 'cuda-ckpt':
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -c")
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -s false -g")
+            except Exception as e:
+                print(f"[run_pos_cli] Error: {e}")
+        def runner():
+            asyncio.run(run_and_log())
+        threading.Thread(target=runner, daemon=True).start()
+
+
+pid = os.getpid()
+print(f"process id: {pid}")
+print(torch.cuda.memory_summary())
+
 for epoch in range(num_epochs):
     print(f"Epoch {epoch + 1}/{num_epochs}")
     unet.train()
     for step, (images, captions) in enumerate(dataloader):
+
+        # checkpoint before forward
+        # if step == 22:
+        #     print(torch.cuda.memory_summary())
+        #     phos.predump(pid, mode='cow')
+
         inputs = tokenizer(
             captions, padding="max_length", truncation=True, return_tensors="pt"
         ).to(device)

@@ -560,7 +560,7 @@ class POSHandle {
 
  protected:
     // counter for exclude copy-on-write and checkpoint process
-    std::atomic<uint8_t> _state_preserve_counter;
+    std::atomic<uint64_t> _state_preserve_counter;
 
     // thread to persist checkpoint of the current handle
     std::thread *_persist_thread;

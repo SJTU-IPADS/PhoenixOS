@@ -88,7 +88,7 @@ class POSCheckpointSlot {
     {
         POS_ASSERT(state_size > 0);
         if(likely(allocator != nullptr)){
-            POS_CHECK_POINTER(this->_data = allocator(state_size));
+            this->_data = allocator(state_size);
         } else {
             POS_CHECK_POINTER(this->_data = reinterpret_cast<void*>(new uint8_t[state_size]));
         }
@@ -249,12 +249,13 @@ class POSCheckpointBag {
      *  \brief  invalidate the checkpoint from this bag
      *  \tparam ckpt_slot_pos       position of the checkpoint slot to be invalidated
      *  \tparam ckpt_state_type     type of the checkpointed state
-     *  \param  version version of the checkpoint to be removed
+     *  \param  version     version of the checkpoint to be removed
+     *  \param  do_remove   whether to remove the checkpoint slot from host/device memory
      *  \return POS_SUCCESS for successfully invalidate
      *          POS_NOT_READY for no checkpoint had been record
      */
     template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
-    pos_retval_t invalidate_by_version(uint64_t version);
+    pos_retval_t invalidate_by_version(uint64_t version, bool do_remove=false);
 
 
     /*!

@@ -61,6 +61,7 @@ enum pos_retval : pos_retval_t {
     POS_WARN_NOT_READY,
     POS_WARN_ABANDONED,
     POS_WARN_BLOCKED,
+    POS_WARN_RETRY,
     POS_FAILED,
     POS_FAILED_NOT_EXIST,
     POS_FAILED_ALREADY_EXIST,

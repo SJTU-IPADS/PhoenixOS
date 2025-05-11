@@ -108,12 +108,12 @@ template uint64_t POSCheckpointBag::get_memory_consumption<kPOS_CkptSlotPosition
 
 
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
-pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
+pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version, bool do_remove) {
    return POS_FAILED_NOT_IMPLEMENTED;
 }
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(uint64_t version);
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(uint64_t version);
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(uint64_t version);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(uint64_t version, bool do_remove);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(uint64_t version, bool do_remove);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(uint64_t version, bool do_remove);
 
 
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>

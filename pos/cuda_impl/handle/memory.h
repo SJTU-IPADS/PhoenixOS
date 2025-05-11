@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <atomic>
 #include <sys/resource.h>
 #include <stdint.h>
 #include <cuda.h>
@@ -36,6 +37,7 @@
 // forward declaration
 class POSHandleManager_CUDA_Memory;
 
+#define POS_CUDA_ONDEIVCE_CKPT_CACHE_SIZE GB(14)
 
 /*!
  *  \brief  handle for cuda memory
@@ -88,76 +90,28 @@ class POSHandle_CUDA_Memory final : public POSHandle_CUDA {
      *  \brief  allocator of the host-side checkpoint memory
      *  \param  state_size  size of the area to store checkpoint
      */
-    static void* __checkpoint_allocator(uint64_t state_size) {
-        cudaError_t cuda_rt_retval;
-        void *ptr;
-
-        if(unlikely(state_size == 0)){
-            POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
-            return nullptr;
-        }
-
-        cuda_rt_retval = cudaMallocHost(&ptr, state_size);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_DETAIL("failed cudaMallocHost, error: %d", cuda_rt_retval);
-            return nullptr;
-        }
-
-        return ptr;
-    }
+    static void* __checkpoint_allocator(uint64_t state_size);
 
 
     /*!
      *  \brief  deallocator of the host-side checkpoint memory
      *  \param  data    pointer of the buffer to be deallocated
      */
-    static void __checkpoint_deallocator(void* data){
-        cudaError_t cuda_rt_retval;
-        if(likely(data != nullptr)){
-            cuda_rt_retval = cudaFreeHost(data);
-            if(unlikely(cuda_rt_retval != cudaSuccess)){
-                POS_WARN_DETAIL("failed cudaFreeHost, error: %d", cuda_rt_retval);
-            }
-        }
-    }
+    static void __checkpoint_deallocator(void* data);
 
 
     /*!
      *  \brief  allocator of the device-side checkpoint memory
      *  \param  state_size  size of the area to store checkpoint
      */
-    static void* __checkpoint_dev_allocator(uint64_t state_size) {
-        cudaError_t cuda_rt_retval;
-        void *ptr;
-
-        if(unlikely(state_size == 0)){
-            POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
-            return nullptr;
-        }
-
-        cuda_rt_retval = cudaMalloc(&ptr, state_size);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            POS_WARN_DETAIL("failed cudaMalloc, error: %d", cuda_rt_retval);
-            return nullptr;
-        }
-
-        return ptr;
-    }
+    static void* __checkpoint_dev_allocator(uint64_t state_size);
 
 
     /*!
      *  \brief  deallocator of the host-side checkpoint memory
      *  \param  data    pointer of the buffer to be deallocated
      */
-    static void __checkpoint_dev_deallocator(void* data){
-        cudaError_t cuda_rt_retval;
-        if(likely(data != nullptr)){
-            cuda_rt_retval = cudaFree(data);
-            if(unlikely(cuda_rt_retval != cudaSuccess)){
-                POS_WARN_DETAIL("failed cudaFree, error: %d", cuda_rt_retval);
-            }
-        }
-    }
+    static void __checkpoint_dev_deallocator(void* data);
 
 
     /*!
@@ -264,6 +218,12 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      *          so that current hm doesn't need to reserve again
      */
     static bool has_finshed_reserved;
+
+    /*!
+     *  \brief  budget for ondevice checkpoint cache (bytes)
+     *  \note   we make this variable shared across clients, as our actual physical memory is shared across clients
+     */
+    static std::atomic<uint64_t> ondevice_ckpt_cache_budget;
 
 
     /*!

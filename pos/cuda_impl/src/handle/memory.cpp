@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <map>
+#include <atomic>
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -31,7 +32,10 @@
 std::map<int, CUdeviceptr>  POSHandleManager_CUDA_Memory::alloc_ptrs;
 std::map<int, uint64_t>     POSHandleManager_CUDA_Memory::alloc_granularities;
 bool                        POSHandleManager_CUDA_Memory::has_finshed_reserved;
-const uint64_t              POSHandleManager_CUDA_Memory::reserved_vm_base = 0x7facd0000000;
+const uint64_t              POSHandleManager_CUDA_Memory::reserved_vm_base = 0x7facd0000000;\
+
+// TODO(zhuobin): make this configurable
+std::atomic<uint64_t>       POSHandleManager_CUDA_Memory::ondevice_ckpt_cache_budget = POS_CUDA_ONDEIVCE_CKPT_CACHE_SIZE;
 
 
 POSHandle_CUDA_Memory::POSHandle_CUDA_Memory(size_t size_, void* hm, pos_u64id_t id_, size_t state_size_)
@@ -147,7 +151,7 @@ pos_retval_t POSHandle_CUDA_Memory::__add(uint64_t version_id, uint64_t stream_i
             /* force_overwrite */ true
         )
     ))){
-        POS_WARN_C("failed to apply checkpoint slot");
+        // POS_WARN_C("failed to apply checkpoint slot");
         retval = POS_FAILED;
         goto exit;
     }
@@ -206,7 +210,7 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(uint64_t version_id, uint64_t strea
     }
 
     POS_CHECK_POINTER(ckpt_slot);
-
+    
     if(from_cache == false){
         // commit from origin buffer
         cuda_rt_retval = cudaMemcpyAsync(
@@ -254,7 +258,7 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(uint64_t version_id, uint64_t strea
         }
     }
 
-    if(is_sync){
+    if(is_sync or from_cache){
         cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(stream_id));
         if(unlikely(cuda_rt_retval != cudaSuccess)){
             POS_WARN_C(
@@ -264,6 +268,27 @@ pos_retval_t POSHandle_CUDA_Memory::__commit(uint64_t version_id, uint64_t strea
             retval = POS_FAILED;
             goto exit;
         }
+    }
+
+    if(from_cache){
+        // we invalidate and remove this cache buffer, as we don't need it after commit
+        if(unlikely(POS_SUCCESS != (
+            this->ckpt_bag->invalidate_by_version<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(
+                /* version */ version_id,
+                /* do_remove */ true
+            )
+        ))){
+            POS_WARN_C(
+                "failed to invalidate checkpoint slot of cache after commit: version_id(%lu), server_addr(%p)",
+                version_id, this->server_addr
+            );
+            retval = POS_FAILED;
+            goto exit;
+        }
+
+        // we add back the on-device cache budget
+        POSHandleManager_CUDA_Memory::ondevice_ckpt_cache_budget.fetch_add(this->state_size);
+        // POS_DEBUG("return cache: %lu bytes", this->state_size);
     }
 
 exit:
@@ -463,6 +488,114 @@ exit:
 }
 
 
+void* POSHandle_CUDA_Memory::__checkpoint_allocator(uint64_t state_size) {
+    cudaError_t cuda_rt_retval;
+    void *ptr;
+
+    if(unlikely(state_size == 0)){
+        POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
+        return nullptr;
+    }
+
+    cuda_rt_retval = cudaMallocHost(&ptr, state_size);
+    if(unlikely(cuda_rt_retval != cudaSuccess)){
+        POS_WARN_DETAIL("failed cudaMallocHost, error: %d", cuda_rt_retval);
+        return nullptr;
+    }
+
+    return ptr;
+}
+
+
+void POSHandle_CUDA_Memory::__checkpoint_deallocator(void* data){
+    cudaError_t cuda_rt_retval;
+    if(likely(data != nullptr)){
+        cuda_rt_retval = cudaFreeHost(data);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed cudaFreeHost, error: %d", cuda_rt_retval);
+        }
+    }
+}
+
+
+void* POSHandle_CUDA_Memory::__checkpoint_dev_allocator(uint64_t state_size) {
+    cudaError_t cuda_rt_retval;
+    void *ptr = nullptr;
+    uint64_t current_budget = 0;
+    bool is_apply_budget_successful = false;
+    uint64_t retry_times = (1<<14);
+
+    if(unlikely(state_size == 0)){
+        POS_WARN_DETAIL("try to allocate checkpoint with state size of 0");
+        return nullptr;
+    }
+
+    while(!is_apply_budget_successful && retry_times > 0){
+        current_budget = POSHandleManager_CUDA_Memory::ondevice_ckpt_cache_budget.load();
+        while(current_budget >= state_size){
+            if(
+                POSHandleManager_CUDA_Memory::ondevice_ckpt_cache_budget.compare_exchange_weak(
+                    current_budget, current_budget - state_size
+                )
+            ){
+                is_apply_budget_successful = true;
+                // POS_DEBUG("current_budget: %lu bytes, take %lu bytes", current_budget, state_size);
+                break;
+            } else {
+                /* the current_budget is changed, we update current_budget to new value and compare again */
+                // POS_DEBUG("current_budget (inside): %lu bytes, requested %lu bytes", current_budget, state_size);
+            }
+        }
+
+        retry_times--;
+    }
+
+    if(is_apply_budget_successful){
+        cuda_rt_retval = cudaMallocAsync(&ptr, state_size, 0);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed cudaMalloc, error: %d", cuda_rt_retval);
+            ptr = nullptr;
+            goto exit;
+        }
+
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(0));
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL(
+                "failed to synchronize after allocating on-device cache: retval(%d)",
+                cuda_rt_retval
+            );
+            ptr = nullptr;
+            goto exit;
+        }
+    } else {
+        ptr = nullptr;
+        goto exit;
+    }
+
+exit:
+    return ptr;
+}
+
+
+void POSHandle_CUDA_Memory::__checkpoint_dev_deallocator(void* data){
+    cudaError_t cuda_rt_retval;
+    if(likely(data != nullptr)){
+        cuda_rt_retval = cudaFreeAsync(data, 0);
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL("failed cudaFree, error: %d", cuda_rt_retval);
+        }
+
+        cuda_rt_retval = cudaStreamSynchronize((cudaStream_t)(0));
+        if(unlikely(cuda_rt_retval != cudaSuccess)){
+            POS_WARN_DETAIL(
+                "failed to synchronize after deallocating on-device cache: retval(%d)",
+                cuda_rt_retval
+            );
+        }
+    }
+}
+
+
 POSHandleManager_CUDA_Memory::POSHandleManager_CUDA_Memory() : POSHandleManager(/* passthrough */ true) {}
 
 
@@ -544,7 +677,7 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
          *  \note   we only reserved 90% of free memory, and round up the size according to allocation granularity
          */
     #define ROUND_UP(size, aligned_size) ((size + aligned_size - 1) / aligned_size) * aligned_size
-        free_portion = 0.9*free;
+        free_portion = 0.99*free;
         reserved_size = ROUND_UP(free_portion, alloc_granularity);
     #undef ROUND_UP
 

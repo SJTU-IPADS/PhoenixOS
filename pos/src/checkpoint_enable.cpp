@@ -177,10 +177,19 @@ pos_retval_t POSCheckpointBag::apply_checkpoint_slot(
             version_set->erase(old_version);
         } else { 
             POS_CHECK_POINTER(*ptr = new POSCheckpointSlot(state_size, allocate_func, deallocate_func, ckpt_slot_pos, ckpt_state_type));
+            if((*ptr)->expose_pointer() == nullptr){
+                delete (*ptr);
+                *ptr = nullptr;
+                retval = POS_FAILED;
+                goto exit;
+            }
         }
     }
-    active_map->insert(std::pair<uint64_t, POSCheckpointSlot*>(version, *ptr));
-    version_set->insert(version);
+
+    if(*ptr != nullptr){
+        active_map->insert(std::pair<uint64_t, POSCheckpointSlot*>(version, *ptr));
+        version_set->insert(version);
+    }
 
 exit:
     return retval;
@@ -406,7 +415,7 @@ template uint64_t POSCheckpointBag::get_memory_consumption<kPOS_CkptSlotPosition
 
 
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>
-pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
+pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version, bool do_remove) {
     pos_retval_t retval = POS_SUCCESS;
     POSCheckpointSlot *ckpt_slot;
     std::unordered_map<uint64_t, POSCheckpointSlot*> *cached_map, *active_map;
@@ -449,14 +458,19 @@ pos_retval_t POSCheckpointBag::invalidate_by_version(uint64_t version) {
 
     active_map->erase(version);
     version_set->erase(version);
-    cached_map->insert(std::pair<uint64_t,POSCheckpointSlot*>(version, ckpt_slot));
+
+    if(do_remove){
+        delete ckpt_slot;
+    } else {
+        cached_map->insert(std::pair<uint64_t,POSCheckpointSlot*>(version, ckpt_slot));
+    }
 
 exit:
     return retval;
 }
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(uint64_t version);
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(uint64_t version);
-template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(uint64_t version);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Device, kPOS_CkptStateType_Device>(uint64_t version, bool do_remove);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Device>(uint64_t version, bool do_remove);
+template pos_retval_t POSCheckpointBag::invalidate_by_version<kPOS_CkptSlotPosition_Host, kPOS_CkptStateType_Host>(uint64_t version, bool do_remove);
 
 
 template<pos_ckptslot_position_t ckpt_slot_pos, pos_ckpt_state_type_t ckpt_state_type>

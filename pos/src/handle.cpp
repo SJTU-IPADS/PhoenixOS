@@ -92,17 +92,22 @@ pos_retval_t POSHandle::checkpoint_add(uint64_t version_id, uint64_t stream_id) 
         goto exit;
     }
 
-    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
+    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_seq_cst);
     if (old_counter == 0) {
         /*!
          *  \brief  [case]  no adding on this handle yet, we conduct sync on-device copy from the origin buffer
          *  \note   this process must be sync, as there could have commit process waiting on this adding to be finished
          */
         retval = this->__add(version_id, stream_id);
-        this->_state_preserve_counter.store(3, std::memory_order_relaxed);
+        if(retval == POS_SUCCESS){
+            this->_state_preserve_counter.store(3, std::memory_order_seq_cst);
+        } else {
+            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+            this->_state_preserve_counter.store(4, std::memory_order_seq_cst);
+        }
     } else if (old_counter == 1) {
         /*!
-         *  \brief  [case]  there's non-finished adding on this handle, we need to wait until the adding finished
+         *  \brief  [case]  there's non-finished commit on this handle, we need to wait until the adding finished
          */
         retval = POS_WARN_ABANDONED;
         while(this->_state_preserve_counter < 3){}
@@ -115,40 +120,36 @@ exit:
 
 pos_retval_t POSHandle::checkpoint_commit_async(uint64_t version_id, uint64_t stream_id){ 
     pos_retval_t retval = POS_SUCCESS;
-    
-    #if POS_CONF_EVAL_CkptEnablePipeline == 1
-        //  if the on-device cache is enabled, the cache should be added previously by checkpoint_add,
-        //  and this commit process doesn't need to be sync, as no ADD could corrupt this process
+    uint8_t old_counter;
+
+    old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_seq_cst);
+    if (old_counter == 0) {
+        /*!
+         *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
+         *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
+         *          commit must be sync, as there could have CoW waiting on this commit to be finished
+         */
+        retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
+        this->_state_preserve_counter.store(4, std::memory_order_seq_cst);
+    } else if (old_counter == 1) {
+        /*!
+         *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
+         *                  commit from the new buffer
+         *  \note   we commit from the cache under this hood, and the commit process is async as there's no CoW 
+         *          on this handle anymore
+         */
+        // retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
+        this->_state_preserve_counter.fetch_sub(1, std::memory_order_seq_cst);
+        retval = POS_WARN_RETRY;
+    } else if(old_counter < 4) {
+        /*!
+         *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
+         *  \note   same as the last case
+         */
         retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-    #else
-        uint8_t old_counter;
-        old_counter = this->_state_preserve_counter.fetch_add(1, std::memory_order_relaxed);
-        if (old_counter == 0) {
-            /*!
-                *  \brief  [case]  no CoW on this handle yet, we directly commit this buffer
-                *  \note   the on-device cache is disabled, the commit should comes from the origin buffer, and this
-                *          commit must be sync, as there could have CoW waiting on this commit to be finished
-                */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ false, /* is_sync */ true);
-            this->_state_preserve_counter.store(3, std::memory_order_relaxed);
-        } else if (old_counter == 1) {
-            /*!
-                *  \brief  [case]  there's non-finished CoW on this handle, we need to wait until the CoW finished and
-                *                  commit from the new buffer
-                *  \note   we commit from the cache under this hood, and the commit process is async as there's no CoW 
-                *          on this handle anymore
-                */
-            while(this->_state_preserve_counter < 3){}
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-        } else {
-            /*!
-                *  \brief  [case]  there's finished CoW on this handle, we can directly commit from the cache
-                *  \note   same as the last case
-                */
-            retval = this->__commit(version_id, stream_id, /* from_cache */ true, /* is_sync */ false);
-        }
-    #endif  // POS_CONF_EVAL_CkptEnablePipeline        
-    
+        this->_state_preserve_counter.store(4, std::memory_order_seq_cst);
+    }
+
     return retval;
 }
 

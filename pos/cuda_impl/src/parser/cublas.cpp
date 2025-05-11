@@ -247,6 +247,7 @@ namespace cublas_sgemm {
     // parser function
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
+        uint64_t i;
         POSClient_CUDA *client;
         POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
@@ -351,6 +352,29 @@ namespace cublas_sgemm {
 
         hm_memory->record_modified_handle(memory_handle_C);
 
+        // [SOSP25] for sosp25 submission
+        // #if POS_CONF_RUNTIME_EnableTrace
+        //     POS_LOG("kernel: %s, timestamp: %lf ms", "cublasSgemm", ws->tsc_timer.tick_to_ms(POSUtilTscTimer::get_tsc()));
+        //     for(i=0; i<wqe->input_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_input_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [in] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        //     for(i=0; i<wqe->output_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_output_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [out] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        //     for(i=0; i<wqe->inout_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_inout_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [inout] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        // #endif
+
         #if POS_CONF_RUNTIME_EnableTrace
             parser->metric_reducers.reduce(
                 /* index */ POSParser::KERNEL_in_memories,
@@ -383,6 +407,7 @@ namespace cublas_sgemm_strided_batched {
     POS_RT_FUNC_PARSER(){
         pos_retval_t retval = POS_SUCCESS;
         POSClient_CUDA *client;
+        uint64_t i;
         POSHandle_cuBLAS_Context *cublas_context_handle;
         POSHandle_CUDA_Memory *memory_handle_A, *memory_handle_B, *memory_handle_C;
         POSHandleManager_cuBLAS_Context *hm_cublas_context;
@@ -485,6 +510,29 @@ namespace cublas_sgemm_strided_batched {
         });
 
         hm_memory->record_modified_handle(memory_handle_C);
+
+        // // [SOSP25] for sosp25 submission
+        // #if POS_CONF_RUNTIME_EnableTrace
+        //     POS_LOG("kernel: %s, timestamp: %lf ms", "cublasSgemmStridedBatched", ws->tsc_timer.tick_to_ms(POSUtilTscTimer::get_tsc()));
+        //     for(i=0; i<wqe->input_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_input_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [in] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        //     for(i=0; i<wqe->output_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_output_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [out] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        //     for(i=0; i<wqe->inout_handle_views.size(); i++){
+        //         POSHandle* &handle = pos_api_inout_handle(wqe, i);
+        //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+        //             POS_LOG("   [inout] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+        //         }
+        //     }
+        // #endif
 
         #if POS_CONF_RUNTIME_EnableTrace
             parser->metric_reducers.reduce(

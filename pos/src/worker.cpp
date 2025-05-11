@@ -50,10 +50,6 @@ POSWorker::POSWorker(POSWorkspace* ws, POSClient* client)
         this->_cow_stream_id = 0;
     #endif
 
-    #if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
-        this->_ckpt_commit_stream_id = 0;
-    #endif
-
     #if POS_CONF_EVAL_MigrOptLevel > 0
         this->_migration_precopy_stream_id = 0;
     #endif
@@ -465,6 +461,7 @@ void POSWorker::__daemon_ckpt_async(){
     POSCommand_QE_t *cmd_wqe;
     std::vector<POSCommand_QE_t*> cmd_wqes;
     POSHandle *handle;
+    uint64_t s_tick, e_tick;
 
     #if POS_CONF_RUNTIME_EnableTrace
         uint64_t nb_cow_handle = 0, nb_cow_stateful_handle = 0, cow_size = 0;
@@ -619,6 +616,7 @@ void POSWorker::__daemon_ckpt_async(){
                  *          [2] the state is under checkpointing, then it blocks until the checkpoint finished
                  *          [3] the state is already checkpointed, then it directly returns
                  */
+                s_tick = this->_ws->tsc_timer.get_tsc();
                 for(auto &inout_handle_view : wqe->inout_handle_views){
                     POS_CHECK_POINTER(handle = inout_handle_view.handle);
                     if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
@@ -627,7 +625,7 @@ void POSWorker::__daemon_ckpt_async(){
                     )){
                         continue;
                     }
-                    if( this->async_ckpt_cxt.cmd->do_cow 
+                    if( this->async_ckpt_cxt.cmd->do_cow
                         && this->async_ckpt_cxt.checkpoint_version_map.count(handle) > 0
                         && this->async_ckpt_cxt.dirty_handles.count(handle) == 0
                     ){
@@ -705,12 +703,13 @@ void POSWorker::__daemon_ckpt_async(){
                         this->async_ckpt_cxt.dirty_handle_state_size += handle->state_size;
                     }
                 }
+                e_tick = this->_ws->tsc_timer.get_tsc();
 
                 #if POS_CONF_RUNTIME_EnableTrace
-                    #if POS_CONF_RUNTIME_EnableMemoryTrace
-                        if(cow_size > 0)
-                            this->_metric_sequences.add_spot(CKPT_cow_size, cow_size);
-                    #endif
+                    if(cow_size > 0){
+                        this->_metric_sequences.add_spot(CKPT_cow_size, cow_size);
+                        this->_metric_sequences.add_spot(CKPT_cow_duration, this->_ws->tsc_timer.tick_range_to_ms(e_tick, s_tick));
+                    }
                 #endif
             } // this->async_ckpt_cxt.TH_actve == true
 
@@ -750,9 +749,10 @@ void POSWorker::__checkpoint_TH_async_thread() {
     POSCommand_QE_t *cmd;
     POSHandle *handle;
     uint64_t s_tick = 0, e_tick = 0;
-    uint64_t commit_stream_id;
+
     
-    std::set<POSHandle*> async_commited_handles;
+    std::set<POSHandle*> remain_stateful_handles;
+    std::set<POSHandle*> commited_handles;
     typename std::set<POSHandle*>::iterator set_iter;
 
     // todo: we need an interface to know how many D2H engine we have,
@@ -762,99 +762,38 @@ void POSWorker::__checkpoint_TH_async_thread() {
     POS_CHECK_POINTER(cmd = this->async_ckpt_cxt.cmd);
     POS_ASSERT(this->_ckpt_stream_id != 0);
 
-    #if POS_CONF_EVAL_CkptEnablePipeline == 1
-        POS_ASSERT(this->_ckpt_commit_stream_id != 0);
-    #endif
+    remain_stateful_handles = cmd->stateful_handles;
 
-    for(set_iter=cmd->stateful_handles.begin(); set_iter!=cmd->stateful_handles.end(); set_iter++){
-        POSHandle *handle = *set_iter;
+    set_iter = remain_stateful_handles.begin();
+    while(!remain_stateful_handles.empty() && !this->_stop_flag){
+        auto current_iter = set_iter++;
+
+        if (set_iter == remain_stateful_handles.end()) {
+            set_iter = remain_stateful_handles.begin();
+        }
+
+        POSHandle *handle = *current_iter;
         POS_CHECK_POINTER(handle);
 
-        if(unlikely(   handle->status == kPOS_HandleStatus_Deleted 
-                    || handle->status == kPOS_HandleStatus_Create_Pending
-                    || handle->status == kPOS_HandleStatus_Broken
-        )){
+        if(unlikely(handle->status == kPOS_HandleStatus_Deleted || handle->status == kPOS_HandleStatus_Broken)){
+            remain_stateful_handles.erase(current_iter); // no need
+            goto membus_lock_check;
+        }
+
+        if(unlikely(handle->status == kPOS_HandleStatus_Create_Pending)){
+            // we will wait until this handle be created
             goto membus_lock_check;
         }
 
         if(unlikely(this->async_ckpt_cxt.checkpoint_version_map.count(handle) == 0)){
             POS_WARN_C("failed to checkpoint handle, no checkpoint version provided: client_addr(%p)", handle->client_addr);
+            remain_stateful_handles.erase(current_iter);
             goto membus_lock_check;
         }
 
         checkpoint_version = this->async_ckpt_cxt.checkpoint_version_map[handle];
 
         // step 1: add & commit of all stateful handles
-    #if POS_CONF_EVAL_CkptEnablePipeline == 1
-        /*!
-         *  \brief  [phrase 1]  add the state of this handle from its origin buffer
-         *  \note   the adding process is sync as it might disturbed by CoW
-         */
-        #if POS_CONF_RUNTIME_EnableTrace
-            this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_done_ticks_by_ckpt_thread);
-            this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_ckpt_thread);
-        #endif
-        retval = handle->checkpoint_add(
-            /* version_id */    checkpoint_version,
-            /* stream_id */     this->_ckpt_stream_id
-        );
-        POS_ASSERT(retval == POS_SUCCESS || retval == POS_WARN_ABANDONED || retval == POS_FAILED_ALREADY_EXIST);
-        #if POS_CONF_RUNTIME_EnableTrace
-            if(retval == POS_SUCCESS){
-                this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_done_ticks_by_ckpt_thread);
-                this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_done_times_by_ckpt_thread);
-                this->async_ckpt_cxt.metric_reducers.reduce(
-                    /* index */ checkpoint_async_cxt_t::CKPT_cow_bytes_by_ckpt_thread,
-                    /* value */ handle->state_size
-                );
-            } else if(retval == POS_WARN_ABANDONED){
-                this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_cow_block_ticks_by_ckpt_thread);
-                this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_cow_block_times_by_ckpt_thread);
-            }
-        #endif
-
-        /*!
-         *  \brief  [phrase 2]  commit the resource state from cache
-         */
-        #if POS_CONF_RUNTIME_EnableTrace
-            this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_commit_ticks_by_ckpt_thread);
-        #endif
-
-        retval = handle->checkpoint_commit_async(
-            /* version_id */    checkpoint_version,
-            /* stream_id */     this->_ckpt_commit_stream_id
-        );
-        if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
-            dirty_retval = retval;
-            goto membus_lock_check;
-        }
-        commit_stream_id = this->_ckpt_commit_stream_id;
-
-        if constexpr (TMP_enable_mem_lock == true){
-            /*!
-             *  \note   originally the commit process is async as it would never be disturbed by CoW, but we also need to prevent
-             *          ckpt memcpy conflict with normal memcpy, so we sync the execution here to check the memcpy flag
-             *  \todo   how many D2H engine do we have?
-             */
-            retval = this->sync(this->_ckpt_commit_stream_id);
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
-                dirty_retval = retval;
-            }
-        } else {
-            async_commited_handles.insert(handle);
-        }
-
-        #if POS_CONF_RUNTIME_EnableTrace
-            this->async_ckpt_cxt.metric_reducers.reduce(
-                /* index */ checkpoint_async_cxt_t::CKPT_commit_bytes_by_ckpt_thread,
-                /* value */ handle->state_size
-            );
-            this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_commit_times_by_ckpt_thread);
-            this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_commit_ticks_by_ckpt_thread);
-        #endif
-    #else
         /*!
          *  \brief  [phrase 1]  commit the resource state from origin buffer or CoW cache
          *  \note   if the CoW is ongoing or finished, it commit from cache; otherwise it commit from origin buffer
@@ -867,33 +806,39 @@ void POSWorker::__checkpoint_TH_async_thread() {
             /* version_id */    checkpoint_version,
             /* stream_id */     this->_ckpt_stream_id
         );
-        if(unlikely(retval != POS_SUCCESS && retval != POS_WARN_ABANDONED)){
+        if(unlikely(retval != POS_SUCCESS && retval != POS_WARN_RETRY)){
             POS_WARN("failed to async commit the handle within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
             dirty_retval = retval;
+            remain_stateful_handles.erase(current_iter);
             goto membus_lock_check;
         }
-        commit_stream_id = this->_ckpt_stream_id;
 
-        if constexpr (TMP_enable_mem_lock == true){
-            // the sync would be done by persist below, we omit here
-            retval = this->sync(this->_ckpt_stream_id);
-            if(unlikely(retval != POS_SUCCESS)){
-                POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
-                dirty_retval = retval;
+        if(retval != POS_WARN_RETRY){
+            commited_handles.insert(handle);
+
+            if constexpr (TMP_enable_mem_lock == true){
+                retval = this->sync(this->_ckpt_stream_id);
+                if(unlikely(retval != POS_SUCCESS)){
+                    POS_WARN("failed to sync the commit within ckpt thread: server_addr(%p), version_id(%lu)", handle->server_addr, checkpoint_version);
+                    dirty_retval = retval;
+                }
             }
-        } else {
-            async_commited_handles.insert(handle);
+
+            #if POS_CONF_RUNTIME_EnableTrace
+                this->async_ckpt_cxt.metric_reducers.reduce(
+                    /* index */ checkpoint_async_cxt_t::CKPT_commit_bytes_by_ckpt_thread,
+                    /* value */ handle->state_size
+                );
+                this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_commit_times_by_ckpt_thread);
+            #endif
+
+            // no need to retry, alreay commited, we erase from the remain set
+            remain_stateful_handles.erase(current_iter);
         }
 
         #if POS_CONF_RUNTIME_EnableTrace
-            this->async_ckpt_cxt.metric_reducers.reduce(
-                /* index */ checkpoint_async_cxt_t::CKPT_commit_bytes_by_ckpt_thread,
-                /* value */ handle->state_size
-            );
-            this->async_ckpt_cxt.metric_counters.add_counter(checkpoint_async_cxt_t::CKPT_commit_times_by_ckpt_thread);
             this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_commit_ticks_by_ckpt_thread);
         #endif
-    #endif
 
     membus_lock_check:
         if constexpr (TMP_enable_mem_lock == true){
@@ -911,11 +856,7 @@ void POSWorker::__checkpoint_TH_async_thread() {
             this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::CKPT_commit_ticks_by_ckpt_thread);
         #endif
     
-        #if POS_CONF_EVAL_CkptEnablePipeline == 1
-            this->sync(this->_ckpt_commit_stream_id);
-        #else
-            this->sync(this->_ckpt_stream_id);
-        #endif
+        this->sync(this->_ckpt_stream_id);
 
         #if POS_CONF_RUNTIME_EnableTrace
             this->async_ckpt_cxt.metric_tickers.end(checkpoint_async_cxt_t::CKPT_commit_ticks_by_ckpt_thread);
@@ -926,7 +867,7 @@ void POSWorker::__checkpoint_TH_async_thread() {
     #if POS_CONF_RUNTIME_EnableTrace
         this->async_ckpt_cxt.metric_tickers.start(checkpoint_async_cxt_t::PERSIST_handle_ticks);
     #endif
-    for(set_iter=async_commited_handles.begin(); set_iter!=async_commited_handles.end(); set_iter++){
+    for(set_iter=commited_handles.begin(); set_iter!=commited_handles.end(); set_iter++){
         POSHandle *handle = *set_iter;
         POS_CHECK_POINTER(handle);
         
@@ -941,7 +882,7 @@ void POSWorker::__checkpoint_TH_async_thread() {
             POS_WARN(
                 "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)",
                 handle->id,
-                cmd->ckpt_dir,
+                cmd->ckpt_dir.c_str(),
                 checkpoint_version
             );
             dirty_retval = retval;
@@ -1080,7 +1021,7 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
         );
         if(unlikely(retval != POS_SUCCESS)){
             POS_WARN(
-                "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)", handle->id, cmd->ckpt_dir
+                "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)", handle->id, cmd->ckpt_dir.c_str()
             );
             goto sync_persist;
         }
@@ -1171,7 +1112,10 @@ pos_retval_t POSWorker::__checkpoint_BH_sync() {
             );
             if(unlikely(retval != POS_SUCCESS)){
                 POS_WARN(
-                    "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)", handle->id, cmd->ckpt_dir
+                    "failed to async raise persist thread: hid(%lu), ckpt_dir(%s) version_id(%lu)",
+                    handle->id,
+                    cmd->ckpt_dir.c_str(),
+                    handle->id
                 );
                 goto sync_persist;
             }
@@ -1547,10 +1491,9 @@ exit:
         };
 
         static std::vector<std::pair<metrics_sequence_type_t, std::string>> sequence_name = {
-            #if POS_CONF_RUNTIME_EnableMemoryTrace
-                { KERNEL_write_state_size, "Kernel Write Size (byte)" },
-                { CKPT_cow_size, "CoW Size (byte)" },
-            #endif
+            { KERNEL_write_state_size, "Kernel Write Size (byte)" },
+            { CKPT_cow_size, "CoW Size (byte)" },
+            { CKPT_cow_duration, "CoW Duration (ms)" },
             { RESTORE_ondemand_restore_handle_nb, "# On-demand Restore Handles" },
             { RESTORE_ondemand_restore_handle_with_state_nb, "# On-demand Restore Handles (with State)" },
             { RESTORE_ondemand_restore_handle_state_size, "On-demand Restore State Size (byte)" },

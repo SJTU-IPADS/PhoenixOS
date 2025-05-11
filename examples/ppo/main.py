@@ -5,6 +5,8 @@ import torch
 import gymnasium as gym
 import time
 import numpy as np
+import asyncio
+import threading
 
 from utils import str2bool, Action_adapter, Reward_adapter, evaluate_policy
 from PPO import PPO_agent
@@ -43,8 +45,45 @@ opt.dvc = torch.device(opt.dvc) # from str to torch.device
 print(opt)
 
 
+async def run_pos_cli(pid, cmd):
+    env = os.environ.copy()
+    env.pop("LD_PRELOAD", None)
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        print(f"[stdout]\n{stdout.decode()}")
+    else:
+        print(f"[stderr]\n{stderr.decode()}")
+        raise RuntimeError(f"Command failed with return code {process.returncode}")
+
+
+class phos:
+    @staticmethod
+    def predump(pid, mode='cow'):
+        async def run_and_log():
+            try:
+                if mode == 'cow':
+                    await run_pos_cli(pid, cmd=f"pos_cli --pre-dump --dir ./ckpt --option cow --pid {pid}")
+                elif mode == 'sow':
+                    await run_pos_cli(pid, cmd=f"pos_cli --pre-dump --dir ./ckpt --pid {pid}")
+                elif mode == 'cuda-ckpt':
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -c")
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -s false -g")
+            except Exception as e:
+                print(f"[run_pos_cli] Error: {e}")
+        def runner():
+            asyncio.run(run_and_log())
+        threading.Thread(target=runner, daemon=True).start()
+
+
 def main():
-    print(f"process id: {os.getpid()}")
+    pid = os.getpid()
+    print(f"process id: {pid}")
 
     EnvName = ['Pendulum-v1','LunarLanderContinuous-v2','Humanoid-v4','HalfCheetah-v4','BipedalWalker-v3','BipedalWalkerHardcore-v3']
     BrifEnvName = ['PV1', 'LLdV2', 'Humanv4', 'HCv4','BWv3', 'BWHv3']
@@ -105,6 +144,10 @@ def main():
 
             '''Interact & trian'''
             while not done:
+                # checkpoint before forward
+                # if total_steps == 10000:
+                #     phos.predump(pid, mode='cow')
+
                 '''Interact with Env'''
                 a, logprob_a = agent.select_action(s, deterministic=False) # use stochastic when training
                 act = Action_adapter(a,opt.max_action) #[0,1] to [-max,max]
@@ -121,6 +164,9 @@ def main():
 
                 '''Update if its time'''
                 if traj_lenth % opt.T_horizon == 0:
+                    # checkpoint before train
+                    # if total_steps > 10000:
+                    #     phos.predump(pid, mode='cow')
                     agent.train()
                     traj_lenth = 0
 

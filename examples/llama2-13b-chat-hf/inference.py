@@ -16,25 +16,50 @@ import os
 import torch
 import transformers
 import time
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
+from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, TextStreamer
+from accelerate import init_on_device
+
+
+# device = torch.device("cuda:0")
+device = torch.device("cuda:0") if torch.cuda.is_available() else 'cpu'
+
+
+original_parameter = torch.nn.Parameter
+original_empty = torch.empty
+
+def parameter_on_device(data, requires_grad=True):
+    return original_parameter(data.to(device), requires_grad=requires_grad)
+
+def empty_on_device(*size, **kwargs):
+    if 'device' in kwargs:
+        kwargs['device'] = device
+    return original_empty(*size, **kwargs)
+
+# monkey patch torch so that we can directly create parameter on device
+torch.nn.Parameter = parameter_on_device
+torch.empty = empty_on_device
 
 coldstart_start_time = time.time()
 
-model = AutoModelForCausalLM.from_pretrained('/data/huggingface/hub/Llama-2-13b-chat-hf/')
-tokenizer = AutoTokenizer.from_pretrained('/data/huggingface/hub/Llama-2-13b-chat-hf/')
+print("load config...")
+config = AutoConfig.from_pretrained("./model/config.json")
+
+print("create model arch...")
+with init_on_device(device):
+    model = AutoModelForCausalLM.from_config(config).to(device)
+    # model.gradient_checkpointing_enable()
+
+print("load tokenizer...")
+tokenizer = AutoTokenizer.from_pretrained("./model", use_fast=True)
+tokenizer.save_pretrained("./model")
 
 # fp16
 # model = model.half()
 
-# copy to device
-model = model.to('cuda:0')
-
-# model = AutoModelForCausalLM.from_pretrained('/nvme/huggingface/hub/models--meta-llama--Meta-Llama-3.1-8B/snapshots/48d6d0fc4e02fb1269b36940650a1b7233035cbb/', ignore_mismatched_sizes=True).to('cuda:0')
-# tokenizer = AutoTokenizer.from_pretrained('/nvme/huggingface/hub/models--meta-llama--Meta-Llama-3.1-8B/snapshots/48d6d0fc4e02fb1269b36940650a1b7233035cbb/')
-
 print(f"process id: {os.getpid()}")
 
 torch.backends.cudnn.enabled = False
+
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 def infer(user_prompt, batch_size=1):

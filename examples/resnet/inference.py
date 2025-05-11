@@ -16,13 +16,16 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
+import asyncio
+import threading
 import torch.nn as nn
 import torch.optim as optim
 from utils.readData import read_dataset
 from utils.ResNet import ResNet50, ResNet101, ResNet152
 import time
 
-print(f"process id: {os.getpid()}")
+pid = os.getpid()
+print(f"process id: {pid}")
 
 # configurations
 torch.backends.cudnn.enabled = False
@@ -39,6 +42,55 @@ model = ResNet152()
 model = model.to(device)
 
 
+async def run_pos_cli(pid, cmd):
+    env = os.environ.copy()
+    env.pop("LD_PRELOAD", None)
+    process = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        print(f"[stdout]\n{stdout.decode()}")
+    else:
+        print(f"[stderr]\n{stderr.decode()}")
+        raise RuntimeError(f"Command failed with return code {process.returncode}")
+
+
+class phos:
+    @staticmethod
+    def predump(pid, mode='cow'):
+        async def run_and_log():
+            try:
+                if mode == 'cow':
+                    await run_pos_cli(pid, cmd=f"pos_cli --pre-dump --dir ./ckpt --option cow --pid {pid}")
+                elif mode == 'cuda-ckpt':
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -c")
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -s false -g")
+            except Exception as e:
+                print(f"[run_pos_cli] Error: {e}")
+        def runner():
+            asyncio.run(run_and_log())
+        threading.Thread(target=runner, daemon=True).start()
+
+    @staticmethod
+    def dump(pid, mode=''):
+        async def run_and_log():
+            try:
+                if mode == '':
+                    await run_pos_cli(pid, cmd=f"pos_cli --dump --dir ./ckpt --pid {pid}")
+                elif mode == 'cuda-ckpt':
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -c")
+                    await run_pos_cli(pid, cmd = f"bash run_nvcr_ckpt.sh -s true -g")
+            except Exception as e:
+                print(f"[run_pos_cli] Error: {e}")
+        def runner():
+            asyncio.run(run_and_log())
+        threading.Thread(target=runner, daemon=True).start()
+
+
 def run_infer():
     iter_durations = []
 
@@ -53,13 +105,18 @@ def run_infer():
         
         nb_iteration = 0
 
-        for _, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
+        for j, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
             start_t = time.time()
 
             # move data to gpu
             data = data.to(device)
             target = target.to(device)
             
+            # checkpoint before forward
+            # if j == 32:
+            #     print(torch.cuda.memory_summary())
+            #     phos.predump(pid, mode='cow')
+
             # forward
             output = model(data).to(device)
 

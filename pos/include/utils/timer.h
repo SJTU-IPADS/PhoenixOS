@@ -134,6 +134,7 @@ class POSUtilTscTimer {
         this->_tsc_freq = this->_tsc_freq_g * 1000000000;
     }
 
+
     /*!
      *  \brief  calculate from tick range to duration (ms)
      *  \param  e_tick  end tick
@@ -143,6 +144,7 @@ class POSUtilTscTimer {
     inline double tick_range_to_ms(uint64_t e_tick, uint64_t s_tick){
         return (double)(e_tick - s_tick) / (double) this->_tsc_freq * (double)1000.0f;
     }
+
 
     /*!
      *  \brief  calculate from tick range to duration (us)
@@ -154,6 +156,7 @@ class POSUtilTscTimer {
         return (double)(e_tick - s_tick) / (double) this->_tsc_freq * (double)1000000.0f;
     }
 
+
     /*!
      *  \brief  calculate from duration (ms) to tick steps
      *  \param  duration  duration (ms)
@@ -162,6 +165,7 @@ class POSUtilTscTimer {
     inline double ms_to_tick(uint64_t duration){
         return (double)(duration) / (double)1000.0f * (double) this->_tsc_freq;
     }
+
 
     /*!
      *  \brief  calculate from duration (us) to tick steps
@@ -172,6 +176,7 @@ class POSUtilTscTimer {
         return (double)(duration) / (double)1000000.0f * (double) this->_tsc_freq;
     }
 
+
     /*!
      *  \brief  calculate from tick steps to duration (ms)
      *  \param  tick steps 
@@ -181,6 +186,7 @@ class POSUtilTscTimer {
         return (double)(ticks) / (double) this->_tsc_freq * (double)1000.0f;
     }
 
+
     /*!
      *  \brief  calculate from tick steps to duration (us)
      *  \param  tick steps 
@@ -189,6 +195,29 @@ class POSUtilTscTimer {
     inline double tick_to_us(uint64_t ticks){
         return (double)(ticks) / (double) this->_tsc_freq * (double)1000000.0f;
     }
+
+
+    /*!
+     *  \brief  delay for specified microseconds
+     *  \param  us  microseconds to delay
+     */
+    inline void delay_us(uint64_t us) {
+        uint64_t start = this->get_tsc();
+        uint64_t end = start + this->us_to_tick(us);
+        while (this->get_tsc() < end) {
+            // busy wait
+        }
+    }
+
+
+    /*!
+     *  \brief  delay for specified milliseconds
+     *  \param  ms  milliseconds to delay
+     */
+    inline void delay_ms(uint64_t ms) {
+        this->delay_us(ms * 1000);
+    }
+
 
  private:
     // frequency of TSC register

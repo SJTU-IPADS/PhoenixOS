@@ -81,12 +81,6 @@ pos_retval_t POSWorker_CUDA::daemon_init(){
     );
 #endif
 
-#if POS_CONF_EVAL_CkptOptLevel == 2 && POS_CONF_EVAL_CkptEnablePipeline == 1
-    POS_ASSERT(
-        cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_ckpt_commit_stream_id))
-    );
-#endif
-
 #if POS_CONF_EVAL_MigrOptLevel == 2
     POS_ASSERT(
         cudaSuccess == cudaStreamCreate((cudaStream_t*)(&this->_migration_precopy_stream_id))

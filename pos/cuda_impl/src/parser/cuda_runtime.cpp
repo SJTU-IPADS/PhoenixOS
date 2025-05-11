@@ -565,6 +565,29 @@ namespace cuda_launch_kernel {
         );
     #endif
 
+    // // [SOSP25] for sosp25 submission
+    // #if POS_CONF_RUNTIME_EnableTrace
+    //     POS_LOG("kernel: %s, timestamp: %lf ms", function_handle->name.c_str(), ws->tsc_timer.tick_to_ms(POSUtilTscTimer::get_tsc()));
+    //     for(i=0; i<wqe->input_handle_views.size(); i++){
+    //         POSHandle* &handle = pos_api_input_handle(wqe, i);
+    //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+    //             POS_LOG("   [in] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+    //         }
+    //     }
+    //     for(i=0; i<wqe->output_handle_views.size(); i++){
+    //         POSHandle* &handle = pos_api_output_handle(wqe, i);
+    //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+    //             POS_LOG("   [out] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+    //         }
+    //     }
+    //     for(i=0; i<wqe->inout_handle_views.size(); i++){
+    //         POSHandle* &handle = pos_api_inout_handle(wqe, i);
+    //         if(handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Memory){
+    //             POS_LOG("   [inout] buffer_id(%lu), buffer_size (%lu)", handle->id, handle->state_size);
+    //         }
+    //     }
+    // #endif
+
     #if POS_PRINT_DEBUG
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
         POS_DEBUG(
