@@ -44,10 +44,11 @@ class POSClient_CUDA : public POSClient {
  public:
     /*!
      *  \brief  constructor
-     *  \param  id  client identifier
-     *  \param  cxt context to initialize this client
+     *  \param  id              client identifier
+     *  \param  cxt             context to initialize this client
+     *  \param  is_restoring    whether this client is under restore
      */
-    POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_CUDA_t cxt, POSWorkspace *ws);
+    POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_CUDA_t cxt, POSWorkspace *ws, bool is_restoring);
     POSClient_CUDA();
     
     
@@ -61,12 +62,9 @@ class POSClient_CUDA : public POSClient {
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
-     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
-     *                          we won't initialize initial handles inside each 
-     *                          handle manager
      *  \return POS_SUCCESS for successfully initialization
      */
-    pos_retval_t init_handle_managers(bool is_restoring) override;
+    pos_retval_t init_handle_managers() override;
 
 
     /*!
@@ -75,6 +73,8 @@ class POSClient_CUDA : public POSClient {
      */
     void deinit_handle_managers() override;
 
+ protected:
+    friend class POSWorkspace_CUDA;
 
  private:
     pos_client_cxt_CUDA _cxt_CUDA;

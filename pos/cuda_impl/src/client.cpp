@@ -27,8 +27,8 @@
 #include "pos/cuda_impl/handle.h"
 
 
-POSClient_CUDA::POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_CUDA_t cxt, POSWorkspace *ws) 
-        : POSClient(id, pid, cxt.cxt_base, ws), _cxt_CUDA(cxt)
+POSClient_CUDA::POSClient_CUDA(pos_client_uuid_t id, pid_t pid, pos_client_cxt_CUDA_t cxt, POSWorkspace *ws, bool is_restoring) 
+        : POSClient(id, pid, cxt.cxt_base, ws, is_restoring), _cxt_CUDA(cxt)
 {
     // raise parser thread
     this->parser = new POSParser_CUDA(ws, this);
@@ -52,7 +52,7 @@ POSClient_CUDA::POSClient_CUDA(){}
 POSClient_CUDA::~POSClient_CUDA(){}
 
 
-pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
+pos_retval_t POSClient_CUDA::init_handle_managers(){
     pos_retval_t retval = POS_SUCCESS;
     std::vector<POSHandle_CUDA_Device*> device_handles;
     std::vector<POSHandle_CUDA_Context*> context_handles;
@@ -95,7 +95,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(device_mgr = new POSHandleManager_CUDA_Device());
     if(unlikely(POS_SUCCESS != (
-        retval = device_mgr->init(related_handles, is_restoring)
+        retval = device_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA device handle manager, client won't be run");
         goto exit;
@@ -108,7 +108,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.insert({ kPOS_ResourceTypeId_CUDA_Device, __cast_to_base_handle_list(device_handles) });
     POS_CHECK_POINTER(ctx_mgr = new POSHandleManager_CUDA_Context());
     if(unlikely(POS_SUCCESS != (
-        retval = ctx_mgr->init(related_handles, is_restoring)
+        retval = ctx_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA context handle manager, client won't be run");
         goto exit;
@@ -121,7 +121,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.insert({ kPOS_ResourceTypeId_CUDA_Context, __cast_to_base_handle_list(context_handles) });
     POS_CHECK_POINTER(stream_mgr = new POSHandleManager_CUDA_Stream());
     if(unlikely(POS_SUCCESS != (
-        retval = stream_mgr->init(related_handles, is_restoring)
+        retval = stream_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA stream handle manager, client won't be run");
         goto exit;
@@ -132,7 +132,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(cublas_context_mgr = new POSHandleManager_cuBLAS_Context());
     if(unlikely(POS_SUCCESS != (
-        retval = cublas_context_mgr->init(related_handles, is_restoring)
+        retval = cublas_context_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize cuBLAS context handle manager, client won't be run");
         goto exit;
@@ -143,7 +143,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(event_mgr = new POSHandleManager_CUDA_Event());
     if(unlikely(POS_SUCCESS != (
-        retval = event_mgr->init(related_handles, is_restoring)
+        retval = event_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA event handle manager, client won't be run");
         goto exit;
@@ -154,13 +154,13 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(module_mgr = new POSHandleManager_CUDA_Module());
     if(unlikely(POS_SUCCESS != (
-        retval = module_mgr->init(related_handles, is_restoring)
+        retval = module_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA module handle manager, client won't be run");
         goto exit;
     }
     this->handle_managers[kPOS_ResourceTypeId_CUDA_Module] = (POSHandleManager<POSHandle>*)(module_mgr);
-    if(std::filesystem::exists(this->_cxt.kernel_meta_path) && !is_restoring){
+    if(std::filesystem::exists(this->_cxt.kernel_meta_path) && !this->_is_restoring){
         POS_DEBUG_C("loading kernel meta from cache %s...", this->_cxt.kernel_meta_path.c_str());
         retval = module_mgr->load_cached_function_metas(this->_cxt.kernel_meta_path);
         if(likely(retval == POS_SUCCESS)){
@@ -176,7 +176,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(function_mgr = new POSHandleManager_CUDA_Function());
     if(unlikely(POS_SUCCESS != (
-        retval = function_mgr->init(related_handles, is_restoring)
+        retval = function_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA function handle manager, client won't be run");
         goto exit;
@@ -187,7 +187,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.clear();
     POS_CHECK_POINTER(var_mgr = new POSHandleManager_CUDA_Var());
     if(unlikely(POS_SUCCESS != (
-        retval = var_mgr->init(related_handles, is_restoring)
+        retval = var_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA var handle manager, client won't be run");
         goto exit;
@@ -200,7 +200,7 @@ pos_retval_t POSClient_CUDA::init_handle_managers(bool is_restoring){
     related_handles.insert({ kPOS_ResourceTypeId_CUDA_Context, __cast_to_base_handle_list(context_handles) });
     POS_CHECK_POINTER(memory_mgr = new POSHandleManager_CUDA_Memory());
     if(unlikely(POS_SUCCESS != (
-        retval = memory_mgr->init(related_handles, is_restoring)
+        retval = memory_mgr->init(related_handles, this->_is_restoring)
     ))){
         POS_WARN_C("failed to initialize CUDA memory handle manager, client won't be run");
         goto exit;

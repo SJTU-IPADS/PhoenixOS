@@ -33,7 +33,7 @@
 #include "pos/include/proto/apicxt.pb.h"
 
 
-POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws) 
+POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws, bool is_restoring) 
     :   id(id),
         pid(pid),
         status(kPOS_ClientStatus_CreatePending),
@@ -41,7 +41,9 @@ POSClient::POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, PO
         offline_counter(0),
         _api_inst_pc(0), 
         _cxt(cxt),
-        _ws(ws)
+        _ws(ws),
+        _is_handle_manager_init(false),
+        _is_restoring(is_restoring)
 {}
 
 
@@ -51,24 +53,25 @@ POSClient::POSClient()
         status(kPOS_ClientStatus_CreatePending),
         is_under_sync_call(false),
         offline_counter(0),
-        _ws(nullptr)
+        _ws(nullptr),
+        _is_handle_manager_init(false),
+        _is_restoring(false)
 {
     POS_ERROR_C("shouldn't call, just for passing compilation");
 }
 
 
-void POSClient::init(bool is_restoring){
+void POSClient::init(){
     pos_retval_t retval = POS_SUCCESS;
-    std::map<pos_u64id_t, POSAPIContext_QE_t*> apicxt_sequence_map;
-    std::multimap<pos_u64id_t, POSHandle*> missing_handle_map;
 
-    if(unlikely(POS_SUCCESS != (
-        retval = this->init_handle_managers(is_restoring)
-    ))){
-        POS_WARN_C("failed to initialize handle managers");
-        goto exit;
-    }
-    
+    // NOTE(zhuobin): we init handle managers in worker thread
+    // if(unlikely(POS_SUCCESS != (
+    //     retval = this->init_handle_managers()
+    // ))){
+    //     POS_WARN_C("failed to initialize handle managers");
+    //     goto exit;
+    // }
+
     if(unlikely(POS_SUCCESS != (
         retval = this->__create_qgroup()
     ))){
@@ -86,7 +89,7 @@ exit:
          *          this should be done after all unexecuted API are loaded
          *          again to parser2worker apicxt queues.
          */
-        if(is_restoring == true){
+        if(this->_is_restoring == true){
             this->status = kPOS_ClientStatus_Hang;
         } else {
             this->status = kPOS_ClientStatus_Active;

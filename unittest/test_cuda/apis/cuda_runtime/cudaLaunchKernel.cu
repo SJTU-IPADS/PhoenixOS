@@ -7,7 +7,6 @@ __global__ void vectorAddKernel(const float* A, const float* B, float* C, int N)
     }
 }
 
-
 TEST_F(PhOSCudaTest, cudaLaunchKernel) {
     const int N = 256;
     const size_t size = N * sizeof(float);

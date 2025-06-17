@@ -44,7 +44,7 @@ POSWorker::POSWorker(POSWorkspace* ws, POSClient* client)
     // start daemon thread
     this->_daemon_thread = new std::thread(&POSWorker::__daemon, this);
     POS_CHECK_POINTER(this->_daemon_thread);
-    
+
     #if POS_CONF_EVAL_CkptOptLevel == 2
         this->_ckpt_stream_id = 0;
         this->_cow_stream_id = 0;
@@ -75,6 +75,10 @@ pos_retval_t POSWorker::init(){
     ))){
         POS_ERROR_C_DETAIL("failed to insert functions: retval(%u)", retval);
     }
+
+    // wait until handle manager finish init (in __daemon)
+    while(!this->_stop_flag and !this->_client->_is_handle_manager_init){}
+
     return retval;
 }
 
@@ -122,6 +126,19 @@ void POSWorker::__done(POSWorkspace* ws, POSAPIContext_QE* wqe){
 
 
 void POSWorker::__daemon(){
+    pos_retval_t tmp_retval;
+
+    // initialize the handle manager lazyly
+    if(unlikely(this->_client->_is_handle_manager_init == false)){
+        if(unlikely(POS_SUCCESS != (
+            tmp_retval = this->_client->init_handle_managers()
+        ))){
+            POS_WARN_C("failed to initialize handle managers");
+            goto exit;
+        }
+        this->_client->_is_handle_manager_init = true;
+    }
+
     if(unlikely(POS_SUCCESS != this->daemon_init())){
         POS_WARN_C("failed to init daemon, worker daemon exit");
         goto exit;
@@ -226,6 +243,9 @@ void POSWorker::__daemon_ckpt_sync(){
             this->_max_wqe_id = wqe->id;
         }
     }
+
+exit:
+    POS_DEBUG_C("worker daemon exited");
 }
 
 
@@ -737,6 +757,9 @@ void POSWorker::__daemon_ckpt_async(){
             this->_max_wqe_id = wqe->id;
         }
     }
+
+exit:
+    POS_DEBUG_C("worker daemon exited");
 }
 
 

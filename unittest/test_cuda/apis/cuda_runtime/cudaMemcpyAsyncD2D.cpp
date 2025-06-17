@@ -69,4 +69,4 @@ TEST_F(PhOSCudaTest, cudaMemcpyAsyncD2D) {
         );
         EXPECT_EQ(cudaSuccess, cuda_retval);
     }
-} 
+}

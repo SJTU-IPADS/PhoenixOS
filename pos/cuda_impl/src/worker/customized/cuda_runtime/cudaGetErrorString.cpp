@@ -1,8 +1,12 @@
 #include <iostream>
+
+#include <string.h>
+
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+
 #include "pos/include/common.h"
 #include "pos/include/client.h"
-#include <cuda_runtime_api.h>
-#include <cuda.h>
 #include "pos/cuda_impl/worker.h"
 
 
@@ -10,6 +14,7 @@ namespace wk_functions {
 namespace cuda_get_error_string {
     POS_WK_FUNC_LAUNCH() {
         pos_retval_t retval = POS_SUCCESS;
+        const char* str_ptr = nullptr;
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -20,10 +25,10 @@ namespace cuda_get_error_string {
             POS_ASSERT(wqe->inout_handle_views.size() == 0);
         #endif
 
-        // TODO: we need to fix this issue, no return value
-        cudaGetErrorString(
-            /* error */ (cudaError_t)(pos_api_param_value(wqe, 0, cudaError_t))
+        str_ptr = cudaGetErrorString(
+            /* error */ pos_api_param_value(wqe, 0, cudaError_t)
         );
+        memcpy(wqe->api_cxt->ret_data, str_ptr, strlen(str_ptr)+1);
 
         if(unlikely(cudaSuccess != wqe->api_cxt->return_code)){
            POSWorker::__restore(ws, wqe);
@@ -32,7 +37,6 @@ namespace cuda_get_error_string {
         }
 
      exit:
-
         return retval;
     }
 

@@ -217,12 +217,15 @@ class POSClient {
  public:
     /*!
      *  \brief  constructor
-     *  \param  id  client identifier
-     *  \param  pid client pid
-     *  \param  cxt context to initialize this client
-     *  \param  ws  pointer to the global workspace
+     *  \param  id              client identifier
+     *  \param  pid             client pid
+     *  \param  cxt             context to initialize this client
+     *  \param  ws              pointer to the global workspace
+     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
+     *                          during init_handle_managers we won't initialize initial 
+     *                          handles inside each handle manager
      */
-    POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws);
+    POSClient(pos_client_uuid_t id, __pid_t pid, pos_client_cxt_t cxt, POSWorkspace *ws, bool is_restoring);
     POSClient();
     ~POSClient(){}
     
@@ -231,11 +234,8 @@ class POSClient {
      *  \brief  initialize of the client
      *  \note   this part can't be in the constructor as we will invoke functions
      *          that implemented by derived class
-     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
-     *                          we won't initialize initial handles inside each 
-     *                          handle manager
      */
-    void init(bool is_restoring);
+    void init();
 
 
     /*!
@@ -287,6 +287,12 @@ class POSClient {
 
     // the global workspace
     POSWorkspace *_ws;
+
+    // mark whether this client has init handle managers
+    volatile bool _is_handle_manager_init;
+
+    // mark whether this client is under restore
+    bool _is_restoring;
     /* ====================== basic ====================== */
 
 
@@ -489,12 +495,9 @@ class POSClient {
      *  \brief  instantiate handle manager for all used resources
      *  \note   the children class should replace this method to initialize their 
      *          own needed handle managers
-     *  \param  is_restoring    identify whether we're restoring a client, if it's, 
-     *                          we won't initialize initial handles inside each 
-     *                          handle manager
      *  \return POS_SUCCESS for successfully initialization
      */
-    virtual pos_retval_t init_handle_managers(bool is_restoring){}
+    virtual pos_retval_t init_handle_managers(){ return POS_FAILED_NOT_IMPLEMENTED; }
 
 
     /*!

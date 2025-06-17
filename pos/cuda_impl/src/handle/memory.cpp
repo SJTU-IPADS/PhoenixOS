@@ -640,8 +640,8 @@ pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<P
             dv_retval = cuCtxPushCurrent(static_cast<CUcontext>(context_handle->server_addr))
         ))){
             POS_WARN(
-                "failed to preserve memory on CUDA device, failed to call cuCtxPushCurrent: retval(%d), device_id(%d)",
-                dv_retval, device_id
+                "failed to preserve memory on CUDA device, failed to call cuCtxPushCurrent: context_handle(%p), retval(%d), device_id(%d)",
+                context_handle->server_addr, dv_retval, device_id
             );
             retval = POS_FAILED_DRIVER;
             goto exit;
