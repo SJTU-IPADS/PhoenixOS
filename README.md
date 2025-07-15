@@ -10,24 +10,14 @@
 </div>
 
 <div>
-    <p>
-    <b>PhoenixOS</b> (PhOS) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application, a key feature required by modern systems like the cloud. Most importantly, PhOS is the first OS-level C/R system that can <b>concurrently execute C/R without stopping the execution of application</b>.
-    <p>
-    Under CUDA platform, we compared the C/R performace of PhOS with <a href="https://github.com/NVIDIA/cuda-checkpoint">nvidia/cuda-checkpoint</a>:
-    <table>
-        <tr><th align="center">Checkpointing Llama2-13b-chat</th></tr>
-        <tr><td align="center"><img src="./docs/docs/source/_static/images/home/llama2_ckpt.gif" /></td></tr>
-    </table>
-    <table>
-        <tr><th align="center">Restoring Llama2-13b-chat</th></tr>
-        <tr><td align="center"><img src="./docs/docs/source/_static/images/home/llama2_restore.gif" /></td></tr>
-    </table>
-    <p>
-    Note that PhOS is aimming to be a generic design that towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by specific hardware platforms. We currently provide the C/R implementation on CUDA platform, support for ROCm and Ascend are under development.
     <div style="padding: 0px 10px;">
         <p>
         <h3 style="margin:0px; margin-bottom:5px;">📑 Latest News</h3>
         <ul>
+            <li style="margin:0px; margin-bottom:8px;">
+                <p style="margin:0px; margin-bottom:1px;">
+                    <b>[July.12, 2025]</b> Our paper is accepted at SOSP'25! 🎉 Please check our updated preprint at [<a href="https://arxiv.org/abs/2405.12079">Paper</a>]. We are still refactoring the code and will soon update the repo. Stay tuned :)
+                </p>        
             <li style="margin:0px; margin-bottom:8px;">
                 <p style="margin:0px; margin-bottom:1px;">
                     <b>[Nov.6, 2024]</b> PhOS is open sourced 🎉 [<a href="https://github.com/PhoenixOS-IPADS/PhoenixOS">Repo</a>] [<a href="https://phoenixos.readthedocs.io/en/latest/index.html">Documentations</a>]
@@ -46,6 +36,25 @@
             </li>
         </ul>
     </div>
+</div>    
+
+<div>
+    <p>
+    <b>PhoenixOS</b> (PhOS) is an OS-level GPU checkpoint/restore (C/R) system. It can <b>transparently</b> C/R processes that use the GPU, without requiring any cooperation from the application (though with cooperation it would be faster :)).
+    Most importantly, PhOS is the first (and only) OS-level GPU C/R system that can <b>concurrently execute C/R without stopping the execution of applications</b>.
+    <p>
+    Concurrent execution brings huge performance gains, e.g., please check below when compared with NVIDIA's CUDA-Checkpoint <a href="https://github.com/NVIDIA/cuda-checkpoint">nvidia/cuda-checkpoint</a>:
+    <table>
+        <tr><th align="center">Checkpointing Llama2-13b-chat</th></tr>
+        <tr><td align="center"><img src="./docs/docs/source/_static/images/home/llama2_ckpt.gif" /></td></tr>
+    </table>
+    <table>
+        <tr><th align="center">Restoring Llama2-13b-chat</th></tr>
+        <tr><td align="center"><img src="./docs/docs/source/_static/images/home/llama2_restore.gif" /></td></tr>
+    </table>
+    <p>
+    Note that PhOS is aiming to be a generic design towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by specific hardware platforms. We currently provide the C/R implementation on CUDA platform, and we are planning to support ROCm and Ascend. Yet we hope we could get help from the community because getting the whole C/R done is really non-trivial.
+
     <table style="margin:20px 0px;">
         <tr><td><b>
         PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://join.slack.com/t/phoenixoshq/shared_invite/zt-2tkievevq-xaQ3sctxs7bLnTaYeMyBBg">slack workspace</a> for more upcoming cool features on PhOS.
@@ -172,7 +181,7 @@
 
 ### 💡 Option 2: Install From Pre-built Binaries
 
-    Will soon be updated :)
+    Will soon be updated, stay tuned :)
 
 
 <br />
@@ -266,11 +275,11 @@ For more details, please check our [paper](https://arxiv.org/abs/2405.12079).
 If you use PhOS in your research, please cite our paper:
 
 ```bibtex
-@article{huang2024parallelgpuos,
-  title={PARALLELGPUOS: A Concurrent OS-level GPU Checkpoint and Restore System using Validated Speculation},
-  author={Huang, Zhuobin and Wei, Xingda and Hao, Yingyi and Chen, Rong and Han, Mingcong and Gu, Jinyu and Chen, Haibo},
-  journal={arXiv preprint arXiv:2405.12079},
-  year={2024}
+@inproceedings{phoenixos,
+  title={PhoenixOS: Concurrent OS-level GPU Checkpoint and Restore with Validated Speculation},
+  author={Xingda Wei, Zhuobin Huang, Tianle Sun, Yingyi Hao, Rong Chen, Mingcong Han, Jinyu Gu and Haibo Chen}
+  booktitle={Proceedings of the ACM SIGOPS 31th Symposium on Operating Systems Principles},
+  year={2025}
 }
 ```
 
