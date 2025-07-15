@@ -54,7 +54,6 @@
     </table>
     <p>
     Note that PhOS is aiming to be a generic design towards various hardware platforms from different vendors, by providing a set of interfaces which should be implemented by specific hardware platforms. We currently provide the C/R implementation on CUDA platform, and we are planning to support ROCm and Ascend. Yet we hope we could get help from the community because getting the whole C/R done is really non-trivial.
-
     <table style="margin:20px 0px;">
         <tr><td><b>
         PhOS is currently under heavy development. If you're interested in contributing to this project, please join our <a href="https://join.slack.com/t/phoenixoshq/shared_invite/zt-2tkievevq-xaQ3sctxs7bLnTaYeMyBBg">slack workspace</a> for more upcoming cool features on PhOS.
