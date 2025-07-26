@@ -74,7 +74,7 @@
     git clone --recursive https://github.com/SJTU-IPADS/PhoenixOS.git
     ```
 
-2. **[Start Container]**
+2. **(Optional) [Start Container]**
     PhOS can be built and installed on official vendor image.
 
     > NOTE: PhOS require libc6 >= 2.29 for compiling CRIU from source.
@@ -103,10 +103,8 @@
     please download these assets by simply running following commands:
 
     ```bash
-    # inside container
-    
     # download assets
-    cd /root/scripts/build_scripts
+    cd path/to/phos/scripts/build_scripts
     bash download_assets.sh
     ```
 
@@ -166,6 +164,15 @@
     #   -i: install after successful building
     #   -u: build PhOS with unit test enable
     bash build.sh -i -3 -u
+    ```
+
+    Optionally, we can use pre-built image to simplify building, e.g.,
+    on CUDA 12.3, please simply use the following:
+    ```bash 
+    ## build a container named phos-base. Can be skipped if it is on the hub
+    make build-image 
+    
+
     ```
 
     For customizing build options, please refers to and modify avaiable options under `scripts/build_scripts/build_config.yaml`.

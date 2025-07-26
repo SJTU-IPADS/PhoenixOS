@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"os"
+	// "os"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"
@@ -130,7 +130,7 @@ func CRIB_PhOS_CUDA_KernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, log
 }
 
 func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
-    if cmdOpt.DoBuild {
+    if cmdOpt.DoPackage {
         // ==================== Prepare ====================
         logger.Infof("pre-build check...")
         utils.CheckAndInstallPackage("git", "git", nil, nil, logger)
@@ -153,7 +153,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
                 set -e
-                pip3 install meson
+                pip3 install meson  -i https://mirrors.aliyun.com/pypi/simple/
                 `, false, logger,
             )
             return err
@@ -164,13 +164,14 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
                 set -e
-                pip3 install ninja
+                pip3 install ninja -i https://mirrors.aliyun.com/pypi/simple/
                 `, false, logger,
             )
             return err
         }
         utils.CheckAndInstallPackage("ninja", "", install_ninja, nil, logger)
 
+		/*
         install_cargo := func() error {
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
@@ -194,9 +195,48 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 			)
 			os.Exit(0)
 			return nil
+		} 
+		utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)
+		*/
+
+		install_cargo := func() error {
+			_, err := utils.BashScriptGetOutput(`
+				#!/bin/bash
+				set -e
+
+				# Install rustup (Rust toolchain installer)
+				export RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup
+				export RUSTUP_UPDATE_ROOT=https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup
+				
+				/usr/bin/curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+				# Source cargo environment (for scripts, not needed for Dockerfile ENV)
+				source $HOME/.cargo/env
+
+				# Install nightly and set as default
+				$HOME/.cargo/bin/rustup install nightly
+				$HOME/.cargo/bin/rustup default nightly
+				`,
+				false, logger,
+			)
+			return err
+		}		    
+		utils.CheckAndInstallPackage("cargo", "", install_cargo, nil, logger)					
+		
+		// XD: fixme: currently only tested on A800 machines with cuda 12.3
+		install_nccl := func() error {
+			_, err := utils.BashScriptGetOutput(`
+				#!/bin/bash
+				set -e
+				apt-get install -y libnccl2 libnccl-dev --allow-change-held-packages
+				`,
+				false, logger,
+			)
+			return err
 		}
-        utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)
-    }
+		utils.CheckAndInstallPackage("nccl", "", install_nccl, nil, logger)					
+	}
+
 
 	// ==================== CRIB Dependencies ====================
 	if cmdOpt.WithThirdParty {

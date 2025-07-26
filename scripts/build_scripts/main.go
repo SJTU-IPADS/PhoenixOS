@@ -46,6 +46,8 @@ func main() {
 
 	var __PrintHelp *bool = flag.Bool("h", false, "Print help message")
 	var __WithThirdParty *bool = flag.Bool("3", false, "Build/clean with 3rd parties")
+	var __DoPackage *bool = flag.Bool("p", true, "Build/clean with pre-built packages")
+	var __DoBuild *bool   = flag.Bool("b", true, "Build/clean PhOS.")
 	var __DoInstall *bool = flag.Bool("i", false, "Do installation")
 	var __DoClean *bool = flag.Bool("c", false, "Do cleanning")
 	var __WithUnitTest *bool = flag.Bool("u", false, "Do unit-testing after build")
@@ -58,6 +60,8 @@ func main() {
 	cmdOpt := CmdOptions{
 		PrintHelp:      *__PrintHelp,
 		WithThirdParty: *__WithThirdParty,
+		DoBuild:        *__DoBuild,
+		DoPackage:      *__DoPackage,
 		DoInstall:      *__DoInstall,
 		DoClean:        *__DoClean,
 		WithUnitTest:   *__WithUnitTest,
@@ -91,10 +95,11 @@ func main() {
 
 	// make sure we won't build/install when clean
 	if cmdOpt.DoClean {
+		cmdOpt.DoPackage = false
 		cmdOpt.DoBuild = false
 		cmdOpt.DoInstall = false
 	} else {
-		cmdOpt.DoBuild = true
+		// cmdOpt.DoBuild = true
 	}
 
 	CRIB_PhOS(cmdOpt, buildConf, logger)

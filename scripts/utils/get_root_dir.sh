@@ -14,4 +14,9 @@
 
 #!/bin/bash
 
-git rev-parse --show-toplevel
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    repo_root=$(git rev-parse --show-toplevel)
+    echo "$repo_root"
+else
+    echo "Not in a git repo."
+fi
