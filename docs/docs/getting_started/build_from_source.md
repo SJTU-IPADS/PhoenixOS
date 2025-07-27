@@ -5,7 +5,7 @@ PhOS provides two options, and you can choose **either one** to build PhOS.
 
 ## Overview of the build 
 
-    PhOS provides a convinient build system, which covers compiling, linking and installing all PhOS components:
+PhOS provides a convinient build system, which covers compiling, linking and installing all PhOS components:
 
     <table>
         <tr>
