@@ -223,7 +223,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 		}		    
 		utils.CheckAndInstallPackage("cargo", "", install_cargo, nil, logger)					
 		
-		// XD: fixme: currently only tested on A800 machines with cuda 12.3
+		// XD: fixme: currently only tested on A800 machines with cuda 11.3
 		install_nccl := func() error {
 			_, err := utils.BashScriptGetOutput(`
 				#!/bin/bash
