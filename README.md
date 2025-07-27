@@ -63,126 +63,9 @@
 
 <br />
 
-## I. Build and Install PhOS
-
-### 💡 Option 1: Build and Install From Source
-
-1. **[Clone Repository]**
-    First of all, clone this repository **recursively**:
-
-    ```bash
-    git clone --recursive https://github.com/SJTU-IPADS/PhoenixOS.git
-    ```
-
-2. **(Optional) [Start Container]**
-    PhOS can be built and installed on official vendor image.
-
-    > NOTE: PhOS require libc6 >= 2.29 for compiling CRIU from source.
-
-    For example, for running PhOS for CUDA 11.3,
-    one can build on official CUDA images
-    (e.g., [`nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04`](https://hub.docker.com/layers/nvidia/cuda/11.3.1-cudnn8-devel-ubuntu20.04/images/sha256-459c130c94363099b02706b9b25d9fe5822ea233203ce9fbf8dfd276a55e7e95)):
-
-
-    ```bash
-    # enter repository
-    cd PhoenixOS/scripts/docker
-
-    # start and enter container with id 1
-    bash run_torch_cu113.sh -s 1
-
-    # enter / close container (no need to execute here, just listed)
-    bash run_torch_cu113.sh -e 1    # enter container
-    bash run_torch_cu113.sh -c 1    # close container
-    ```
-
-    Note that it's important to execute docker container with root privilege, as CRIU needs the permission to C/R kernel-space memory pages.
-
-3. **[Downloading Necesssary Assets]**
-    PhOS relies on some assets to build and test,
-    please download these assets by simply running following commands:
-
-    ```bash
-    # download assets
-    cd path/to/phos/scripts/build_scripts
-    bash download_assets.sh
-    ```
-
-4. **[Build]**
-    Building PhOS is simple!
-
-    PhOS provides a convinient build system, which covers compiling, linking and installing all PhOS components:
-
-    <table>
-        <tr>
-            <th width="25%">Component</th>
-            <th width="75%">Description</th>
-        </tr>
-        <tr>
-            <td><code>phos-autogen</code></td>
-            <td><b>Autogen Engine</b> for generating most of Parser and Worker code for specific hardware platform, based on lightwight notation.</td>
-        </tr>
-        <tr>
-            <td><code>phosd</code></td>
-            <td><b>PhOS Daemon</b>, which continuously run at the background, taking over the control of all GPU devices on the node.</td>
-        </tr>
-        <tr>
-            <td><code>libphos.so</code></td>
-            <td><b>PhOS Hijacker</b>, which hijacks all GPU API calls on the client-side and forward to PhOS Daemon.</td>
-        </tr>
-        <tr>
-            <td><code>libpccl.so</code></td>
-            <td><b>PhOS Checkpoint Communication Library</b> (PCCL), which provide highly-optimized device-to-device state migration. Note that this library is not included in current release.</td>
-        </tr>
-        <tr>
-            <td><code>unit-testing</code></td>
-            <td><b>Unit Tests</b> for PhOS, which is based on GoogleTest.</td>
-        </tr>
-        <tr>
-            <td><code>phos-cli</code></td>
-            <td><b>Command Line Interface</b> (CLI) for interacting with PhOS.</td>
-        </tr>
-        <tr>
-            <td><code>phos-remoting</code></td>
-            <td><b>Remoting Framework</b>, which provide highly-optimized GPU API remoting performance. See more details at <a href="https://github.com/SJTU-IPADS/PhoenixOS-Remoting">SJTU-IPADS/PhoenixOS-Remoting</a>.</td>
-        </tr>
-    </table>
-
-    To build and install all above components and other dependencies, simply run the build script in the container would works:
-
-    ```bash
-    # inside container
-    cd /root/scripts/build_scripts
-
-    # clear old build cache
-    #   -c: clear previous build
-    #   -3: the clean process involves all third-parties
-    bash build.sh -c -3
-
-    # start building
-    #   -3: the build process involves all third-parties
-    #   -i: install after successful building
-    #   -u: build PhOS with unit test enable
-    bash build.sh -i -3 -u
-    ```
-
-    Optionally, we can use pre-built image to simplify building, e.g.,
-    on CUDA 12.3, please simply use the following:
-    ```bash 
-    ## build a container named phos-base. Can be skipped if it is on the hub
-    make build-image 
-    
-
-    ```
-
-    For customizing build options, please refers to and modify avaiable options under `scripts/build_scripts/build_config.yaml`.
-
-    If you encounter any build issues, you're able to see building logs under `build_log`. Please open a new issue if things are stuck :-|
-
-### 💡 Option 2: Install From Pre-built Binaries
-
-    Will soon be updated, stay tuned :)
-
+## I. Quick start 
+    Currently, we don't have pre-built binaries. 
+    Please check [build from Source](docs/docs/getting_started/build_from_source.md) for how to build and run from source! 
 
 <br />
 
@@ -201,7 +84,15 @@ Once successfully installed PhOS, you can now try run your program with PhOS sup
 1. Start the PhOS daemon (`phosd`), which takes over all GPU reousces on the node:
 
     ```bash
+    ## If built in an interactive container (or host)
     pos_cli --start --target daemon
+    ```
+
+    or 
+
+    ```bash
+    ## If built with our container
+    make server-run
     ```
 
 2. To run your program with PhOS support, one need to put a `yaml` configure file under the directory which your program would regard as `$PWD`.

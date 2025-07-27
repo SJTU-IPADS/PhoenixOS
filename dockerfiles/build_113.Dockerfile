@@ -6,7 +6,7 @@ ARG proxy
 RUN apt update
 RUN apt-get install -y libibverbs-dev libboost-all-dev net-tools            \
     git-lfs pkg-config python3-pip libelf-dev libssl-dev libgl1-mesa-dev    \
-    libvdpau-dev iputils-ping wget gdb vim nsight-compute-2023.1.1    
+    libvdpau-dev iputils-ping wget gdb vim nsight-compute-2023.1.1  curl
 
 RUN apt-get update && \
     apt-get install -y software-properties-common && \
@@ -26,18 +26,27 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
 COPY  scripts/ /scripts
 COPY  third_party/go1.23.2.linux-amd64.tar.gz /third_party/go1.23.2.linux-amd64.tar.gz
 
+
+ENV RUSTUP_UPDATE_ROOT=https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup
+RUN RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup 
+RUN mkdir -p /opt/rust
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+RUN . /opt/rust/.cargo/env
+RUN rustup install nightly
+RUN rustup default nightly
+
+ENV CARGO_HOME=/opt/rust/.cargo
+ENV RUSTUP_HOME=/opt/rust/.rustup
+ENV PATH="/opt/rust/.cargo/bin:${PATH}"
+
+
 # Make scripts executable and run download_assets.sh
 RUN chmod +x /scripts/build_scripts/*.sh
 RUN cd /scripts/build_scripts && bash build.sh -p -b=false -3=true
 
 ENV PATH="/root/bin:${PATH}"
-ENV PATH="/opt/rust/.cargo/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/root/lib:${LD_LIBRARY_PATH}"
-ENV CARGO_HOME=/opt/rust/.cargo
-ENV RUSTUP_HOME=/opt/rust/.rustup
-
-RUN . /opt/rust/.cargo/env
-RUN export RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup && rustup default nightly
 
 WORKDIR /root
 
