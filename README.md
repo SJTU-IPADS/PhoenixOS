@@ -64,8 +64,9 @@
 <br />
 
 ## I. Quick start 
-    Currently, we don't have pre-built binaries. 
-    Please check [build from Source](docs/docs/getting_started/build_from_source.md) for how to build and run from source! 
+
+Currently, we don't have pre-built binaries. 
+Please check [build from Source](docs/docs/getting_started/build_from_source.md) for how to build and run from source! 
 
 <br />
 
