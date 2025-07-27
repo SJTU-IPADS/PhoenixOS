@@ -153,7 +153,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
                 set -e
-                pip3 install meson  -i https://mirrors.aliyun.com/pypi/simple/
+                pip3 install meson
                 `, false, logger,
             )
             return err
@@ -164,14 +164,13 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
                 set -e
-                pip3 install ninja -i https://mirrors.aliyun.com/pypi/simple/
+                pip3 install ninja
                 `, false, logger,
             )
             return err
         }
         utils.CheckAndInstallPackage("ninja", "", install_ninja, nil, logger)
 
-		/*
         install_cargo := func() error {
             _, err := utils.BashScriptGetOutput(`
                 #!/bin/bash
@@ -196,32 +195,7 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 			os.Exit(0)
 			return nil
 		} 
-		utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)
-		*/
-
-		install_cargo := func() error {
-			_, err := utils.BashScriptGetOutput(`
-				#!/bin/bash
-				set -e
-
-				# Install rustup (Rust toolchain installer)
-				export RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup
-				export RUSTUP_UPDATE_ROOT=https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup
-				
-				/usr/bin/curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-				# Source cargo environment (for scripts, not needed for Dockerfile ENV)
-				source $HOME/.cargo/env
-
-				# Install nightly and set as default
-				$HOME/.cargo/bin/rustup install nightly
-				$HOME/.cargo/bin/rustup default nightly
-				`,
-				false, logger,
-			)
-			return err
-		}		    
-		utils.CheckAndInstallPackage("cargo", "", install_cargo, nil, logger)					
+		utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)				
 		
 		// XD: fixme: currently only tested on A800 machines with cuda 11.3
 		install_nccl := func() error {
