@@ -7,7 +7,7 @@ PhOS provides two options, and you can choose **either one** to build PhOS.
 
 PhOS provides a convinient build system, which covers compiling, linking and installing all PhOS components:
 
-    <table>
+<table>
         <tr>
             <th width="25%">Component</th>
             <th width="75%">Description</th>
@@ -40,7 +40,7 @@ PhOS provides a convinient build system, which covers compiling, linking and ins
             <td><code>phos-remoting</code></td>
             <td><b>Remoting Framework</b>, which provide highly-optimized GPU API remoting performance. See more details at <a href="https://github.com/SJTU-IPADS/PhoenixOS-Remoting">SJTU-IPADS/PhoenixOS-Remoting</a>.</td>
         </tr>
-    </table>
+</table>
 
 
 1. **[Clone Repository]**
