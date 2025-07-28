@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	// "os"
+	"os"
 
 	"github.com/PhoenixOS-IPADS/PhOS/scripts/utils"
 	"github.com/charmbracelet/log"

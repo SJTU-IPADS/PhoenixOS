@@ -28,17 +28,18 @@ COPY  third_party/go1.23.2.linux-amd64.tar.gz /third_party/go1.23.2.linux-amd64.
 
 
 ENV RUSTUP_UPDATE_ROOT=https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup
-RUN RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup 
+ENV RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup 
 RUN mkdir -p /opt/rust
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-RUN . /opt/rust/.cargo/env
-RUN rustup install nightly
-RUN rustup default nightly
 
 ENV CARGO_HOME=/opt/rust/.cargo
 ENV RUSTUP_HOME=/opt/rust/.rustup
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 ENV PATH="/opt/rust/.cargo/bin:${PATH}"
+RUN . /opt/rust/.cargo/env
+
+RUN rustup install nightly
+RUN rustup default nightly
 
 
 # Make scripts executable and run download_assets.sh
