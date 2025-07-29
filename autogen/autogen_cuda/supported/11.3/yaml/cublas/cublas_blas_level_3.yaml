@@ -44,7 +44,7 @@ apis:
     parent_name: "cublasSgemm_v2"
     parser_type: "default"
     worker_type: "default"
-    is_sync: false
+    is_sync: true
     # parser
     type: "set_resource"
     create_edges:
@@ -149,7 +149,7 @@ apis:
     parent_name: "cublasSgemmStridedBatched"
     parser_type: "default"
     worker_type: "default"
-    is_sync: false
+    is_sync: true
     # parser
     type: "set_resource"
     create_edges:
