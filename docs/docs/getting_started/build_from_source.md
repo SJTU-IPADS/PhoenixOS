@@ -50,7 +50,7 @@ PhOS provides a convenient build system, which covers compiling, linking and ins
     git clone --recursive https://github.com/SJTU-IPADS/PhoenixOS.git
     ```
 
-2. **[Downloading Necesssary (third-party) Assets]**
+2. **[Downloading Necessary (third-party) Assets]**
     PhOS relies on some assets to build and test,
     please download these assets by simply running following commands:
 
