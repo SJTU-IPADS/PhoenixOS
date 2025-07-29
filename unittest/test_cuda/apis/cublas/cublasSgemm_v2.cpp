@@ -15,8 +15,8 @@ TEST_F(PhOSCudaTest, cublasSgemm_v2) {
     float *h_A = nullptr, *h_B = nullptr, *h_C = nullptr, *true_h_C = nullptr;
     float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
     float **d_A_ptr = &d_A, **d_B_ptr = &d_B, **d_C_ptr = &d_C;
-    float a = 1.0f, b = 0.0f;
-    float *a_ptr = &a, *b_ptr = &b;
+    volatile float a = 1.0f, b = 0.0f;
+    volatile float *a_ptr = &a, *b_ptr = &b;
     uint64_t byte_size_A = 0, byte_size_B = 0, byte_size_C = 0;
     cudaMemcpyKind kind_h2d = cudaMemcpyHostToDevice, kind_d2h = cudaMemcpyDeviceToHost;
 
@@ -143,6 +143,10 @@ TEST_F(PhOSCudaTest, cublasSgemm_v2) {
         }
     );
     EXPECT_EQ(CUBLAS_STATUS_SUCCESS, cublas_retval);
+
+    // stack pointers now point to random data
+    a = 100;
+    b = 100;
 
     // sync stream
     cuda_retval = (cudaError)this->_ws->pos_process( 
