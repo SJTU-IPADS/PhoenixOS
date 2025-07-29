@@ -63,6 +63,7 @@ type CmdOptions struct {
 	WithUnitTest   bool
 	Target         string
 	PrintHelp      bool
+	DoPackage      bool	
 	DoBuild        bool
 	DoInstall      bool
 	DoClean        bool
@@ -75,6 +76,7 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 			- WithThirdParty: %v
 			- Target: %v
 			- PrintHelp: %v
+			- DoPackage: %v
 			- DoClean: %v
 			- DoInstall: %v
 			- WithUnitTest: %v
@@ -83,6 +85,7 @@ func (cmdOpt *CmdOptions) print(logger *log.Logger) {
 		cmdOpt.WithThirdParty,
 		cmdOpt.Target,
 		cmdOpt.PrintHelp,
+		cmdOpt.DoPackage,
 		cmdOpt.DoClean,
 		cmdOpt.DoInstall,
 		cmdOpt.WithUnitTest,

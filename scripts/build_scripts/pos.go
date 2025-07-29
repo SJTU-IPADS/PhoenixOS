@@ -29,9 +29,14 @@ const (
 func CRIB_PhOS_Remoting(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
 	if cmdOpt.DoBuild {
 		// TODO(zhuobin): we need to install NCCL version according to CUDA version
-		utils.CheckAndInstallMultiPackagesViaOsPkgManager([]string{
-			"libnccl2=2.26.5-1+cuda12.9", "libnccl-dev=2.26.5-1+cuda12.9",
-		}, logger)
+		//utils.CheckAndInstallMultiPackagesViaOsPkgManager([]string{
+		//	"libnccl2=2.26.5-1+cuda12.9", "libnccl-dev=2.26.5-1+cuda12.9",
+		//}, logger)
+		//if !utils.CheckPackageViaOsPkgManager("libnccl-dev", logger) {
+		//	utils.UnInstallPackageViaOsPkgManager("libnccl2", logger)
+		//}
+		//utils.CheckAndInstallPackageViaOsPkgManager("libnccl2=2.26.5-1+cuda12.9", logger)
+		//utils.CheckAndInstallPackageViaOsPkgManager("libnccl-dev=2.26.5-1+cuda12.9", logger)
 		utils.CheckAndInstallPackageViaOsPkgManager("clang", logger)
 		utils.CheckAndInstallPackageViaOsPkgManager("cmake", logger)
 	}
