@@ -28,9 +28,28 @@ apis:
     index: 1001
     supported: false
 
+  # cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags ( int* numBlocks, CUfunction func, int  blockSize, size_t dynamicSMemSize, unsigned int  flags )
   - name: "cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags"
     index: 1002
-    supported: false
+    supported: true
+    parent_name: "cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags"
+    parser_type: "default"
+    worker_type: "default"
+    is_sync: true
+    # parser
+    type: "get_resource"
+    create_edges:
+    delete_edges:
+    in_edges:
+      - param_index: 2
+        handle_type: "cuda_function"
+        handle_source: "from_param"
+    out_edges:
+    inout_edges:
+    # worker
+    involve_membus: false
+    need_stream_sync: false
+    constant_params:
 
   - name: "cuOccupancyMaxPotentialBlockSize"
     index: 1003
