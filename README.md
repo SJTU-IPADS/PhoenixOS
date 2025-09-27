@@ -275,8 +275,8 @@ If you use PhOS in your research, please cite our paper:
 
 ```bibtex
 @inproceedings{phoenixos,
-  title={PhoenixOS: Concurrent OS-level GPU Checkpoint and Restore with Validated Speculation},
-  author={Xingda Wei, Zhuobin Huang, Tianle Sun, Yingyi Hao, Rong Chen, Mingcong Han, Jinyu Gu and Haibo Chen}
+  title={PhoenixOS: Concurrent {OS}-level GPU Checkpoint and Restore with Validated Speculation},
+  author={Xingda, Wei and Zhuobin, Huang and Tianle, Sun and Yingyi, Hao and Rong, Chen and Mingcong, Han and Jinyu, Gu and Haibo, Chen},
   booktitle={Proceedings of the ACM SIGOPS 31th Symposium on Operating Systems Principles},
   year={2025}
 }
