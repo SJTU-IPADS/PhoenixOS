@@ -130,7 +130,7 @@ func CRIB_PhOS_CUDA_KernelPatcher(cmdOpt CmdOptions, buildConf BuildConfigs, log
 }
 
 func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logger) {
-    if cmdOpt.DoBuild {
+    if cmdOpt.DoPackage {
         // ==================== Prepare ====================
         logger.Infof("pre-build check...")
         utils.CheckAndInstallPackage("git", "git", nil, nil, logger)
@@ -194,9 +194,23 @@ func CRIB_PhOS_CUDA(cmdOpt CmdOptions, buildConf BuildConfigs, logger *log.Logge
 			)
 			os.Exit(0)
 			return nil
+		} 
+		utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)				
+		
+		// XD: fixme: currently only tested on A800 machines with cuda 11.3
+		install_nccl := func() error {
+			_, err := utils.BashScriptGetOutput(`
+				#!/bin/bash
+				set -e
+				apt-get install -y libnccl2 libnccl-dev --allow-change-held-packages
+				`,
+				false, logger,
+			)
+			return err
 		}
-        utils.CheckAndInstallPackage("cargo", "", install_cargo, post_install_cargo, logger)
-    }
+		utils.CheckAndInstallPackage("nccl", "", install_nccl, nil, logger)					
+	}
+
 
 	// ==================== CRIB Dependencies ====================
 	if cmdOpt.WithThirdParty {

@@ -59,7 +59,6 @@ util_install_common () {
     fi   
 }
 
-
 check_and_install_go() {
     if [[ ! -x "$(command -v go)" ]]; then
         warn "no go installed, installing from assets..."
