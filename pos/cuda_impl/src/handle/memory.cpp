@@ -63,56 +63,41 @@ POSHandle_CUDA_Memory::POSHandle_CUDA_Memory(void *client_addr_, size_t size_, v
 
 pos_retval_t POSHandle_CUDA_Memory::tear_down(){
     pos_retval_t retval = POS_SUCCESS;
-    CUresult cuda_dv_retval;
-    CUmemGenericAllocationHandle hdl;
-
+    CUresult dv_retval;
+    bool ctx_switched = false; // moved before any goto
+    CUcontext old_ctx = nullptr; // moved before any goto
+    POSHandle* ctx_handle = nullptr; // moved before any goto
+    
     if(unlikely(this->status != kPOS_HandleStatus_Active)){ goto exit; }
 
-    // obtain the physical memory handle
-    cuda_dv_retval = cuMemRetainAllocationHandle(&hdl, this->server_addr);
-    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-        POS_WARN_DETAIL(
-            "failed to tear down CUDA memory, failed to call cuMemRetainAllocationHandle: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
-            this->id, this->client_addr, this->server_addr, cuda_dv_retval
-        );
-        retval = POS_FAILED;
-        goto exit;
+    // 显式上下文切换到父 Context（守护进程 Primary Context）
+    if (this->parent_handles.size() > 0) {
+        ctx_handle = this->parent_handles[0];
+        CUresult ctx_err = cuCtxPushCurrent((CUcontext)ctx_handle->server_addr);
+        if (ctx_err == CUDA_SUCCESS) {
+            ctx_switched = true;
+        } else {
+            POS_WARN_DETAIL("tear_down: failed to push context, id(%lu), err(%d)", this->id, ctx_err);
+            // 尝试继续释放（在当前上下文），以避免资源泄露
+        }
+    } else {
+        POS_WARN_DETAIL("tear_down: no parent context handle found for id(%lu)", this->id);
+        // 尝试继续释放（在当前上下文），以避免资源泄露
     }
 
-    // ummap the virtual memory
-    cuda_dv_retval = cuMemUnmap(
-        /* ptr */ (CUdeviceptr)(this->server_addr),
-        /* size */ this->state_size
-    );
-    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
+    // UVM 释放
+    dv_retval = cuMemFree((CUdeviceptr)(uintptr_t)this->server_addr);
+    if(unlikely(CUDA_SUCCESS != dv_retval)){
         POS_WARN_DETAIL(
-            "failed to tear down CUDA memory, failed to call cuMemUnmap: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
-            this->id, this->client_addr, this->server_addr, cuda_dv_retval
+            "tear_down: cuMemFree failed: id(%lu), ptr(%p), retval(%d)",
+            this->id, this->server_addr, dv_retval
         );
         retval = POS_FAILED;
-        goto exit;
     }
 
-    // release the physical memory
-    cuda_dv_retval = cuMemRelease(hdl);
-    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-        POS_WARN_DETAIL(
-            "failed to tear down CUDA memory, failed to call cuMemRelease x 1: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
-            this->id, this->client_addr, this->server_addr, cuda_dv_retval
-        );
-        retval = POS_FAILED;
-        goto exit;
-    }
-
-    // as we call cuMemRetainAllocationHandle above, we need to release again
-    cuda_dv_retval = cuMemRelease(hdl);
-    if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-        POS_WARN_DETAIL(
-            "failed to tear down CUDA memory, failed to call cuMemRelease x 2: id(%lu), client_addr(%p), server_addr(%p), retval(%d)",
-            this->id, this->client_addr, this->server_addr, cuda_dv_retval
-        );
-        retval = POS_FAILED;
-        goto exit;
+    // 恢复上下文
+    if (ctx_switched) {
+        cuCtxPopCurrent(&old_ctx);
     }
 
 exit:
@@ -468,156 +453,38 @@ POSHandleManager_CUDA_Memory::POSHandleManager_CUDA_Memory() : POSHandleManager(
 
 pos_retval_t POSHandleManager_CUDA_Memory::init(std::map<uint64_t, std::vector<POSHandle*>> related_handles, bool is_restoring){
     pos_retval_t retval = POS_SUCCESS;
-    uint64_t nb_context, i, j;
-    POSHandle *context_handle;
     
+    // 设置资源类型 ID
     this->_rid = kPOS_ResourceTypeId_CUDA_Memory;
 
-    /*!
-     *  \brief  reserve a large portion of virtual memory space on a specified device
-     *  \param  context_handle  handle of the context of the specified device
-     */
-    auto __reserve_device_vm_space = [](POSHandle *context_handle) -> pos_retval_t {
-        uint64_t free_portion, free, total;
-        uint64_t reserved_size, alloc_granularity;
-        CUmemAllocationProp prop = {};
-        CUmemGenericAllocationHandle hdl;
-        CUmemAccessDesc accessDesc;
-        CUdeviceptr ptr;
-        pos_retval_t retval = POS_SUCCESS, tmp_retval;
-        cudaError_t rt_retval;
-        CUresult dv_retval;
-        CUcontext old_ctx;
-        bool do_ctx_switch = false;
-        int device_id;
-
-        POS_ASSERT(context_handle->parent_handles.size() == 1);
-        POS_ASSERT(context_handle->parent_handles[0]->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
-        device_id = static_cast<int>((uint64_t)(context_handle->parent_handles[0]->client_addr));
-
-        POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 0);
-        POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 0);
-
-        // switch to target device
-        if(unlikely(CUDA_SUCCESS != (
-            dv_retval = cuCtxPushCurrent(static_cast<CUcontext>(context_handle->server_addr))
-        ))){
-            POS_WARN(
-                "failed to preserve memory on CUDA device, failed to call cuCtxPushCurrent: retval(%d), device_id(%d)",
-                dv_retval, device_id
-            );
-            retval = POS_FAILED_DRIVER;
-            goto exit;
-        }
-        cuCtxSynchronize();
-        do_ctx_switch = true;
-
-        // obtain avaliable device memory space
-        rt_retval = cudaMemGetInfo(&free, &total);
-        if(unlikely(rt_retval == cudaErrorMemoryAllocation || free < 16*1024*1024)){
-            POS_LOG("no available memory space on device to reserve, skip: device_id(%d)", device_id);
-            POSHandleManager_CUDA_Memory::alloc_granularities[device_id] = 0;
-            POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] = (CUdeviceptr)(nullptr);
-            goto exit;
-        }
-        if(unlikely(cudaSuccess != rt_retval)){
-            POS_WARN("failed to call cudaMemGetInfo: retval(%d)", rt_retval);
-        }
-
-        // obtain granularity of allocation
-        prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-        prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-        prop.location.id = device_id;
-        if(unlikely(CUDA_SUCCESS != (
-            dv_retval = cuMemGetAllocationGranularity(&alloc_granularity, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM)
-        ))){
-            POS_WARN(
-                "failed to preserve memory on CUDA device, failed to call cuMemGetAllocationGranularity: retval(%d), device_id(%d)",
-                dv_retval, device_id
-            );
-            retval = POS_FAILED_DRIVER;
-            goto exit;
-        }
-        POSHandleManager_CUDA_Memory::alloc_granularities[device_id] = alloc_granularity;
-
-        /*!
-         *  \note   we only reserved 90% of free memory, and round up the size according to allocation granularity
-         */
-    #define ROUND_UP(size, aligned_size) ((size + aligned_size - 1) / aligned_size) * aligned_size
-        free_portion = 0.9*free;
-        reserved_size = ROUND_UP(free_portion, alloc_granularity);
-    #undef ROUND_UP
-
-        if(unlikely(CUDA_SUCCESS != (
-            dv_retval = cuMemAddressReserve(&ptr, reserved_size, 0, POSHandleManager_CUDA_Memory::reserved_vm_base, 0ULL)
-        ))){
-            POS_WARN(
-                "failed to preserve memory on CUDA device, failed to call cuMemAddressReserve: retval(%d), device_id(%d)",
-                dv_retval, device_id
-            );
-            if(likely(dv_retval == CUDA_ERROR_OUT_OF_MEMORY)){
-                retval = POS_FAILED_OOM;
-            } else {
-                retval = POS_FAILED_DRIVER;
-            }
-
-            goto exit;
-        }
-        POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] = ptr;
-        POS_LOG("reserved virtual memory space: device_id(%d), base(%p), size(%lu)", device_id, ptr, reserved_size);
-
-    exit:
-        if(do_ctx_switch == true){
-            // switch back to old context
-            if(unlikely(CUDA_SUCCESS != (
-                dv_retval = cuCtxPopCurrent(&old_ctx)
-            ))){
-                POS_WARN("preserved memory on CUDA device, but failed to call cuCtxPopCurrent: retval(%d)", dv_retval);
-                retval = POS_FAILED_DRIVER;
-            } else {
-                cuCtxSynchronize();
-            }
-        }
-        return retval;
-    };
-
+    // =================================================================================
+    // 1. 保留基本的输入检查
+    // 即使不预分配，我们也需要确保 Context Handle 存在，保证系统依赖关系正确
+    // =================================================================================
     if(unlikely(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 0)){
         retval = POS_FAILED_INVALID_INPUT;
         POS_WARN_C("failed to init handle manager for CUDA memory, no context provided");
         goto exit;
     }
 
-    nb_context = related_handles[kPOS_ResourceTypeId_CUDA_Context].size();
-    if(unlikely(nb_context == 0)){
+    if(unlikely(related_handles[kPOS_ResourceTypeId_CUDA_Context].size() == 0)){
         retval = POS_FAILED_INVALID_INPUT;
         POS_WARN_C("failed to init handle manager for CUDA memory, no context provided");
         goto exit;
     }
 
-    // no need to conduct reserving if previous hm has already done
-    if(this->has_finshed_reserved == true){ goto exit; }
+    // =================================================================================
+    // [删除] 核心改动点
+    // =================================================================================
+    // 1. 删除了 __reserve_device_vm_space Lambda 函数
+    // 2. 删除了 cuCtxPushCurrent / cuCtxPopCurrent (因为不需要再操作设备了)
+    // 3. 删除了 cuMemAddressReserve (不再预占虚拟地址)
+    // 4. 删除了 alloc_ptrs 和 alloc_granularities 的赋值
+    // 5. 删除了遍历 Context 的 for 循环
+    // =================================================================================
 
-    // we reserve virtual memory space on each device
-    for(i=0; i<nb_context; i++){
-        POS_CHECK_POINTER(context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][i]);
-        if(unlikely(POS_SUCCESS != (
-            retval = __reserve_device_vm_space(context_handle)
-        ))){
-            if(retval == POS_FAILED_OOM){
-                POS_WARN_C(
-                    "failed to preserve memory space on device, out of memory, omit this device",
-                    context_handle->client_addr
-                );
-                retval = POS_SUCCESS;
-            } else {
-                POS_WARN_C(
-                    "failed to preserve memory space on device: context_client_addr(%p), retval(%u)",
-                    context_handle->client_addr, retval
-                );
-            }
-        }
-    }
-
+    // 2. 直接标记初始化完成
+    // 此时，PhOS 不持有任何虚拟地址空间，完全依赖后续 Parser 阶段的 UVM 分配
     this->has_finshed_reserved = true;
 
 exit:
@@ -631,46 +498,31 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     size_t size,
     bool use_expected_addr,
     uint64_t expected_addr,
-    uint64_t state_size
+    uint64_t state_size,
+    void* pre_alloc_ptr
 ){
     pos_retval_t retval = POS_SUCCESS;
     CUdeviceptr alloc_ptr;
-    uint64_t aligned_alloc_size;
-    POSHandle *context_handle, *device_handle;
-    int device_id;
+    POSHandle *context_handle;
 
     POS_CHECK_POINTER(handle);
 
-    // get parent context handle
+    // 获取父 Context 句柄（用于记录父子关系）
     POS_ASSERT(related_handles.count(kPOS_ResourceTypeId_CUDA_Context) == 1);
     POS_ASSERT(related_handles[kPOS_ResourceTypeId_CUDA_Context].size() == 1);
     POS_CHECK_POINTER(context_handle = related_handles[kPOS_ResourceTypeId_CUDA_Context][0]);
     
-    // get device id based on context handle
-    POS_ASSERT(context_handle->parent_handles.size() == 1);
-    POS_CHECK_POINTER(device_handle = context_handle->parent_handles[0]);
-    POS_ASSERT(device_handle->resource_type_id == kPOS_ResourceTypeId_CUDA_Device);
-    device_id = static_cast<int>((uint64_t)(device_handle->client_addr));
-
-    POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_ptrs.count(device_id) == 1);
-    POS_ASSERT(POSHandleManager_CUDA_Memory::alloc_granularities.count(device_id) == 1);
-
-    // obtain the desired address based on reserved virtual memory space pointer
-    alloc_ptr = POSHandleManager_CUDA_Memory::alloc_ptrs[device_id];
-
-    // no avaialble memory space on device
-    if(unlikely((void*)(alloc_ptr) == nullptr)){
-        retval = POS_FAILED_DRAIN;
+    // UVM 模式：直接使用传入的指针
+    if (likely(pre_alloc_ptr != nullptr)) {
+        alloc_ptr = (CUdeviceptr)(uintptr_t)pre_alloc_ptr;
+    } else {
+        POS_WARN_C("UVM Error: allocate_mocked_resource called without pre_alloc_ptr");
+        retval = POS_FAILED_INVALID_INPUT;
         goto exit;
     }
 
-    // forward the allocation pointer
-#define ROUND_UP(size, alloc_granularity) ((size + alloc_granularity - 1) / alloc_granularity) * alloc_granularity
-    aligned_alloc_size = ROUND_UP(state_size, POSHandleManager_CUDA_Memory::alloc_granularities[device_id]);
-    POSHandleManager_CUDA_Memory::alloc_ptrs[device_id] += aligned_alloc_size;
-#undef ROUND_UP
-
-    retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, aligned_alloc_size);
+    // 分配 Handle（调用通用模板，state_size 直接透传）
+    retval = this->__allocate_mocked_resource(handle, size, use_expected_addr, expected_addr, state_size);
     if(unlikely(retval != POS_SUCCESS)){
         POS_WARN_C("failed to allocate mocked CUDA memory in the manager");
         goto exit;
@@ -679,8 +531,8 @@ pos_retval_t POSHandleManager_CUDA_Memory::allocate_mocked_resource(
     POS_CHECK_POINTER(*handle);
     (*handle)->record_parent_handle(context_handle);
 
-    // we directly setup the passthrough address here
-    (*handle)->set_passthrough_addr((void*)(alloc_ptr), (*handle));
+    // 设置透传地址（client_addr/server_addr 同步为真实 UVM 指针数值）
+    (*handle)->set_passthrough_addr((void*)(uintptr_t)alloc_ptr, (*handle));
 
 exit:
     return retval;

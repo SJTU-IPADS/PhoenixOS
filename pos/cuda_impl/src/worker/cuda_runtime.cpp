@@ -33,14 +33,16 @@ namespace wk_functions {
 namespace cuda_malloc {
     // launch function
     POS_WK_FUNC_LAUNCH(){
-        CUmemAllocationProp prop = {};
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *memory_handle;
         POSHandle_CUDA_Device *device_handle;
-        size_t allocate_size;
-        void *ptr;
-        CUmemGenericAllocationHandle hdl;
-        CUmemAccessDesc access_desc;
+
+        // 新增变量全部置顶，避免 goto 跨越初始化
+        CUcontext phos_daemon_ctx = nullptr;
+        CUcontext old_ctx = nullptr;
+        POSHandle* ctx_handle = nullptr;
+        CUdeviceptr dptr = 0;
+        CUresult rc = CUDA_SUCCESS;
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -51,62 +53,43 @@ namespace cuda_malloc {
         memory_handle = pos_api_create_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
-        prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-        prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-        prop.location.id = device_handle->id;
+        // 1) 获取父 Context Handle
+        if (unlikely(memory_handle->parent_handles.size() == 0)) {
+            POS_WARN("Worker(cuda_malloc): memory handle missing parent context");
+            wqe->api_cxt->return_code = CUDA_ERROR_UNKNOWN;
+            retval = POS_FAILED;
+            goto exit;
+        }
+        ctx_handle = memory_handle->parent_handles[0];
+        phos_daemon_ctx = (CUcontext)ctx_handle->server_addr;
 
-        // create physical memory on the device
-        wqe->api_cxt->return_code = cuMemCreate(
-            /* handle */ &hdl,
-            /* size */ memory_handle->state_size,
-            /* prop */ &prop,
-            /* flags */ 0
-        );
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemCreate: client_addr(%p), state_size(%lu), retval(%d)",
-                memory_handle->client_addr, memory_handle->state_size,
-                wqe->api_cxt->return_code
-            );
+        // 2) 切换到守护进程 Primary Context (Push)
+        if (unlikely(CUDA_SUCCESS != (rc = cuCtxPushCurrent(phos_daemon_ctx)))) {
+            POS_WARN("Worker(cuda_malloc): failed to push daemon context");
+            wqe->api_cxt->return_code = rc;
             retval = POS_FAILED;
             goto exit;
         }
 
-        // map the virtual memory space to the physical memory
-        wqe->api_cxt->return_code = cuMemMap(
-            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
-            /* size */ memory_handle->state_size,
-            /* offset */ 0ULL,
-            /* handle */ hdl,
-            /* flags */ 0ULL
+        // 3) 执行异步预取 (Prefetch)
+        dptr = (CUdeviceptr)(memory_handle->server_addr);
+        wqe->api_cxt->return_code = cuMemPrefetchAsync(
+            dptr,
+            memory_handle->state_size,
+            device_handle->id,
+            0
         );
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemMap: client_addr(%p), state_size(%lu), retval(%d)",
-                memory_handle->client_addr, memory_handle->state_size,
-                wqe->api_cxt->return_code
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
 
-        // set access attribute of this memory
-        access_desc.location = prop.location;
-        access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-        wqe->api_cxt->return_code = cuMemSetAccess(
-            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
-            /* size */ memory_handle->state_size,
-            /* desc */ &access_desc,
-            /* count */ 1ULL
-        );
+        // 4) 恢复上下文 (Pop)
+        cuCtxPopCurrent(&old_ctx);
+
+        // 错误处理（预取失败非致命，仅警告）
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
             POS_WARN_DETAIL(
-                "failed to execute cuMemSetAccess: client_addr(%p), state_size(%lu), retval(%d)",
-                memory_handle->client_addr, memory_handle->state_size,
+                "Worker(cuda_malloc): cuMemPrefetchAsync failed: ptr(%p), size(%lu), dev(%d), retval(%d)",
+                memory_handle->server_addr, memory_handle->state_size, device_handle->id,
                 wqe->api_cxt->return_code
             );
-            retval = POS_FAILED;
-            goto exit;
         }
 
         memory_handle->mark_status(kPOS_HandleStatus_Active);
@@ -132,7 +115,13 @@ namespace cuda_free {
     POS_WK_FUNC_LAUNCH(){
         pos_retval_t retval = POS_SUCCESS;
         POSHandle *memory_handle;
-        CUmemGenericAllocationHandle hdl;
+
+        // [关键] 变量声明全部置顶，防止 goto 跨越初始化
+        CUcontext old_ctx = nullptr;
+        bool ctx_pushed = false;
+        CUdeviceptr dptr = 0;
+        POSHandle* ctx_handle = nullptr;
+        CUresult rc = CUDA_SUCCESS; // 用于记录中间状态
 
         POS_CHECK_POINTER(ws);
         POS_CHECK_POINTER(wqe);
@@ -140,57 +129,59 @@ namespace cuda_free {
         memory_handle = pos_api_delete_handle(wqe, 0);
         POS_CHECK_POINTER(memory_handle);
 
-        // obtain the physical memory handle
-        wqe->api_cxt->return_code = cuMemRetainAllocationHandle(&hdl, memory_handle->server_addr);
+        // ========================================================================
+        // 1. 获取 Context 并切换 (Push)
+        // ========================================================================
+        if (likely(memory_handle->parent_handles.size() > 0)) {
+            ctx_handle = memory_handle->parent_handles[0];
+            // 尝试切换到父上下文
+            rc = cuCtxPushCurrent((CUcontext)ctx_handle->server_addr);
+            if (likely(rc == CUDA_SUCCESS)) {
+                ctx_pushed = true;
+            } else {
+                POS_WARN("Worker(cuda_free): failed to push context, ret=%d", rc);
+                // 即使切换失败，也尝试继续走释放流程（死马当活马医），防止泄漏
+            }
+        } else {
+            POS_WARN("Worker(cuda_free): handle missing parent context");
+        }
+
+        // ========================================================================
+        // [删除] 原有的 VMM 逻辑:
+        // cuMemRetainAllocationHandle / cuMemUnmap / cuMemRelease
+        // ========================================================================
+
+        // ========================================================================
+        // 2. 执行 UVM 释放 (Free)
+        // ========================================================================
+        dptr = (CUdeviceptr)(memory_handle->server_addr);
+
+        // 执行释放
+        wqe->api_cxt->return_code = cuMemFree(dptr);
+
+        // ========================================================================
+        // 3. 恢复上下文 (Pop)
+        // ========================================================================
+        if (ctx_pushed) {
+            cuCtxPopCurrent(&old_ctx);
+        }
+
+        // 错误检查
         if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
             POS_WARN_DETAIL(
-                "failed to execute cuMemRetainAllocationHandle: client_addr(%p), retval(%d)",
-                memory_handle->client_addr, wqe->api_cxt->return_code
+                "Worker(cuda_free): cuMemFree failed: ptr(%p), retval(%d)",
+                memory_handle->server_addr, wqe->api_cxt->return_code
             );
             retval = POS_FAILED;
             goto exit;
         }
 
-        // ummap the virtual memory
-        wqe->api_cxt->return_code = cuMemUnmap(
-            /* ptr */ (CUdeviceptr)(memory_handle->server_addr),
-            /* size */ memory_handle->state_size
-        );
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemUnmap: client_addr(%p), retval(%d)",
-                memory_handle->client_addr, wqe->api_cxt->return_code
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // release the physical memory
-        wqe->api_cxt->return_code = cuMemRelease(hdl);
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemRelease x 1: client_addr(%p), retval(%d)",
-                memory_handle->client_addr, wqe->api_cxt->return_code
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // as we call cuMemRetainAllocationHandle above, we need to release again
-        wqe->api_cxt->return_code = cuMemRelease(hdl);
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemRelease x 2: client_addr(%p), retval(%d)",
-                memory_handle->client_addr, wqe->api_cxt->return_code
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
+        // 标记状态
         memory_handle->mark_status(kPOS_HandleStatus_Deleted);
         
     exit:
-        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){ 
+        // Restore/Done 逻辑保持不变
+        if(unlikely(CUDA_SUCCESS != wqe->api_cxt->return_code)){
             POSWorker::__restore(ws, wqe);
         } else {
             POSWorker::__done(ws, wqe);
@@ -1237,4 +1228,4 @@ namespace template_cuda {
 
 
 
-} // namespace wk_functions 
+} // namespace wk_functions

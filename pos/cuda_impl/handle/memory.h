@@ -300,12 +300,13 @@ class POSHandleManager_CUDA_Memory : public POSHandleManager<POSHandle_CUDA_Memo
      */
     pos_retval_t allocate_mocked_resource(
         POSHandle_CUDA_Memory** handle,
-        std::map</* type */ uint64_t, std::vector<POSHandle*>> related_handles,
-        size_t size=kPOS_HandleDefaultSize,
+        std::map<uint64_t, std::vector<POSHandle*>> related_handles,
+        size_t size = kPOS_HandleDefaultSize,
         bool use_expected_addr = false,
         uint64_t expected_addr = 0,
-        uint64_t state_size = 0
-    ) override;
+        uint64_t state_size = 0,
+        void* pre_alloc_ptr = nullptr
+    );
 
 
     /*!

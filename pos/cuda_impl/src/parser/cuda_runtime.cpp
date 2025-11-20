@@ -15,6 +15,9 @@
  */
 
 #include <iostream>
+#include <cstring>
+#include <cuda.h>
+#include <map>
 
 #include "pos/include/common.h"
 #include "pos/cuda_impl/handle.h"
@@ -38,6 +41,16 @@ namespace cuda_malloc {
         POSHandle_CUDA_Memory *memory_handle;
         POSHandleManager_CUDA_Context *hm_context;
         POSHandleManager_CUDA_Memory *hm_memory;
+        POSHandle* ctx_handle = nullptr; // moved earlier to avoid goto-crossing initialization
+
+        // [新增] UVM 分配与上下文切换所需的变量
+        CUdeviceptr d_ptr = 0;
+        CUcontext phos_daemon_ctx = nullptr;
+        CUcontext old_ctx = nullptr;
+        CUresult err = CUDA_SUCCESS;
+
+        // 获取请求大小（延迟到检查之后）
+        size_t size = 0; // assign after pointer checks
 
         POS_CHECK_POINTER(wqe);
         POS_CHECK_POINTER(ws);
@@ -57,6 +70,9 @@ namespace cuda_malloc {
         }
     #endif
 
+        // 在参数检查通过后再读取 size
+        size = pos_api_param_value(wqe, 0, size_t);
+
         hm_context = pos_get_client_typed_hm(
             client, kPOS_ResourceTypeId_CUDA_Context, POSHandleManager_CUDA_Context
         );
@@ -73,31 +89,74 @@ namespace cuda_malloc {
         );
         POS_CHECK_POINTER(hm_memory);
 
-        // operate on handler manager
+        // [新增] 提取守护进程 Primary Context
+        ctx_handle = hm_context->latest_used_handle;
+        POS_CHECK_POINTER(ctx_handle);
+        phos_daemon_ctx = (CUcontext)ctx_handle->server_addr;
+
+        // ========================================================================
+        // [新增] 1. 切换到守护进程 Primary Context (Push)
+        // ========================================================================
+        if (unlikely(CUDA_SUCCESS != cuCtxPushCurrent(phos_daemon_ctx))) {
+            POS_WARN("Parser(cuda_malloc): failed to push daemon context");
+            retval = POS_FAILED_DRIVER;
+            goto exit;
+        }
+
+        // ========================================================================
+        // [新增] 2. 分配 UVM 内存 (Alloc)
+        // 使用 ATTACH_GLOBAL 标志，确保 P2P 场景下的可见性
+        // ========================================================================
+        err = cuMemAllocManaged(&d_ptr, size, CU_MEM_ATTACH_GLOBAL);
+
+        // ========================================================================
+        // [新增] 3. 恢复上下文 (Pop)
+        // ========================================================================
+        cuCtxPopCurrent(&old_ctx);
+
+        // 检查分配结果
+        if (unlikely(err != CUDA_SUCCESS)) {
+            POS_WARN("Parser(cuda_malloc): cuMemAllocManaged failed, ret=%d, size=%lu", err, size);
+            // 映射错误码：通常映射为 OOM 或 DRIVER 错误
+            retval = (err == CUDA_ERROR_OUT_OF_MEMORY) ? POS_FAILED_OOM : POS_FAILED_DRIVER;
+            goto exit;
+        }
+
+        // ========================================================================
+        // [修改] 注册资源 (传递 UVM 指针)
+        // 注意：这里调用的是第一阶段新增的带 pre_alloc_ptr 参数的重载版本
+        // ========================================================================
         retval = hm_memory->allocate_mocked_resource(
-            /* handle */ &memory_handle,
-            /* related_handles */ std::map<uint64_t, std::vector<POSHandle*>>({{ 
-                /* id */ kPOS_ResourceTypeId_CUDA_Context, 
-                /* handles */ std::vector<POSHandle*>({hm_context->latest_used_handle}) 
+            &memory_handle,
+            std::map<uint64_t, std::vector<POSHandle*>>({{
+                kPOS_ResourceTypeId_CUDA_Context,
+                std::vector<POSHandle*>({ctx_handle})
             }}),
-            /* size */ pos_api_param_value(wqe, 0, size_t),
-            /* use_expected_addr */ false,
-            /* expected_addr */ 0,
-            /* state_size */ (uint64_t)pos_api_param_value(wqe, 0, size_t)
+            size,
+            false,
+            0,
+            (uint64_t)size,
+            (void*)(uintptr_t)d_ptr
         );
 
         if(unlikely(retval != POS_SUCCESS)){
-            POS_WARN("parse(cuda_malloc): failed to allocate mocked resource within the CUDA memory handler manager");
+            POS_WARN("Parser(cuda_malloc): failed to register UVM resource, rolling back");
+            
+            // [关键回滚逻辑]
+            cuCtxPushCurrent(phos_daemon_ctx);
+            cuMemFree(d_ptr);
+            cuCtxPopCurrent(&old_ctx);
+            
+            // 清空返回值
             memset(wqe->api_cxt->ret_data, 0, sizeof(uint64_t));
             goto exit;
         } else {
+            // [修改] 将分配的 UVM 地址填入返回值
             memcpy(wqe->api_cxt->ret_data, &(memory_handle->client_addr), sizeof(uint64_t));
         }
         
-        // record the related handle to QE
-        wqe->record_handle<kPOS_Edge_Direction_Create>({
-            /* handle */ memory_handle
-        });
+        // 记录资源图关系 (保持不变)
+        wqe->record_handle<kPOS_Edge_Direction_Create>({ memory_handle });
 
     exit:
         wqe->status = kPOS_API_Execute_Status_Return_After_Parse;
