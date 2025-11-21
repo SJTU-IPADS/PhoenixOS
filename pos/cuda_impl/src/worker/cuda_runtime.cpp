@@ -15,6 +15,7 @@
  */
 
 #include <iostream>
+#include <algorithm>
 
 #include "pos/include/common.h"
 #include "pos/include/client.h"
@@ -242,6 +243,84 @@ namespace cuda_launch_kernel {
             cuda_args[i] = args + function_handle->param_offsets[i];
             POS_CHECK_POINTER(cuda_args[i]);
         }
+
+        // Kernel 参数重定位：根据 WQE 的 Handle Views，将参数包中的旧地址替换为新地址
+        auto is_pointer_param = [&](uint32_t idx)->bool {
+            return (
+                std::find(function_handle->input_pointer_params.begin(), function_handle->input_pointer_params.end(), idx) != function_handle->input_pointer_params.end()
+                || std::find(function_handle->output_pointer_params.begin(), function_handle->output_pointer_params.end(), idx) != function_handle->output_pointer_params.end()
+                || std::find(function_handle->inout_pointer_params.begin(), function_handle->inout_pointer_params.end(), idx) != function_handle->inout_pointer_params.end()
+            );
+        };
+        auto get_confirmed_struct_offsets = [&](uint32_t idx){
+            std::vector<uint64_t> offsets; offsets.reserve(2);
+            for(const auto &p : function_handle->confirmed_suspicious_params){
+                if(p.first == idx){ offsets.push_back(p.second); }
+            }
+            return offsets;
+        };
+        auto patch_views = [&](const std::vector<POSHandleView_t>& views){
+            for(const auto &view : views){
+                if(unlikely(view.handle == nullptr)){ continue; }
+                // 仅处理 CUDA 内存句柄
+                if(unlikely(view.handle->resource_type_id != kPOS_ResourceTypeId_CUDA_Memory)){ continue; }
+                // 基本边界检查
+                if(unlikely(view.param_index >= function_handle->param_offsets.size() || view.param_index >= function_handle->nb_params)){
+                    POS_WARN("cuda_launch_kernel: invalid param_index(%lu), nb_params(%u)", view.param_index, function_handle->nb_params);
+                    continue;
+                }
+                // 真实地址：server_addr + offset
+                uint64_t real_addr = (uint64_t)(view.handle->server_addr) + view.offset;
+                uint64_t old_client_addr = (uint64_t)(view.handle->client_addr) + view.offset;
+
+                if(likely(is_pointer_param((uint32_t)view.param_index))){
+                    // 标准指针参数，直接覆写参数槽位
+                    void **slot = (void**)((char*)args + function_handle->param_offsets[view.param_index]);
+                    uint64_t old_val = (uint64_t)(*slot);
+                    *slot = (void*)real_addr;
+                    POS_DEBUG_C("cuda_launch_kernel: patch ptr arg[%lu]: old(%p) -> new(%p)", view.param_index, (void*)old_val, (void*)real_addr);
+                } else {
+                    // 结构体参数兜底逻辑
+                    // 1) 使用已确认的可疑偏移（可能有多个）
+                    auto confirmed_offsets = get_confirmed_struct_offsets((uint32_t)view.param_index);
+                    bool patched_by_confirmed = false;
+                    if(!confirmed_offsets.empty()){
+                        for(uint64_t s_off : confirmed_offsets){
+                            void **field_slot = (void**)((char*)args + function_handle->param_offsets[view.param_index] + s_off);
+                            uint64_t cur_val = (uint64_t)(*field_slot);
+                            if(cur_val == old_client_addr){
+                                *field_slot = (void*)real_addr;
+                                POS_DEBUG_C("cuda_launch_kernel: patch struct arg[%lu]+%lu: old(%p) -> new(%p)", view.param_index, s_off, (void*)cur_val, (void*)real_addr);
+                                patched_by_confirmed = true;
+                            }
+                        }
+                    }
+                    if(!patched_by_confirmed){
+                        // 2) 8 字节窗口扫描
+                        uint32_t psize = 0;
+                        if(likely(view.param_index < function_handle->param_sizes.size())){
+                            psize = function_handle->param_sizes[view.param_index];
+                        }
+                        if(psize >= sizeof(uint64_t)){
+                            char *base = (char*)args + function_handle->param_offsets[view.param_index];
+                            for(uint32_t off = 0; off + sizeof(uint64_t) <= psize; off += sizeof(uint64_t)){
+                                uint64_t val = 0; memcpy(&val, base + off, sizeof(uint64_t));
+                                if(val == old_client_addr){
+                                    memcpy(base + off, &real_addr, sizeof(uint64_t));
+                                    POS_DEBUG_C("cuda_launch_kernel: scan-patch struct arg[%lu]+%u: old(%p) -> new(%p)", view.param_index, off, (void*)val, (void*)real_addr);
+                                }
+                            }
+                        } else {
+                            POS_WARN("cuda_launch_kernel: suspicious struct arg[%lu] has insufficient size(%u) for scanning", view.param_index, psize);
+                        }
+                    }
+                }
+            }
+        };
+        patch_views(wqe->input_handle_views);
+        patch_views(wqe->output_handle_views);
+        patch_views(wqe->inout_handle_views);
+
         typedef struct __dim3 { uint32_t x; uint32_t y; uint32_t z; } __dim3_t;
 
         wqe->api_cxt->return_code = cuLaunchKernel(

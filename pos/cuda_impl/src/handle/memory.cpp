@@ -301,96 +301,63 @@ pos_retval_t POSHandle_CUDA_Memory::__generate_protobuf_binary(google::protobuf:
 
 pos_retval_t POSHandle_CUDA_Memory::__restore(){
     pos_retval_t retval = POS_SUCCESS;
+    CUresult dv_retval;
+    CUcontext phos_daemon_ctx = nullptr;
+    CUcontext old_ctx = nullptr;
+    POSHandle* ctx_handle = nullptr;
+    CUdeviceptr d_ptr = 0;
+    CUdevice cu_device = 0;
 
-    cudaError_t cuda_rt_retval;
-    CUresult cuda_dv_retval;
-    POSHandle_CUDA_Device *device_handle;
-    
-    CUmemAllocationProp prop = {};
-    CUmemGenericAllocationHandle hdl;
-    CUmemAccessDesc access_desc;
-
-    void *rt_ptr;
-
-    POS_ASSERT(this->parent_handles.size() == 1);
-    POS_CHECK_POINTER(device_handle = static_cast<POSHandle_CUDA_Device*>(this->parent_handles[0]));
-
-    if(likely(this->server_addr != 0)){
-        /*!
-            *  \note   case:   restore memory handle at the specified memory address
-            */
-        POS_ASSERT(this->client_addr == this->server_addr);
-
-        prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-        prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-        prop.location.id = device_handle->id;
-
-        cuda_dv_retval = cuMemCreate(
-            /* handle */ &hdl,
-            /* size */ this->state_size,
-            /* prop */ &prop,
-            /* flags */ 0
-        );
-        if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemCreate while restoring: client_addr(%p), state_size(%lu), retval(%d)",
-                this->client_addr, this->state_size, cuda_dv_retval
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        cuda_dv_retval = cuMemMap(
-            /* ptr */ (CUdeviceptr)(this->server_addr),
-            /* size */ this->state_size,
-            /* offset */ 0ULL,
-            /* handle */ hdl,
-            /* flags */ 0ULL
-        );
-        if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemMap while restoring: client_addr(%p), state_size(%lu), retval(%d)",
-                this->client_addr, this->state_size, cuda_dv_retval
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
-
-        // set access attribute of this memory
-        access_desc.location = prop.location;
-        access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-        cuda_dv_retval = cuMemSetAccess(
-            /* ptr */ (CUdeviceptr)(this->server_addr),
-            /* size */ this->state_size,
-            /* desc */ &access_desc,
-            /* count */ 1ULL
-        );
-        if(unlikely(CUDA_SUCCESS != cuda_dv_retval)){
-            POS_WARN_DETAIL(
-                "failed to execute cuMemSetAccess while restoring: client_addr(%p), state_size(%lu), retval(%d)",
-                this->client_addr, this->state_size, cuda_dv_retval
-            );
-            retval = POS_FAILED;
-            goto exit;
-        }
+    // [1] 获取父 Context
+    if (this->parent_handles.size() > 0) {
+        ctx_handle = this->parent_handles[0];
+        phos_daemon_ctx = (CUcontext)ctx_handle->server_addr;
     } else {
-        /*!
-         *  \note   case:   no specified address to restore, randomly assign one
-         */
-        cuda_rt_retval = cudaMalloc(&rt_ptr, this->state_size);
-        if(unlikely(cuda_rt_retval != cudaSuccess)){
-            retval = POS_FAILED;
-            POS_WARN_C_DETAIL("failed to restore CUDA memory, cudaMalloc failed: %d", cuda_rt_retval);
-            goto exit;
-        }
+        POS_WARN_DETAIL("Memory restore failed: missing parent context");
+        retval = POS_FAILED_INVALID_INPUT;
+        goto exit;
+    }
 
-        retval = this->set_passthrough_addr(rt_ptr, this);
-        if(unlikely(POS_SUCCESS != retval)){ 
-            POS_WARN_DETAIL("failed to restore CUDA memory, failed to set passthrough address for the memory handle: %p", rt_ptr);
-            goto exit;
+    // [2] 切换上下文
+    if (unlikely(CUDA_SUCCESS != cuCtxPushCurrent(phos_daemon_ctx))) {
+        POS_WARN_DETAIL("Memory restore failed: push context error");
+        retval = POS_FAILED_DRIVER;
+        goto exit;
+    }
+
+    // [3] 强制 UVM 分配 (无视旧 server_addr)
+    dv_retval = cuMemAllocManaged(&d_ptr, this->state_size, CU_MEM_ATTACH_GLOBAL);
+    if (unlikely(CUDA_SUCCESS != dv_retval)) {
+        POS_WARN_DETAIL("Memory restore failed: cuMemAllocManaged error %d", dv_retval);
+        cuCtxPopCurrent(&old_ctx);
+        retval = POS_FAILED_DRIVER;
+        goto exit;
+    }
+
+    // [3.1] 立即预取到 GPU，避免后续 Kernel 首次访问触发 UVM 缺页
+    dv_retval = cuCtxGetDevice(&cu_device);
+    if (unlikely(CUDA_SUCCESS != dv_retval)) {
+        POS_WARN_DETAIL("Memory restore warning: cuCtxGetDevice failed %d, skip prefetch", dv_retval);
+    } else {
+        dv_retval = cuMemPrefetchAsync(d_ptr, this->state_size, cu_device, /*stream*/0);
+        if (unlikely(CUDA_SUCCESS != dv_retval)) {
+            POS_WARN_DETAIL("Memory restore warning: cuMemPrefetchAsync failed %d", dv_retval);
         }
     }
 
+    // [4] 更新映射 (保留 client_addr, 更新 server_addr)
+    this->server_addr = (void*)(uintptr_t)d_ptr;
+    {
+        // 影子页表记录：Key=旧 client_addr, Value=更新过 server_addr 的当前对象
+        auto* hm_cast = (POSHandleManager<POSHandle_CUDA_Memory>*)(this->_hm);
+        POS_CHECK_POINTER(hm_cast);
+        (void)hm_cast->record_handle_address(this->client_addr, this);
+    }
+
+    // [5] 恢复上下文
+    cuCtxPopCurrent(&old_ctx);
+
+    // [6] 句柄状态设为 Active（数据填充在 __reload_state 中执行，目标地址为新的 server_addr）
     this->mark_status(kPOS_HandleStatus_Active);
 
 exit:
